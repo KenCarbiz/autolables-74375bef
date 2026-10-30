@@ -1,11 +1,11 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Bell, Clock, Headset, Plus, ShieldCheck, Trash2, User, Users, type LucideIcon } from "lucide-react";
+import { Bell, Building, Building2, ChevronRight, CircleAlert, CircleCheck, Clock, FileText, GripVertical, Headset, Mail, MessageSquare, Plus, ShieldCheck, Smartphone, Trash2, TriangleAlert, User, Users, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { AdminButton, AdminCard, AdminTable, InlineNote, SectionTitle, StatusChip, Td, Th } from "@/components/admin/v2/primitives";
-import { SummaryList } from "@/components/detail/parts";
+import { AdminButton, AdminCard, ICON, InlineNote, SectionTitle } from "@/components/admin/v2/primitives";
 import { ADMIN_CHILD_ROUTES } from "@/lib/admin/sections";
-import { namedAgents, routingOrderRows, type RoutingOrderRow } from "@/lib/admin/routingDraft";
+import type { RoutingReadiness } from "@/lib/admin/effectivePolicy";
+import { namedAgents, notificationMethodRows, routingOrderRows, withEmailMethod, type NotificationMethodRow, type RoutingOrderRow } from "@/lib/admin/routingDraft";
 import type { ContactMode, CustomerPassportContactSettings, PassportAgent, RoutingPriorityItem } from "@/lib/passportRouting";
 import { useRoutingDraft } from "./useRoutingDraft";
 import { RoutingPreview } from "./RoutingPreview";
@@ -17,6 +17,15 @@ import { DAY_NAMES, Field, ToggleRow, inputCls, newAgent, selectCls } from "./co
 // every control from the legacy Lead Routing panel sits below the fold and
 // edits the same draft. Nothing is saved until Review & Apply.
 
+const ORDER_ICON: Record<RoutingPriorityItem, LucideIcon> = {
+  crm_owner: User,
+  vehicle_assigned_agent: User,
+  available_sales_rotation: Users,
+  bdc: Headset,
+  sales_manager: ShieldCheck,
+  dealership_default: Building2,
+};
+
 const READINESS_META: Record<string, { icon: LucideIcon; href: string; description: string }> = {
   default_contact: { icon: User, href: "#routing-default-contact", description: "Store contact for unassigned requests." },
   sales_rotation: { icon: Users, href: "#routing-rotation", description: "At least two salespeople required." },
@@ -26,6 +35,13 @@ const READINESS_META: Record<string, { icon: LucideIcon; href: string; descripti
   escalation: { icon: Bell, href: ADMIN_CHILD_ROUTES.escalation, description: "Every escalation tier needs a destination." },
 };
 
+// The readiness rail lists the routing checks; the two escalation checks are
+// reported by the Response and escalation card, which owns those tiers.
+const RAIL_CHECKS = ["default_contact", "sales_rotation", "manager_recipient", "after_hours"];
+
+const METHOD_ICON: Record<NotificationMethodRow["key"], LucideIcon> = { email: Mail, sms: MessageSquare, in_app: Bell, push: Smartphone };
+const SUMMARY_METHODS: NotificationMethodRow["key"][] = ["email", "in_app"];
+
 const MODE_LABEL: Record<ContactMode, string> = {
   smart_routing: "Smart routing",
   assigned_agent: "the assigned agent",
@@ -33,7 +49,113 @@ const MODE_LABEL: Record<ContactMode, string> = {
   dealership_default: "the store contact",
 };
 
+const iconBtn = "w-8 h-8 rounded-md inline-flex items-center justify-center text-adm-muted hover:bg-adm-workspace focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary flex-shrink-0";
+
+// The reference draws the row and rail glyphs (user, users, shield, clock,
+// mail, bell, building) 22 to 24px: a 24px lucide users glyph measures 24x20
+// in the mock, so the inline size from the shared scale is too small here.
+const ROW_ICON = "w-6 h-6";
+
+type PillTone = "success" | "danger" | "warning" | "neutral";
+
+// The mock's state chips are 29px pills with a 16px mark 12px in and the
+// label 8px after it, wider than the shared StatusChip (28px, 6px radius).
+const PILL: Record<PillTone, { cls: string; icon: LucideIcon | null }> = {
+  success: { cls: "bg-adm-success-bg text-adm-success", icon: CircleCheck },
+  danger: { cls: "bg-adm-danger-bg text-adm-danger", icon: CircleAlert },
+  warning: { cls: "bg-adm-warning-bg text-adm-warning", icon: TriangleAlert },
+  neutral: { cls: "bg-adm-workspace text-adm-muted border border-adm-border", icon: null },
+};
+
+const Pill = ({ tone, children }: { tone: PillTone; children: string }) => {
+  const Icon = PILL[tone].icon;
+  return (
+    <span className={cn("inline-flex items-center gap-2 h-[29px] px-3 rounded-full text-[12px] leading-[18px] font-semibold whitespace-nowrap", PILL[tone].cls)}>
+      {Icon && <Icon className="w-4 h-4 flex-shrink-0" aria-hidden="true" />}
+      {children}
+    </span>
+  );
+};
+
+const OrderRow = ({ row }: { row: RoutingOrderRow }) => {
+  const Icon = ORDER_ICON[row.key];
+  return (
+    <li data-landmark="order-row" className="min-h-[67.5px] rounded-[6px] border border-adm-border bg-adm-surface flex items-stretch">
+      <div className="min-w-0 flex-1 flex items-center py-[13px]">
+        <GripVertical className={cn(ICON.inline, "-ml-[3px] text-adm-muted flex-shrink-0")} aria-hidden="true" />
+        <span className="ml-[14px] w-[34px] h-[34px] rounded-full bg-adm-workspace text-adm-ink text-[14px] font-semibold flex items-center justify-center flex-shrink-0">{row.step}</span>
+        <div className="min-w-0 flex-1 ml-[21px] pr-3">
+          <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{row.title}</p>
+          <p className="text-[12px] leading-[18px] text-adm-muted">{row.description}</p>
+        </div>
+      </div>
+      <div className="relative sm:w-[230px] flex-shrink-0 flex items-center pl-[13px] pr-[3px] pt-[11px] pb-[15px] before:content-[''] before:absolute before:left-0 before:top-2 before:bottom-[7px] before:w-px before:bg-adm-border">
+        {row.state === "incomplete" ? (
+          <Pill tone="danger">Incomplete</Pill>
+        ) : row.state === "off" ? (
+          <Pill tone="neutral">Off</Pill>
+        ) : (
+          <span className="hidden sm:flex items-center gap-[13px] min-w-0">
+            <Icon className={cn(ROW_ICON, "text-adm-muted flex-shrink-0")} aria-hidden="true" />
+            <span className="min-w-0">
+              <span className="block text-[14px] leading-[20px] font-semibold text-adm-ink truncate">{row.owner}</span>
+              <span className="block text-[11px] leading-[16px] text-adm-muted truncate">{row.ownerDetail}</span>
+            </span>
+          </span>
+        )}
+        <a href={`#${row.anchor}`} aria-label={`Edit ${row.title}`} className={cn(iconBtn, "ml-auto mt-1")}><ChevronRight className={ICON.chevron} aria-hidden="true" /></a>
+      </div>
+    </li>
+  );
+};
+
+type Check = RoutingReadiness["checks"][number];
+
+const ReadinessRow = ({ check, chip }: { check: Check; chip: { tone: PillTone; label: string } }) => {
+  const meta = READINESS_META[check.key] ?? { icon: Bell, href: "#routing-contact-mode", description: check.detail };
+  const Icon = meta.icon;
+  const body = (
+    <>
+      <Icon className={cn(ROW_ICON, "text-adm-muted flex-shrink-0")} aria-hidden="true" />
+      <span className="min-w-0 flex-1 ml-3 sm:ml-[22px]">
+        <span className="block text-[13px] leading-[18px] font-bold text-adm-ink">{check.label}</span>
+        <span className="block text-[11px] leading-[16px] text-adm-muted">{meta.description}</span>
+      </span>
+      <span className="sm:w-[146px] flex-shrink-0 flex items-center">
+        <Pill tone={chip.tone}>{chip.label}</Pill>
+      </span>
+      <span className="w-8 h-8 flex items-center justify-center flex-shrink-0" aria-hidden="true"><ChevronRight className={cn(ICON.chevron, "text-adm-muted")} /></span>
+    </>
+  );
+  const cls = "flex items-center pl-[18px] pr-[3px] py-[9px] hover:bg-adm-workspace/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary";
+  return <li title={check.detail}>{meta.href.startsWith("#") ? <a href={meta.href} className={cls}>{body}</a> : <Link to={meta.href} className={cls}>{body}</Link>}</li>;
+};
+
+// The mock's row rules start under the title and stop at the value, leaving
+// the icon and the chevron columns open.
+const TimingRow = ({ icon: Icon, title, hint, value, last = false }: { icon: LucideIcon; title: string; hint: string; value: string; last?: boolean }) => (
+  <li className={cn("relative flex items-center gap-[3px] pt-2 pl-[5px] pr-[5px]", last ? "pb-2" : "pb-[9px] after:content-[''] after:absolute after:left-[49px] after:right-[40px] after:bottom-0 after:h-px after:bg-adm-border")}>
+    <Icon className="w-[22px] h-[22px] text-adm-muted flex-shrink-0" aria-hidden="true" />
+    <span className="min-w-0 flex-1 ml-[19px]">
+      <span className="block text-[13px] leading-[18px] font-bold text-adm-ink">{title}</span>
+      <span className="block text-[11px] leading-[16px] text-adm-muted break-words">{hint}</span>
+    </span>
+    <span className="text-[14px] leading-[20px] text-adm-ink whitespace-nowrap">{value}</span>
+    <Link to={ADMIN_CHILD_ROUTES.escalation} aria-label={`${title}: open escalation rules`} className={iconBtn}><ChevronRight className={ICON.chevron} aria-hidden="true" /></Link>
+  </li>
+);
+
 const minutesLabel = (v: number | undefined | null, off: string): string => (v && v > 0 ? `${v} ${v === 1 ? "minute" : "minutes"}` : off);
+
+const ScopeBadge = ({ count }: { count: number }) => (
+  <div data-parity="scope" className="flex items-center gap-[14px]" title="Routing is stored once per account and applies to every rooftop.">
+    <span className="text-[13px] leading-[18px] text-adm-muted">Scope</span>
+    <span className="inline-flex items-center gap-[11px] h-[42px] min-w-[191px] pl-[11px] pr-4 rounded-[6px] border border-adm-border bg-adm-surface text-[13px] leading-[18px] text-adm-ink">
+      <Building className="w-[22px] h-[22px] text-adm-muted flex-shrink-0" aria-hidden="true" />
+      {count > 1 ? `All rooftops (${count})` : "This rooftop"}
+    </span>
+  </div>
+);
 
 export default function RoutingView() {
   const api = useRoutingDraft();
@@ -47,7 +169,20 @@ export default function RoutingView() {
   const errors = state.validation;
   const patch = api.patchRouting;
   const rows = routingOrderRows(draft);
+  const methods = notificationMethodRows(rules).filter((m) => SUMMARY_METHODS.includes(m.key));
+  const railChecks = readiness.checks.filter((c) => RAIL_CHECKS.includes(c.key));
+  const escalationBlockers = readiness.checks.filter((c) => !RAIL_CHECKS.includes(c.key) && c.state === "missing").map((c) => c.label.replace(/^[A-Z](?=[a-z])/, (ch) => ch.toLowerCase()));
   const smart = cfg.contactMode === "smart_routing";
+  const rotationCount = namedAgents(agents).filter((a) => a.acceptsPassportLeads !== false && a.manualOverride !== "unavailable").length;
+
+  const chipFor = (c: Check): { tone: "success" | "danger" | "warning" | "neutral"; label: string } => {
+    if (c.state === "missing") return { tone: "danger", label: "Missing" };
+    if (c.state === "warning") return { tone: "warning", label: "Check" };
+    if (c.key === "sales_rotation") return cfg.salesRotationSettings.enabled ? { tone: "success", label: `${rotationCount} ${rotationCount === 1 ? "salesperson" : "salespeople"}` } : { tone: "neutral", label: "Off" };
+    if (c.key === "manager_recipient" && !cfg.managerFallback?.enabled) return { tone: "neutral", label: "Off" };
+    if (c.key === "bdc_destination" && !cfg.bdcSettings?.enabled) return { tone: "neutral", label: "Off" };
+    return { tone: "success", label: "Configured" };
+  };
 
   const setSmart = (on: boolean) => patch({ contactMode: on ? "smart_routing" : lastManualMode.current });
   const setMode = (mode: ContactMode) => {
@@ -84,86 +219,90 @@ export default function RoutingView() {
   const statusDanger = errors.length > 0 || phase === "failed";
   const ro = !canEdit;
 
-  const blockers = readiness.checks.filter((c) => c.state === "missing");
-  const hoursLine = (day: number) => {
-    const b = cfg.businessHours.find((x) => x.dayOfWeek === day);
-    return b ? `${b.startTime} to ${b.endTime}` : "Closed";
-  };
-  const statusChip = (st: RoutingOrderRow["state"]) =>
-    st === "ok" ? <StatusChip tone="success">Active</StatusChip> : st === "off" ? <StatusChip tone="neutral">Disabled</StatusChip> : <StatusChip tone="warning">Incomplete</StatusChip>;
-
   return (
-    <div>
-      {ro && <InlineNote tone="info" title="View only." className="mb-4">Your role can see routing but cannot change it. Ask an administrator for changes.</InlineNote>}
+    <div className="pt-[5px]">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-[26px] leading-[32px] font-bold text-adm-ink">Contact & Routing</h2>
+          <p className="text-[15px] leading-[22px] text-adm-muted">Give every customer request a clear owner and fallback.</p>
+        </div>
+        <div className="mt-px"><ScopeBadge count={api.storeCount} /></div>
+      </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-4 items-start">
+      {ro && <InlineNote tone="info" title="View only." className="mt-4">Your role can see routing but cannot change it. Ask an administrator for changes.</InlineNote>}
+
+      <div className="mt-[19px] grid grid-cols-1 xl:grid-cols-[minmax(0,622fr)_minmax(0,656fr)] gap-4 xl:gap-[14px]">
         <AdminCard
           inset="sm"
-          flush
-          title="Lead routing rules (in order)"
-          action={<ToggleRow compact id="smart-routing" label="Smart routing" checked={smart} onChange={setSmart} disabled={ro} switchSize="routing" />}
+          title="Routing order"
+          headerClassName="pt-[13px] pr-[14px]"
+          bodyClassName="px-3 pt-[15px]"
+          action={<div className="mt-[2px]"><ToggleRow compact id="smart-routing" label="Smart routing" checked={smart} onChange={setSmart} disabled={ro} switchSize="routing" /></div>}
         >
-          <AdminTable caption="Lead routing rules" minWidth={640} className={cn(!smart && "opacity-60")}>
-            <thead>
-              <tr>
-                <Th className="w-12">#</Th>
-                <Th>Condition</Th>
-                <Th>Recipients</Th>
-                <Th>Status</Th>
-                <Th align="right">Actions</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.key} data-landmark="order-row">
-                  <Td className="tabular-nums text-adm-muted">{r.step}</Td>
-                  <Td className="font-medium">{r.title}</Td>
-                  <Td className="max-w-[260px] truncate text-adm-muted">{r.owner}{r.ownerDetail ? `, ${r.ownerDetail.toLowerCase()}` : ""}</Td>
-                  <Td>{statusChip(r.state)}</Td>
-                  <Td align="right"><a href={`#${r.anchor}`} aria-label={`Edit ${r.title}`} className="font-semibold text-adm-primary hover:underline">Edit</a></Td>
-                </tr>
-              ))}
-            </tbody>
-          </AdminTable>
+          <ol className={cn("space-y-2", !smart && "opacity-60")}>{rows.map((r) => <OrderRow key={r.key} row={r} />)}</ol>
           {!smart && (
-            <p className="px-4 py-3 text-[12px] leading-[18px] text-adm-muted" role="status">
+            <p className="mt-3 text-[12px] leading-[18px] text-adm-muted" role="status">
               Smart routing is off. Every request goes to {MODE_LABEL[cfg.contactMode]}. The order above applies when it is on.
             </p>
           )}
         </AdminCard>
 
-        <div className="flex flex-col gap-4">
-          <AdminCard inset="sm" title="Routing settings" action={<Link to={ADMIN_CHILD_ROUTES.escalation} className="text-[14px] font-semibold text-adm-primary hover:underline">Review escalation rules</Link>}>
-            <SummaryList
-              rows={[
-                ...(cfg.businessHours.length === 0
-                  ? [{ label: "Business hours", value: "Not set" }]
-                  : DAY_NAMES.map((d, i) => ({ label: d, value: hoursLine(i) })).filter((_, i) => cfg.businessHours.some((b) => b.dayOfWeek === i))),
-                { label: "First response", value: rules.enabled ? minutesLabel(rules.firstResponseSlaMinutes, "Not set") : "Off" },
-                { label: "Route to BDC", value: rules.enabled ? minutesLabel(rules.escalateToBdcAfterMinutes ?? rules.firstResponseSlaMinutes, "Off") : "Off" },
-                { label: "Route to manager", value: rules.enabled ? minutesLabel(rules.escalateToManagerAfterMinutes, "Off") : "Off" },
-              ]}
-              dense
-            />
+        <div className="space-y-[14px]">
+          <AdminCard inset="sm" title="Configuration readiness" headerClassName="pt-[13px] px-[14px]" bodyClassName="px-3 pt-[15px] pb-[14px]">
+            <ul data-landmark="readiness-list" className="rounded-[6px] border border-adm-border divide-y divide-adm-border">
+              {railChecks.map((c) => <ReadinessRow key={c.key} check={c} chip={chipFor(c)} />)}
+            </ul>
+            <Link to={ADMIN_CHILD_ROUTES.escalation} data-parity="review-escalation" className="mt-[11px] inline-flex items-center gap-[15px] min-h-[36px] w-[232px] max-w-full pl-[25px] pr-2 rounded-md border border-adm-primary/40 text-[14px] font-semibold text-adm-primary whitespace-nowrap hover:bg-adm-selected focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary">
+              <FileText className={cn(ICON.button, "flex-shrink-0")} aria-hidden="true" />
+              Review escalation rules
+            </Link>
           </AdminCard>
-          <section data-landmark="readiness-list" aria-label="Routing blockers" className={cn("rounded-[6px] border px-4 py-3", blockers.length ? "border-[#F3B4AE] bg-adm-danger-bg" : "border-adm-border bg-adm-surface")}>
-            <h3 className={cn("text-[16px] leading-[22px] font-semibold", blockers.length ? "text-adm-danger" : "text-adm-ink")}>Routing blockers</h3>
-            {blockers.length === 0 ? (
-              <p className="mt-1 text-[13px] leading-[18px] text-adm-muted">No blockers. Every step that is on has a recipient.</p>
-            ) : (
-              <ul className="mt-1 text-[13px] leading-[18px] text-adm-ink">
-                {blockers.map((c) => {
-                  const meta = READINESS_META[c.key];
-                  return (
-                    <li key={c.key} className="flex items-baseline justify-between gap-3 py-0.5">
-                      <span className="min-w-0 truncate">{c.label}: {meta?.description ?? c.detail}</span>
-                      {meta?.href.startsWith("#") ? <a href={meta.href} className="font-semibold text-adm-primary hover:underline">Review</a> : <Link to={meta?.href ?? ADMIN_CHILD_ROUTES.escalation} className="font-semibold text-adm-primary hover:underline">Review</Link>}
-                    </li>
-                  );
-                })}
+
+          {/* The escalation on/off switch lives on the Escalation child, which owns the tiers; this card reports the state. */}
+          <AdminCard inset="sm" title="Response and escalation" headerClassName="pt-[14px] px-[14px]" bodyClassName="px-3 pt-[7px] pb-3">
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_266px]">
+              <ul>
+                <TimingRow icon={Clock} title="First response" hint="Customer should get a reply within:" value={rules.enabled ? minutesLabel(rules.firstResponseSlaMinutes, "Not set") : "Off"} />
+                <TimingRow icon={Users} title="Route to BDC" hint="If no response after:" value={rules.enabled ? minutesLabel(rules.escalateToBdcAfterMinutes ?? rules.firstResponseSlaMinutes, "Off") : "Off"} />
+                <TimingRow icon={ShieldCheck} title="Route to manager" hint="If still no response after:" value={rules.enabled ? minutesLabel(rules.escalateToManagerAfterMinutes, "Off") : "Off"} last />
               </ul>
+              <div className="pt-[5px] lg:border-l lg:border-adm-border lg:pl-[19px]">
+                <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">Notification methods</p>
+                <ul className="mt-2.5 space-y-[14px]">
+                  {methods.map((m) => {
+                    const Icon = METHOD_ICON[m.key];
+                    return (
+                      <li key={m.key} className="flex items-start gap-[21px]">
+                        <Icon className="w-[21px] h-[21px] mt-[6px] text-adm-ink flex-shrink-0" aria-hidden="true" />
+                        <div className="min-w-0 flex-1">
+                          <ToggleRow
+                            id={`method-${m.key}`}
+                            label={m.label}
+                            hint={m.supported ? m.detail : "Not supported yet."}
+                            hintClassName="text-[11px] leading-[14px]"
+                            switchSize="sm"
+                            switchClassName="mt-[3px] mr-1"
+                            checked={m.enabled}
+                            onChange={(v) => patchRules(withEmailMethod(rules, v))}
+                            disabled={ro || !m.supported}
+                          />
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </div>
+            {readiness.blockers.length > 0 && (
+              <div role="status" className="flex items-center gap-3 rounded-[6px] border border-[#F1D58A] bg-adm-warning-bg pl-[13px] pr-3 py-[7px] text-[12px] leading-[18px] text-adm-ink">
+                <TriangleAlert className="w-5 h-5 text-adm-warning flex-shrink-0" aria-hidden="true" />
+                <p className="min-w-0">
+                  <span className="font-semibold">Add a valid fallback before enabling this route.</span>
+                  {escalationBlockers.length > 0 && <> Missing: {escalationBlockers.join(", ")}.</>}
+                </p>
+              </div>
             )}
-          </section>
+          </AdminCard>
         </div>
       </div>
 
@@ -335,11 +474,11 @@ export default function RoutingView() {
 
       <div className="mt-5 sticky bottom-0 z-10 -mx-4 sm:-mx-6 px-4 sm:px-6 py-4 xl:pt-2 xl:pb-[31px] bg-adm-surface border-t border-adm-border flex items-center justify-between gap-4 flex-wrap">
         <div className="min-w-0 flex items-baseline gap-x-5 gap-y-0 flex-wrap">
-          <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">Draft configuration</p>
+          <p className="text-[16px] leading-[22px] font-semibold text-adm-ink">Draft configuration</p>
           <p className={cn("text-[12px] leading-[18px]", statusDanger ? "text-adm-danger" : "text-adm-muted")} role="status">{status}</p>
         </div>
         <div className="flex items-center gap-2">
-          {dirty && phase !== "applying" && <AdminButton variant="secondary" onClick={api.discard}>Discard</AdminButton>}
+          {dirty && phase !== "applying" && <AdminButton variant="ghost" onClick={api.discard}>Discard</AdminButton>}
           <AdminButton variant="primary" data-parity="review-changes" className="min-w-[149px]" disabled={!canReview} onClick={onReview}>Review changes</AdminButton>
         </div>
       </div>

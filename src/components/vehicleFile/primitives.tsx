@@ -34,16 +34,13 @@ export const sinceLabel = (iso: string | null | undefined): string | null => {
   return `${Math.round(hours / 24)} days`;
 };
 
-export const TabHeader = ({ title, description, action }: {
+export const TabHeader = ({ title, action }: {
   title: string;
-  description: ReactNode;
+  description?: ReactNode;
   action?: ReactNode;
 }) => (
-  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-    <div className="min-w-0">
-      <h2 className="text-[17px] leading-[24px] font-semibold text-adm-ink">{title}</h2>
-      <p className="text-[14px] leading-[20px] text-adm-muted mt-0.5 max-w-2xl">{description}</p>
-    </div>
+  <div className="flex items-center justify-end gap-3">
+    <h2 className="sr-only">{title}</h2>
     {action && <div className="shrink-0">{action}</div>}
   </div>
 );

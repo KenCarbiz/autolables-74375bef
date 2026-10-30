@@ -301,24 +301,7 @@ export default function ProductApplicabilityPage() {
         {state.phase === "applied" && state.result && <InlineNote tone="success" title="Applied">{state.result.message}</InlineNote>}
         {state.error && state.phase !== "applied" && <InlineNote tone="danger">{state.error}</InlineNote>}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
-          <Panel title="Product details">
-            <KeyValueList
-              className="grid-cols-[minmax(96px,120px)_1fr]"
-              rows={[
-                { label: "Product name", value: product.name },
-                { label: "Subtitle", value: product.subtitle ?? "Unknown" },
-                { label: "Description", value: <span className="line-clamp-3">{product.benefit_justification || "Unknown"}</span> },
-                { label: "Price", value: fmtMoney(Number(product.price) || 0) },
-                { label: "Price treatment", value: draft.treatment === "installed" ? "Installed product" : "Optional accessory" },
-                { label: "Warranty", value: product.warranty ?? "None" },
-                { label: "Status", value: product.is_active ? "Active" : "Inactive" },
-                { label: "Created", value: fmtDay((product as { created_at?: string }).created_at) },
-                { label: "Last updated", value: fmtDay((product as { updated_at?: string }).updated_at) },
-              ]}
-            />
-          </Panel>
-
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
           <Panel title="Applicability rules" description="Choose which inventory is eligible for this product." >
             {/* Reference rows: 81, 101 and 108px with dividers inset 16px from the box edge. */}
             <div className="rounded-[6px] border border-adm-border bg-adm-surface" data-landmark="applicability-rules">
@@ -440,53 +423,53 @@ export default function ProductApplicabilityPage() {
               </ul>
             </Panel>
 
+            <Panel title="Sample vehicle results" description="Real vehicles from your inventory, run through the same matcher the addendum uses." >
+              {live && vehiclesQuery.isLoading ? (
+                <p className="text-[13px] text-adm-muted">Loading vehicles…</p>
+              ) : live && vehiclesQuery.isError ? (
+                <p role="status" className="text-[13px] text-adm-muted">Inventory could not be read, so sample results are Unknown.</p>
+              ) : vehicles.length === 0 ? (
+                <p className="text-[13px] text-adm-muted">No active vehicles to sample yet.</p>
+              ) : (
+                <div className="rounded-[6px] border border-adm-border overflow-hidden" data-landmark="sample-results">
+                  <AdminTable caption="Sample vehicle results" minWidth={560} className="[&_th]:px-4 [&_td]:px-4 [&_th]:py-[10px] [&_th]:text-[13px] [&_th]:text-adm-ink [&_td]:py-[7px] [&_th]:border-r [&_td]:border-r [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0 [&_tbody_tr:last-child>td]:border-b-0">
+                    <thead>
+                      <tr>
+                        <Th className="w-[164px]">Vehicle</Th>
+                        <Th className="w-[89px]">Eligible</Th>
+                        <Th className="w-[153px]">Evidence</Th>
+                        <Th>Publication</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {results.map((r) => (
+                        <tr key={r.vehicle.vin}>
+                          <Td>
+                            <p className="text-[14px] leading-[20px] font-semibold text-adm-ink whitespace-nowrap">{[r.vehicle.year, r.vehicle.make, r.vehicle.model].filter(Boolean).join(" ")}</p>
+                            <p className="text-[12px] leading-[18px] text-adm-muted whitespace-nowrap">{[r.vehicle.trim, r.vehicle.condition ? CONDITION_WORD[r.vehicle.condition.toLowerCase()] ?? r.vehicle.condition : null, r.vehicle.mileage != null ? `${r.vehicle.mileage.toLocaleString()} mi` : null].filter(Boolean).join(" · ")}</p>
+                          </Td>
+                          <Td>
+                            {r.status === "undetermined" ? (
+                              <>
+                                <StateMark icon={HelpCircle} tone="neutral">Unknown</StateMark>
+                                <p className="text-[12px] leading-[16px] text-adm-muted">{r.evaluation.unknown.map((f) => describeUnknown(f, r.vehicle)).join("; ")}</p>
+                              </>
+                            ) : (
+                              <StateMark icon={r.eligible ? CheckCircle2 : XCircle} tone={r.eligible ? "success" : "danger"}>{r.eligible ? "Yes" : "No"}</StateMark>
+                            )}
+                          </Td>
+                          <Td>{proofsLoading && r.eligible && r.proof === "unknown" ? <span className="text-adm-muted text-[12px]">Checking…</span> : <StateMark icon={PROOF_MARK[r.proof].icon} tone={PROOF_MARK[r.proof].tone}>{PROOF_LABEL[r.proof]}</StateMark>}</Td>
+                          <Td>{proofsLoading && r.eligible && r.publication === "unknown" ? <span className="text-adm-muted text-[12px]">Checking…</span> : <StateMark icon={PUBLICATION_MARK[r.publication].icon} tone={PUBLICATION_MARK[r.publication].tone}>{PUBLICATION_LABEL[r.publication]}</StateMark>}</Td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </AdminTable>
+                </div>
+              )}
+            </Panel>
           </div>
         </div>
 
-      <Panel title="Sample vehicle results" description="Real vehicles from your inventory, run through the same matcher the addendum uses." >
-        {live && vehiclesQuery.isLoading ? (
-          <p className="text-[13px] text-adm-muted">Loading vehicles…</p>
-        ) : live && vehiclesQuery.isError ? (
-          <p role="status" className="text-[13px] text-adm-muted">Inventory could not be read, so sample results are Unknown.</p>
-        ) : vehicles.length === 0 ? (
-          <p className="text-[13px] text-adm-muted">No active vehicles to sample yet.</p>
-        ) : (
-          <div className="rounded-[6px] border border-adm-border overflow-hidden" data-landmark="sample-results">
-            <AdminTable caption="Sample vehicle results" minWidth={560} className="[&_th]:px-4 [&_td]:px-4 [&_th]:py-[10px] [&_th]:text-[13px] [&_th]:text-adm-ink [&_td]:py-[7px] [&_th]:border-r [&_td]:border-r [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0 [&_tbody_tr:last-child>td]:border-b-0">
-              <thead>
-                <tr>
-                  <Th className="w-[164px]">Vehicle</Th>
-                  <Th className="w-[89px]">Eligible</Th>
-                  <Th className="w-[153px]">Evidence</Th>
-                  <Th>Publication</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {results.map((r) => (
-                  <tr key={r.vehicle.vin}>
-                    <Td>
-                      <p className="text-[14px] leading-[20px] font-semibold text-adm-ink whitespace-nowrap">{[r.vehicle.year, r.vehicle.make, r.vehicle.model].filter(Boolean).join(" ")}</p>
-                      <p className="text-[12px] leading-[18px] text-adm-muted whitespace-nowrap">{[r.vehicle.trim, r.vehicle.condition ? CONDITION_WORD[r.vehicle.condition.toLowerCase()] ?? r.vehicle.condition : null, r.vehicle.mileage != null ? `${r.vehicle.mileage.toLocaleString()} mi` : null].filter(Boolean).join(" · ")}</p>
-                    </Td>
-                    <Td>
-                      {r.status === "undetermined" ? (
-                        <>
-                          <StateMark icon={HelpCircle} tone="neutral">Unknown</StateMark>
-                          <p className="text-[12px] leading-[16px] text-adm-muted">{r.evaluation.unknown.map((f) => describeUnknown(f, r.vehicle)).join("; ")}</p>
-                        </>
-                      ) : (
-                        <StateMark icon={r.eligible ? CheckCircle2 : XCircle} tone={r.eligible ? "success" : "danger"}>{r.eligible ? "Yes" : "No"}</StateMark>
-                      )}
-                    </Td>
-                    <Td>{proofsLoading && r.eligible && r.proof === "unknown" ? <span className="text-adm-muted text-[12px]">Checking…</span> : <StateMark icon={PROOF_MARK[r.proof].icon} tone={PROOF_MARK[r.proof].tone}>{PROOF_LABEL[r.proof]}</StateMark>}</Td>
-                    <Td>{proofsLoading && r.eligible && r.publication === "unknown" ? <span className="text-adm-muted text-[12px]">Checking…</span> : <StateMark icon={PUBLICATION_MARK[r.publication].icon} tone={PUBLICATION_MARK[r.publication].tone}>{PUBLICATION_LABEL[r.publication]}</StateMark>}</Td>
-                  </tr>
-                ))}
-              </tbody>
-            </AdminTable>
-          </div>
-        )}
-      </Panel>
 
 
         {reviewing && (

@@ -124,12 +124,18 @@ const PrepSignOff = () => {
   // LIST VIEW
   if (view === "list") {
     const loaded = !signOffsLoading;
+    const selected = filtered.find((x) => x.id === searchParams.get("sel")) ?? null;
+    const select = (sid: string | null) => {
+      const n = new URLSearchParams(searchParams);
+      if (sid) n.set("sel", sid); else n.delete("sel");
+      setSearchParams(n, { replace: true });
+    };
     return (
       <PageBody width="wide">
         <PageHeader
           title="Prep & Vendors"
           description="Shop foreman approves every vehicle before it hits the lot."
-          actions={<ProductButton variant="primary" onClick={() => setSearchParams({ view: "new" })}>New sign-off request</ProductButton>}
+          actions={<ProductButton variant="primary" onClick={() => setSearchParams({ view: "new" })}>New sign-off</ProductButton>}
         />
 
         <LocalTabs
@@ -149,10 +155,10 @@ const PrepSignOff = () => {
         <MetricStrip
           label="Prep sign-off summary"
           metrics={[
-            { label: "Pending sign-off", value: loaded ? pending.length : null, loading: !loaded, tone: "warning", hint: `of ${signOffs.length} requests` },
+            { label: "Pending sign-off", value: loaded ? pending.length : null, loading: !loaded, tone: "warning" },
             { label: "Signed off today", value: loaded ? signedToday : null, loading: !loaded, tone: "success" },
             { label: "Rejected this week", value: loaded ? rejectedThisWeek : null, loading: !loaded, tone: "danger" },
-            { label: "Ready for listing", value: loaded ? ready.length : null, loading: !loaded, tone: "info", hint: "signed off and unlocked" },
+            { label: "Ready for listing", value: loaded ? ready.length : null, loading: !loaded, tone: "info" },
           ]}
         />
 
@@ -167,25 +173,25 @@ const PrepSignOff = () => {
               : `This filter shows ${filter} sign-offs only; ${signOffs.length} ${signOffs.length === 1 ? "request exists" : "requests exist"} in total.`}
           />
         ) : (
-          <ProductPanel flush>
-            <WorkTable caption="Prep sign-offs" minWidth={760}>
+          <div className={selected ? "grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start" : ""}>
+            <div className="min-w-0">
+            <WorkTable caption="Prep sign-offs" minWidth={selected ? 520 : 760}>
               <thead>
                 <tr>
                   <Th>Vehicle</Th>
                   <Th>Status</Th>
-                  <Th>Accessories installed</Th>
-                  <Th>Photos</Th>
+                  <Th>Accessories</Th>
                   <Th>Foreman</Th>
                   <Th>Updated</Th>
-                  <Th align="right">Next action</Th>
+                  <Th align="right"><span className="sr-only">Next action</span></Th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map(s => (
-                  <tr key={s.id} className="hover:bg-adm-workspace">
-                    <Td className="max-w-[240px]">
+                  <tr key={s.id} className={`h-14 cursor-pointer ${selected?.id === s.id ? "bg-adm-selected" : "hover:bg-adm-workspace"}`} onClick={() => select(s.id)}>
+                    <Td className="max-w-[260px]">
                       <p className="truncate font-semibold text-adm-ink">{s.ymm || s.vin}</p>
-                      <p className="truncate text-[12px] leading-[16px] text-adm-muted">{s.stock_number ? `Stock ${s.stock_number} · ` : ""}{s.vin}</p>
+                      <p className="truncate text-[12px] leading-[16px] text-adm-muted">{s.stock_number ? `Stock ${s.stock_number}` : s.vin}</p>
                     </Td>
                     <Td>
                       <StatusText tone={s.status === "pending" ? "warning" : s.status === "signed" ? "success" : s.status === "rejected" ? "danger" : "neutral"}>
@@ -193,24 +199,69 @@ const PrepSignOff = () => {
                       </StatusText>
                     </Td>
                     <Td className="whitespace-nowrap">{s.accessories_installed.filter(a => a.installed_date).length} of {s.accessories_installed.length}</Td>
-                    <Td>{s.install_photos?.length || 0}</Td>
                     <Td className="whitespace-nowrap">{s.foreman_name}</Td>
                     <Td className="whitespace-nowrap text-adm-muted">{format(new Date(s.updated_at), "MMM d, h:mm a")}</Td>
                     <Td align="right">
-                      <span className="inline-flex items-center justify-end gap-2 whitespace-nowrap">
-                        <button type="button" className="text-[14px] font-semibold text-adm-primary hover:underline" onClick={() => setSearchParams({ view: "detail", id: s.id })}>
-                          {s.status === "pending" ? "Review and sign" : "View"}
-                        </button>
-                        <button type="button" className="text-[14px] font-semibold text-adm-primary hover:underline" onClick={() => navigate(`/prep/${s.vin}`)} title="Open the QR mobile work-event flow for this VIN">
-                          Mobile flow
-                        </button>
-                      </span>
+                      <button type="button" className="text-[14px] font-semibold text-adm-primary hover:underline whitespace-nowrap" onClick={(e) => { e.stopPropagation(); select(s.id); }}>
+                        {s.status === "pending" ? "Review" : "View"}
+                      </button>
                     </Td>
                   </tr>
                 ))}
               </tbody>
             </WorkTable>
-          </ProductPanel>
+            </div>
+            {selected && (
+              <aside aria-label="Sign-off detail" className="min-w-0 rounded-[6px] border border-adm-border bg-adm-surface lg:sticky lg:top-4">
+                <div className="flex items-start justify-between gap-3 border-b border-adm-border px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-[17px] leading-[24px] font-semibold text-adm-ink truncate">Detail work</p>
+                    <p className="text-[13px] leading-[18px] text-adm-muted truncate">{selected.ymm || selected.vin}</p>
+                  </div>
+                  <button type="button" onClick={() => select(null)} aria-label="Close detail" className="w-9 h-9 grid place-items-center rounded-md text-adm-muted hover:bg-adm-workspace"><X className="w-5 h-5" /></button>
+                </div>
+                <div className="space-y-4 px-4 py-4 text-[14px] leading-[20px]">
+                  {selected.install_photos?.[0]?.url ? (
+                    <img src={selected.install_photos[0].url} alt={selected.install_photos[0].caption || "Install photo"} className="w-full max-h-[180px] rounded-[4px] border border-adm-border object-cover" />
+                  ) : (
+                    <p className="rounded-[4px] border border-dashed border-adm-border px-3 py-6 text-center text-adm-muted">No install photo on file</p>
+                  )}
+                  <dl className="space-y-1.5">
+                    {[
+                      ["Foreman", selected.foreman_name || "Unknown"],
+                      ["Status", selected.status.charAt(0).toUpperCase() + selected.status.slice(1)],
+                      ["Updated", format(new Date(selected.updated_at), "MMM d, yyyy")],
+                      ["Photos", String(selected.install_photos?.length || 0)],
+                    ].map(([k, v]) => (
+                      <div key={k} className="flex justify-between gap-3"><dt className="text-adm-muted">{k}</dt><dd className="text-adm-ink text-right">{v}</dd></div>
+                    ))}
+                  </dl>
+                  <div>
+                    <p className="font-semibold text-adm-ink mb-1">Installed accessories</p>
+                    {selected.accessories_installed.length === 0 ? (
+                      <p className="text-adm-muted">None listed.</p>
+                    ) : (
+                      <ul className="divide-y divide-adm-border">
+                        {selected.accessories_installed.map((a, i) => (
+                          <li key={i} className="flex justify-between gap-3 py-1.5">
+                            <span className="min-w-0 truncate text-adm-ink">{a.product_name}</span>
+                            <span className="text-adm-muted whitespace-nowrap">{a.installed_date ? "Installed" : "Pending"}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  {selected.notes && <p className="text-adm-muted">{selected.notes}</p>}
+                </div>
+                <div className="flex flex-col gap-2 border-t border-adm-border px-4 py-3">
+                  <ProductButton variant="primary" onClick={() => setSearchParams({ view: "detail", id: selected.id })}>
+                    {selected.status === "pending" ? "Review and sign" : "Open sign-off"}
+                  </ProductButton>
+                  <ProductButton onClick={() => navigate(`/prep/${selected.vin}`)}>Open mobile flow</ProductButton>
+                </div>
+              </aside>
+            )}
+          </div>
         )}
       </PageBody>
     );

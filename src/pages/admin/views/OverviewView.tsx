@@ -1,17 +1,16 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Building2, ChevronRight, FileText, Globe, Link2, MessageSquare, ShieldCheck, Tag, Users, type LucideIcon } from "lucide-react";
+import { AlertCircle, AlertTriangle, ArrowLeftRight, Building2, CarFront, CheckCircle2, ChevronRight, FileSpreadsheet, FileText, Globe, Info, Smile, SquareCheckBig, Tag, User, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useViewFixture, useAdminNow } from "@/lib/admin/dataSource";
 import { ADMIN_SECTIONS, adminTabHref } from "@/lib/admin/sections";
 import { buildAttentionQueue, ATTENTION_STATUS_META, type AttentionItem } from "@/lib/admin/attention";
-import { deriveRoutingReadiness, type EffectivePolicyRow } from "@/lib/admin/effectivePolicy";
-import { countDisplay, deriveFeedHealth, describeAge, HEALTH_META, knownCount, needsAttention, type CountValue, type HealthVerdict } from "@/lib/admin/health";
-import { AdminCard, AdminTable, ICON_BOX, StatusChip, Td, Th } from "@/components/admin/v2/primitives";
-import { MetricStrip } from "@/components/product";
+import { deriveEffectivePolicy, deriveRoutingReadiness, type EffectivePolicyRow } from "@/lib/admin/effectivePolicy";
+import { classifyRunOutcome, countDisplay, deriveFeedHealth, describeAge, HEALTH_META, knownCount, needsAttention, type CountValue, type HealthVerdict, type HealthTone } from "@/lib/admin/health";
+import { AdminCard, AdminLinkButton, AdminTable, InlineNote, StatTile, StatusChip, Td, Th } from "@/components/admin/v2/primitives";
 
 // Overview: the operational control center. Everything here is derived from
 // evidence the app already holds; opening the page calls no provider.
@@ -141,26 +140,50 @@ const SETUP_CHECKS = (s: ReturnType<typeof useDealerSettings>["settings"]) => [
   !!s.new_inventory_url || !!s.used_inventory_url,
 ];
 
-interface Shortcut {
-  section: string;
-  tab: string;
-  icon: LucideIcon;
-  title: string;
-  detail: string;
-}
+const SHORTCUTS = [
+  { section: "brand", icon: Building2, glyph: "text-adm-ink", title: "Dealership & Brand", detail: "Store details, brand settings, legal info and logos." },
+  { section: "people", icon: Users, glyph: "text-adm-primary", title: "People & Access", detail: "Manage users, roles and permissions." },
+  { section: "pricing", icon: Tag, glyph: "text-adm-primary", title: "Pricing & Products", detail: "Price rules, products and deal structure." },
+  { section: "customer-experience", icon: Smile, glyph: "text-adm-primary", title: "Customer Experience", detail: "Disclosure, messaging and buyer-facing settings." },
+  { section: "publishing", icon: Globe, glyph: "text-adm-primary", title: "Publishing", detail: "Listing rules, syndication and visibility." },
+  { section: "documents", icon: FileText, glyph: "text-adm-primary", title: "Documents & Service", detail: "Forms, disclosures and service settings." },
+] as const;
 
-const SHORTCUTS: Shortcut[] = [
-  { section: "brand", tab: "identity", icon: Building2, title: "Dealership & Brand", detail: "Identity, appearance, hours and public information" },
-  { section: "people", tab: "team", icon: Users, title: "People & Access", detail: "Manage team members, roles and permissions" },
-  { section: "pricing", tab: "price-rules", icon: Tag, title: "Pricing & Products", detail: "Label pricing, products, warranties and incentives" },
-  { section: "customer-experience", tab: "routing", icon: MessageSquare, title: "Customer Experience", detail: "Routing, modules and calls to action" },
-  { section: "publishing", tab: "effective-policy", icon: Globe, title: "Publishing", detail: "Control what goes live and when" },
-  { section: "documents", tab: "templates", icon: FileText, title: "Documents & Service", detail: "Document approval, retail readiness and service settings" },
-  { section: "integrations", tab: "inventory-feed", icon: Link2, title: "Integrations & Data", detail: "System integrations and feed health" },
-  { section: "publishing", tab: "approvals", icon: ShieldCheck, title: "Approvals", detail: "Review listing, document and signing approvals" },
-];
+const ATTENTION_ICON: Record<AttentionItem["status"], typeof AlertTriangle> = {
+  blocked: AlertCircle,
+  needs_review: AlertTriangle,
+  review_required: AlertTriangle,
+  incomplete: Info,
+  unknown: AlertTriangle,
+};
 
-const ACTIVITY_DATE = (iso: string) => new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+// The reference draws status marks as filled glyphs in these hues; the
+// lighter success green is the mark colour, not the chip text token.
+const MARK = { warning: "text-[#F29C09]", success: "text-[#3F9C50]", danger: "text-adm-danger", neutral: "text-[#6B7585]", info: "text-adm-primary" } as const satisfies Record<HealthTone, string>;
+
+// The reference banner edge is a soft 2px amber stroke from y 253 to 312.
+const BANNER_MARK: Record<HealthTone, string> = {
+  warning: "[&>svg]:text-[#F29C09] border-[#FCDC9A]",
+  success: "[&>svg]:text-[#3F9C50]",
+  danger: "[&>svg]:text-adm-danger",
+  neutral: "[&>svg]:text-[#6B7585]",
+  info: "[&>svg]:text-adm-primary",
+};
+
+// Chip fills measured on the reference queue: deeper than the banner tints. The
+// warning label is darkened from the token (4.3:1 on this fill) to keep 4.5:1.
+const QUEUE_CHIP: Record<HealthTone, string> = {
+  warning: "bg-[#FDE4B4] text-[#8A5900]",
+  danger: "bg-[#FDD5D7]",
+  neutral: "border-0 bg-[#E3E7EC] text-adm-ink",
+  success: "",
+  info: "",
+};
+
+const POLICY_ICON: Record<string, typeof Tag> = { price_basis: Tag, publishing: Globe, used_cpo: CarFront };
+
+// One flat row of four summary tiles; each names its population.
+const TILE_GRID = "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3";
 
 export default function OverviewView() {
   const fixture = useViewFixture<OverviewFixture>("overview");
@@ -177,6 +200,7 @@ export default function OverviewView() {
   });
 
   const routing = useMemo(() => deriveRoutingReadiness(settings.passport_contact_routing, settings.passport_agents), [settings.passport_contact_routing, settings.passport_agents]);
+  const policy = useMemo(() => fixture?.policy ?? deriveEffectivePolicy({ settings }), [fixture, settings]);
 
   const feed = fixture ? fixture.feed : live.data?.feed ?? null;
   const loading = !fixture && (live.isLoading || !tenantId);
@@ -202,108 +226,157 @@ export default function OverviewView() {
   const openExceptions: CountValue | null = fixture ? fixture.openExceptions : failed ? { kind: "failed" } : loading ? { kind: "loading" } : live.data?.openExceptions ?? null;
   const activity = fixture ? fixture.activity : live.data?.activity ?? [];
 
-  const feedAttention = feed && needsAttention(feed.state);
-  const feedTone = feed ? HEALTH_META[feed.state].tone : "neutral";
+  const bannerTone = feed && needsAttention(feed.state) ? HEALTH_META[feed.state].tone : null;
 
   return (
-    <div className="flex flex-col gap-4">
-      {feed && (
-        <div className="flex flex-wrap items-center justify-end gap-x-3 text-[13px] leading-[18px]">
-          <span className={`h-2.5 w-2.5 rounded-full ${feedAttention ? (feedTone === "danger" ? "bg-adm-danger" : "bg-[#F29C09]") : "bg-adm-success"}`} aria-hidden="true" />
-          <span className="font-semibold text-adm-ink">Feed health: {feedAttention ? feed.headline : "Healthy"}</span>
-          <Link to={adminTabHref("inventory-feed")} className="font-semibold text-adm-primary hover:underline">View feed health</Link>
+    <div className="space-y-3.5">
+      <div className="space-y-3.5">
+        {feed && bannerTone && (
+          <InlineNote
+            tone={bannerTone}
+            className={`-mt-px -mb-px border-2 py-[10.5px] pl-[15px] pr-[12px] text-adm-ink [&>svg]:w-[34px] [&>svg]:h-[34px] [&>svg]:-ml-0.5 [&>svg]:fill-current [&>svg]:stroke-white ${BANNER_MARK[bannerTone]}`}
+            title={<span className="text-[16px]">{feed.state !== "healthy" ? "Inventory sync needs attention" : feed.headline}</span>}
+            action={<AdminLinkButton to={adminTabHref("inventory-feed")} variant="outline" size="sm" className="min-h-[35px] px-3">Review sync</AdminLinkButton>}
+          >
+            <span className="text-[12.5px] text-[#3E5169]">{feed.detail}</span>
+          </InlineNote>
+        )}
+        {failed && (
+          <p role="status" className="text-[13px] text-adm-muted">Some counts could not be read for this rooftop. They show as Unavailable rather than zero.</p>
+        )}
+
+        <div className={TILE_GRID}>
+          <StatTile icon={CarFront} label="Active inventory" value={countDisplay(activeInventory)} href="/inventory" tone="info" />
+          <StatTile icon={SquareCheckBig} label="Setup" value={setup ? `${setup.done} of ${setup.total}` : "Unknown"} href={adminTabHref("identity")} tone="success" />
+          <StatTile icon={FileText} label="Policy reviews" value={countDisplay(policyReviews)} href="/dashboard/document-review" tone="info" />
+          <StatTile icon={AlertTriangle} label="Open exceptions" value={countDisplay(openExceptions)} href="/admin/exceptions" tone="danger" />
         </div>
-      )}
-      {failed && <p role="status" className="text-[13px] text-adm-muted">Some counts could not be read for this rooftop. They show as Unavailable rather than zero.</p>}
-
-      <MetricStrip
-        label="Administration summary"
-        metrics={[
-          { label: "Active inventory", value: countDisplay(activeInventory), href: "/inventory", loading },
-          { label: "Policy reviews", value: countDisplay(policyReviews), href: "/dashboard/document-review", loading },
-          { label: "Open exceptions", value: countDisplay(openExceptions), href: "/admin/exceptions", tone: openExceptions?.kind === "known" && openExceptions.value > 0 ? "danger" : "neutral", loading },
-          { label: "Setup complete", value: setup ? `${setup.done} of ${setup.total}` : null, href: adminTabHref("identity"), tone: "success" },
-        ]}
-      />
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {SHORTCUTS.map((s) => {
-          const section = ADMIN_SECTIONS.find((x) => x.id === s.section)!;
-          const tab = section.tabs.find((t) => t.id === s.tab) ?? section.tabs[0];
-          return (
-            <Link key={s.title} to={adminTabHref(tab.id)} className="flex min-h-[72px] items-center gap-3 rounded-[6px] border border-adm-border bg-adm-surface px-3 py-3 hover:border-adm-primary/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary">
-              <span className={`${ICON_BOX.square} flex flex-shrink-0 items-center justify-center bg-adm-selected text-adm-primary`} aria-hidden="true"><s.icon className="h-6 w-6" /></span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[14px] leading-[20px] font-semibold text-adm-ink">{s.title}</span>
-                <span className="block text-[12px] leading-[16px] text-adm-muted line-clamp-2">{s.detail}</span>
-              </span>
-              <ChevronRight className="h-5 w-5 flex-shrink-0 text-adm-muted" aria-hidden="true" />
-            </Link>
-          );
-        })}
       </div>
 
-      <AdminCard title="Administration activity (recent)" flush inset="sm" action={<Link to={adminTabHref("activity")} className="text-[14px] font-semibold text-adm-primary hover:underline">View all</Link>}>
-        {activity.length === 0 ? (
-          <p className="px-4 pb-4 text-[13px] text-adm-muted">No recent activity recorded for this rooftop.</p>
-        ) : (
-          <AdminTable caption="Recent activity" minWidth={640}>
-            <thead>
-              <tr>
-                <Th>Date / Time</Th>
-                <Th>Action</Th>
-                <Th>Details</Th>
-                <Th>Age</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {activity.slice(0, 5).map((a) => (
-                <tr key={a.id}>
-                  <Td className="whitespace-nowrap">{ACTIVITY_DATE(a.at)}</Td>
-                  <Td>{a.action}</Td>
-                  <Td className="max-w-[320px] truncate text-adm-muted">{a.detail}</Td>
-                  <Td className="whitespace-nowrap text-adm-muted">{compactAge(a.at, now)}</Td>
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,2.156fr)_minmax(300px,1fr)] gap-3 items-stretch">
+        <div className="space-y-3.5 min-w-0">
+        <AdminCard title="What needs attention" flush inset="sm" headerClassName="pt-3 pb-3 [&_h3]:text-[17px] [&_h3]:leading-[24px]">
+          {loading && !fixture ? (
+            <p className="px-4 pb-4 text-[13px] text-adm-muted">Checking this rooftop…</p>
+          ) : attention.length === 0 ? (
+            <p className="px-4 pb-4 text-[13px] text-adm-muted">{failed ? "Attention items could not be checked." : "Nothing needs attention right now."}</p>
+          ) : (
+            // Row rhythm measured on the reference: 52, 53, 53 and 56px under a 35px header.
+            <AdminTable caption="Ranked attention queue" minWidth={680} inset className="mb-[14px] [&_tbody_tr:first-child>td]:pt-[5px] [&_tbody_tr:last-child>td]:border-b-0 [&_tbody_tr:last-child>td]:pt-2 [&_tbody_tr:last-child>td]:pb-[11px]">
+              <thead>
+                <tr>
+                  <Th className="w-[43.2%] py-2 text-[12.5px] leading-[18px] text-adm-ink">Issue</Th>
+                  <Th className="w-[18.4%] py-2 text-[12.5px] leading-[18px] text-adm-ink">Owner</Th>
+                  <Th className="w-[18.6%] py-2 text-[12.5px] leading-[18px] text-adm-ink">Status</Th>
+                  <Th className="w-[19.8%] py-2 text-[12.5px] leading-[18px] text-adm-ink">Action</Th>
                 </tr>
-              ))}
-            </tbody>
-          </AdminTable>
-        )}
-      </AdminCard>
+              </thead>
+              <tbody>
+                {attention.map((item) => {
+                  const meta = ATTENTION_STATUS_META[item.status];
+                  const Icon = ATTENTION_ICON[item.status];
+                  return (
+                    <tr key={item.id}>
+                      <Td className="pt-1.5 pb-[9px]">
+                        <div className="flex items-center gap-[22px]">
+                          <Icon className={`w-7 h-7 -ml-[3px] flex-shrink-0 fill-current stroke-white ${MARK[meta.tone]}`} aria-hidden="true" />
+                          <div className="min-w-0">
+                            <p className="text-[13px] leading-[18px] font-semibold text-adm-ink">{item.title}</p>
+                            <p className="mt-px text-[12px] leading-[18px] text-adm-muted">{item.detail}</p>
+                          </div>
+                        </div>
+                      </Td>
+                      <Td className="pt-1.5 pb-[9px] text-[13px] leading-[18px] text-adm-ink">{item.owner ?? "—"}</Td>
+                      <Td className="pt-1.5 pb-[9px]"><StatusChip tone={meta.tone} className={`px-3 py-[3.5px] text-[12.5px] leading-[18px] ${QUEUE_CHIP[meta.tone]}`}>{meta.label}</StatusChip></Td>
+                      <Td className="pt-1.5 pb-[9px]"><Link to={item.action.href} className="text-[13px] leading-[18px] font-semibold text-adm-primary hover:underline">{item.action.label}</Link></Td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </AdminTable>
+          )}
+        </AdminCard>
 
-      <AdminCard title="What needs attention" flush inset="sm">
-        {loading && !fixture ? (
-          <p className="px-4 pb-4 text-[13px] text-adm-muted">Checking this rooftop</p>
-        ) : attention.length === 0 ? (
-          <p className="px-4 pb-4 text-[13px] text-adm-muted">{failed ? "Attention items could not be checked." : "Nothing needs attention right now."}</p>
-        ) : (
-          <AdminTable caption="Ranked attention queue" minWidth={680}>
-            <thead>
-              <tr>
-                <Th>Issue</Th>
-                <Th>Owner</Th>
-                <Th>Status</Th>
-                <Th>Action</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {attention.map((item) => {
-                const meta = ATTENTION_STATUS_META[item.status];
-                return (
-                  <tr key={item.id}>
-                    <Td>
-                      <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{item.title}</p>
-                      <p className="max-w-[420px] truncate text-[12px] leading-[18px] text-adm-muted">{item.detail}</p>
-                    </Td>
-                    <Td>{item.owner ?? "Unknown"}</Td>
-                    <Td><StatusChip tone={meta.tone}>{meta.label}</StatusChip></Td>
-                    <Td><Link to={item.action.href} className="font-semibold text-adm-primary hover:underline">{item.action.label}</Link></Td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </AdminTable>
-        )}
-      </AdminCard>
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2.16fr)_minmax(260px,1fr)] gap-[11px] items-stretch">
+        <AdminCard title="Administration settings" inset="sm" headerClassName="pt-[9px] [&_h3]:text-[15px] [&_h3]:leading-[20px]" bodyClassName="pt-2 pb-[10px] pl-3 pr-[11px]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 min-[1440px]:grid-cols-3 min-[1440px]:grid-rows-[minmax(74px,auto)_minmax(76px,auto)] gap-1.5">
+            {SHORTCUTS.map((s) => {
+              const section = ADMIN_SECTIONS.find((x) => x.id === s.section)!;
+              return (
+                <Link key={s.section} to={adminTabHref(section.tabs[0].id)} className="relative flex items-start rounded-[6px] border border-adm-border pl-2 pr-0.5 pt-1.5 pb-[5px] hover:border-adm-primary/60">
+                  <span className="w-10 h-10 rounded-[6px] bg-adm-workspace flex items-center justify-center flex-shrink-0" aria-hidden="true"><s.icon className={`w-[22px] h-[22px] ${s.glyph}`} /></span>
+                  <span className="ml-2.5 min-w-0 flex-1 pt-[1.5px] pr-[22px] min-[1440px]:pr-0">
+                    {/* From 1440px the chevron floats one title line down, so a one-line title runs above it as the
+                        reference draws; narrower tiles keep it in its own lane so a wrapped word never drops under it. */}
+                    <span className="hidden min-[1440px]:block float-right w-0 h-4" aria-hidden="true" />
+                    <ChevronRight className="absolute right-0.5 top-[23.5px] min-[1440px]:static min-[1440px]:float-right min-[1440px]:clear-right w-5 h-5 text-adm-muted" aria-hidden="true" />
+                    <span className="block text-[12.5px] leading-[16px] font-semibold text-adm-ink">{s.title}</span>
+                    <span className="block mt-[1.5px] text-[11px] leading-[13px] text-adm-muted">{s.detail}</span>
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </AdminCard>
+
+        <AdminCard
+          title="Recent activity"
+          inset="sm"
+          headerClassName="pt-[9px] [&_h3]:text-[15px] [&_h3]:leading-[20px]"
+          bodyClassName="pt-2 pb-[6px] pl-3.5 pr-3.5"
+          action={<Link to={adminTabHref("activity")} className="text-[12.5px] leading-[20px] font-semibold text-adm-primary hover:underline">View all</Link>}
+        >
+          {activity.length === 0 ? (
+            <p className="text-[13px] text-adm-muted">No recent activity recorded for this rooftop.</p>
+          ) : (
+            <ul className="border-t border-adm-border divide-y divide-adm-border">
+              {activity.slice(0, 5).map((a) => (
+                <li key={a.id} className="flex items-start gap-4 pt-[3px] pb-[6px]">
+                  <span className={`mt-px w-6 h-6 flex items-center justify-center flex-shrink-0 ${a.tone === "warning" ? MARK.warning : a.tone === "success" ? MARK.success : "text-adm-primary"}`} aria-hidden="true">
+                    {a.tone === "warning" ? <AlertTriangle className="w-6 h-6 fill-current stroke-white" /> : a.tone === "success" ? <CheckCircle2 className="w-[22px] h-[22px] fill-current stroke-white" /> : a.tone === "info" ? <User className="w-6 h-6" /> : <FileSpreadsheet className="w-5 h-5" />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-baseline gap-2">
+                      <span className="min-w-0 flex-1 text-[11px] leading-[16px] font-semibold text-adm-ink break-words">{a.action}</span>
+                      <span className="text-[11px] leading-[16px] text-adm-muted whitespace-nowrap">{compactAge(a.at, now)}</span>
+                    </span>
+                    <span data-parity="activity-detail" className="block text-[11px] leading-[14px] text-adm-muted break-words">{a.detail}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </AdminCard>
+        </div>
+        </div>
+
+        <AdminCard
+          title="Effective policy"
+          inset="sm"
+          className="h-full"
+          headerClassName="pt-3 [&_h3]:text-[17px] [&_h3]:leading-[24px]"
+          bodyClassName="pt-[2.5px] pb-3"
+          action={<Link to={adminTabHref("effective-policy")} className="text-[12.5px] leading-[24px] font-semibold text-adm-primary hover:underline">Edit</Link>}
+        >
+          <ul className="divide-y divide-adm-border">
+            {policy.map((row) => {
+              const Icon = POLICY_ICON[row.key] ?? ArrowLeftRight;
+              const ok = row.state === "ok";
+              return (
+                <li key={row.key} className="flex items-start py-3">
+                  <span className="mt-[3px] -ml-0.5 w-9 h-9 rounded-md bg-adm-workspace text-adm-ink flex items-center justify-center flex-shrink-0" aria-hidden="true"><Icon className="w-5 h-5" /></span>
+                  {ok ? <CheckCircle2 className={`-mt-[1.5px] ml-[6.5px] w-[25px] h-[25px] flex-shrink-0 fill-current stroke-white ${MARK.success}`} aria-hidden="true" /> : <AlertCircle className={`-mt-[1.5px] ml-[6.5px] w-[25px] h-[25px] flex-shrink-0 fill-current stroke-white ${MARK.danger}`} aria-hidden="true" />}
+                  <div className="ml-[11.5px] min-w-0 flex-1">
+                    <p className="text-[15px] leading-[20px] font-semibold text-adm-ink">{row.title}</p>
+                    <Link to={row.href} className="block mt-[3px] text-[15px] leading-[20px] font-medium text-adm-ink hover:underline">{row.value}</Link>
+                    <p className="mt-[1.5px] text-[12.5px] leading-[18px] text-adm-muted">{row.detail}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </AdminCard>
+      </div>
     </div>
   );
 }

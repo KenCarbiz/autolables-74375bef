@@ -748,7 +748,7 @@ export default function FactoryStickerWorkspace({
                     Preview PDF
                   </a>
                 )}
-                {manager && genStatus !== "PUBLISHED" && (
+                {manager && genStatus !== "PUBLISHED" && !!currentDoc && (
                   <button
                     type="button"
                     onClick={() => act("approve_publish")}
@@ -791,9 +791,9 @@ export default function FactoryStickerWorkspace({
                     key={label}
                     type="button"
                     onClick={() => setZoom(z)}
-                    className={`h-7 px-2.5 rounded-md border text-[11px] font-semibold ${
+                    className={`h-8 px-3 rounded-md border text-[12px] font-semibold ${
                       zoom === z
-                        ? "bg-blue-600 text-white border-blue-600"
+                        ? "bg-adm-selected text-adm-primary border-adm-primary"
                         : fullscreen ? "bg-slate-800 text-slate-200 border-slate-600" : "border-border hover:bg-muted/40"
                     }`}
                   >
@@ -819,7 +819,7 @@ export default function FactoryStickerWorkspace({
                 <button
                   type="button"
                   onClick={() => setFullscreen((f) => !f)}
-                  className={`h-7 px-2.5 rounded-md border text-[11px] font-semibold ${fullscreen ? "bg-slate-800 text-slate-200 border-slate-600" : "border-border hover:bg-muted/40"}`}
+                  className={`h-8 px-3 rounded-md border text-[12px] font-semibold ${fullscreen ? "bg-slate-800 text-slate-200 border-slate-600" : "border-border hover:bg-muted/40"}`}
                 >
                   {fullscreen ? "Exit full screen" : "Full screen"}
                 </button>
@@ -890,17 +890,6 @@ export default function FactoryStickerWorkspace({
                       {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
                       Build from saved data
                     </button>
-                    {needsSourceData && (
-                      <button
-                        type="button"
-                        onClick={() => act("orchestrate", { allowSourceFetch: true })}
-                        disabled={!!busy}
-                        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold disabled:opacity-50"
-                      >
-                        {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                        Retrieve vehicle data &amp; generate
-                      </button>
-                    )}
                   </div>
                 )}
               </div>

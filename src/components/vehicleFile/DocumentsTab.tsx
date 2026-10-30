@@ -52,6 +52,8 @@ interface RegisterRow {
   status: string;
   tone: Tone;
   packet: string;
+  version?: string;
+  updated?: string | null;
   href?: string;
   to?: string;
 }
@@ -88,7 +90,9 @@ const DocumentRegister = ({ vehicle }: { vehicle: VehicleRow }) => {
     rows.push({
       key: `gen-${d.id}`,
       group: d.document_type === "buyers_guide" ? "Sales & Disclosure" : "Stickers & Build Record",
-      name: `${GENERATED_LABEL[d.document_type] || d.document_type} v${d.version}`,
+      name: GENERATED_LABEL[d.document_type] || d.document_type,
+      version: `v${d.version}`,
+      updated: d.created_at ?? null,
       status: STATUS_META[d.document_status]?.label || d.document_status,
       tone: GENERATED_TONE[d.document_status] || "neutral",
       packet: "Stored version",
@@ -99,22 +103,23 @@ const DocumentRegister = ({ vehicle }: { vehicle: VehicleRow }) => {
   const grouped = GROUP_ORDER.map((g) => ({ g, items: rows.filter((r) => r.group === g) })).filter((x) => x.items.length > 0);
 
   return (
-    <Card title="Document register">
-      <WorkTable caption="Documents on file for this vehicle" minWidth={640}>
+    <div className="space-y-2">
+      <WorkTable caption="Documents on file for this vehicle" minWidth={760}>
         <thead>
-          <tr><Th>Document</Th><Th>Group</Th><Th>Status</Th><Th>Customer packet</Th><Th align="right">Action</Th></tr>
+          <tr><Th>Type</Th><Th>Version</Th><Th>State</Th><Th>Visibility</Th><Th>Updated</Th><Th align="right">Action</Th></tr>
         </thead>
         <tbody>
           {grouped.flatMap(({ g, items }) => [
-            <tr key={`g-${g}`}><td colSpan={5} className="bg-adm-workspace px-3 py-2 text-[12px] leading-[18px] font-semibold text-adm-muted border-b border-adm-border">{g} ({items.length})</td></tr>,
+            <tr key={`g-${g}`}><td colSpan={6} className="bg-adm-workspace px-3 py-2 text-[12px] leading-[18px] font-semibold text-adm-muted border-b border-adm-border">{g} ({items.length})</td></tr>,
             ...items.map((r) => (
             <tr key={r.key}>
               <Td className="font-semibold">{r.name}</Td>
-              <Td className="text-adm-muted">{r.group}</Td>
+              <Td className="text-adm-muted">{r.version ?? "-"}</Td>
               <Td><StatusText tone={r.tone}>{r.status}</StatusText></Td>
               <Td className="text-adm-muted">{r.packet}</Td>
+              <Td className="text-adm-muted">{r.updated ? new Date(r.updated).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : "-"}</Td>
               <Td align="right">
-                {r.to ? <Link className="text-adm-primary underline" to={r.to}>Review</Link> : r.href ? <a className="text-adm-primary underline" href={r.href} target="_blank" rel="noreferrer">Open</a> : <span className="text-adm-muted">-</span>}
+                {r.to ? <Link className="text-adm-primary hover:underline" to={r.to}>Review</Link> : r.href ? <a className="text-adm-primary hover:underline" href={r.href} target="_blank" rel="noreferrer">Open</a> : <span className="text-adm-muted">-</span>}
               </Td>
             </tr>
             )),
@@ -124,7 +129,7 @@ const DocumentRegister = ({ vehicle }: { vehicle: VehicleRow }) => {
       <p className="text-[12px] leading-[18px] text-adm-muted">
         Customer packet shows Unknown where the packet settings do not name the document. Titles, registrations and identity documents are private and are not listed here.
       </p>
-    </Card>
+    </div>
   );
 };
 

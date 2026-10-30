@@ -97,7 +97,7 @@ export default function DocumentsPrintCenter() {
       <PageBody width="wide">
         <PageHeader
           title="Print Center"
-          description="Review the versioned documents for a vehicle and print the bundle. Printing does not publish, approve or rewrite a stored document."
+          description="Select documents, review, and print for a vehicle."
           actions={actions}
         />
         {children}
@@ -237,18 +237,7 @@ export default function DocumentsPrintCenter() {
   ].filter(Boolean).join("  ·  ");
 
   const printAction = (
-    <>
     <CommandAction Icon={Gauge} capability="can_view_inventory" href={`/vin-command/${vehicle.id}`}>VIN Command Center</CommandAction>
-    <CommandAction
-      variant="primary"
-      capability="can_print"
-      Icon={Printer}
-      busy={busy === "packet"}
-      disabledReason={packetReason}
-      onClick={() => runPrint("packet")}>
-      Print bundle
-    </CommandAction>
-    </>
   );
 
   return shell(
@@ -296,15 +285,13 @@ export default function DocumentsPrintCenter() {
                 </thead>
                 <tbody>
                   {documents.map((d) => {
-                    const RowIcon = d.kind === "qr" ? QrCode : FileText;
                     const versionNote = d.isCurrent ? null : d.internalStatus.label === "Draft" ? "Draft" : null;
                     const reprinting = busyRow?.id === d.id && busyRow.kind === "reprint";
                     const generating = busyRow?.id === d.id && busyRow.kind === "generate";
                     return (
-                      <tr key={d.id} className="hover:bg-adm-workspace">
+                      <tr key={d.id} className="h-14 hover:bg-adm-workspace">
                         <Td className="max-w-[190px]">
                           <span className="inline-flex max-w-full items-center gap-2">
-                            <RowIcon className="h-5 w-5 shrink-0 text-adm-muted" aria-hidden="true" />
                             <span className="truncate text-[14px] font-semibold text-adm-ink">{d.label}</span>
                           </span>
                         </Td>
@@ -313,7 +300,7 @@ export default function DocumentsPrintCenter() {
                           {versionNote ? <span className="ml-1.5 text-[12px] text-adm-muted">{versionNote}</span> : null}
                         </Td>
                         <Td><StatusText tone={productTone(d.internalStatus.tone)}>{d.internalStatus.label}</StatusText></Td>
-                        <Td><StatusText tone={productTone(d.passportVisibility.tone)}>{d.passportVisibility.label}</StatusText></Td>
+                        <Td className="text-adm-muted whitespace-nowrap">{d.passportVisibility.label}</Td>
                         <Td><StatusText tone={productTone(d.printStatus.tone)}>{d.printStatus.label}</StatusText></Td>
                         <Td align="right">
                           <span className="inline-flex items-center justify-end gap-1">
@@ -368,7 +355,7 @@ export default function DocumentsPrintCenter() {
         }
         aside={
           <>
-            <Panel title="Preview" description="Documents visible to the customer in their Passport.">
+            <Panel title="Preview">
               {passportPreview.length === 0 ? (
                 <p className="text-[14px] leading-[20px] text-adm-muted">No documents are shared to the customer Passport yet.</p>
               ) : (
@@ -394,7 +381,7 @@ export default function DocumentsPrintCenter() {
               </div>
             </Panel>
 
-            <Panel title="Print bundle" description="Paper groups the bundle releases.">
+            <Panel title="Print bundle">
               <ul className="divide-y divide-adm-border">
                 {bundle.map((b) => {
                   const Icon = BUNDLE_ICON(b.label);

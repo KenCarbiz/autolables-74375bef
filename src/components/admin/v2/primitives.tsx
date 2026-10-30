@@ -148,27 +148,18 @@ export const StatTile = ({
   tone?: Tone;
   ariaLabel?: string;
 }) => {
-  // A tone bar, not an icon halo: the national product draws metrics flat.
-  const bar: Record<Tone, string> = {
-    neutral: "bg-adm-border",
-    success: "bg-adm-success",
-    warning: "bg-[#D98B00]",
-    danger: "bg-adm-danger",
-    info: "bg-adm-primary",
-  };
   const body = (
     <>
-      <span className={cn("self-stretch w-[3px] rounded-[2px] flex-shrink-0", bar[tone])} aria-hidden="true" />
       {Icon && <Icon className={cn(ICON.inline, "flex-shrink-0 text-adm-muted")} aria-hidden="true" />}
       <span className="min-w-0 flex-1">
         <span className="block text-[13px] leading-[18px] text-adm-muted">{label}</span>
-        <span className="block text-[24px] leading-[32px] font-bold text-adm-ink tabular-nums truncate">{value}</span>
+        <span className={cn("block text-[24px] leading-[32px] font-bold tabular-nums truncate", tone === "danger" ? "text-adm-danger" : "text-adm-ink")}>{value}</span>
         {hint && <span className="block text-[12px] leading-[18px] text-adm-muted mt-0.5 truncate">{hint}</span>}
       </span>
       {href && <ChevronRight className={cn(ICON.chevron, "text-adm-muted flex-shrink-0")} aria-hidden="true" />}
     </>
   );
-  const cls = "flex items-center gap-3 rounded-[6px] border border-adm-border bg-adm-surface px-4 py-3 min-h-[76px]";
+  const cls = "flex items-center gap-3 border-l border-adm-border px-5 py-2 min-h-[64px] first:border-l-0";
   return href ? (
     <Link to={href} className={cn(cls, "hover:border-adm-primary/60 focus-visible:outline-2 focus-visible:outline-adm-primary")} aria-label={ariaLabel ?? `${label}: ${typeof value === "string" || typeof value === "number" ? value : ""}`}>
       {body}
@@ -244,8 +235,8 @@ export const Th = ({ children, className, align = "left" }: { children?: ReactNo
   </th>
 );
 
-export const Td = ({ children, className, align = "left" }: { children?: ReactNode; className?: string; align?: "left" | "right" }) => (
-  <td className={cn("px-3 py-3.5 border-b border-adm-border align-middle", align === "right" ? "text-right tabular-nums" : "text-left", className)}>{children}</td>
+export const Td = ({ children, className, align = "left", colSpan }: { children?: ReactNode; className?: string; align?: "left" | "right"; colSpan?: number }) => (
+  <td colSpan={colSpan} className={cn("px-3 py-3.5 border-b border-adm-border align-middle", align === "right" ? "text-right tabular-nums" : "text-left", className)}>{children}</td>
 );
 
 export const KeyValueList = ({ rows, className }: { rows: Array<{ label: ReactNode; value: ReactNode }>; className?: string }) => (

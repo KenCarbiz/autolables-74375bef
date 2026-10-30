@@ -1,11 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useReconEstimates, type ReconEstimate, type NewLine } from "@/hooks/useReconEstimates";
 import { useDealerSettings, type ReconCannedService } from "@/contexts/DealerSettingsContext";
-import NextStepBanner from "@/components/workflow/NextStepBanner";
+import { supabase } from "@/integrations/supabase/client";
+import { useTenant } from "@/contexts/TenantContext";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { Plus, Trash2, Send, Loader2 } from "lucide-react";
-import { Button, LocalTabs, MetricStrip, PageBody, PageHeader, Panel, QueryState, Td, Th, WorkTable, type LocalTab } from "@/components/product";
+import { Button, LocalTabs, MetricStrip, PageBody, PageHeader, QueryState, Td, Th, WorkTable, type LocalTab } from "@/components/product";
 import { EstimateState, ageOf, money } from "@/components/recon/estimateParts";
 
 type ReconView = "pending" | "in-recon" | "closed" | "all";
@@ -20,6 +21,17 @@ export default function ReconBoard() {
   const viewParam = searchParams.get("view");
   const view: ReconView = viewParam === "in-recon" || viewParam === "closed" || viewParam === "all" ? viewParam : "pending";
   const [showNew, setShowNew] = useState(false);
+  const { tenant } = useTenant();
+  const [names, setNames] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!tenant?.id || tenant.id === "house") return;
+    // deno-lint-ignore no-explicit-any
+    void (supabase as any).rpc("list_tenant_members", { p_tenant_id: tenant.id }).then(({ data }: { data: Array<{ user_id?: string; email?: string }> | null }) => {
+      const map: Record<string, string> = {};
+      for (const m of data || []) if (m.user_id && m.email) map[m.user_id] = m.email.split("@")[0];
+      setNames(map);
+    });
+  }, [tenant?.id]);
   const legacyEstimate = searchParams.get("estimate");
 
   const groups = useMemo(() => ({
@@ -52,24 +64,22 @@ export default function ReconBoard() {
       <PageHeader
         title="Recon Approvals"
         description={isManager ? "Approve or decline recon work and ask service questions." : "Submit recon work and track approvals."}
-        actions={<Button variant="primary" onClick={() => setShowNew(true)}><Plus className="h-4 w-4" aria-hidden="true" /> New estimate</Button>}
-      />
-
-      <NextStepBanner stage="recon" />
-
-      <MetricStrip
-        label="Recon estimate totals"
-        metrics={[
-          { label: isManager ? "Pending review" : "Awaiting approval", value: loading ? null : groups.needs.length, loading, hint: loading ? undefined : `of ${estimates.length} estimates`, tone: "warning" },
-          { label: "Pending amount", value: loading ? null : money(groups.needs.reduce((s, e) => s + (e.subtotal || 0), 0)), loading, hint: "estimated, not yet authorized", tone: "neutral" },
-          { label: "In recon", value: loading ? null : groups.inRecon.length, loading, hint: "approved or partly approved", tone: "info" },
-          { label: "Approved amount", value: loading ? null : money(groups.inRecon.reduce((s, e) => s + (e.approved_total || 0), 0)), loading, hint: "on estimates in recon", tone: "success" },
-        ]}
+        actions={<Button variant="primary" onClick={() => setShowNew(true)}>New estimate</Button>}
       />
 
       <LocalTabs label="Recon estimate states" tabs={tabs} />
 
-      <Panel flush title={loading ? shown.label : `${shown.items.length.toLocaleString()} ${shown.items.length === 1 ? "estimate" : "estimates"} · ${shown.label}`}>
+      <MetricStrip
+        label="Recon estimate totals"
+        metrics={[
+          { label: isManager ? "Pending review" : "Awaiting approval", value: loading ? null : groups.needs.length, loading, tone: "warning" },
+          { label: "Pending amount", value: loading ? null : money(groups.needs.reduce((s, e) => s + (e.subtotal || 0), 0)), loading, tone: "neutral" },
+          { label: "In recon", value: loading ? null : groups.inRecon.length, loading, tone: "info" },
+          { label: "Approved amount", value: loading ? null : money(groups.inRecon.reduce((s, e) => s + (e.approved_total || 0), 0)), loading, tone: "success" },
+        ]}
+      />
+
+      <div>
         <QueryState
           status={status}
           emptyTitle={estimates.length === 0 ? "No recon estimates yet." : `No estimates are ${shown.label.toLowerCase()}.`}
@@ -78,34 +88,31 @@ export default function ReconBoard() {
           <WorkTable caption="Recon estimates" minWidth={820}>
             <thead>
               <tr>
-                <Th>Vehicle</Th>
-                <Th>State</Th>
-                <Th align="right">Estimate</Th>
-                <Th align="right">Approved</Th>
-                <Th>Owner</Th>
                 <Th>Age</Th>
-                <Th align="right">Action</Th>
+                <Th>Vehicle</Th>
+                <Th>Owner</Th>
+                <Th align="right">Total</Th>
+                <Th align="right">Approved</Th>
+                <Th>Status</Th>
+                <Th>Next action</Th>
               </tr>
             </thead>
             <tbody>
               {shown.items.map((e) => (
-                <tr key={e.id}>
-                  <Td>
-                    <p className="font-semibold text-adm-ink">{e.ymm || "Vehicle"}</p>
-                    <p className="font-mono text-[12px] text-adm-muted">VIN …{e.vin.slice(-6)}</p>
-                  </Td>
-                  <Td><EstimateState status={e.status} /></Td>
-                  <Td align="right">{money(e.subtotal)}</Td>
-                  <Td align="right">{e.approved_total > 0 ? money(e.approved_total) : "—"}</Td>
-                  <Td>{e.submitted_by || <span className="text-adm-muted">Unassigned</span>}</Td>
+                <tr key={e.id} className="h-14 hover:bg-adm-workspace">
                   <Td className="whitespace-nowrap text-adm-muted">{ageOf(e.created_at)}</Td>
-                  <Td align="right"><Button size="sm" onClick={() => openEstimate(e.id)} aria-label={`Review estimate for ${e.ymm || e.vin}`}>Review</Button></Td>
+                  <Td className="max-w-[300px] truncate font-semibold text-adm-ink">{e.ymm || "Vehicle"}</Td>
+                  <Td className="text-adm-muted">{(e.submitted_by && names[e.submitted_by]) || "Unknown"}</Td>
+                  <Td align="right" className="tabular-nums">{money(e.subtotal)}</Td>
+                  <Td align="right" className="tabular-nums">{e.approved_total > 0 ? money(e.approved_total) : "-"}</Td>
+                  <Td><EstimateState status={e.status} /></Td>
+                  <Td><button type="button" onClick={() => openEstimate(e.id)} aria-label={`Review estimate for ${e.ymm || e.vin}`} className="text-[14px] font-semibold text-adm-primary hover:underline">{e.status === "submitted" ? "Review" : "View"}</button></Td>
                 </tr>
               ))}
             </tbody>
           </WorkTable>
         </QueryState>
-      </Panel>
+      </div>
 
       {showNew && <NewEstimateModal canned={canned} onClose={() => setShowNew(false)} onSubmit={async (input) => { const ok = await submit(input); if (ok) { setShowNew(false); toast.success("Recon estimate submitted"); } else toast.error("Couldn't submit — check the VIN belongs to your inventory."); return ok; }} />}
     </PageBody>

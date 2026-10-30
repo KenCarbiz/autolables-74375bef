@@ -95,7 +95,7 @@ const CustomerRecord = () => {
 
       <div className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)_320px] lg:items-start">
         <div className="flex min-w-0 flex-col gap-6">
-          <Panel title="Contact information" description={bridged ? "Identity proven by a document request that carries the same visitor id." : "Identity from a form only."}>
+          <Panel title="Contact information">
             <SummaryList
               rows={[
                 { label: "Name", value: customer.identified ? customer.name || "Not given" : "Unidentified" },
@@ -151,7 +151,7 @@ const CustomerRecord = () => {
             )}
           </Panel>
 
-          <Panel title="Intent timeline" description="Leads, document requests, tracked engagement, signatures and returns in one trail.">
+          <Panel title="Intent timeline">
             {customer.activity.length === 0 ? (
               <p className="text-[14px] leading-[20px] text-adm-muted">Nothing has been captured for this customer yet.</p>
             ) : (
@@ -219,7 +219,7 @@ const CustomerRecord = () => {
             )}
           </Panel>
           <Panel title="Contact actions">
-            <div className="flex flex-col gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {callHref ? <LinkButton variant="secondary" to={callHref}>Call</LinkButton> : null}
               {customer.email ? <LinkButton variant="secondary" to={`mailto:${customer.email}`}>Send email</LinkButton> : null}
               {primaryVehicle?.slug ? <LinkButton variant="secondary" to={`/v/${primaryVehicle.slug}`}>Open Passport</LinkButton> : null}
@@ -237,13 +237,18 @@ const CustomerRecord = () => {
                   <li key={deal.id} className="space-y-1 py-3 first:pt-0 last:pb-0">
                     <div className="flex items-start justify-between gap-2">
                       <p className="min-w-0 truncate text-[14px] leading-[20px] font-semibold text-adm-ink">{deal.vehicleLabel}</p>
-                      <Chip tone={dealStateTone(deal.state)}>{deal.stateLabel}</Chip>
+                      <span className="shrink-0 whitespace-nowrap"><Chip tone={dealStateTone(deal.state)}>{deal.stateLabel}</Chip></span>
                     </div>
                     <p className="text-[13px] leading-[18px] text-adm-muted">
                       {money(deal.amount)}{deal.employeeName ? ` · Sold by ${deal.employeeName}` : ""}
                     </p>
                     {deal.returnInfo && <p className="text-[13px] leading-[18px] text-adm-ink">{deal.returnInfo.label}</p>}
-                    {deal.state === "out_for_signature" && <AddendumStatusTimeline addendumId={deal.id} />}
+                    {deal.state === "out_for_signature" && (
+                      <details>
+                        <summary className="cursor-pointer text-[13px] font-semibold text-adm-primary">Signing status</summary>
+                        <div className="mt-2"><AddendumStatusTimeline addendumId={deal.id} /></div>
+                      </details>
+                    )}
                   </li>
                 ))}
               </ul>

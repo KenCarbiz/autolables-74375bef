@@ -36,7 +36,7 @@ vi.mock("@/components/admin/PriceIntegrityPanel", () => ({ PriceIntegrityPanel: 
 
 import FeeReviewPage from "./FeeReviewPage";
 
-const dialog = () => screen.getByRole("region", { name: "Fee change review: document fee" });
+const dialog = () => screen.getByRole("dialog", { name: "Review document fee change" });
 
 const ReturnEcho = () => {
   const loc = useLocation();
@@ -53,6 +53,7 @@ const renderPage = (route: string, fixture: typeof SCREEN_06.fixture | null) =>
     { route, fixture },
   );
 
+const LIVE_BACK_FIXTURE = { ...SCREEN_06.fixture, views: { ...SCREEN_06.fixture.views, "fee-review": { ...FEE_REVIEW_FIXTURE, backHref: undefined } } };
 
 const listingRows = [
   { vin: "EXAMPLEVIN0000001", year: 2024, make: "Example", model: "Crossover", trim: "Base", archived_at: null, advertised_price_before_doc: 30000, doc_fee: 895, website_sale_price: 30895, price_parse_status: "ok", stock: "EX-1" },
@@ -70,15 +71,17 @@ beforeEach(() => {
 });
 
 describe("FeeReviewPage with the 06 fixture", () => {
-  it("renders the review step as a page with before, after, impact and samples, and writes nothing", () => {
+  it("renders the review step over the pricing page with before, after, impact and samples, and writes nothing", () => {
     renderPage("/admin/pricing/fee-review", SCREEN_06.fixture);
     const d = dialog();
-    expect(within(d).getByText(/Step 2 of 3, Review/)).toBeInTheDocument();
+    expect(within(d).getByText("Current step")).toBeInTheDocument();
+    expect(within(d).getByText("Completed")).toBeInTheDocument();
+    expect(within(d).getByText("Not started")).toBeInTheDocument();
     const summary = within(d).getByRole("table", { name: "Before and after" });
     expect(within(summary).getByText("$895")).toBeInTheDocument();
     expect(within(summary).getByText("$925")).toBeInTheDocument();
     expect(within(summary).getByText("13")).toBeInTheDocument();
-    expect(within(d).getAllByText("48").length).toBeGreaterThan(0);
+    expect(within(d).getByText("48")).toBeInTheDocument();
     expect(within(d).getByText("active vehicles eligible")).toBeInTheDocument();
     expect(within(d).getByText("Totals stay; the fee comes out of the vehicle price")).toBeInTheDocument();
     expect(within(d).getByText("No changes will be made to archived records")).toBeInTheDocument();
@@ -97,6 +100,20 @@ describe("FeeReviewPage with the 06 fixture", () => {
     expect(within(item).getByText("Selling price").nextElementSibling).toHaveTextContent("$18,525$18,495$30");
     expect(within(item).getByText("Document fee").nextElementSibling).toHaveTextContent("$895$925$30");
     expect(within(item).getByText("Advertised total").nextElementSibling).toHaveTextContent("$19,420$19,420No change");
+  });
+
+  it("returns to Price rules with the draft on Escape and on Close, writing nothing", () => {
+    renderPage("/admin/pricing/fee-review", LIVE_BACK_FIXTURE);
+    fireEvent.keyDown(dialog(), { key: "Escape" });
+    expect(screen.getByText("price rules page")).toBeInTheDocument();
+    expect(JSON.parse(screen.getByTestId("returned").textContent ?? "null")).toEqual({ draft: { enabled: true, amount: 925, stateCode: "CT" }, scope: "active" });
+    expect(writeCalls()).toEqual([]);
+  });
+
+  it("closes to the fixture's own back route when it names one", () => {
+    renderPage("/admin/pricing/fee-review", SCREEN_06.fixture);
+    fireEvent.click(within(dialog()).getByRole("button", { name: "Close review" }));
+    expect(JSON.parse(screen.getByTestId("returned").textContent ?? "null")).toMatchObject({ draft: { amount: 925 } });
   });
 
   it("disables Apply and says why when the review is held", () => {
@@ -187,10 +204,24 @@ describe("FeeReviewPage against live data without the server contracts", () => {
     expect(cancel).toHaveAttribute("href", "/admin?tab=price-rules");
     fireEvent.click(cancel);
     expect(screen.getByText("price rules page")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Review document fee change" })).toBeNull();
     expect(writeCalls()).toEqual([]);
     expect(rpcCalls()).toEqual([]);
     expect(settingsState.updateSettings).not.toHaveBeenCalled();
     expect(auditState.log).not.toHaveBeenCalled();
+  });
+
+  it("closes from the close button and from Escape without any write", () => {
+    const first = renderPage("/admin/pricing/fee-review?enabled=1&amount=925&state=CT&scope=active", null);
+    fireEvent.click(within(dialog()).getByRole("button", { name: "Close review" }));
+    expect(screen.getByText("price rules page")).toBeInTheDocument();
+    first.unmount();
+
+    renderPage("/admin/pricing/fee-review?enabled=1&amount=925&state=CT&scope=active", null);
+    fireEvent.keyDown(dialog(), { key: "Escape" });
+    expect(screen.getByText("price rules page")).toBeInTheDocument();
+    expect(writeCalls()).toEqual([]);
+    expect(settingsState.updateSettings).not.toHaveBeenCalled();
   });
 
   it("goes back from the review step to the edit step keeping the draft, and applies nothing", async () => {

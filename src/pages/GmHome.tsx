@@ -10,7 +10,7 @@ import { useOperatingMetrics } from "@/hooks/useOperatingMetrics";
 import { useAdvertisedPrices, assessDrift } from "@/hooks/useAdvertisedPrices";
 import { hasDealerCapability, type DealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import {
-  PageBody, PageHeader, SectionHeading, MetricStrip, QueryState, LinkButton, Panel, WorkTable, Th, Td, StatusText, InlineNote,
+  PageBody, PageHeader, SectionHeading, MetricStrip, QueryState, LinkButton, Panel, WorkTable, Th, Td, InlineNote,
 } from "@/components/product";
 
 // A vehicle counts as stuck when its canonical lifecycle state has not moved
@@ -385,15 +385,14 @@ const GmHome = () => {
     <PageBody width="wide">
       <PageHeader
         title="Today"
-        scope={scopeName}
         description={
           reading
             ? "Reading today's operating position..."
             : attention === 0
-              ? `${greeting}, ${name}. Nothing needs a decision from you right now.`
+              ? "Nothing needs a decision from you right now."
               : `${greeting}, ${name}. ${attention} item${attention === 1 ? "" : "s"} need${attention === 1 ? "s" : ""} you today: ${approvals.length} awaiting a decision, ${stuck.length} vehicle${stuck.length === 1 ? "" : "s"} stuck, ${systemIssues} system issue${systemIssues === 1 ? "" : "s"}.`
         }
-        actions={canViewInventory ? <LinkButton to="/inventory" variant="primary">Open inventory</LinkButton> : undefined}
+        actions={canViewInventory ? <LinkButton to="#today-work" variant="primary">Review work</LinkButton> : undefined}
       />
 
       {metricsError && (
@@ -413,76 +412,61 @@ const GmHome = () => {
       <MetricStrip
         label="Today at a glance"
         metrics={[
-          { label: "Needs decision", value: reading ? null : approvals.length, loading: reading, hint: approvals.length === 1 ? "approval waiting" : "approvals waiting", tone: approvals.length > 0 ? "warning" : "neutral" },
-          { label: "Vehicles at risk", value: reading ? null : stuck.length, loading: reading, hint: `no stage change in ${STUCK_HOURS / 24}+ days`, tone: stuck.length > 0 ? "warning" : "neutral" },
-          { label: "Customer opportunities", value: openLeads.length, hint: openLeads.length === 1 ? "open lead" : "open leads" },
-          { label: "System issues", value: metricsError ? null : systemIssues, loading: metricsLoading, hint: systemIssues === 0 ? "no data defects" : "used vehicles missing a lifecycle row", tone: systemIssues > 0 ? "danger" : "neutral" },
+          { label: "Needs decision", value: reading ? null : approvals.length, loading: reading, tone: approvals.length > 0 ? "warning" : "neutral" },
+          { label: "Vehicles at risk", value: reading ? null : stuck.length, loading: reading, tone: stuck.length > 0 ? "warning" : "neutral" },
+          { label: "Customer opportunities", value: openLeads.length },
+          { label: "System issues", value: metricsError ? null : systemIssues, loading: metricsLoading, tone: systemIssues > 0 ? "danger" : "neutral" },
         ]}
       />
 
-      <section aria-labelledby="today-work" className="flex flex-col gap-3">
-        <SectionHeading
-          id="today-work"
-          title="Work for today"
-          description={
-            reading || readFailed
-              ? undefined
-              : `Ranked by urgency, then time waiting. Showing ${shown.length} of ${ranked.length} open items for ${scopeName}.`
-          }
-        />
-        <Panel>
-          <QueryState
-            status={reading ? "loading" : readFailed ? "error" : ranked.length === 0 ? "empty" : "ready"}
-            errorTitle="Today's work could not be read."
-            errorDetail="Nothing is being shown as clear. Reload to try again."
-            emptyTitle="Nothing is waiting on you"
-            emptyDetail="Service repairs, recon estimates, price discrepancies, stuck vehicles and compliance decisions appear here when they are raised."
-          >
-            <WorkTable caption="Ranked work for today" minWidth={760}>
-              <thead>
-                <tr>
-                  <Th>Item</Th>
-                  <Th>Issue</Th>
-                  <Th>Owner</Th>
-                  <Th>Waiting</Th>
-                  <Th align="right">Amount</Th>
-                  <Th align="right">Next step</Th>
+      <section id="today-work" aria-label="Work for today" className="flex flex-col gap-3">
+        <QueryState
+          status={reading ? "loading" : readFailed ? "error" : ranked.length === 0 ? "empty" : "ready"}
+          errorTitle="Today's work could not be read."
+          errorDetail="Nothing is being shown as clear. Reload to try again."
+          emptyTitle="Nothing is waiting on you"
+          emptyDetail="Service repairs, recon estimates, price discrepancies, stuck vehicles and compliance decisions appear here when they are raised."
+        >
+          <WorkTable caption="Ranked work for today" minWidth={900}>
+            <thead>
+              <tr>
+                <Th>Rank</Th>
+                <Th>Type</Th>
+                <Th>Vehicle</Th>
+                <Th>Owner</Th>
+                <Th>Issue / Next action</Th>
+                <Th align="right">Age</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((r, i) => (
+                <tr key={r.id} className="h-14 hover:bg-adm-workspace">
+                  <Td className="tabular-nums">
+                    <span className={`inline-flex min-w-[24px] justify-center rounded-[2px] px-1.5 text-[12px] font-bold ${r.urgent ? "bg-adm-danger-bg text-adm-danger" : "bg-adm-workspace text-adm-muted"}`}>{i + 1}</span>
+                  </Td>
+                  <Td className="max-w-[160px] truncate text-adm-muted">{r.kind}</Td>
+                  <Td className="max-w-[260px] truncate font-semibold text-adm-ink">{r.vehicle}</Td>
+                  <Td className="max-w-[160px] truncate text-adm-muted">{r.owner}</Td>
+                  <Td className="max-w-[320px] truncate">
+                    <Link to={r.href} className="text-adm-primary hover:underline" title={r.issue}>{r.next}</Link>
+                    <span className="text-adm-muted">{` - ${r.issue}`}</span>
+                  </Td>
+                  <Td align="right" className="whitespace-nowrap tabular-nums text-adm-muted">
+                    {r.age > 0 ? duration(r.age) : "Unknown"}
+                  </Td>
                 </tr>
-              </thead>
-              <tbody>
-                {shown.map((r) => (
-                  <tr key={r.id} className="hover:bg-adm-workspace">
-                    <Td>
-                      <p className="font-semibold">{r.vehicle}</p>
-                      <p className="text-[12px] leading-[18px] text-adm-muted">{r.kind}</p>
-                    </Td>
-                    <Td className="max-w-[320px]">
-                      <p className="truncate">{r.issue}</p>
-                      <p className="truncate text-[12px] leading-[18px] text-adm-muted">{r.detail}</p>
-                    </Td>
-                    <Td className="max-w-[180px] truncate text-adm-muted">{r.owner}</Td>
-                    <Td className="whitespace-nowrap tabular-nums">
-                      {r.age > 0 ? duration(r.age) : <span className="text-adm-muted">Unknown</span>}
-                      {r.urgent && <StatusText tone="danger" className="ml-2">Urgent</StatusText>}
-                    </Td>
-                    <Td align="right">{r.amount !== null && r.amount > 0 ? money(r.amount) : <span className="text-adm-muted">-</span>}</Td>
-                    <Td align="right">
-                      <LinkButton to={r.href} size="sm">{r.next}</LinkButton>
-                    </Td>
-                  </tr>
-                ))}
-              </tbody>
-            </WorkTable>
-            {ranked.length > shown.length && (
-              <p className="border-t border-adm-border px-4 py-3 text-[12px] leading-[18px] text-adm-muted">
-                {ranked.length - shown.length} more open items. Service repairs are listed in{" "}
-                <Link className="text-adm-primary underline" to="/service/approvals">Service approvals</Link>, recon in{" "}
-                <Link className="text-adm-primary underline" to="/recon">Recon</Link>, and stuck vehicles in{" "}
-                <Link className="text-adm-primary underline" to="/ready-board">Ready board</Link>.
-              </p>
-            )}
-          </QueryState>
-        </Panel>
+              ))}
+            </tbody>
+          </WorkTable>
+          {ranked.length > shown.length && (
+            <p className="px-1 text-[12px] leading-[18px] text-adm-muted">
+              {ranked.length - shown.length} more open items. Service repairs are listed in{" "}
+              <Link className="text-adm-primary underline" to="/service/approvals">Service approvals</Link>, recon in{" "}
+              <Link className="text-adm-primary underline" to="/recon">Recon</Link>, and stuck vehicles in{" "}
+              <Link className="text-adm-primary underline" to="/ready-board">Ready board</Link>.
+            </p>
+          )}
+        </QueryState>
       </section>
 
       {canViewGetReady && (

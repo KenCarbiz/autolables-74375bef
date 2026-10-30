@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { deriveRecallView, type RecallRowInput } from "@/lib/vehicleTruth/recallView";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { LocalTabs, PageHeader } from "@/components/product";
-import { Crumbs, DetailLayout, FactStrip } from "@/components/detail/parts";
+import { Crumbs, DetailLayout } from "@/components/detail/parts";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
@@ -342,7 +342,12 @@ export default function ServiceVehicleWorkspace() {
         <Crumbs items={[{ label: "Service Desk", to: "/service" }, { label: ymm }]} />
         <PageHeader
           title={ymm}
-          description={`VIN ${vin}${stock ? ` · Stock ${stock}` : ""} · ${ws.label}${ws.blockerLabel ? ` · ${ws.blockerLabel}` : ""}`}
+          description={`VIN ${vin}${stock ? ` · Stock ${stock}` : ""}`}
+          meta={[
+            veh.mileage != null ? `${Number(veh.mileage).toLocaleString("en-US")} mi` : null,
+            sold ? "Sold" : "In stock",
+            assignedMember ? memberName(assignedMember) : gr?.assigned_technician || "Unassigned",
+          ].filter(Boolean).join(" · ")}
           actions={
             <>
               <Link to={`/vehicle-file/${veh.id}`} className={BTN_SECONDARY}>Vehicle file</Link>
@@ -357,18 +362,6 @@ export default function ServiceVehicleWorkspace() {
           }
         />
         <WorkspaceTabs />
-
-        <FactStrip
-          label="Vehicle facts"
-          className="lg:grid-cols-5"
-          facts={[
-            { label: "Condition", value: <span className="capitalize">{veh.condition || "Unknown"}</span> },
-            { label: "Mileage", value: veh.mileage != null ? `${Number(veh.mileage).toLocaleString("en-US")} mi` : "Unknown" },
-            { label: "Assigned to", value: assignedMember ? memberName(assignedMember) : gr?.assigned_technician || "Unassigned" },
-            { label: "Sold status", value: sold ? "Sold" : "In stock" },
-            { label: "Delivery target", value: gr?.delivery_target ? formatCommandDateTime(gr.delivery_target) : "Unknown" },
-          ]}
-        />
 
         <DetailLayout
           main={
@@ -1750,10 +1743,10 @@ function WorkspaceTabs() {
   const { hash } = useLocation();
   const current = hash || "#inspection";
   const tabs = [
-    { key: "inspection", label: "K-208 inspection", to: "#inspection" },
-    { key: "failures", label: "Repairs and reinspection", to: "#failures" },
+    { key: "inspection", label: "Inspection findings", to: "#inspection" },
+    { key: "failures", label: "Repairs", to: "#failures" },
     { key: "approvals", label: "Approvals", to: "#approvals" },
-    { key: "summary", label: "Summary and history", to: "#summary" },
+    { key: "summary", label: "History", to: "#summary" },
   ];
   return <LocalTabs label="Workspace sections" tabs={tabs.map((t) => ({ ...t, active: t.to === current }))} />;
 }

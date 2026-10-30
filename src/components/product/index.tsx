@@ -171,34 +171,25 @@ export interface Metric {
   key?: string;
 }
 
-const BAR: Record<Tone, string> = {
-  neutral: "bg-adm-border",
-  info: "bg-adm-primary",
-  success: "bg-adm-success",
-  warning: "bg-[#D98B00]",
-  danger: "bg-adm-danger",
-};
-
 /** Four or fewer primary metrics in one strip, each with its own denominator. */
 export const MetricStrip = ({ metrics, label, className, action }: { metrics: Metric[]; label: string; className?: string; action?: ReactNode }) => {
   const shown = metrics.slice(0, 4);
   return (
-    <section aria-label={label} className={cn("rounded-[6px] border border-adm-border bg-adm-surface", className)}>
+    <section aria-label={label} className={cn("border-y border-adm-border", className)}>
       <div className="flex flex-col lg:flex-row lg:items-stretch">
         <dl className={cn("grid flex-1 grid-cols-2", shown.length >= 4 ? "lg:grid-cols-4" : shown.length === 3 ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
           {shown.map((m, i) => {
             const body = (
               <>
-                <span className={cn("absolute left-4 top-4 bottom-4 w-[3px] rounded-[2px]", BAR[m.tone ?? "neutral"])} aria-hidden="true" />
                 <dt className="text-[12px] leading-[18px] font-medium text-adm-muted">{m.label}</dt>
-                <dd className="mt-0.5 text-[24px] leading-[32px] font-bold tabular-nums text-adm-ink">
+                <dd className={cn("mt-0.5 text-[24px] leading-[32px] font-bold tabular-nums", m.tone === "danger" ? "text-adm-danger" : "text-adm-ink")}>
                   {m.loading ? <SkeletonBlock className="h-7 w-16" /> : <ValueOrUnknown value={m.value} />}
                 </dd>
-                {m.hint && <dd className="text-[12px] leading-[18px] text-adm-muted">{m.hint}</dd>}
+                {m.hint && <dd className="truncate text-[12px] leading-[18px] text-adm-muted">{m.hint}</dd>}
               </>
             );
             const cell = cn(
-              "relative block py-4 pl-8 pr-4 min-w-0",
+              "relative block py-3 px-5 min-w-0",
               i % 2 === 1 && "border-l border-adm-border",
               i >= 2 && "border-t border-adm-border lg:border-t-0",
               i >= 1 && "lg:border-l",

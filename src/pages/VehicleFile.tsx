@@ -223,13 +223,13 @@ const VehicleFile = () => {
   }));
 
   return (
-    <PageBody width="wide" className="pb-24 lg:pb-8">
+    <PageBody width="wide" className="pb-24 lg:pb-8 gap-4">
       <Crumbs items={[{ label: "Vehicles", to: "/inventory" }, { label: vehicle.ymm || vehicle.vin }]} />
 
-      <section aria-label="Vehicle identity" className="rounded-[6px] border border-adm-border bg-adm-surface p-4">
+      <section aria-label="Vehicle identity">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-          <div className="sm:w-[148px] shrink-0">
-            <div className="h-[100px] rounded-[4px] overflow-hidden bg-adm-workspace flex items-center justify-center">
+          <div className="sm:w-[132px] shrink-0">
+            <div className="h-[88px] rounded-[4px] overflow-hidden bg-adm-workspace flex items-center justify-center">
               {gallery.length ? (
                 <div className="relative w-full h-full">
                   <img src={gallery[safeImg]} alt={vehicle.ymm ? `${vehicle.ymm} photo ${safeImg + 1} of ${gallery.length}` : "Vehicle photo"} className="w-full h-full object-cover" />
@@ -304,7 +304,7 @@ const VehicleFile = () => {
                 <Copy className="w-5 h-5" /> Copy link
               </Button>
               {published ? (
-                <LinkButton to={viewUrl} variant="primary" target="_blank" rel="noreferrer">
+                <LinkButton to={viewUrl} variant={tab === "overview" ? "primary" : undefined} target="_blank" rel="noreferrer">
                   <ExternalLink className="w-5 h-5" /> View shopper page
                 </LinkButton>
               ) : (

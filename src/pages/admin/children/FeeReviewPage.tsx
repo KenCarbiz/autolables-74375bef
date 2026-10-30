@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, MoveRight } from "lucide-react";
+import { Archive, ArrowLeft, CarFront, Check, MoveRight, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
@@ -10,21 +10,22 @@ import { useAudit } from "@/contexts/AuditContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import { useViewFixture } from "@/lib/admin/dataSource";
-import { adminTabHref } from "@/lib/admin/sections";
+import { ADMIN_SECTIONS, adminTabHref, firstVisibleTab, resolveAdminTab, visibleSections, visibleTabs, type AdminVisibilityContext } from "@/lib/admin/sections";
 import { canApply, initialReviewApply, newIdempotencyKey, reviewApplyReducer, type ImpactSnapshot, type ReviewApplyEvent, type ReviewApplyState } from "@/lib/admin/reviewApply";
 import { feeChangeDiff, feeDraftFromSettings, feeDraftWarnings, fmtMoney, validateFeeDraft, type FeeDraft, type FeeImpactSample } from "@/lib/admin/pricing/feePolicy";
 import { describeFeeBasis, resolveFeeBasis, type FeeBasis } from "@/lib/admin/pricing/feeBasis";
 import { STATE_DOC_FEES } from "@/data/docFees";
 import type { PriceDisplayMode } from "@/lib/priceModel";
-import { AdminPageContainer, Breadcrumbs } from "@/components/admin/v2/AdminShell";
+import { AdminPageContainer, AdminShell } from "@/components/admin/v2/AdminShell";
 import { AdminButton, AdminTable, InlineNote, SkeletonBlock, StatusChip, Td, Th, type Tone } from "@/components/admin/v2/primitives";
-import { MetricStrip } from "@/components/product";
 import { applyFeeChange, loadPolicyVersion, parseFeeReviewParams, tenantIdOf, useFeePreview, usePolicyVersion, type FeePreviewResult, type FeeScope, type PolicyVersion } from "@/pages/admin/views/pricing/pricingData";
 import { AdminInput, AdminSelect, Field } from "@/pages/admin/views/pricing/ui";
+import PriceRulesView from "@/pages/admin/views/pricing/PriceRulesView";
 import { cn } from "@/lib/utils";
 import vehiclePlaceholder from "@/assets/admin-v2/artwork/vehicle-placeholder.svg";
 
-// Fee Change Review: Edit, Review, Apply, one page with a summary strip.
+// Fee Change Review: Edit, Review, Apply. The dialog sits over the Price rules
+// page it came from and dims only the workspace, as the reference draws it.
 // Opening it writes nothing; the impact is computed for the exact draft under
 // review; apply is refused for a stale review, an unknown count, an unknown
 // policy version or a role without pricing authority. The shared server
@@ -52,6 +53,10 @@ export interface FeeReviewReturn {
 }
 
 const APPLY_ROLES = new Set(["owner", "admin", "general_manager", "gsm"]);
+const FOCUSABLE = "button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])";
+// The dialog top sits 123px under the product header in the reference frame
+// (md:top-[123px]). Below md the dialog is pinned to the viewport instead.
+const NARROW = "(max-width: 767px)";
 
 type FeeState = ReviewApplyState<FeeDraft>;
 type FeeEvent = ReviewApplyEvent<FeeDraft>;
@@ -72,11 +77,44 @@ const stepOf = (phase: FeeState["phase"]): 1 | 2 | 3 => {
   return 2;
 };
 
-const Tile = ({ value, label, hint }: { value: string; label: string; hint: string }) => (
-  <div data-landmark="fee-impact-tile" className="rounded-[6px] border border-adm-border px-4 py-3">
-    <p data-landmark="impact-count" className="text-[24px] leading-[30px] font-bold text-adm-ink tabular-nums">{value}</p>
-    <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{label}</p>
-    <p className="mt-0.5 text-[13px] leading-[18px] text-adm-muted">{hint}</p>
+type StepStatus = "done" | "current" | "todo";
+
+// 37px circle (a ringed grey one when not started), 18px check or 16px
+// digit, a 14/12px label pair; a completed step's number hangs left of its
+// label so the status line aligns under the label, as the reference draws it.
+const StepItem = ({ n, label, status, trailing = false, className }: { n: number; label: string; status: StepStatus; trailing?: boolean; className?: string }) => (
+  <li className={cn("flex items-center", trailing && "flex-1", className)}>
+    <div className="flex items-center gap-[13px]" data-landmark="fee-review-step">
+      <span
+        aria-hidden="true"
+        className={cn("w-[37px] h-[37px] rounded-full flex items-center justify-center text-[16px] font-semibold flex-shrink-0", status === "todo" ? "bg-[#E8EBEF] border border-[#C9D3E0] text-adm-ink" : "bg-adm-primary text-white")}
+      >
+        {status === "done" ? <Check className="w-[18px] h-[18px]" strokeWidth={3} /> : n}
+      </span>
+      <span className="min-w-0 flex">
+        {status === "done" && <span className="w-[15px] flex-shrink-0 text-[14px] leading-[18px] font-semibold text-adm-primary">{n}</span>}
+        <span className="min-w-0">
+          <span className="block text-[14px] leading-[18px] font-semibold text-adm-ink whitespace-nowrap">{label}</span>
+          <span className="block text-[12px] leading-[17px] text-adm-muted whitespace-nowrap">{status === "done" ? "Completed" : status === "current" ? "Current step" : "Not started"}</span>
+        </span>
+      </span>
+    </div>
+    {trailing && <span aria-hidden="true" className="hidden sm:block flex-1 h-px bg-adm-border ml-[18px] mr-[13px]" />}
+  </li>
+);
+
+// Reference tile: a 48px circle with a 26px glyph, a 24px count, a 14px
+// label and a 13px hint, 112px tall.
+const Tile = ({ icon: Icon, tone, value, label, hint, filled = false }: { icon: typeof CarFront; tone: "success" | "neutral"; value: string; label: string; hint: string; filled?: boolean }) => (
+  <div data-landmark="fee-impact-tile" className="flex items-start gap-5 rounded-[6px] border border-adm-border bg-adm-workspace pl-[17px] pr-4 pt-[14px] pb-[11px] min-h-[112px]">
+    <span aria-hidden="true" className={cn("-mt-[2px] w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0", tone === "success" ? "bg-adm-success-bg text-adm-success" : "bg-adm-border/50 text-adm-muted")}>
+      <Icon className={cn("w-[26px] h-[26px]", filled && "fill-current")} />
+    </span>
+    <div className="min-w-0">
+      <p data-landmark="impact-count" className="text-[24px] leading-[25px] font-bold text-adm-ink tabular-nums">{value}</p>
+      <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{label}</p>
+      <p className="mt-1 text-[13px] leading-[18px] text-adm-muted">{hint}</p>
+    </div>
   </div>
 );
 
@@ -136,6 +174,8 @@ const TABLE_CLASS = "[&_th]:py-2 [&_th]:px-3 [&_td]:px-3 md:[&_th]:px-4 md:[&_td
 const RESULT_TONE: Record<"applied" | "partial" | "failed", Tone> = { applied: "success", partial: "warning", failed: "danger" };
 const RESULT_LABEL: Record<"applied" | "partial" | "failed", string> = { applied: "Applied", partial: "Partially applied", failed: "Not applied" };
 
+const BUTTON_41 = "h-[41px] px-5 text-[15px] gap-3.5";
+
 export default function FeeReviewPage() {
   const fixture = useViewFixture<FeeReviewFixture>("fee-review");
   const { loading } = useDealerSettings();
@@ -160,6 +200,7 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
   const audit = useAudit();
   const tenantId = tenantIdOf(tenant);
   const live = !fixture;
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   const original = useMemo(() => fixture?.before ?? feeDraftFromSettings(settings), [fixture, settings]);
   const parsed = useMemo(() => parseFeeReviewParams(params, original), [params, original]);
@@ -193,9 +234,37 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
     dispatch({ type: "review", impact: snapshotOf(preview.data, version.data?.version ?? null), idempotencyKey: newIdempotencyKey("doc-fee") });
   }, [fixture, state.phase, tenantId, preview.data, preview.isError, preview.error, version.data, version.isLoading]);
 
+  useEffect(() => {
+    dialogRef.current?.focus();
+  }, []);
+
+  // Below md the dialog is pinned to the viewport and scrolls its own body, so
+  // the page behind it is held still.
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia(NARROW);
+    const root = document.documentElement;
+    const previous = root.style.overflow;
+    const sync = () => { root.style.overflow = mq.matches ? "hidden" : previous; };
+    sync();
+    mq.addEventListener?.("change", sync);
+    return () => { mq.removeEventListener?.("change", sync); root.style.overflow = previous; };
+  }, []);
+
   const backHref = fixture?.backHref ?? adminTabHref("price-rules");
   const returnState: { feeReviewReturn: FeeReviewReturn } = { feeReviewReturn: { draft: state.draft, scope } };
   const close = () => navigate(backHref, { state: returnState });
+
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Escape") { e.preventDefault(); close(); return; }
+    if (e.key !== "Tab" || !dialogRef.current) return;
+    const nodes = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE));
+    if (nodes.length === 0) return;
+    const first = nodes[0];
+    const last = nodes[nodes.length - 1];
+    if (e.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  };
 
   const step = stepOf(state.phase);
   const previewResult = fixture ? fixture.preview : preview.data ?? null;
@@ -248,51 +317,56 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
     void reload?.();
   };
 
+  const ctx = useMemo<AdminVisibilityContext>(() => ({ role, isAdmin, features: { feature_product_rules: settings.feature_product_rules, feature_invoicing: settings.feature_invoicing, feature_warranty: settings.feature_warranty } }), [role, isAdmin, settings.feature_product_rules, settings.feature_invoicing, settings.feature_warranty]);
+  const resolved = resolveAdminTab("price-rules");
+  const sections = fixture ? [...ADMIN_SECTIONS] : visibleSections(ctx);
+  const tabs = resolved ? (fixture ? resolved.section.tabs.filter((t) => !t.unpictured) : visibleTabs(resolved.section, ctx)) : [];
+
   const eligibleLabel = scope === "all" ? "vehicles" : "active vehicles";
   const eligibleCount = impact?.eligible ?? null;
   const applyLabel = state.phase === "applying" ? "Applying…" : `Apply to ${eligibleCount == null ? "Unknown" : eligibleCount.toLocaleString()} ${eligibleLabel}`;
   const footNote: ReactNode = step === 2 ? (applyReason ?? "Requires pricing-management permission. Change will be audited.") : step === 3 ? "This review is complete." : "Nothing is changed until the review is applied.";
 
-  const STEP_NAMES = ["Edit", "Review", "Apply"] as const;
-  const feeValue = (d: FeeDraft) => (d.enabled && Number.isFinite(d.amount) ? fmtMoney(d.amount) : "Off");
-  const delta = state.original.enabled && state.draft.enabled && Number.isFinite(state.original.amount) && Number.isFinite(state.draft.amount) ? state.draft.amount - state.original.amount : null;
-  const deltaLabel = delta === null ? "Unknown" : Math.abs(delta) < 0.005 ? "No change" : `${delta > 0 ? "+" : "-"}${fmtMoney(Math.abs(delta))}`;
-  const primary =
-    step === 1 ? (
-      <AdminButton variant="primary" disabled={unchanged || state.phase === "validating"} onClick={startReview}>{state.phase === "validating" ? "Computing…" : "Review changes"}</AdminButton>
-    ) : step === 2 ? (
-      <AdminButton variant="primary" data-landmark="fee-apply" disabled={!applyEnabled} onClick={onApply}>{applyLabel}</AdminButton>
-    ) : (
-      <AdminButton variant="primary" onClick={close}>Done</AdminButton>
-    );
-
   return (
-    <AdminPageContainer>
-      <div className="space-y-4">
-        <Breadcrumbs crumbs={[{ label: "Administration", href: "/admin" }, { label: "Pricing & Products", href: backHref }, { label: "Fee change review" }]} />
-        <section aria-labelledby="fee-review-title" className="space-y-4 text-adm-ink">
-          <header className="flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0">
-              <div className="flex items-center gap-3 flex-wrap">
-                <h1 id="fee-review-title" className="text-[28px] leading-[36px] font-bold text-adm-ink">Fee change review: document fee</h1>
-                {step < 3 && <StatusChip>Draft</StatusChip>}
-              </div>
-              <p className="mt-0.5 text-[14px] leading-[20px] text-adm-muted">Step {step} of 3, {STEP_NAMES[step - 1]}. Confirm the new fee and the vehicles it will update before anything is applied.</p>
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">{primary}</div>
-          </header>
-          <MetricStrip
-            label="Fee change summary"
-            metrics={[
-              { label: "Current fee", value: feeValue(state.original) },
-              { label: "Proposed fee", value: feeValue(state.draft) },
-              { label: "Change", value: deltaLabel, tone: delta === null || Math.abs(delta) < 0.005 ? "neutral" : delta > 0 ? "danger" : "success" },
-              { label: eligibleLabel === "vehicles" ? "Impacted vehicles" : "Impacted active vehicles", value: eligibleCount == null ? null : eligibleCount.toLocaleString() },
-            ]}
-          />
-          <div data-fee-review-body>
+    <div className="relative">
+      <div aria-hidden="true" className="pointer-events-none select-none">
+        {resolved && (
+          <AdminShell sections={sections} activeSection={resolved.section} activeTab={resolved.tab} tabsForSection={tabs} firstTabFor={(s) => (fixture ? s.tabs[0] : firstVisibleTab(s, ctx))}>
+            <PriceRulesView />
+          </AdminShell>
+        )}
+      </div>
+      <div className="absolute max-md:fixed inset-0 z-40 bg-[#626A75]/[0.64]" onClick={close} aria-hidden="true" />
+      {/* The reference draws the review 18px left of the content column centre on desktop; narrow widths centre it. */}
+      <div aria-hidden="true" data-landmark="fee-review-top" className="absolute inset-x-0 top-0 h-[123px] pointer-events-none" />
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="fee-review-title"
+        tabIndex={-1}
+        onKeyDown={onKeyDown}
+        className="z-50 rounded-[8px] border border-adm-border bg-adm-surface shadow-2xl outline-none text-adm-ink md:absolute md:top-[123px] md:left-1/2 md:-translate-x-1/2 lg:left-[calc(50%-18px)] md:w-[min(907px,calc(100%-32px))] md:px-[26px] md:pt-[22px] md:pb-6 max-md:fixed max-md:inset-x-3 max-md:top-3 max-md:max-h-[calc(100dvh-24px)] max-md:flex max-md:flex-col max-md:overflow-hidden"
+      >
+        <header className="flex items-start justify-between gap-4 max-md:flex-shrink-0 max-md:px-4 max-md:pt-4 max-md:pb-3 max-md:border-b max-md:border-adm-border">
+          <div className="min-w-0">
+            <h2 id="fee-review-title" className="text-[22px] leading-[28px] font-bold text-adm-ink">Review document fee change</h2>
+            <p className="mt-1 text-[13px] leading-[18px] text-adm-muted">Confirm the new fee and the vehicles it will update before anything is applied.</p>
+          </div>
+          <button type="button" onClick={close} aria-label="Close review" className="-mt-2 -mr-3 w-9 h-9 rounded-md inline-flex items-center justify-center text-adm-muted hover:bg-adm-workspace focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary flex-shrink-0">
+            <X className="w-5 h-5" aria-hidden="true" />
+          </button>
+        </header>
+        <div data-fee-review-body className="max-md:flex-1 max-md:min-h-0 max-md:overflow-y-auto max-md:overscroll-contain max-md:px-4 max-md:pb-5">
+        {/* At the reference width the circles sit at the measured x (116, 362 and 634px into the content box); narrower dialogs share the row evenly. */}
+        <ol className="mt-[18px] mx-auto xl:mx-0 xl:ml-[116px] flex items-center flex-wrap gap-y-3 w-full max-w-[640px] xl:max-w-none xl:w-auto" data-landmark="fee-review-steps" aria-label="Review steps">
+          <StepItem n={1} label="Edit" status={step > 1 ? "done" : "current"} trailing className="xl:flex-none xl:w-[246px]" />
+          <StepItem n={2} label="Review" status={step === 2 ? "current" : step > 2 ? "done" : "todo"} trailing className="xl:flex-none xl:w-[272px]" />
+          <StepItem n={3} label="Apply" status={step === 3 ? (state.phase === "applied" ? "done" : "current") : "todo"} />
+        </ol>
+
         {step === 1 && (
-          <div className="rounded-[6px] border border-adm-border bg-adm-surface p-6 space-y-5">
+          <div className="mt-[31px] space-y-5">
             <div className="flex items-center justify-between gap-4 rounded-md border border-adm-border px-3 py-2.5">
               <div>
                 <p className="text-[14px] font-semibold text-adm-ink">Charge a document fee</p>
@@ -330,11 +404,11 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
         {step === 2 && (
           <>
             {(state.phase === "conflict" || state.phase === "invalidated") && (
-              <InlineNote tone="danger" className="mt-0" title={state.phase === "conflict" ? "The policy changed after this review." : "The review is no longer valid."}>
+              <InlineNote tone="danger" className="mt-[31px]" title={state.phase === "conflict" ? "The policy changed after this review." : "The review is no longer valid."}>
                 {state.phase === "conflict" ? "Reload and review the change again before applying it." : state.error}
               </InlineNote>
             )}
-            {state.error && state.phase === "reviewing" && <InlineNote tone="danger" className="mt-0">{state.error}</InlineNote>}
+            {state.error && state.phase === "reviewing" && <InlineNote tone="danger" className="mt-[31px]">{state.error}</InlineNote>}
 
             <div className={cn("grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_312px] gap-7 items-start", state.phase === "conflict" || state.phase === "invalidated" || (state.error && state.phase === "reviewing") ? "mt-5" : "mt-7")}>
               <section aria-labelledby="fee-change-summary" data-landmark="fee-change-summary">
@@ -364,11 +438,11 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
               <section aria-labelledby="fee-expected-impact">
                 <h3 id="fee-expected-impact" className="text-[16px] leading-[22px] font-semibold text-adm-ink">Expected impact</h3>
                 <div className="mt-3.5 space-y-2">
-                  <Tile value={eligibleCount == null ? "Unknown" : eligibleCount.toLocaleString()} label={`${eligibleLabel} eligible`} hint={(impact?.basis ?? basis) === "includes_fee" ? "Totals stay; the fee comes out of the vehicle price" : "Rows will be updated only when values differ"} />
+                  <Tile icon={CarFront} filled tone="success" value={eligibleCount == null ? "Unknown" : eligibleCount.toLocaleString()} label={`${eligibleLabel} eligible`} hint={(impact?.basis ?? basis) === "includes_fee" ? "Totals stay; the fee comes out of the vehicle price" : "Rows will be updated only when values differ"} />
                   {scope === "all" ? (
-                    <Tile value={impact ? impact.includedArchived.toLocaleString() : "Unknown"} label="archived vehicles included" hint="Archived records will be recalculated too" />
+                    <Tile icon={Archive} tone="neutral" value={impact ? impact.includedArchived.toLocaleString() : "Unknown"} label="archived vehicles included" hint="Archived records will be recalculated too" />
                   ) : (
-                    <Tile value={impact ? impact.excludedArchived.toLocaleString() : "Unknown"} label="archived vehicles excluded" hint="No changes will be made to archived records" />
+                    <Tile icon={Archive} tone="neutral" value={impact ? impact.excludedArchived.toLocaleString() : "Unknown"} label="archived vehicles excluded" hint="No changes will be made to archived records" />
                   )}
                 </div>
                 {impact && impact.unchanged > 0 && <p className="mt-2 text-[12px] leading-[18px] text-adm-muted">{impact.unchanged.toLocaleString()} {impact.unchanged === 1 ? "vehicle already carries" : "vehicles already carry"} these values and will not be touched.</p>}
@@ -466,7 +540,7 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
         )}
 
         {step === 3 && state.result && (
-          <div className="mt-0 space-y-3">
+          <div className="mt-[31px] space-y-3">
             <div className="flex items-center gap-3">
               <StatusChip tone={RESULT_TONE[state.result.status]} icon>{RESULT_LABEL[state.result.status]}</StatusChip>
               {state.result.affected != null && <span className="text-[13px] text-adm-muted">{state.result.affected.toLocaleString()} {state.result.affected === 1 ? "vehicle" : "vehicles"} updated</span>}
@@ -475,31 +549,41 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
             {state.result.auditEventId && <p className="text-[12px] leading-[18px] text-adm-muted">Audit event {state.result.auditEventId}</p>}
           </div>
         )}
-        {step === 3 && !state.result && state.error && <InlineNote tone="danger" className="mt-0">{state.error}</InlineNote>}
+        {step === 3 && !state.result && state.error && <InlineNote tone="danger" className="mt-[31px]">{state.error}</InlineNote>}
         </div>
 
-        <footer className="flex items-start justify-between gap-x-4 gap-y-2 flex-wrap">
+        <footer className="mt-[23px] flex items-start justify-between gap-x-4 gap-y-2 flex-wrap max-md:flex-shrink-0 max-md:mt-0 max-md:px-4 max-md:pt-3 max-md:pb-3 max-md:border-t max-md:border-adm-border">
           <div className="flex items-center gap-2">
             {step === 1 && (
-              <Link to={backHref} state={returnState} className="inline-flex items-center justify-center min-h-[36px] px-4 rounded-md border border-adm-border bg-adm-surface text-[14px] font-semibold text-adm-ink hover:bg-adm-workspace">Cancel</Link>
+              <Link to={backHref} state={returnState} className="inline-flex items-center justify-center h-[41px] px-6 rounded-md border border-adm-border bg-adm-surface text-[15px] font-semibold text-adm-ink hover:bg-adm-workspace">Cancel</Link>
             )}
             {step === 2 && (
-              <AdminButton data-landmark="fee-back" onClick={() => dispatch({ type: "edit", draft: state.draft })} disabled={state.phase === "applying"}>
+              <AdminButton data-landmark="fee-back" className={BUTTON_41} onClick={() => dispatch({ type: "edit", draft: state.draft })} disabled={state.phase === "applying"}>
                 <ArrowLeft className="w-5 h-5" aria-hidden="true" />
                 Back to edit
               </AdminButton>
             )}
             {step === 3 && state.result?.status !== "applied" && (
-              <AdminButton onClick={() => dispatch({ type: "edit", draft: state.draft })}>
+              <AdminButton className={BUTTON_41} onClick={() => dispatch({ type: "edit", draft: state.draft })}>
                 <ArrowLeft className="w-5 h-5" aria-hidden="true" />
                 Back to edit
               </AdminButton>
             )}
           </div>
-          <p className="text-[12px] leading-[18px] text-adm-muted text-right">{footNote}</p>
+          <div className="flex flex-col items-end min-w-0">
+            {step === 1 && (
+              <AdminButton variant="primary" className={BUTTON_41} disabled={unchanged || state.phase === "validating"} onClick={startReview}>{state.phase === "validating" ? "Computing…" : "Review changes"}</AdminButton>
+            )}
+            {step === 2 && (
+              <AdminButton variant="primary" data-landmark="fee-apply" className="h-[41px] px-4 text-[15px]" disabled={!applyEnabled} onClick={onApply}>{applyLabel}</AdminButton>
+            )}
+            {step === 3 && (
+              <AdminButton variant="primary" className={BUTTON_41} onClick={close}>Done</AdminButton>
+            )}
+            <p className="mt-1.5 text-[11px] leading-[16px] text-adm-muted text-right">{footNote}</p>
+          </div>
         </footer>
-        </section>
       </div>
-    </AdminPageContainer>
+    </div>
   );
 }

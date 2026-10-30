@@ -208,11 +208,12 @@ export const ComplianceTab = ({ vehicle, ready, recall, lifecycle, onReload }: {
         }
       />
 
-      <Card title="Compliance status">
-        <dl className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-3" aria-label="Compliance status">
+      <div className="space-y-3">
+        <h3 className="text-[15px] leading-[22px] font-semibold text-adm-ink">Compliance status</h3>
+        <dl className="grid grid-cols-2 lg:grid-cols-4 gap-3" aria-label="Compliance status">
           {[recallLine, facts.signing, facts.delivery, facts.retail].map((f) => (
-            <div key={f.label} className="min-w-0">
-              <dt className="text-[12px] leading-[18px] text-adm-muted">{f.label}</dt>
+            <div key={f.label} className="min-w-0 rounded-[6px] border border-adm-border bg-adm-surface p-3">
+              <dt className="text-[13px] leading-[18px] text-adm-ink">{f.label}</dt>
               <dd className="mt-0.5">
                 <StatusText tone={f.tone} icon={f.tone !== "neutral" && f.tone !== "info"}>{f.value}</StatusText>
                 {f.detail && <span className="block text-[12px] leading-[18px] text-adm-muted mt-0.5">{f.detail}</span>}
@@ -222,7 +223,7 @@ export const ComplianceTab = ({ vehicle, ready, recall, lifecycle, onReload }: {
         </dl>
 
         <div id="vf-compliance-blockers" className="scroll-mt-24">
-          <p className="text-[14px] leading-[20px] font-semibold text-adm-ink mb-2">
+          <p className="text-[15px] leading-[22px] font-semibold text-adm-ink mb-2">
             Current blockers and open items ({ready.remaining.length + (recallLine.tone === "neutral" ? 1 : 0)})
           </p>
           {ready.remaining.length === 0 && recallLine.tone !== "neutral" ? (
@@ -237,14 +238,14 @@ export const ComplianceTab = ({ vehicle, ready, recall, lifecycle, onReload }: {
                   <tr>
                     <Td>Recall: Unknown for this VIN</Td>
                     <Td><StatusText tone="neutral">Not cleared</StatusText></Td>
-                    <Td><a className="text-adm-primary underline" href="#vf-recall-card">Recall card below</a></Td>
+                    <Td><a className="text-adm-primary hover:underline" href="#vf-recall-card">Recall card below</a></Td>
                   </tr>
                 )}
                 {ready.remaining.map((c) => (
                   <tr key={c.label}>
                     <Td>{c.label}</Td>
                     <Td>{c.blocks ? <StatusText tone="danger" icon>Blocks publish</StatusText> : <StatusText tone="warning">Open item</StatusText>}</Td>
-                    <Td className="text-adm-muted">This tab, or the matching section</Td>
+                    <Td className="text-adm-muted">On this tab</Td>
                   </tr>
                 ))}
               </tbody>
@@ -256,7 +257,7 @@ export const ComplianceTab = ({ vehicle, ready, recall, lifecycle, onReload }: {
             No evidence events are recorded for this VIN yet, so a defense packet cannot be built.
           </p>
         )}
-      </Card>
+      </div>
 
       <PriceIntegrityCards vehicle={vehicle} />
 

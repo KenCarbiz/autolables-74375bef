@@ -12,8 +12,8 @@ import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import { canDispatchGetReady } from "@/lib/commandCenter/dispatchAuthority";
 import { clearanceReasonLabel } from "@/lib/service/workspaceStatus";
 import { toast } from "sonner";
-import { CheckCircle2, MinusCircle, Loader2, MoreHorizontal, RefreshCw, X, Printer, Wrench } from "lucide-react";
-import { Button, LocalTabs, MetricStrip, PageBody, PageHeader, Panel, QueryState, StatusText, Td, Th, WorkTable, type LocalTab } from "@/components/product";
+import { Loader2, MoreHorizontal, X, Printer } from "lucide-react";
+import { Button, LocalTabs, MetricStrip, PageBody, PageHeader, QueryState, StatusText, Td, Th, WorkTable, type LocalTab } from "@/components/product";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 // /ready-board — the used-car manager's daily cockpit. Every car and where it
@@ -305,14 +305,11 @@ export default function ReadyBoard() {
     <PageBody width="wide">
       <PageHeader
         title="Ready Board"
-        description="Where every vehicle stands across Service K-208, Detail, Prep and install, Recon and Recall."
+        description="Vehicle lifecycle workboard across service, detail, prep, recon and recall."
         actions={
           <>
             <Button onClick={() => setTodayOnly((v) => !v)} aria-pressed={todayOnly}>
               {todayOnly ? "Showing today's intake" : "Today's intake only"}
-            </Button>
-            <Button onClick={load} disabled={loading}>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <RefreshCw className="h-4 w-4" aria-hidden="true" />} Refresh
             </Button>
           </>
         }
@@ -323,13 +320,13 @@ export default function ReadyBoard() {
       <MetricStrip
         label="Ready Board summary"
         metrics={[
-          { label: "Waiting for acceptance", value: ready ? bucketCounts.acceptance : null, loading, hint: total != null ? `of ${total.toLocaleString()} on the board` : undefined, tone: "warning", href: "/ready-board?view=acceptance" },
-          { label: "Waiting for Get-Ready", value: ready ? bucketCounts.getready : null, loading, hint: total != null ? `of ${total.toLocaleString()} on the board` : undefined, tone: "info", href: "/ready-board?view=getready" },
-          { label: "Ready", value: ready ? bucketCounts.ready : null, loading, hint: "every station cleared", tone: "success", href: "/ready-board?view=ready" },
-          { label: "Recall review", value: stats ? stats.recallBlocked : null, loading, hint: "before they can be sold", tone: stats && stats.recallBlocked > 0 ? "danger" : "neutral" },
+          { label: "Waiting for acceptance", value: ready ? bucketCounts.acceptance : null, loading, tone: "warning", href: "/ready-board?view=acceptance" },
+          { label: "Waiting for Get-Ready", value: ready ? bucketCounts.getready : null, loading, tone: "info", href: "/ready-board?view=getready" },
+          { label: "Ready", value: ready ? bucketCounts.ready : null, loading, tone: "success", href: "/ready-board?view=ready" },
+          { label: "Recall review", value: stats ? stats.recallBlocked : null, loading, tone: stats && stats.recallBlocked > 0 ? "danger" : "neutral" },
         ]}
       />
-      <Panel flush>
+      <div>
         <QueryState
           status={status}
           onRetry={load}
@@ -342,81 +339,84 @@ export default function ReadyBoard() {
             <thead>
               <tr>
                 <Th>Vehicle</Th>
-                <Th>Service K-208</Th>
-                <Th>Detail</Th>
-                <Th>Prep / install</Th>
-                <Th>Recon</Th>
+                <Th>Current stage</Th>
+                <Th>Stations done</Th>
                 <Th>Recall</Th>
                 <Th>Ready</Th>
-                <Th align="right">Actions</Th>
+                <Th>Next action</Th>
+                <Th align="right"><span className="sr-only">More</span></Th>
               </tr>
             </thead>
             <tbody>
               {visibleRows.map((r) => {
                 const rc = recallState(r);
+                const used = isUsed(r.condition);
+                const stations: Array<[string, boolean]> = [
+                  ...(used ? [["Service K-208", service.has(r.vin)] as [string, boolean]] : []),
+                  ["Detail", detail.has(r.vin)],
+                  ["Prep and install", prep.has(r.vin)],
+                  ["Recon", !reconNeeds.has(r.vin)],
+                ];
+                const open = stations.find(([, done]) => !done);
+                const stage = open ? open[0] : recallReview.has(r.vin) ? "Recall review" : "All stations clear";
+                const done = stations.filter(([, d]) => d).length;
+                const primary: { label: string; run: () => void; busy: boolean } | null =
+                  canDecideRetailReady && lifecycleOf(r) === "FINAL_READY_VERIFICATION"
+                    ? { label: "Mark retail ready", run: () => markRetailReady(r), busy: marking === r.vin }
+                    : canAccept && bucketOf(r) === "acceptance"
+                      ? { label: "Authorize and dispatch", run: () => acceptAndDispatch(r), busy: accepting === r.vin }
+                      : bucketOf(r) === "ready" && !r.deal_processed_at
+                        ? { label: "Open deal", run: () => navigate(`/vehicle-file/${r.id}?tab=deal`), busy: false }
+                        : null;
                 return (
-                  <tr key={r.vin}>
-                    <Td>
-                      <div className="flex max-w-[260px] items-center gap-2 font-semibold text-adm-ink">
+                  <tr key={r.vin} className="h-14 hover:bg-adm-workspace">
+                    <Td className="max-w-[300px]">
+                      <div className="flex items-center gap-2 font-semibold text-adm-ink">
                         <span className="truncate">{r.ymm || "Vehicle"}</span>
                         {isToday(r) && <StatusText tone="info">New</StatusText>}
-                        {staleVins.has(r.vin) && <span title="Get-Ready changed since acceptance"><StatusText tone="warning" icon>Changed</StatusText></span>}
+                        {staleVins.has(r.vin) && <span title="Get-Ready changed since acceptance"><StatusText tone="warning">Changed</StatusText></span>}
                       </div>
-                      <div className="font-mono text-[12px] text-adm-muted">{r.vin} · {r.status || "draft"}</div>
+                      <div className="truncate font-mono text-[12px] text-adm-muted">{r.vin}</div>
                     </Td>
-                    <Td><Cell on={service.has(r.vin)} dim={!isUsed(r.condition)} /></Td>
-                    <Td><Cell on={detail.has(r.vin)} /></Td>
-                    <Td><Cell on={prep.has(r.vin)} /></Td>
-                    <Td>
-                      {reconNeeds.has(r.vin)
-                        ? <button onClick={() => navigate("/recon")} className="inline-flex items-center gap-1 whitespace-nowrap text-[13px] font-semibold text-adm-warning hover:underline"><Wrench className="h-4 w-4" aria-hidden="true" /> OK work</button>
-                        : <CheckCircle2 className="inline h-5 w-5 text-adm-success" aria-label="No recon approval pending" />}
+                    <Td className="whitespace-nowrap">{stage}</Td>
+                    <Td className="whitespace-nowrap tabular-nums text-adm-muted">{done} of {stations.length}</Td>
+                    <Td className="whitespace-nowrap">
+                      {recallReview.has(r.vin) ? <StatusText tone="danger">Review</StatusText>
+                        : rc === "ok" ? <span className="text-adm-muted">Current</span>
+                        : rc === "dnd" ? <StatusText tone="danger">Do not drive</StatusText>
+                        : <span className="text-adm-muted">Unknown</span>}
                     </Td>
-                    <Td>
-                      {recallReview.has(r.vin) ? <span title="Open recall — service review required"><StatusText tone="danger" icon>Review</StatusText></span>
-                        : rc === "ok" ? <CheckCircle2 className="inline h-5 w-5 text-adm-success" aria-label="Recall check current" />
-                        : rc === "dnd" ? <span title="Do-not-drive recall"><StatusText tone="danger" icon>Do not drive</StatusText></span>
-                        : <span title="Recall check stale or missing"><StatusText tone="warning" icon>Unverified</StatusText></span>}
+                    <Td className="whitespace-nowrap">
+                      {lifecycleOf(r) === "RETAIL_READY" ? <StatusText tone="success">Retail ready</StatusText>
+                        : isReady(r) ? <StatusText tone="success">Ready</StatusText>
+                        : <span className="text-adm-muted">Not ready</span>}
                     </Td>
-                    <Td>
-                      {isReady(r) ? <StatusText tone="success" icon>Ready</StatusText>
-                        : <span className="text-adm-muted">—</span>}
+                    <Td className="whitespace-nowrap">
+                      {primary ? (
+                        <button type="button" onClick={primary.run} disabled={primary.busy} className="text-[14px] font-semibold text-adm-primary hover:underline disabled:opacity-50">
+                          {primary.busy ? "Working…" : primary.label}
+                        </button>
+                      ) : bucketOf(r) === "ready" && r.deal_processed_at ? (
+                        <StatusText tone="success">Filed</StatusText>
+                      ) : (
+                        <button type="button" onClick={() => navigate(`/vehicle-file/${r.id}?tab=getready`)} className="text-[14px] font-semibold text-adm-primary hover:underline">View</button>
+                      )}
                     </Td>
                     <Td align="right">
-                      <div className="flex items-center justify-end gap-2 whitespace-nowrap">
-                        {lifecycleOf(r) === "RETAIL_READY" && <StatusText tone="success">Retail ready</StatusText>}
-                        {(() => {
-                          const primary: { label: string; run: () => void; busy: boolean } | null =
-                            canDecideRetailReady && lifecycleOf(r) === "FINAL_READY_VERIFICATION"
-                              ? { label: "Mark retail ready", run: () => markRetailReady(r), busy: marking === r.vin }
-                              : canAccept && bucketOf(r) === "acceptance"
-                                ? { label: "Authorize and dispatch", run: () => acceptAndDispatch(r), busy: accepting === r.vin }
-                                : bucketOf(r) === "ready" && !r.deal_processed_at
-                                  ? { label: "Open deal", run: () => navigate(`/vehicle-file/${r.id}?tab=deal`), busy: false }
-                                  : null;
-                          return primary ? (
-                            <button type="button" onClick={primary.run} disabled={primary.busy} className="text-[14px] font-semibold text-adm-primary hover:underline disabled:opacity-50">
-                              {primary.busy ? "Working…" : primary.label}
-                            </button>
-                          ) : bucketOf(r) === "ready" && r.deal_processed_at ? (
-                            <span title={`Deal filed ${new Date(r.deal_processed_at).toLocaleDateString()}`}><StatusText tone="success">Filed</StatusText></span>
-                          ) : null;
-                        })()}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger aria-label={`More actions for ${r.ymm || r.vin}`} className="rounded-[6px] p-1 text-adm-muted hover:bg-adm-workspace">
-                            <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {staleVins.has(r.vin) && addMap.get(r.vin) && (
-                              <DropdownMenuItem onSelect={() => navigate(`/addendum?id=${addMap.get(r.vin)!.id}&edit=1`)}>Update addendum</DropdownMenuItem>
-                            )}
-                            {service.has(r.vin) && <DropdownMenuItem onSelect={() => navigate(`/k208/${r.vin}`)}>Print K-208</DropdownMenuItem>}
-                            <DropdownMenuItem onSelect={() => printSticker(r)}>Print window sticker</DropdownMenuItem>
-                            <DropdownMenuItem disabled={sending === r.vin} onSelect={() => sendGetReady(r)}>Send get-ready to detail</DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => showQr(r.vin)}>Get-Ready QR</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger aria-label={`More actions for ${r.ymm || r.vin}`} className="rounded-[6px] p-1 text-adm-muted hover:bg-adm-workspace">
+                          <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {staleVins.has(r.vin) && addMap.get(r.vin) && (
+                            <DropdownMenuItem onSelect={() => navigate(`/addendum?id=${addMap.get(r.vin)!.id}&edit=1`)}>Update addendum</DropdownMenuItem>
+                          )}
+                          {service.has(r.vin) && <DropdownMenuItem onSelect={() => navigate(`/k208/${r.vin}`)}>Print K-208</DropdownMenuItem>}
+                          <DropdownMenuItem onSelect={() => printSticker(r)}>Print window sticker</DropdownMenuItem>
+                          <DropdownMenuItem disabled={sending === r.vin} onSelect={() => sendGetReady(r)}>Send get-ready to detail</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => showQr(r.vin)}>Get-Ready QR</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </Td>
                   </tr>
                 );
@@ -424,7 +424,7 @@ export default function ReadyBoard() {
             </tbody>
           </WorkTable>
         </QueryState>
-      </Panel>
+      </div>
 
       {qrVin && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={() => setQrVin(null)}>
@@ -447,10 +447,4 @@ export default function ReadyBoard() {
       )}
     </PageBody>
   );
-}
-
-function Cell({ on, dim }: { on: boolean; dim?: boolean }) {
-  if (on) return <CheckCircle2 className="inline h-5 w-5 text-adm-success" aria-label="Done" />;
-  if (dim) return <span className="text-[12px] text-adm-muted">n/a</span>;
-  return <MinusCircle className="inline h-5 w-5 text-adm-muted" aria-label="Not done" />;
 }

@@ -15,8 +15,9 @@ import {
   WORK_LANES,
   type WorkLane,
 } from "@/lib/work/workClassification";
-import { AlertTriangle, Car, CheckCircle2, ClipboardList, Filter, Inbox, PlayCircle, Printer, RefreshCw, RotateCcw, ScanLine, ShieldCheck, Sparkles, Trash2, Wrench } from "lucide-react";
+import { MoreHorizontal, AlertTriangle, Car, CheckCircle2, ClipboardList, Filter, Inbox, PlayCircle, Printer, RefreshCw, RotateCcw, ScanLine, ShieldCheck, Sparkles, Trash2, Wrench } from "lucide-react";
 import { toast } from "sonner";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useSearchParams } from "react-router-dom";
 import { PageBody, PageHeader, LocalTabs, QueryState, Panel, WorkTable, Th, Td, Button, StatusText, InlineNote, type LocalTab } from "@/components/product";
 
@@ -312,12 +313,11 @@ const WorkQueue = () => {
     <PageBody width="wide">
       <PageHeader
         title="Work Queue"
-        description="Tasks people own come first. Everything the sync recorded about a vehicle sits in its own tab, so a feed event never counts as somebody's job."
+        description="Your tasks and items across the team."
         actions={
           <>
-            <Button onClick={load} disabled={loading}><RefreshCw className="h-4 w-4" /> Refresh</Button>
             <Button variant="primary" onClick={confirmBuild} disabled={creating}>
-              <PlayCircle className="h-4 w-4" /> {creating ? "Building queue..." : "Review and build from inventory"}
+              {creating ? "Building queue..." : "Review and build from inventory"}
             </Button>
           </>
         }
@@ -351,9 +351,6 @@ const WorkQueue = () => {
             <option value="passport">Passport</option>
             <option value="finance">Finance</option>
           </select>
-          <QuickFilter label="Needs approval" onClick={() => { setStatus("needs_approval"); setDepartment("all"); }} />
-          <QuickFilter label="Get-ready" onClick={() => { setDepartment("service"); setStatus("all"); }} />
-          <QuickFilter label="Compliance" onClick={() => { setDepartment("compliance"); setStatus("all"); }} />
           {filtersActive && (
             <Button size="sm" variant="ghost" onClick={() => { setStatus("all"); setDepartment("all"); setQ(""); }}>Clear filters</Button>
           )}
@@ -378,7 +375,7 @@ const WorkQueue = () => {
       {tabKey === "print" ? (
         <VinPrintQueue />
       ) : (
-        <Panel>
+        <div>
           <QueryState
             status={loading ? "loading" : laneItems.length === 0 ? "empty" : "ready"}
             emptyTitle={
@@ -401,11 +398,12 @@ const WorkQueue = () => {
               <thead>
                 <tr>
                   <Th>Task</Th>
-                  <Th>Vehicle or customer</Th>
+                  <Th>Vehicle</Th>
+                  <Th>Department</Th>
                   <Th>Owner</Th>
                   <Th>Due</Th>
                   <Th>Status</Th>
-                  <Th align="right">Next step</Th>
+                  <Th align="right"><span className="sr-only">Actions</span></Th>
                 </tr>
               </thead>
               <tbody>
@@ -424,15 +422,20 @@ const WorkQueue = () => {
               </tbody>
             </WorkTable>
           </QueryState>
-        </Panel>
+        </div>
       )}
     </PageBody>
   );
 };
 
-function QuickFilter({ label, onClick }: { label: string; onClick: () => void }) {
+function RowMenu({ children, label }: { children: ReactNode; label: string }) {
   return (
-    <Button size="sm" variant="ghost" onClick={onClick}>{label}</Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger aria-label={label} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-adm-border text-adm-muted hover:bg-adm-workspace">
+        <MoreHorizontal className="h-5 w-5" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48">{children}</DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -452,47 +455,26 @@ function HumanTaskRow({ item, currentUserId, previews, onOpen, onUpdate }: {
   const external = item.source === "description_exception";
 
   return (
-    <tr className="hover:bg-adm-workspace align-top">
-      <Td className="max-w-[360px]">
-        <p className="font-semibold text-adm-ink">{item.title}</p>
-        <p className="text-[12px] leading-[18px] text-adm-muted">
-          {item.description || "Created from this vehicle's state during the last inventory sync."}
-        </p>
-        <p className="text-[12px] leading-[18px] text-adm-muted capitalize">
-          {item.department || "inventory"}
-          {urgent && <StatusText tone="danger" icon className="ml-2">{item.priority}</StatusText>}
-        </p>
-        {previews > 0 && item.status !== "completed" && (
-          <p className="text-[12px] leading-[18px] text-adm-muted">
-            Next-best-action engine sees {previews} possible requirement{previews === 1 ? "" : "s"} for this vehicle.
-          </p>
-        )}
+    <tr className="h-14 hover:bg-adm-workspace">
+      <Td className="max-w-[320px] truncate font-semibold text-adm-ink">
+        {item.title}
+        {urgent && <StatusText tone="danger" className="ml-2">{item.priority}</StatusText>}
       </Td>
-      <Td className="max-w-[200px] truncate">{vehicleLabel(item)}</Td>
+      <Td className="max-w-[220px] truncate">{vehicleLabel(item)}</Td>
+      <Td className="text-adm-muted capitalize truncate">{item.department || "inventory"}</Td>
       <Td className="text-adm-muted">{owner}</Td>
       <Td className="whitespace-nowrap">
         <span className={due.overdue ? "text-adm-danger" : "text-adm-muted"}>{due.text}</span>
       </Td>
       <Td className="whitespace-nowrap">{statusLabels[item.status] || item.status}</Td>
       <Td align="right">
-        <div className="flex flex-wrap justify-end gap-2">
-          {link && <Button size="sm" onClick={() => onOpen(link)}>Open record</Button>}
-          {/* A description exception is not a dealer_work_items row, so Start /
-              Mark done cannot act on it. */}
-          {!external && (
-            <>
-              {item.status !== "in_progress" && item.status !== "completed" && (
-                <Button size="sm" onClick={() => onUpdate(item, "in_progress")}>Start</Button>
-              )}
-              {item.department === "print" && item.status !== "completed" && (
-                <Button size="sm" variant="primary" onClick={() => onUpdate(item, "completed")}>
-                  <Printer className="h-4 w-4" /> Approve done
-                </Button>
-              )}
-              {item.status !== "completed" && item.department !== "print" && (
-                <Button size="sm" variant="primary" onClick={() => onUpdate(item, "completed")}>Mark done</Button>
-              )}
-            </>
+        <div className="flex items-center justify-end gap-2">
+          {link && <button type="button" onClick={() => onOpen(link)} className="text-[14px] font-semibold text-adm-primary hover:underline">Open</button>}
+          {!external && item.status !== "completed" && (
+            <RowMenu label={`More actions for ${item.title}`}>
+              {item.status !== "in_progress" && <DropdownMenuItem onSelect={() => onUpdate(item, "in_progress")}>Start</DropdownMenuItem>}
+              <DropdownMenuItem onSelect={() => onUpdate(item, "completed")}>{item.department === "print" ? "Approve done" : "Mark done"}</DropdownMenuItem>
+            </RowMenu>
           )}
         </div>
       </Td>
@@ -513,33 +495,22 @@ function ExceptionRow({ item, onOpen, onDismiss }: {
   const departed = item.vehicleActive === false;
 
   return (
-    <tr className="hover:bg-adm-workspace align-top">
-      <Td className="max-w-[360px]">
-        <p className="font-semibold text-adm-ink">{copy.label}</p>
-        <p className="text-[12px] leading-[18px] text-adm-muted">{copy.why}</p>
-        {showDetail && <p className="text-[12px] leading-[18px] text-adm-muted">{detail}</p>}
-        <details className="mt-1">
-          <summary className="text-[12px] leading-[18px] cursor-pointer text-adm-muted">Diagnostics</summary>
-          <p className="text-[12px] leading-[18px] text-adm-muted break-all font-mono">
-            {item.work_type} | {item.source || "unknown source"} | {item.status} | {item.id}
-          </p>
-        </details>
-      </Td>
-      <Td className="max-w-[220px]">
-        <p className="truncate">{vehicleLabel(item)}</p>
-        {item.vin && <p className="text-[12px] leading-[18px] text-adm-muted font-mono truncate">VIN {item.vin}</p>}
-        {departed && <p className="text-[12px] leading-[18px] text-adm-muted">Vehicle no longer in inventory</p>}
-      </Td>
+    <tr className="h-14 hover:bg-adm-workspace" title={[copy.why, showDetail ? detail : ""].filter(Boolean).join(" ")}>
+      <Td className="max-w-[320px] truncate font-semibold text-adm-ink">{copy.label}</Td>
+      <Td className="max-w-[220px] truncate">{vehicleLabel(item)}{departed ? " (left the lot)" : ""}</Td>
+      <Td className="text-adm-muted">System</Td>
       <Td className="text-adm-muted">System</Td>
       <Td className="whitespace-nowrap text-adm-muted">
-        {item.created_at ? `Recorded ${format(new Date(item.created_at), "MMM d, yyyy")}` : "Unknown"}
+        {item.created_at ? format(new Date(item.created_at), "MMM d, yyyy") : "Unknown"}
       </Td>
       <Td className="whitespace-nowrap">{statusLabels[item.status] || item.status}</Td>
       <Td align="right">
-        <div className="flex flex-wrap justify-end gap-2">
-          {copy.nextAction && link && <Button size="sm" variant="primary" onClick={() => onOpen(link)}>{copy.nextAction}</Button>}
+        <div className="flex items-center justify-end gap-2">
+          {copy.nextAction && link && <button type="button" onClick={() => onOpen(link)} className="text-[14px] font-semibold text-adm-primary hover:underline">{copy.nextAction}</button>}
           {!external && item.status !== "completed" && (
-            <Button size="sm" onClick={() => onDismiss(item, "completed")}>Dismiss</Button>
+            <RowMenu label={`More actions for ${copy.label}`}>
+              <DropdownMenuItem onSelect={() => onDismiss(item, "completed")}>Dismiss</DropdownMenuItem>
+            </RowMenu>
           )}
         </div>
       </Td>

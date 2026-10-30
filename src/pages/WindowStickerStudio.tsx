@@ -73,24 +73,18 @@ const fmtWhen = (d?: string | null) =>
 
 function StepRail({ active }: { active: number }) {
   return (
-    <ol className="flex items-stretch gap-0 overflow-x-auto border border-adm-border rounded-[4px] bg-adm-surface" aria-label="Window sticker steps">
+    <ol className="flex items-center" aria-label="Window sticker steps">
       {STEPS.map((s, i) => {
         const state = s.n < active ? "done" : s.n === active ? "current" : "todo";
         return (
-          <li
-            key={s.n}
-            aria-current={state === "current" ? "step" : undefined}
-            className={`flex-1 min-w-[150px] flex items-center gap-2 px-3 py-2 ${i > 0 ? "border-l border-adm-border" : ""} ${state === "current" ? "border-b-2 border-b-adm-primary" : ""}`}
-          >
-            <span aria-hidden className={`w-6 h-6 rounded-full grid place-items-center text-[12px] font-bold shrink-0 ${
-              state === "done" ? "bg-adm-success text-white" : state === "current" ? "bg-adm-primary text-white" : "bg-adm-workspace text-adm-muted"
+          <li key={s.n} aria-current={state === "current" ? "step" : undefined} className={`flex items-center gap-2 ${i < STEPS.length - 1 ? "flex-1" : ""}`}>
+            <span aria-hidden className={`w-8 h-8 rounded-full grid place-items-center text-[14px] font-bold shrink-0 border ${
+              state === "done" ? "bg-adm-success border-adm-success text-white" : state === "current" ? "bg-adm-primary border-adm-primary text-white" : "bg-adm-surface border-adm-border text-adm-muted"
             }`}>
-              {state === "done" ? <Check className="w-3.5 h-3.5" /> : s.n}
+              {state === "done" ? <Check className="w-5 h-5" /> : s.n}
             </span>
-            <span className="min-w-0">
-              <span className={`block text-[14px] leading-[20px] font-semibold ${state === "todo" ? "text-adm-muted" : "text-adm-ink"}`}>{s.title}</span>
-              <span className="block text-[12px] leading-[18px] text-adm-muted truncate">{s.detail}</span>
-            </span>
+            <span className={`text-[14px] leading-[20px] font-semibold ${state === "todo" ? "text-adm-muted" : "text-adm-ink"}`}>{s.title}</span>
+            {i < STEPS.length - 1 && <span aria-hidden className="mx-2 h-px flex-1 bg-adm-border" />}
           </li>
         );
       })}
@@ -118,6 +112,8 @@ export default function WindowStickerStudio() {
   const [vinInput, setVinInput] = useState("");
   const [vinDuplicate, setVinDuplicate] = useState<VehicleHit | null>(null);
   const [history, setHistory] = useState<HistoryRow[] | null>(null);
+  const [picked, setPicked] = useState<VehicleHit | null>(null);
+  const [mode, setMode] = useState<"inventory" | "vin">("inventory");
 
   const select = useCallback((vehicleId: string) => {
     const next = new URLSearchParams(params);
@@ -256,19 +252,20 @@ export default function WindowStickerStudio() {
     );
   }
 
-  const studioTabs: LocalTab[] = [
-    { key: "create", label: "Create", to: "/window-sticker-studio" + (selectedId ? `?vehicle=${encodeURIComponent(selectedId)}` : ""), active: tab === "create" },
-    { key: "history", label: "History", to: "/window-sticker-studio?tab=history", active: tab === "history" },
+  const modeTabs: LocalTab[] = [
+    { key: "inventory", label: "Search inventory", to: "#", active: mode === "inventory" },
+    { key: "vin", label: "Create by VIN", to: "#", active: mode === "vin" },
   ];
 
   return (
     <PageBody width="wide">
       <PageHeader
         title="Window Sticker Studio"
-        description="Create, validate and publish VIN-specific OEM window stickers. Nothing is fetched or generated until you choose to."
+        description="Create and publish factory window stickers for your inventory."
+        actions={tab === "history"
+          ? <Button onClick={() => setTab("create")}>Back to studio</Button>
+          : <Button onClick={() => setTab("history")}>History</Button>}
       />
-
-      <LocalTabs tabs={studioTabs} label="Window sticker studio" />
 
       {tab === "create" && (
         <>
@@ -290,109 +287,121 @@ export default function WindowStickerStudio() {
               <FactoryStickerWorkspace vehicleId={selectedId} embedded />
             </>
           ) : (
-            <div className="grid lg:grid-cols-[1fr_360px] gap-4">
-              <Panel title="Select an existing vehicle">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <div className="relative flex-1 min-w-[220px]">
-                    <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-adm-muted" />
-                    <input
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") runSearch(); }}
-                      placeholder="VIN, stock number, year, make or model"
-                      className="w-full min-h-[36px] pl-8 pr-3 rounded-md border border-adm-border bg-adm-surface text-[14px]"
-                      aria-label="Search inventory"
-                    />
-                  </div>
-                  <select
-                    value={conditionFilter}
-                    onChange={(e) => setConditionFilter(e.target.value)}
-                    className="min-h-[36px] px-2 rounded-md border border-adm-border bg-adm-surface text-[14px]"
-                    aria-label="Condition"
-                  >
-                    <option value="">All conditions</option>
-                    <option value="new">New</option>
-                    <option value="used">Used</option>
-                    <option value="cpo">CPO</option>
-                  </select>
-                  <Button variant="primary" onClick={runSearch} disabled={searching}>
-                    {searching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />} Search
-                  </Button>
-                </div>
+            <div className="flex flex-col gap-4">
+              <h2 className="text-[17px] leading-[24px] font-semibold text-adm-ink">Select vehicle</h2>
+              <nav aria-label="Vehicle source" className="flex gap-6 border-b border-adm-border">
+                {modeTabs.map((t) => (
+                  <button key={t.key} type="button" onClick={() => setMode(t.key as "inventory" | "vin")} aria-current={t.active ? "page" : undefined}
+                    className={`-mb-px h-10 border-b-2 text-[14px] font-semibold ${t.active ? "border-adm-primary text-adm-primary" : "border-transparent text-adm-muted hover:text-adm-ink"}`}>
+                    {t.label}
+                  </button>
+                ))}
+              </nav>
 
-                <div className="divide-y divide-adm-border rounded-[4px] border border-adm-border overflow-hidden mt-3">
-                  {hits === null && <p className="p-3 text-[14px] text-adm-muted">Loading inventory...</p>}
-                  {hits?.length === 0 && (
-                    <p className="p-3 text-[14px] text-adm-muted">
-                      No vehicles matched. Try a different search, or start from a VIN.
+              {mode === "inventory" && (
+                <>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="relative flex-1 min-w-[220px] max-w-2xl">
+                      <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-adm-muted" />
+                      <input
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") runSearch(); }}
+                        placeholder="Search by stock #, VIN, or vehicle (e.g. QX60)"
+                        className="w-full h-10 pl-10 pr-3 rounded-md border border-adm-border bg-adm-surface text-[14px]"
+                        aria-label="Search inventory"
+                      />
+                    </div>
+                    <select
+                      value={conditionFilter}
+                      onChange={(e) => setConditionFilter(e.target.value)}
+                      className="h-10 px-2 rounded-md border border-adm-border bg-adm-surface text-[14px]"
+                      aria-label="Condition"
+                    >
+                      <option value="">All conditions</option>
+                      <option value="new">New</option>
+                      <option value="used">Used</option>
+                      <option value="cpo">CPO</option>
+                    </select>
+                    <Button variant="primary" onClick={runSearch} disabled={searching}>
+                      {searching ? <Loader2 className="w-5 h-5 animate-spin" /> : null} Search
+                    </Button>
+                  </div>
+
+                  {picked ? (
+                    <div className="flex items-center justify-between gap-4 rounded-[6px] border border-adm-border bg-adm-surface px-4 py-3">
+                      <div className="min-w-0">
+                        <p className="text-[12px] leading-[18px] text-adm-muted">{picked.stock_number ? `Stock ${picked.stock_number}` : "No stock number"}</p>
+                        <p className="text-[17px] leading-[24px] font-semibold text-adm-ink truncate">{picked.ymm || "Vehicle"}</p>
+                        <p className="text-[13px] leading-[18px] text-adm-muted truncate">
+                          VIN {picked.vin || "Unknown"}{picked.condition ? ` | ${humanize(picked.condition)}` : ""}
+                        </p>
+                      </div>
+                      <Button onClick={() => setPicked(null)}>Change</Button>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-adm-border rounded-[6px] border border-adm-border bg-adm-surface overflow-hidden">
+                      {hits === null && <p className="p-3 text-[14px] text-adm-muted">Loading inventory...</p>}
+                      {hits?.length === 0 && (
+                        <p className="p-3 text-[14px] text-adm-muted">No vehicles matched. Try a different search, or create by VIN.</p>
+                      )}
+                      {hits?.map((v) => (
+                        <button
+                          key={v.id}
+                          type="button"
+                          onClick={() => setPicked(v)}
+                          className="w-full text-left h-14 px-4 hover:bg-adm-workspace flex items-center justify-between gap-3"
+                        >
+                          <span className="min-w-0 flex-1 truncate text-[14px] leading-[20px] font-semibold text-adm-ink">{v.ymm || "Vehicle"}</span>
+                          <span className="hidden sm:block w-[280px] truncate text-[13px] text-adm-muted font-mono">{v.vin || "no VIN"}</span>
+                          <span className="hidden md:block w-[120px] truncate text-[13px] text-adm-muted">{v.condition ? humanize(v.condition) : "Unknown"}</span>
+                          <ArrowRight className="w-5 h-5 text-adm-muted shrink-0" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex justify-end">
+                    <Button variant="primary" disabled={!picked} onClick={() => picked && select(picked.id)}>Continue to OEM data</Button>
+                  </div>
+                </>
+              )}
+
+              {mode === "vin" && (
+                <div className="max-w-xl space-y-3">
+                  <p className="text-[14px] leading-[20px] text-adm-muted">
+                    For a vehicle that did not arrive through the nightly inventory feed. This dealership&apos;s records are checked first, so a duplicate is never created.
+                  </p>
+                  <input
+                    value={vinInput}
+                    onChange={(e) => setVinInput(e.target.value)}
+                    placeholder="17-character VIN"
+                    maxLength={17}
+                    className="w-full h-10 px-3 rounded-md border border-adm-border bg-adm-surface text-[14px] font-mono uppercase"
+                    aria-label="VIN"
+                  />
+                  {vinInput.trim() && !vinValid && (
+                    <p className="text-[13px] leading-[18px] text-adm-danger">That is not a valid 17-character VIN.</p>
+                  )}
+                  {vinDuplicate && (
+                    <p className="text-[13px] leading-[18px] text-adm-warning">
+                      This VIN already exists in your inventory ({vinDuplicate.ymm || "vehicle"}). Continue opens the existing record.
                     </p>
                   )}
-                  {hits?.map((v) => (
-                    <button
-                      key={v.id}
-                      type="button"
-                      onClick={() => select(v.id)}
-                      className="w-full text-left min-h-[52px] px-3 py-2 hover:bg-adm-workspace flex items-center justify-between gap-3"
-                    >
-                      <span className="min-w-0">
-                        <span className="block text-[14px] leading-[20px] font-semibold text-adm-ink truncate">
-                          {v.ymm || "Vehicle"}
-                        </span>
-                        <span className="block text-[12px] leading-[18px] text-adm-muted truncate">
-                          {v.vin || "no VIN"}
-                          {v.stock_number ? ` | Stock ${v.stock_number}` : ""}
-                          {v.condition ? ` | ${humanize(v.condition)}` : ""}
-                          {v.status ? ` | ${humanize(v.status)}` : ""}
-                        </span>
-                      </span>
-                      <ArrowRight className="w-4 h-4 text-adm-muted shrink-0" />
-                    </button>
-                  ))}
+                  <div className="flex justify-end">
+                    <Button variant="primary" onClick={startFromVin} disabled={!vinValid || busy || !canCreate}>
+                      {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+                      {vinDuplicate ? "Open existing vehicle" : "Continue to OEM data"}
+                    </Button>
+                  </div>
+                  {!canCreate && (
+                    <p className="text-[13px] leading-[18px] text-adm-muted">Starting a sticker from a VIN needs manager authority. You can still open an existing vehicle.</p>
+                  )}
+                  {canCreate && !canPublish && (
+                    <p className="text-[13px] leading-[18px] text-adm-muted">Publishing to the customer passport needs manager authority. You can still review the draft.</p>
+                  )}
                 </div>
-              </Panel>
-
-              <Panel title="Create from VIN" className="h-fit">
-                <p className="text-[13px] leading-[18px] text-adm-muted">
-                  For a vehicle that did not arrive through the nightly inventory feed. The Studio checks this
-                  dealership&apos;s records first and never creates a duplicate.
-                </p>
-                <input
-                  value={vinInput}
-                  onChange={(e) => setVinInput(e.target.value)}
-                  placeholder="17-character VIN"
-                  maxLength={17}
-                  className="w-full min-h-[36px] px-3 rounded-md border border-adm-border bg-adm-surface text-[14px] font-mono uppercase mt-3"
-                  aria-label="VIN"
-                />
-                {vinInput.trim() && !vinValid && (
-                  <p className="text-[12px] leading-[18px] text-adm-danger inline-flex items-start gap-1.5 mt-2">
-                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" /> That is not a valid 17-character VIN.
-                  </p>
-                )}
-                {vinDuplicate && (
-                  <p className="text-[12px] leading-[18px] text-adm-warning inline-flex items-start gap-1.5 mt-2">
-                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
-                    <span>
-                      This VIN already exists in your inventory ({vinDuplicate.ymm || "vehicle"}). Continue opens the
-                      existing record instead of creating a second one.
-                    </span>
-                  </p>
-                )}
-                <Button variant="primary" className="w-full mt-3" onClick={startFromVin} disabled={!vinValid || busy || !canCreate}>
-                  {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowRight className="w-3.5 h-3.5" />}
-                  {vinDuplicate ? "Open existing vehicle" : "Continue"}
-                </Button>
-                {!canCreate && (
-                  <p className="text-[12px] leading-[18px] text-adm-muted mt-2">
-                    Starting a sticker from a VIN needs manager authority. You can still open an existing vehicle.
-                  </p>
-                )}
-                {canCreate && !canPublish && (
-                  <p className="text-[12px] leading-[18px] text-adm-muted mt-2">
-                    Publishing to the customer passport needs manager authority. You can still review the draft.
-                  </p>
-                )}
-              </Panel>
+              )}
             </div>
           )}
         </>

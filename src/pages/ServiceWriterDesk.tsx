@@ -7,11 +7,11 @@ import { useOperatingMetrics } from "@/hooks/useOperatingMetrics";
 import { compareServicePriority, deriveServicePriority, type ServicePriority } from "@/lib/service/priority";
 import { clearanceReasonLabel } from "@/lib/service/workspaceStatus";
 import {
-  BTN_SECONDARY, EM_DASH, EmptyState, ErrorCard, LoadingCard, StatusPill,
+  EM_DASH, EmptyState, ErrorCard, LoadingCard,
   formatCommandDate, type Tone,
 } from "@/components/command/CommandPrimitives";
-import { ChevronDown, ChevronRight, ClipboardList } from "lucide-react";
-import { LocalTabs, MetricStrip, PageBody, PageHeader, type LocalTab } from "@/components/product";
+import { ClipboardList } from "lucide-react";
+import { LocalTabs, MetricStrip, PageBody, PageHeader, StatusText, Td, Th, WorkTable, type LocalTab, type Tone as ProductTone } from "@/components/product";
 import { cn } from "@/lib/utils";
 import { SERVICE_FLOOR_STATES, stateLabel, type ServiceFloorState } from "@/lib/lifecycle/states";
 
@@ -187,7 +187,6 @@ export default function ServiceWriterDesk() {
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const tab: TabKey = TABS.some((t) => t.key === tabParam) ? (tabParam as TabKey) : "all";
-  const [expanded, setExpanded] = useState<string | null>(null);
 
   const overdueHours = settings.service_overdue_hours || 24;
 
@@ -393,176 +392,76 @@ export default function ServiceWriterDesk() {
     );
   }
 
+  const tabs = TABS.map((t): LocalTab => ({ key: t.key, label: t.label, to: `/service-desk?tab=${t.key}`, count: counts[t.key], active: t.key === tab }));
+  const PRODUCT_TONE: Record<StatusKey, ProductTone> = { WAITING: "neutral", IN_PROGRESS: "info", AUTHORIZED: "info", NEEDS_REVIEW: "warning", COMPLETED: "success" };
+
   return (
     <PageBody width="wide">
       <PageHeader
-        title="Service writer desk"
-        description={`${rows.length} ${rows.length === 1 ? "vehicle" : "vehicles"} in the service pipeline.`}
+        title="Service Writer Desk"
+        description="Every vehicle in the service pipeline, highest priority first."
       />
+
+      <LocalTabs label="Service pipeline stages" tabs={tabs} />
 
       <MetricStrip
         label="Service pipeline summary"
         metrics={[
-          { label: "In the pipeline", value: rows.length, hint: "all service stages" },
-          { label: "Unassigned", value: counts.unassigned, hint: `of ${rows.length}`, tone: counts.unassigned > 0 ? "warning" : "neutral" },
-          { label: "Inside get ready", value: metrics.inGetReady, hint: "current lifecycle state", tone: "info" },
-          { label: "Retail ready", value: metrics.retailReady, hint: "lifecycle state, not listing visibility", tone: "success" },
+          { label: "In the pipeline", value: rows.length },
+          { label: "Unassigned", value: counts.unassigned, tone: counts.unassigned > 0 ? "warning" : "neutral" },
+          { label: "Inside get ready", value: metrics.inGetReady },
+          { label: "Retail ready", value: metrics.retailReady },
         ]}
       />
-
-      <LocalTabs
-        label="Service pipeline stages"
-        tabs={TABS.map((t): LocalTab => ({ key: t.key, label: t.label, to: `/service-desk?tab=${t.key}`, count: counts[t.key], active: t.key === tab }))}
-      />
-
-      <p className="text-[12px] leading-[18px] text-adm-muted">
-        K-208 is shown here for visibility only. Certification authority comes from the store&apos;s K-208 policy and is
-        enforced by the server &mdash; it is never granted by a job title, and nothing on this desk certifies a vehicle.
-      </p>
 
       {visible.length === 0 ? (
         <EmptyState Icon={ClipboardList} title={TAB_EMPTY[tab].title} detail={TAB_EMPTY[tab].detail} />
       ) : (
-        <section className="rounded-2xl border border-adm-border bg-adm-surface p-2 md:p-4">
-          <table className="w-full table-fixed text-[14px] leading-[20px]">
-            <caption className="sr-only">Vehicles in the service pipeline, highest priority first</caption>
-            <colgroup>
-              <col className="w-[34%] md:w-[26%]" />
-              <col className="w-[30%] md:w-[20%]" />
-              <col className="hidden md:table-column md:w-[12%]" />
-              <col className="hidden md:table-column md:w-[9%]" />
-              <col className="hidden md:table-column md:w-[13%]" />
-              <col className="w-[36%] md:w-[20%]" />
-            </colgroup>
+        <div>
+          <WorkTable caption="Vehicles in the service pipeline, highest priority first" minWidth={900}>
             <thead>
-              <tr className="text-[12px] leading-[18px] uppercase tracking-[0.12em] text-adm-muted border-b border-adm-border">
-                <th scope="col" className="text-left font-bold py-2 pr-2">Vehicle</th>
-                <th scope="col" className="text-left font-bold py-2 pr-2">Current state</th>
-                <th scope="col" className="hidden md:table-cell text-left font-bold py-2 pr-2">Assigned to</th>
-                <th scope="col" className="hidden md:table-cell text-left font-bold py-2 pr-2">Age</th>
-                <th scope="col" className="hidden md:table-cell text-left font-bold py-2 pr-2">Delivery target</th>
-                <th scope="col" className="text-right font-bold py-2">Next action</th>
+              <tr>
+                <Th>Vehicle</Th>
+                <Th>Stage</Th>
+                <Th>Technician</Th>
+                <Th align="right">Age</Th>
+                <Th>Delivery target</Th>
+                <Th>Next action</Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
-              {visible.slice(0, 100).map((r) => {
-                const open = expanded === r.vehicleId;
-                return [
-                  <tr key={r.vehicleId}>
-                    <td className="py-2.5 pr-2 align-top">
-                      <button
-                        type="button"
-                        aria-expanded={open}
-                        onClick={() => setExpanded(open ? null : r.vehicleId)}
-                        className="flex items-start gap-1.5 text-left min-h-[44px] w-full"
-                      >
-                        {open
-                          ? <ChevronDown className="w-4 h-4 mt-0.5 shrink-0 text-adm-muted" aria-hidden="true" />
-                          : <ChevronRight className="w-4 h-4 mt-0.5 shrink-0 text-adm-muted" aria-hidden="true" />}
-                        <span className="min-w-0">
-                          <span className="block text-adm-ink font-semibold truncate">{r.ymm}</span>
-                          <span className="block font-mono text-[12px] leading-[18px] text-adm-muted">
-                            &hellip;{r.vin.slice(-8)}
-                          </span>
-                        </span>
-                      </button>
-                    </td>
-                    <td className="py-2.5 pr-2 align-top">
-                      <span className="block text-adm-ink">{stateLabel(r.state)}</span>
-                      <span className="mt-1 inline-block">
-                        <StatusPill tone={STATUS_TONE[STATE_STATUS[r.state as ServiceFloorState] || "WAITING"]}>
-                          {(STATE_STATUS[r.state as ServiceFloorState] || "WAITING").replace("_", " ")}
-                        </StatusPill>
-                      </span>
-                    </td>
-                    <td className="hidden md:table-cell py-2.5 pr-2 align-top text-adm-muted truncate">
-                      {r.assignedName ?? "Unassigned"}
-                    </td>
-                    <td className="hidden md:table-cell py-2.5 pr-2 align-top tabular-nums text-adm-ink whitespace-nowrap">
-                      {durationLabel(r.ageHours)}
-                    </td>
-                    <td className="hidden md:table-cell py-2.5 pr-2 align-top text-adm-muted whitespace-nowrap">
-                      {formatCommandDate(r.deliveryTarget) ?? EM_DASH}
-                    </td>
-                    <td className="py-2.5 align-top text-right">
-                      <Link
-                        to={`/service/vehicle/${encodeURIComponent(r.vin)}`}
-                        className={cn(BTN_SECONDARY, "whitespace-nowrap")}
-                      >
-                        {NEXT_ACTION[r.state as ServiceFloorState] || "Open file"}
-                      </Link>
-                    </td>
-                  </tr>,
-                  open ? (
-                    <tr key={`${r.vehicleId}-detail`} className="bg-adm-workspace">
-                      <td colSpan={6} className="p-3">
-                        <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-3">
-                          <div>
-                            <dt className="text-[12px] leading-[18px] text-adm-muted">Stock</dt>
-                            <dd className="text-[14px] leading-[20px] text-adm-ink">{r.stockNumber || EM_DASH}</dd>
-                          </div>
-                          <div>
-                            <dt className="text-[12px] leading-[18px] text-adm-muted">VIN</dt>
-                            <dd className="text-[14px] leading-[20px] text-adm-ink font-mono break-all">{r.vin}</dd>
-                          </div>
-                          <div className="md:hidden">
-                            <dt className="text-[12px] leading-[18px] text-adm-muted">Assigned to</dt>
-                            <dd className="text-[14px] leading-[20px] text-adm-ink">{r.assignedName ?? "Unassigned"}</dd>
-                          </div>
-                          <div className="md:hidden">
-                            <dt className="text-[12px] leading-[18px] text-adm-muted">Age in state</dt>
-                            <dd className="text-[14px] leading-[20px] text-adm-ink tabular-nums">{durationLabel(r.ageHours)}</dd>
-                          </div>
-                          <div className="md:hidden">
-                            <dt className="text-[12px] leading-[18px] text-adm-muted">Delivery target</dt>
-                            <dd className="text-[14px] leading-[20px] text-adm-ink">
-                              {formatCommandDate(r.deliveryTarget) ?? EM_DASH}
-                            </dd>
-                          </div>
-                          <div>
-                            <dt className="text-[12px] leading-[18px] text-adm-muted">Priority</dt>
-                            <dd className="text-[14px] leading-[20px] text-adm-ink flex flex-wrap items-center gap-1.5">
-                              <StatusPill tone={PRIORITY_TONE[r.priority.level]}>{r.priority.level}</StatusPill>
-                              <span className="text-[12px] leading-[18px] text-adm-muted">{r.priority.label}</span>
-                            </dd>
-                          </div>
-                          <div>
-                            <dt className="text-[12px] leading-[18px] text-adm-muted">Overdue</dt>
-                            <dd className="text-[14px] leading-[20px] text-adm-ink">
-                              {r.overdue ? `Past ${durationLabel(overdueHours)} in this stage` : "Within the store threshold"}
-                            </dd>
-                          </div>
-                          <div className="col-span-2">
-                            <dt className="text-[12px] leading-[18px] text-adm-muted">Delivery clearance</dt>
-                            <dd className="text-[14px] leading-[20px] text-adm-ink">
-                              {r.blocked
-                                ? (r.clearanceReasons.length
-                                  ? r.clearanceReasons.map(clearanceReasonLabel).join(" · ")
-                                  : "Blocked")
-                                : "No stored blocker"}
-                            </dd>
-                          </div>
-                          <div className="col-span-2 md:col-span-4">
-                            <dt className="text-[12px] leading-[18px] text-adm-muted">Open request</dt>
-                            <dd className="text-[14px] leading-[20px] text-adm-ink">
-                              {r.openRequest ?? "No estimate is waiting on a manager."}
-                            </dd>
-                          </div>
-                        </dl>
-                      </td>
-                    </tr>
-                  ) : null,
-                ];
-              })}
+            <tbody>
+              {visible.slice(0, 100).map((r) => (
+                <tr key={r.vehicleId} className="h-14 hover:bg-adm-workspace">
+                  <Td className="max-w-[300px]">
+                    <p className="truncate font-semibold text-adm-ink">{r.ymm}</p>
+                    <p className="truncate font-mono text-[12px] leading-[18px] text-adm-muted">{r.stockNumber ? `${r.stockNumber} / ` : ""}{r.vin}</p>
+                  </Td>
+                  <Td className="whitespace-nowrap">
+                    <StatusText tone={PRODUCT_TONE[STATE_STATUS[r.state as ServiceFloorState] || "WAITING"]}>{stateLabel(r.state)}</StatusText>
+                  </Td>
+                  <Td className="text-adm-muted">{r.assignedName ?? "Unassigned"}</Td>
+                  <Td align="right" className="tabular-nums whitespace-nowrap">{durationLabel(r.ageHours)}</Td>
+                  <Td className="text-adm-muted whitespace-nowrap">{formatCommandDate(r.deliveryTarget) ?? EM_DASH}</Td>
+                  <Td className="whitespace-nowrap">
+                    <Link to={`/service/vehicle/${encodeURIComponent(r.vin)}`} className="font-semibold text-adm-primary hover:underline">
+                      {NEXT_ACTION[r.state as ServiceFloorState] || "Open file"}
+                    </Link>
+                  </Td>
+                </tr>
+              ))}
             </tbody>
-          </table>
+          </WorkTable>
           {visible.length > 100 ? (
             <p className="text-[12px] leading-[18px] text-adm-muted pt-3">
               Showing the 100 highest-priority of {visible.length}.
             </p>
           ) : null}
-        </section>
+        </div>
       )}
+
+      <p className="text-[12px] leading-[18px] text-adm-muted">
+        K-208 certification authority comes from the store&apos;s K-208 policy and is enforced by the server, never by a job title.
+      </p>
     </PageBody>
   );
 }

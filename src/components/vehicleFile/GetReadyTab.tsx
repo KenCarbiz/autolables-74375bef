@@ -95,9 +95,9 @@ const PrepCard = ({ row, onOpen }: { row: PrepRow; onOpen: () => void }) => {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <p className="text-al-body font-semibold text-foreground truncate">{row.foreman_name || "Unassigned foreman"}</p>
-          <span className={`text-al-meta font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${statusCls}`}>{row.status}</span>
+          <span className={`text-al-meta font-semibold px-1.5 py-0.5 rounded-[2px] ${statusCls}`}>{row.status}</span>
           {row.listing_unlocked && (
-            <span className="text-al-meta font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 inline-flex items-center gap-1">
+            <span className="text-al-meta font-semibold px-1.5 py-0.5 rounded-[2px] bg-emerald-100 text-emerald-700 inline-flex items-center gap-1">
               <Unlock className="w-2.5 h-2.5" /> unlocked
             </span>
           )}
@@ -219,50 +219,18 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready }: { vehicle: VehicleRow
             </div>
           )}
 
-          <Card title="Stage rail">
+          <div>
             <RailStrip state={offRail ? (row?.previous_state ?? null) : state} />
             {offRail && (
-              <p className="text-al-meta text-muted-foreground">
+              <p className="text-al-meta text-muted-foreground mt-2">
                 Positioned from the last stage before the hold{row?.previous_state ? ` (${STATE_LABEL[row.previous_state]})` : ""}. No stage advances while the vehicle is parked.
               </p>
             )}
-          </Card>
+          </div>
 
-          <Card title="Current stage">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              <Pair label="Lifecycle state" value={STATE_LABEL[state]} />
-              <Pair label="Owner" value={STATE_OWNER[state]} />
-              <Pair label="Time in stage" value={sinceLabel(row?.state_changed_at) ?? "Unknown"} />
-              <Pair label="Since" value={fmtWhen(row?.state_changed_at) ?? "Unknown"} />
-            </div>
-            <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2">
-              <div>
-                <p className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground">Next action</p>
-                <p className="text-al-body text-foreground mt-0.5">{STATE_NEXT_ACTION[state]}</p>
-              </div>
-              <div>
-                <p className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground">Blocker</p>
-                <p className="text-al-body text-foreground mt-0.5">
-                  {row?.gate_reason
-                    ? row.gate_reason
-                    : offRail
-                      ? "A manager gate is holding this vehicle."
-                      : state === "RETAIL_READY"
-                        ? "None — the vehicle has cleared get ready."
-                        : `Nothing beyond the stage itself. ${STATE_OWNER[state]} owns the next move.`}
-                </p>
-              </div>
-            </div>
-            {(state === "K208_READY_TO_CERTIFY" || state === "K208_FINALIZED") && (
-              <p className="text-al-meta text-muted-foreground">
-                Shown for visibility only. K-208 certification authority comes from the store's K-208 policy and is enforced server-side — never from a job title.
-              </p>
-            )}
-          </Card>
-        </>
-      )}
-
-      {ready && (
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+            <div className="min-w-0 flex flex-col gap-4">
+          {ready && (
         <Card title="Checklist">
           <ul className="divide-y divide-adm-border">
             {ready.checks.map((c) => (
@@ -281,25 +249,39 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready }: { vehicle: VehicleRow
           </ul>
         </Card>
       )}
-
-      <Card title="Publishing gate">
-        <div className={`rounded-xl border p-4 flex items-start gap-3 ${
-          unlocked ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"
-        }`}>
-          {unlocked ? <Unlock className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" /> : <Lock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />}
-          <div className="min-w-0">
-            <p className={`text-al-card ${unlocked ? "text-emerald-900" : "text-amber-900"}`}>
-              {unlocked ? "Publishing unlocked" : "Publishing locked — prep sign-off required"}
-            </p>
-            <p className={`text-al-body mt-0.5 ${unlocked ? "text-emerald-800" : "text-amber-800"}`}>
-              {unlocked
-                ? `Foreman ${latestPrep?.foreman_name || "sign-off"} recorded ${fmtWhen(latestPrep?.signed_at) ?? "on file"}.`
-                : "A signed prep record gates the public listing. The latest sign-off must have the inspection passed and the listing unlocked."}
-            </p>
-          </div>
-        </div>
-      </Card>
-
+            </div>
+            <div className="min-w-0 flex flex-col gap-4">
+          <Card title="Current stage">
+            <div className="grid grid-cols-2 gap-4">
+              <Pair label="Lifecycle state" value={STATE_LABEL[state]} />
+              <Pair label="Owner" value={STATE_OWNER[state]} />
+              <Pair label="Time in stage" value={sinceLabel(row?.state_changed_at) ?? "Unknown"} />
+              <Pair label="Since" value={fmtWhen(row?.state_changed_at) ?? "Unknown"} />
+            </div>
+            <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2">
+              <div>
+                <p className="text-al-meta font-semibold text-muted-foreground">Next action</p>
+                <p className="text-al-body text-foreground mt-0.5">{STATE_NEXT_ACTION[state]}</p>
+              </div>
+              <div>
+                <p className="text-al-meta font-semibold text-muted-foreground">Blocker</p>
+                <p className="text-al-body text-foreground mt-0.5">
+                  {row?.gate_reason
+                    ? row.gate_reason
+                    : offRail
+                      ? "A manager gate is holding this vehicle."
+                      : state === "RETAIL_READY"
+                        ? "None — the vehicle has cleared get ready."
+                        : `Nothing beyond the stage itself. ${STATE_OWNER[state]} owns the next move.`}
+                </p>
+              </div>
+            </div>
+            {(state === "K208_READY_TO_CERTIFY" || state === "K208_FINALIZED") && (
+              <p className="text-al-meta text-muted-foreground">
+                Shown for visibility only. K-208 certification authority comes from the store's K-208 policy and is enforced server-side — never from a job title.
+              </p>
+            )}
+          </Card>
       <Card title="Notes">
         {historyLoading ? (
           <p className="text-[14px] text-adm-muted">Loading notes...</p>
@@ -321,6 +303,28 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready }: { vehicle: VehicleRow
             </ul>
           );
         })()}
+      </Card>
+            </div>
+          </div>
+        </>
+      )}
+
+      <Card title="Publishing gate">
+        <div className={`rounded-xl border p-4 flex items-start gap-3 ${
+          unlocked ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"
+        }`}>
+          {unlocked ? <Unlock className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" /> : <Lock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />}
+          <div className="min-w-0">
+            <p className={`text-al-card ${unlocked ? "text-emerald-900" : "text-amber-900"}`}>
+              {unlocked ? "Publishing unlocked" : "Publishing locked — prep sign-off required"}
+            </p>
+            <p className={`text-al-body mt-0.5 ${unlocked ? "text-emerald-800" : "text-amber-800"}`}>
+              {unlocked
+                ? `Foreman ${latestPrep?.foreman_name || "sign-off"} recorded ${fmtWhen(latestPrep?.signed_at) ?? "on file"}.`
+                : "A signed prep record gates the public listing. The latest sign-off must have the inspection passed and the listing unlocked."}
+            </p>
+          </div>
+        </div>
       </Card>
 
       <Card title="Prep & install records">

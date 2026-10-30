@@ -10,7 +10,7 @@ import {
   type CustomerEntry,
   type DealEntry,
 } from "@/components/customers/customerBook";
-import { Button, InlineNote, LocalTabs, PageBody, PageHeader, type LocalTab } from "@/components/product";
+import { Button, InlineNote, LocalTabs, MetricStrip, PageBody, PageHeader, type LocalTab } from "@/components/product";
 import { useCustomerBook } from "@/components/customers/useCustomerBook";
 import {
   Chip,
@@ -148,7 +148,7 @@ const Deals = () => {
 
       <PageHeader
         title="Deals"
-        description="Every addendum in the state the database says it is in. Price integrity is the server-side check that gates signing: a mismatch cannot be signed around."
+        description="Every deal, its signature state and what it needs next."
         actions={
           <Button onClick={refetch}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" /> Refresh
@@ -165,6 +165,15 @@ const Deals = () => {
       <LocalTabs
         label="Deal lifecycle views"
         tabs={tabs.map((t): LocalTab => ({ key: t.key, label: t.label, to: `/deals?state=${t.key}${q ? `&q=${encodeURIComponent(q)}` : ""}`, count: loading && !book.deals.length ? null : t.count, active: t.key === tab }))}
+      />
+      <MetricStrip
+        label="Deal totals"
+        metrics={[
+          { label: "Total deals", value: loading && !book.deals.length ? null : searched.length },
+          { label: "Out for signature", value: loading && !book.deals.length ? null : searched.filter((d) => d.state === "out_for_signature").length },
+          { label: "Signed", value: loading && !book.deals.length ? null : searched.filter((d) => d.state === "signed").length },
+          { label: "Delivered", value: loading && !book.deals.length ? null : searched.filter((d) => d.state === "delivered").length },
+        ]}
       />
       <label className="relative block max-w-sm">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-adm-muted" aria-hidden="true" />
@@ -186,63 +195,43 @@ const Deals = () => {
       ) : (
         <>
           <div className="hidden lg:block bg-adm-surface rounded-[6px] border border-adm-border overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[980px] text-left">
-                <thead className="bg-adm-workspace">
-                  <tr className="text-[12px] leading-[18px] text-adm-muted">
-                    <th className="font-semibold px-5 py-2.5">Date</th>
-                    <th className="font-semibold py-2.5">Vehicle</th>
-                    <th className="font-semibold py-2.5">Stock</th>
-                    <th className="font-semibold py-2.5">Customer</th>
-                    <th className="font-semibold py-2.5 text-right pr-4">Amount</th>
-                    <th className="font-semibold py-2.5">State</th>
-                    <th className="font-semibold py-2.5">Price integrity</th>
-                    <th className="font-semibold py-2.5">Next action</th>
-                    <th className="font-semibold py-2.5 pr-5 text-right">Open</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((deal) => {
-                    const customer = deal.customerId ? customerById.get(deal.customerId) || null : null;
-                    return (
-                      <tr key={deal.id} className="border-t border-adm-border align-top hover:bg-adm-workspace transition-colors">
-                        <td className="px-5 py-3.5 text-[12px] leading-[18px] text-adm-muted tabular-nums whitespace-nowrap">{dateLabel(deal.createdAt)}</td>
-                        <td className="py-3.5 pr-4 w-[16%]">
-                          <VehicleCell label={deal.vehicleLabel} stock={null} vin={deal.vin} slug={deal.slug} />
-                        </td>
-                        <td className="py-3.5 pr-4 text-[14px] leading-[20px] text-adm-ink whitespace-nowrap">{deal.stock || "--"}</td>
-                        <td className="py-3.5 pr-4 w-[13%]">
-                          <p className="text-[14px] leading-[20px] text-adm-ink truncate">{deal.customerName || "No customer on the deal"}</p>
-                          {deal.employeeName && <p className="text-[12px] leading-[18px] text-adm-muted truncate">Sold by {deal.employeeName}</p>}
-                        </td>
-                        <td className="py-3.5 pr-4 text-[14px] leading-[20px] text-adm-ink text-right tabular-nums whitespace-nowrap">{money(deal.amount)}</td>
-                        <td className="py-3.5 pr-4">
-                          <Chip tone={dealStateTone(deal.state)}>{deal.stateLabel}</Chip>
-                          <p className="text-[12px] leading-[18px] text-adm-muted mt-1">{deal.returnInfo ? deal.returnInfo.label : deal.stateDetail}</p>
-                        </td>
-                        <td className="py-3.5 pr-4">
-                          <PriceIntegrityChip integrity={deal.priceIntegrity} />
-                        </td>
-                        <td className="py-3.5 pr-4 w-[22%]">
-                          <NextActionCell action={deal.nextAction} />
-                        </td>
-                        <td className="py-3.5 pr-5">
-                          <div className="flex items-center justify-end gap-2">
-                            <Link
-                              to={`/deals/${encodeURIComponent(deal.id)}`}
-                              className="inline-flex items-center h-8 px-3 rounded-md border border-adm-primary text-adm-primary text-[13px] leading-[18px] font-semibold hover:bg-adm-selected transition-colors"
-                            >
-                              Open
-                            </Link>
-                            <DealMenu deal={deal} customer={customer} onCopy={copyLink} onText={textLink} onView={view} onOpenVehicleFile={(id) => navigate(`/vehicle-file/${id}`)} onOpenCustomer={(id) => navigate(`/customers/${encodeURIComponent(id)}`)} />
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <table className="w-full table-fixed text-left">
+              <thead className="bg-adm-workspace">
+                <tr className="text-[12px] leading-[18px] text-adm-muted">
+                  <th className="font-semibold px-4 py-2.5 w-[9%]">Date</th>
+                  <th className="font-semibold py-2.5 w-[20%]">Vehicle</th>
+                  <th className="font-semibold py-2.5 w-[13%]">Customer</th>
+                  <th className="font-semibold py-2.5 w-[9%] text-right pr-4">Amount</th>
+                  <th className="font-semibold py-2.5 w-[13%]">Document state</th>
+                  <th className="font-semibold py-2.5 w-[14%]">Price integrity</th>
+                  <th className="font-semibold py-2.5 w-[16%]">Next action</th>
+                  <th className="font-semibold py-2.5 pr-3 w-[7%]"><span className="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((deal) => {
+                  const customer = deal.customerId ? customerById.get(deal.customerId) || null : null;
+                  return (
+                    <tr key={deal.id} className="h-14 border-t border-adm-border hover:bg-adm-workspace transition-colors">
+                      <td className="px-4 text-[13px] text-adm-muted tabular-nums whitespace-nowrap">{dateLabel(deal.createdAt)}</td>
+                      <td className="pr-3 text-[14px] truncate">
+                        <Link to={`/deals/${encodeURIComponent(deal.id)}`} className="font-semibold text-adm-primary hover:underline">{deal.vehicleLabel}</Link>
+                      </td>
+                      <td className="pr-3 text-[14px] text-adm-ink truncate">{deal.customerName || "No customer"}</td>
+                      <td className="pr-4 text-[14px] text-adm-ink text-right tabular-nums truncate">{money(deal.amount)}</td>
+                      <td className="pr-3 whitespace-nowrap"><Chip tone={dealStateTone(deal.state)}>{deal.stateLabel}</Chip></td>
+                      <td className="pr-3 whitespace-nowrap"><PriceIntegrityChip integrity={deal.priceIntegrity} /></td>
+                      <td className="pr-3 text-[14px] truncate">
+                        <Link to={`/deals/${encodeURIComponent(deal.id)}`} className="text-adm-primary hover:underline">{deal.nextAction.headline}</Link>
+                      </td>
+                      <td className="pr-3 text-right">
+                        <DealMenu deal={deal} customer={customer} onCopy={copyLink} onText={textLink} onView={view} onOpenVehicleFile={(id) => navigate(`/vehicle-file/${id}`)} onOpenCustomer={(id) => navigate(`/customers/${encodeURIComponent(id)}`)} />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
 
           <div className="lg:hidden space-y-3">

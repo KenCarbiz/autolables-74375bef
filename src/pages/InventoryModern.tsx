@@ -530,8 +530,7 @@ const InventoryModern = () => {
     <PageBody width="wide">
       <PageHeader
         title="Inventory"
-        scope={dealerName + (dealerLoc ? `, ${dealerLoc}` : "")}
-        description="Every active vehicle with its checklist, recall, price and publication state."
+        description="All vehicles in your inventory with status, pricing and next steps."
         actions={
           <>
             <ActionsMenu items={moreActions} />
@@ -541,44 +540,24 @@ const InventoryModern = () => {
       />
       <span id="market-batch-notice" className="sr-only">{MARKET_BATCH_NOTICE}</span>
 
-      <MetricStrip
-        label="Inventory summary"
-        metrics={[
-          {
-            label: "Active vehicles", value: loading ? null : counts.total, loading,
-            hint: `${counts.newCount} new, ${counts.usedCount} used, ${counts.cpoCount} CPO`,
-          },
-          {
-            label: "Checklist complete", value: loading ? null : counts.checklistComplete, loading,
-            tone: counts.checklistComplete > 0 ? "success" : "neutral",
-            hint: `of ${counts.total} vehicles pass all 5 checks${counts.checklistRatePct != null ? ` (${counts.checklistRatePct}%)` : ""}`,
-          },
-          {
-            label: "Average checklist completeness", value: loading || counts.meanCompletenessPct == null ? null : `${counts.meanCompletenessPct}%`, loading,
-            hint: `mean of 5 checks across ${counts.total} vehicles`,
-          },
-          {
-            label: "Needs attention", value: loading ? null : counts.needsAttention, loading,
-            tone: counts.needsAttention > 0 ? "warning" : "neutral",
-            hint: `${counts.openRecallVehicles} with a recall reported, ${counts.priceVerify} price reviews`,
-            href: undefined,
-          },
-        ]}
-      />
-
-      <p className="-mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] leading-[18px] text-adm-muted">
-        <span>VIN decoded {counts.vinDecoded} of {counts.total}</span>
-        <button type="button" className="underline hover:text-adm-ink" onClick={() => onHealthMetric("needs-sticker")}>Missing stickers {counts.needsSticker}</button>
-        <button type="button" className="underline hover:text-adm-ink" onClick={() => onHealthMetric("missing-addendum")}>Missing addendums {counts.missingAddendum}</button>
-        <button type="button" className="underline hover:text-adm-ink" onClick={() => onHealthMetric("open-recalls")}>Recall reported {counts.openRecallVehicles}</button>
-        <button type="button" className="underline hover:text-adm-ink" onClick={() => onHealthMetric("price-reviews")}>Price reviews {counts.priceVerify}</button>
-        <button type="button" className="underline hover:text-adm-ink" onClick={runMarketBatch} disabled title={MARKET_BATCH_NOTICE} aria-describedby="market-batch-notice">
-          Average market position ${Math.abs(below).toLocaleString()} {below >= 0 ? "below" : "above"}
-        </button>
-      </p>
-
       <section className="flex flex-col gap-3" aria-label="Vehicles">
         <LocalTabs tabs={conditionTabs} label="Condition" />
+
+        <MetricStrip
+          label="Inventory summary"
+          metrics={[
+            { label: "Active", value: loading ? null : counts.total, loading },
+            { label: "Checklist complete", value: loading ? null : counts.checklistComplete, loading, tone: counts.checklistComplete > 0 ? "success" : "neutral" },
+            { label: "Needs attention", value: loading ? null : counts.needsAttention, loading, tone: counts.needsAttention > 0 ? "warning" : "neutral" },
+            { label: "Published", value: loading ? null : counts.published, loading },
+          ]}
+        />
+
+        <p className="text-[12px] leading-[18px] text-adm-muted">
+          <button type="button" className="underline hover:text-adm-ink" onClick={runMarketBatch} disabled title={MARKET_BATCH_NOTICE} aria-describedby="market-batch-notice">
+            Average market position ${Math.abs(below).toLocaleString()} {below >= 0 ? "below" : "above"}
+          </button>
+        </p>
 
         {/* Compact toolbar: search, three selects, sort, view */}
         <div className="flex items-center gap-2 flex-wrap">
@@ -625,58 +604,52 @@ const InventoryModern = () => {
         ) : (
           <>
             <div className={`${viewMode === "list" ? "hidden md:block" : "hidden"} rounded-[4px] border border-adm-border bg-adm-surface`}>
-              <WorkTable caption="Inventory vehicles" minWidth={1040}>
+              <WorkTable caption="Inventory vehicles" minWidth={900}>
                 <thead>
                   <tr>
                     <Th>Vehicle</Th>
-                    <Th>Status</Th>
-                    <Th>Checklist</Th>
-                    <Th>Compliance</Th>
-                    <Th align="right">Advertised price</Th>
-                    <Th>Customer page</Th>
-                    <Th>Updated</Th>
-                    <Th align="right">Actions</Th>
+                    <Th>Stock / VIN</Th>
+                    <Th>Condition</Th>
+                    <Th>State</Th>
+                    <Th align="right">Price</Th>
+                    <Th>Next action</Th>
+                    <Th align="right"><span className="sr-only">Actions</span></Th>
                   </tr>
                 </thead>
                 <tbody>
-                  {pageRows.map((r) => (
-                    <tr key={r.id} className="group hover:bg-adm-workspace cursor-pointer" onClick={() => navigate(`/vehicle-file/${r.id}`)}>
-                      <Td className="py-2">
-                        <div className="flex items-center gap-3">
-                          <Thumb r={r} />
-                          <div className="min-w-0 leading-tight">
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-semibold text-adm-ink truncate">{r.ymm || "(needs decode)"}</span>
-                              {r.condition && <CondBadge condition={r.condition} />}
+                  {pageRows.map((r) => {
+                    const sg = signalFor(r);
+                    const next = deriveRecallView(r).riskSignalled ? "Resolve recall"
+                      : r.status === "draft" ? "Publish listing"
+                      : !sg.hasAddendum ? "Create addendum"
+                      : sg.needsPriceVerify ? "Review price"
+                      : !sg.stickerDone ? "Generate sticker"
+                      : "Open vehicle";
+                    return (
+                      <tr key={r.id} className="h-14 group hover:bg-adm-workspace cursor-pointer" onClick={() => navigate(`/vehicle-file/${r.id}`)}>
+                        <Td className="py-1.5 max-w-[280px]">
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-14 shrink-0 overflow-hidden rounded-[4px] bg-adm-workspace">
+                              {r.hero_image_url ? <img src={r.hero_image_url} alt="" loading="lazy" className="h-full w-full object-cover" /> : null}
                             </div>
-                            {r.trim && <p className="text-[12px] leading-[18px] text-adm-muted truncate">{r.trim}</p>}
-                            <p className="text-[12px] leading-[18px] text-adm-muted font-mono truncate">
-                              Stock {r.stock_number ? `#${r.stock_number}` : "-"} | VIN ...{(r.vin || "").slice(-6)}
-                            </p>
+                            <span className="min-w-0 truncate font-semibold text-adm-ink">{r.ymm || "Needs VIN decode"}</span>
                           </div>
-                        </div>
-                      </Td>
-                      <Td className="py-2"><SimpleStatusPill status={r.status} /></Td>
-                      <Td className="py-2"><ReadinessCell r={r} signal={signalFor(r)} pct={rowReadiness(r)} /></Td>
-                      <Td className="py-2"><ComplianceCell ymm={r.ymm} row={r} /></Td>
-                      <Td align="right" className="py-2">
-                        <PriceCell price={r.price} docFee={settings.doc_fee_amount} ap={byVin.get((r.vin || "").toUpperCase())} position={r.market_position} value={r.market_value} />
-                      </Td>
-                      <Td className="py-2" ><PortalChip status={r.status} row={r} /></Td>
-                      <Td className="py-2">{r.updated_at ? <UpdatedCell iso={r.updated_at} /> : <span className="text-[12px] text-adm-muted">Unknown</span>}</Td>
-                      <Td align="right" className="py-2">
-                        <div className="flex justify-end items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                          <div className="hidden md:flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-                            <HoverBtn title="Open vehicle" onClick={() => navigate(`/vehicle-file/${r.id}`)}><ExternalLink className="w-3.5 h-3.5" /></HoverBtn>
-                            <HoverBtn title="Generate sticker" onClick={() => navigate(`${r.condition === "new" ? "/new-car-sticker" : "/used-car-sticker"}?vehicleId=${r.id}`)}><Printer className="w-3.5 h-3.5" /></HoverBtn>
-                            {r.status === "published" && <HoverBtn title="View customer packet" onClick={() => window.open(`/v3/${r.slug}`, "_blank", "noopener")}><Eye className="w-3.5 h-3.5" /></HoverBtn>}
-                            <HoverBtn title="Quick recall check" onClick={() => quickRecall(r.vin)}><ShieldCheck className="w-3.5 h-3.5" /></HoverBtn>
+                        </Td>
+                        <Td className="font-mono text-[13px] text-adm-muted whitespace-nowrap">
+                          {r.stock_number || "Unknown"} / ...{(r.vin || "").slice(-6)}
+                        </Td>
+                        <Td className="capitalize">{r.condition ? (r.condition === "cpo" ? "CPO" : r.condition) : "Unknown"}</Td>
+                        <Td><SimpleStatusPill status={r.status} /></Td>
+                        <Td align="right" className="tabular-nums">{r.price != null ? `$${Number(r.price).toLocaleString("en-US")}` : <span className="text-adm-muted">Unknown</span>}</Td>
+                        <Td className="whitespace-nowrap"><span className="font-semibold text-adm-primary">{next}</span></Td>
+                        <Td align="right" className="py-2">
+                          <div className="flex justify-end items-center" onClick={(e) => e.stopPropagation()}>
+                            <KebabMenu items={rowActions(r)} />
                           </div>
-                          <KebabMenu items={rowActions(r)} />
-                        </div>
-                      </Td>
-                    </tr>
-                  ))}
+                        </Td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </WorkTable>
             </div>

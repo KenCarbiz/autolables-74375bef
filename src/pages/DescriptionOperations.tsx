@@ -1,8 +1,7 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-  AlertTriangle, Car, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Clock, Database,
-  Loader2, MoreVertical, RefreshCw, Search, Settings2, ShieldCheck, SlidersHorizontal, XCircle,
+  CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Loader2, RefreshCw, Search, X, XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -206,21 +205,14 @@ export default function DescriptionOperations() {
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "updated", dir: "desc" });
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
-  const [expanded, setExpanded] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
-  const [menu, setMenu] = useState<{ id: string; x: number; y: number; vehicleId: string; vin: string } | null>(null);
-
-  useEffect(() => {
-    if (!menu) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setMenu(null); };
-    const onScroll = () => setMenu(null);
-    window.addEventListener("keydown", onKey);
-    window.addEventListener("scroll", onScroll, true);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("scroll", onScroll, true);
-    };
-  }, [menu]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedId = searchParams.get("vehicle");
+  const select = (id: string | null) => {
+    const next = new URLSearchParams(searchParams);
+    if (id) next.set("vehicle", id); else next.delete("vehicle");
+    setSearchParams(next, { replace: true });
+  };
 
   const runReconcile = async () => {
     // Reconciliation can start description generation, which can incur cost.
@@ -379,17 +371,92 @@ export default function DescriptionOperations() {
 
   const loadingRows = allRows === null;
   const metricList = [
-    {
-      label: "Active vehicles", value: metricsLoading || metricsError ? null : metrics.activeInventory, loading: metricsLoading,
-      hint: metricsLoading ? undefined : metricsError ? "Inventory counts unavailable" : `${metrics.newInventory} new, ${metrics.usedInventory} used. Current snapshot.`,
-    },
-    { label: "Published", value: loadingRows ? null : kpis.published, loading: loadingRows, tone: "success" as Tone, hint: "Distinct vehicles live with nothing outstanding" },
-    {
-      label: "Needs review", value: loadingRows ? null : kpis.needs_review, loading: loadingRows, tone: "warning" as Tone,
-      hint: `Distinct vehicles, folded from ${openEventCount} open exception event${openEventCount === 1 ? "" : "s"}`,
-    },
-    { label: "Failed generation", value: loadingRows ? null : kpis.failed, loading: loadingRows, tone: "danger" as Tone, hint: "Distinct vehicles, last attempt failed or blocked" },
+    { label: "Active vehicles", value: metricsLoading || metricsError ? null : metrics.activeInventory, loading: metricsLoading },
+    { label: "Published", value: loadingRows ? null : kpis.published, loading: loadingRows, tone: "success" as Tone },
+    { label: "Needs review", value: loadingRows ? null : kpis.needs_review, loading: loadingRows, tone: "warning" as Tone },
+    { label: "Failed generation", value: loadingRows ? null : kpis.failed, loading: loadingRows, tone: "danger" as Tone },
   ];
+
+  const selectedRow = (allRows || []).find((r) => r.vehicleId === selectedId) ?? null;
+
+
+  const drawer = selectedRow ? (
+    <aside aria-label="Description record" className="min-w-0 rounded-[6px] border border-adm-border bg-adm-surface lg:sticky lg:top-4">
+      <div className="flex items-start justify-between gap-3 border-b border-adm-border px-4 py-3">
+        <div className="min-w-0">
+          <p className="text-[17px] leading-[24px] font-semibold text-adm-ink truncate">{vehicleStockNumber(selectedRow.vehicle) || "No stock number"}</p>
+          <p className="text-[13px] leading-[18px] text-adm-muted truncate">{selectedRow.vehicle.ymm || "Vehicle"}</p>
+        </div>
+        <button type="button" onClick={() => select(null)} aria-label="Close record" className="w-9 h-9 grid place-items-center rounded-md text-adm-muted hover:bg-adm-workspace">
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+      <div className="space-y-4 px-4 py-4 text-[14px] leading-[20px]">
+        <dl className="space-y-1.5">
+          {[
+            ["VIN", selectedRow.vehicle.vin || "Unknown"],
+            ["Condition", selectedRow.vehicle.condition ? String(selectedRow.vehicle.condition).replace(/^./, (c) => c.toUpperCase()) : "Unknown"],
+            ["Status", <StatusText key="s" tone={STATE_META[selectedRow.state].tone}>{STATE_META[selectedRow.state].label}</StatusText>],
+            ["Fact confidence", selectedRow.caseRow?.fact_confidence != null ? `${selectedRow.caseRow.fact_confidence}% sourced` : "Not evaluated"],
+          ].map(([k, v]) => (
+            <div key={String(k)} className="flex items-baseline justify-between gap-3">
+              <dt className="text-adm-muted">{k}</dt>
+              <dd className="text-adm-ink text-right min-w-0 truncate">{v}</dd>
+            </div>
+          ))}
+        </dl>
+        <div>
+          <p className="font-semibold text-adm-ink mb-1.5">Source gaps</p>
+          {selectedRow.exceptions.length === 0 ? (
+            <p className="text-adm-muted">{selectedRow.issue || "No open source gaps."}</p>
+          ) : (
+            <ul className="space-y-1">
+              {selectedRow.exceptions.slice(0, 6).map((e) => (
+                <li key={e.id} className="flex items-baseline justify-between gap-3">
+                  <span className="min-w-0 truncate text-adm-ink">{issueLabel(e.exception_type)}</span>
+                  <StatusText tone={e.blocking ? "danger" : "warning"}>{e.blocking ? "Blocking" : "Open"}</StatusText>
+                </li>
+              ))}
+              {selectedRow.exceptions.length > 6 && <li className="text-adm-muted">+{selectedRow.exceptions.length - 6} more</li>}
+            </ul>
+          )}
+        </div>
+        <div>
+          <p className="font-semibold text-adm-ink mb-1.5">Latest attempt</p>
+          <p className="text-adm-ink">
+            {selectedRow.caseRow?.last_orchestrated_at ? new Date(selectedRow.caseRow.last_orchestrated_at as string).toLocaleString() : "No attempt recorded"}
+          </p>
+          {selectedRow.caseRow?.status && <p className="text-adm-muted">{String(selectedRow.caseRow.status).replace(/_/g, " ").toLowerCase().replace(/^./, (c) => c.toUpperCase())}</p>}
+        </div>
+        <details className="group">
+          <summary className="cursor-pointer font-semibold text-adm-primary">Diagnostics</summary>
+          <div className="mt-2 overflow-x-auto">
+            <VehicleDiagnosticPanel
+              vin={selectedRow.vehicle.vin || ""}
+              caseStatus={(selectedRow.caseRow?.status as string | undefined) ?? null}
+              eligibility={(selectedRow.caseRow?.publication_eligibility as string | undefined) ?? null}
+              factConfidence={(selectedRow.caseRow?.fact_confidence as number | null | undefined) ?? null}
+              currentSourceVersion={(selectedRow.caseRow?.current_source_data_version as string | undefined) ?? null}
+              processedSourceVersion={(selectedRow.caseRow?.processed_source_data_version as string | undefined) ?? null}
+              lastRunAt={(selectedRow.caseRow?.last_orchestrated_at as string | undefined) ?? null}
+              presentChannels={selectedRow.channelsPresent}
+              configuredChannels={configuredChannels}
+              exceptions={selectedRow.exceptions}
+              onOpenRecord={() => navigate(`/description-intelligence/${selectedRow.vehicleId}`)}
+              onOpenStudio={() => navigate(`/description-studio?vehicle=${selectedRow.vehicleId}`)}
+            />
+          </div>
+        </details>
+      </div>
+      <div className="flex flex-col gap-2 border-t border-adm-border px-4 py-3">
+        <Button variant="primary" onClick={() => navigate(`/description-intelligence/${selectedRow.vehicleId}`)}>Review description record</Button>
+        <div className="flex gap-2">
+          <Button className="flex-1" onClick={() => navigate(`/description-studio?vehicle=${selectedRow.vehicleId}`)}>Open studio</Button>
+          <Button className="flex-1" onClick={() => navigate(`/vehicle-file/${selectedRow.vehicleId}`)}>Vehicle file</Button>
+        </div>
+      </div>
+    </aside>
+  ) : null;
 
   return (
     <PageBody width="wide">
@@ -400,12 +467,7 @@ export default function DescriptionOperations() {
           <>
             {perms.canGenerate && (
               <Button onClick={runReconcile} disabled={syncing}>
-                {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Review reconciliation
-              </Button>
-            )}
-            {perms.canConfigure && (
-              <Button onClick={() => navigate("/admin?tab=merchandising-seo")}>
-                <Settings2 className="w-4 h-4" /> Automation settings
+                {syncing ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />} Review reconciliation
               </Button>
             )}
             <Button variant="primary" onClick={() => applyStateFilter("needs_review")}>
@@ -421,47 +483,21 @@ export default function DescriptionOperations() {
         <InlineNote tone="warning" title="Inventory counts unavailable">{metricsError}</InlineNote>
       )}
 
-      {allRows && (
-        <p className="text-[12px] leading-[18px] text-adm-muted -mt-3">
-          {allRows.length} vehicle{allRows.length === 1 ? "" : "s"} classified: {kpis.published} published,{" "}
-          {kpis.needs_review} needs review, {kpis.waiting_on_data} waiting on data, {kpis.failed} failed,{" "}
-          {allRows.length - kpis.published - kpis.needs_review - kpis.waiting_on_data - kpis.failed} ready or in progress.
-          Each vehicle is counted once.
-          {!metricsLoading && !metricsError && metrics.activeInventory !== allRows.length
-            ? ` Operating metrics reports ${metrics.activeInventory} active vehicles for this dealership.`
-            : ""}
-        </p>
-      )}
-
-      {summary && summary.missing > 0 && (
-        <InlineNote
-          tone="warning"
-          title={`${summary.missing} active vehicle${summary.missing === 1 ? "" : "s"} never started a description`}
-          action={perms.canGenerate ? (
-            <Button size="sm" onClick={runReconcile} disabled={syncing}>
-              {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Review and initialize
-            </Button>
-          ) : undefined}
-        >
-          Vehicles added outside the inventory feed are picked up by reconciliation.
-        </InlineNote>
-      )}
-
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[220px]">
+        <div className="relative flex-1 min-w-[220px] max-w-md">
           <Search className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             value={query}
             onChange={(e) => { setQuery(e.target.value); setPage(0); }}
             placeholder="Search by make, model, stock # or VIN"
             aria-label="Search vehicles"
-            className="w-full min-h-[44px] pl-10 pr-3 rounded-xl border border-border bg-card text-al-body focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full h-10 pl-10 pr-3 rounded-md border border-adm-border bg-adm-surface text-[14px] focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>
         <select
           value={stateFilter} aria-label="Filter by description state"
           onChange={(e) => { setStateFilter(e.target.value as "all" | OpsState); setPage(0); }}
-          className="min-h-[44px] px-3 rounded-xl border border-border bg-card text-al-meta font-medium"
+          className="h-10 px-3 rounded-md border border-adm-border bg-adm-surface text-[14px]"
         >
           <option value="all">All description states</option>
           {(Object.keys(STATE_META) as OpsState[]).map((s) => (
@@ -471,7 +507,7 @@ export default function DescriptionOperations() {
         <select
           value={conditionFilter} aria-label="Filter by condition"
           onChange={(e) => { setConditionFilter(e.target.value); setPage(0); }}
-          className="min-h-[44px] px-3 rounded-xl border border-border bg-card text-al-meta font-medium"
+          className="h-10 px-3 rounded-md border border-adm-border bg-adm-surface text-[14px]"
         >
           <option value="all">New and used</option>
           <option value="new">New</option>
@@ -481,7 +517,7 @@ export default function DescriptionOperations() {
         <select
           value={channelFilter} aria-label="Filter by channel coverage"
           onChange={(e) => { setChannelFilter(e.target.value); setPage(0); }}
-          className="min-h-[44px] px-3 rounded-xl border border-border bg-card text-al-meta font-medium"
+          className="h-10 px-3 rounded-md border border-adm-border bg-adm-surface text-[14px]"
         >
           <option value="all">Any channel coverage</option>
           <option value="complete">Every channel covered</option>
@@ -491,13 +527,14 @@ export default function DescriptionOperations() {
         <button
           type="button"
           onClick={() => { setStateFilter("all"); setConditionFilter("all"); setChannelFilter("all"); setQuery(""); setPage(0); }}
-          className="min-h-[44px] px-3.5 rounded-xl border border-border bg-card text-al-meta font-semibold text-foreground inline-flex items-center gap-1.5"
+          className="h-10 px-3 text-[14px] font-semibold text-adm-primary hover:underline"
         >
-          <SlidersHorizontal className="w-4 h-4" /> Reset
+          Clear filters
         </button>
       </div>
 
-      <div className="rounded-[6px] border border-adm-border bg-adm-surface overflow-hidden">
+      <div className={drawer ? "grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start" : ""}>
+      <div className="min-w-0 rounded-[6px] border border-adm-border bg-adm-surface overflow-hidden">
         {error || exceptionError ? (
           <div className="p-8 text-center">
             <XCircle className="w-8 h-8 text-rose-500 mx-auto mb-2" />
@@ -529,178 +566,53 @@ export default function DescriptionOperations() {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[1100px]">
-                <thead>
-                  <tr className="text-al-meta font-semibold text-adm-muted bg-adm-workspace border-b border-adm-border">
-                    <th className="px-2 py-2.5"><span className="sr-only">Expand diagnostics</span></th>
-                    <SortHead k="vehicle">Vehicle</SortHead>
-                    <SortHead k="state">Description state</SortHead>
-                    <SortHead k="confidence">Fact confidence</SortHead>
-                    <th className="px-3 py-2.5">Primary issue</th>
-                    <th className="px-3 py-2.5">Publication state</th>
-                    <th className="px-3 py-2.5">Channels</th>
-                    <SortHead k="updated">Updated</SortHead>
-                    <th className="px-3 py-2.5 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {paged.map((r) => {
-                    const conf = confidenceBand(r.caseRow?.fact_confidence as number | null | undefined);
-                    const state = STATE_META[r.state];
-                    const stock = vehicleStockNumber(r.vehicle);
-                    const isOpen = expanded === r.vehicleId;
-                    const published = r.caseRow?.status === "PUBLISHED" || r.caseRow?.status === "PARTIALLY_PUBLISHED";
-                    return (
-                      <Fragment key={r.vehicleId}>
-                        <tr className="hover:bg-primary/[0.025] transition-colors duration-hover ease-standard motion-reduce:transition-none">
-                          <td className="px-2 py-3 align-top">
-                            <button
-                              type="button"
-                              aria-expanded={isOpen}
-                              aria-label={`${isOpen ? "Hide" : "Show"} diagnostics for ${r.vehicle.ymm || r.vehicle.vin || "vehicle"}`}
-                              onClick={() => setExpanded(isOpen ? null : r.vehicleId)}
-                              className="w-9 h-9 grid place-items-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                            >
-                              {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                            </button>
-                          </td>
-                          <td className="px-3 py-3">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              {r.vehicle.hero_image_url ? (
-                                <img
-                                  src={r.vehicle.hero_image_url} alt="" loading="lazy"
-                                  className="w-14 h-10 rounded-lg object-cover border border-border shrink-0"
-                                />
-                              ) : (
-                                <span className="w-14 h-10 rounded-lg border border-border bg-muted grid place-items-center shrink-0">
-                                  <Car className="w-4 h-4 text-muted-foreground" />
-                                </span>
-                              )}
-                              <span className="min-w-0">
-                                <span className="block text-al-body font-semibold text-foreground truncate">{r.vehicle.ymm || "Vehicle"}</span>
-                                <span className="block text-al-meta text-muted-foreground truncate">
-                                  {[r.vehicle.trim, stock ? `Stock ${stock}` : "No stock number"].filter(Boolean).join(" - ")}
-                                </span>
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-3 py-3">
-                            <StatusText tone={state.tone} icon>{state.label}</StatusText>
-                          </td>
-                          <td className="px-3 py-3">
-                            <span className={`block text-al-body font-semibold ${conf.className}`}>{conf.word}</span>
-                            <span className="block text-al-meta text-muted-foreground tabular-nums">
-                              {r.caseRow?.fact_confidence != null ? `${r.caseRow.fact_confidence}% of claims sourced` : "Not evaluated"}
-                            </span>
-                          </td>
-                          <td className="px-3 py-3">
-                            <span className="block text-al-body text-foreground">{r.issue || "None"}</span>
-                            {r.exceptions.length > 1 && (
-                              <span className="block text-al-meta text-muted-foreground">
-                                +{r.exceptions.length - 1} more open on this vehicle
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-3 py-3">
-                            {published ? (
-                              <>
-                                <span className="block text-al-body font-semibold text-emerald-700">
-                                  {r.caseRow?.status === "PARTIALLY_PUBLISHED" ? "Partly Published" : "Published"}
-                                </span>
-                                <span className="block text-al-meta text-muted-foreground">
-                                  {r.caseRow?.last_success_at ? new Date(r.caseRow.last_success_at as string).toLocaleDateString() : ""}
-                                </span>
-                              </>
-                            ) : (
-                              <span className="text-al-body text-muted-foreground">Not Published</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-3">
-                            {configuredChannels.length === 0 ? (
-                              <>
-                                <span className="block text-al-body text-muted-foreground">—</span>
-                                <span className="block text-al-meta text-muted-foreground">No channels enabled</span>
-                              </>
-                            ) : (
-                              <>
-                                <span className={`block text-al-body font-semibold tabular-nums ${
-                                  r.channelsPresent.length === configuredChannels.length ? "text-emerald-700"
-                                    : r.channelsPresent.length === 0 ? "text-muted-foreground" : "text-amber-700"}`}>
-                                  {r.channelsPresent.length}/{configuredChannels.length}
-                                </span>
-                                <span className="block text-al-meta text-muted-foreground">variants live</span>
-                              </>
-                            )}
-                          </td>
-                          <td className="px-3 py-3 whitespace-nowrap">
-                            <span className="block text-al-meta text-foreground">
-                              {r.updatedAt ? new Date(r.updatedAt).toLocaleDateString() : "—"}
-                            </span>
-                            <span className="block text-al-meta text-muted-foreground">
-                              {r.updatedAt ? new Date(r.updatedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : ""}
-                            </span>
-                          </td>
-                          <td className="px-3 py-3 text-right">
-                            <span className="inline-flex items-center gap-1 justify-end">
-                              <button
-                                type="button"
-                                onClick={() => navigate(`/description-intelligence/${r.vehicleId}`)}
-                                className="min-h-[44px] px-3 rounded-lg border border-border bg-card text-al-meta font-bold tracking-wide text-foreground hover:border-primary"
-                              >
-                                {ACTION_LABEL[r.state]}
-                              </button>
-                              <button
-                                type="button"
-                                aria-label={`More actions for ${r.vehicle.ymm || r.vehicle.vin || "vehicle"}`}
-                                aria-haspopup="menu" aria-expanded={menu?.id === r.vehicleId}
-                                onClick={(e) => {
-                                  const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                                  // Flip above the trigger when the menu would run
-                                  // off the bottom of the viewport.
-                                  const MENU_H = 156;
-                                  const below = window.innerHeight - box.bottom > MENU_H + 12;
-                                  setMenu(menu?.id === r.vehicleId ? null : {
-                                    id: r.vehicleId, x: box.right,
-                                    y: below ? box.bottom + 4 : Math.max(8, box.top - MENU_H - 4),
-                                    vehicleId: r.vehicleId, vin: r.vehicle.vin || "",
-                                  });
-                                }}
-                                className="w-11 h-11 grid place-items-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                              >
-                                <MoreVertical className="w-4 h-4" />
-                              </button>
-                            </span>
-                          </td>
-                        </tr>
-                        {isOpen && (
-                          <tr>
-                            <td colSpan={9} className="px-3 pb-4 bg-muted/20">
-                              <VehicleDiagnosticPanel
-                                vin={r.vehicle.vin || ""}
-                                caseStatus={(r.caseRow?.status as string | undefined) ?? null}
-                                eligibility={(r.caseRow?.publication_eligibility as string | undefined) ?? null}
-                                factConfidence={(r.caseRow?.fact_confidence as number | null | undefined) ?? null}
-                                currentSourceVersion={(r.caseRow?.current_source_data_version as string | undefined) ?? null}
-                                processedSourceVersion={(r.caseRow?.processed_source_data_version as string | undefined) ?? null}
-                                lastRunAt={(r.caseRow?.last_orchestrated_at as string | undefined) ?? null}
-                                presentChannels={r.channelsPresent}
-                                configuredChannels={configuredChannels}
-                                exceptions={r.exceptions}
-                                onOpenRecord={() => navigate(`/description-intelligence/${r.vehicleId}`)}
-                                onOpenStudio={() => navigate(`/description-studio?vehicle=${r.vehicleId}`)}
-                              />
-                            </td>
-                          </tr>
-                        )}
-                      </Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <table className="w-full table-fixed text-left border-collapse">
+              <colgroup>
+                <col className="w-[30%]" /><col className="w-[12%]" /><col className="w-[19%]" /><col className="w-[17%]" /><col className="w-[9%]" /><col className="w-[13%]" />
+              </colgroup>
+              <thead>
+                <tr className="text-[12px] leading-[18px] font-semibold text-adm-muted bg-adm-workspace border-b border-adm-border">
+                  <SortHead k="vehicle">Vehicle</SortHead>
+                  <th className="px-3 py-2.5">Stock #</th>
+                  <SortHead k="state">Description state</SortHead>
+                  <th className="px-3 py-2.5">Primary issue</th>
+                  <th className="px-3 py-2.5">Channels</th>
+                  <SortHead k="updated">Updated</SortHead>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-adm-border">
+                {paged.map((r) => {
+                  const state = STATE_META[r.state];
+                  const stock = vehicleStockNumber(r.vehicle);
+                  const active = selectedId === r.vehicleId;
+                  return (
+                    <tr
+                      key={r.vehicleId}
+                      onClick={() => select(active ? null : r.vehicleId)}
+                      aria-selected={active}
+                      className={`h-14 cursor-pointer transition-colors ${active ? "bg-adm-selected" : "hover:bg-adm-workspace"}`}
+                    >
+                      <td className="px-3 text-[14px] font-semibold text-adm-ink truncate">
+                        <button type="button" onClick={(e) => { e.stopPropagation(); select(active ? null : r.vehicleId); }} className="text-left max-w-full truncate hover:underline focus-visible:underline">
+                          {r.vehicle.ymm || "Vehicle"}
+                        </button>
+                      </td>
+                      <td className="px-3 text-[14px] text-adm-muted truncate">{stock || "Unknown"}</td>
+                      <td className="px-3"><StatusText tone={state.tone}>{state.label}</StatusText></td>
+                      <td className="px-3 text-[14px] text-adm-ink truncate">{r.issue || "None"}</td>
+                      <td className="px-3 text-[14px] tabular-nums text-adm-ink">
+                        {configuredChannels.length === 0 ? "Unknown" : `${r.channelsPresent.length}/${configuredChannels.length}`}
+                      </td>
+                      <td className="px-3 text-[13px] text-adm-muted whitespace-nowrap">
+                        {r.updatedAt ? new Date(r.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "Unknown"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
 
-            <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-border flex-wrap">
+            <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-adm-border flex-wrap">
               <p className="text-al-meta text-muted-foreground">
                 {page * pageSize + 1}–{Math.min(total, (page + 1) * pageSize)} of {total} vehicles - active inventory
                 {lastRun ? ` - last automated run ${lastRun.toLocaleString()}` : ""}
@@ -749,37 +661,14 @@ export default function DescriptionOperations() {
           </>
         )}
       </div>
+      {drawer}
+      </div>
 
-      {menu && (
-        <>
-          <div className="fixed inset-0 z-30" onClick={() => setMenu(null)} aria-hidden />
-          <div role="menu" style={{ top: menu.y, left: Math.max(8, menu.x - 208) }}
-            className="fixed z-40 w-52 rounded-xl border border-border bg-card shadow-lg p-1">
-            {([
-              ["Open description record", () => navigate(`/description-intelligence/${menu.vehicleId}`)],
-              ["Open studio", () => navigate(`/description-studio?vehicle=${menu.vehicleId}`)],
-              ["Open vehicle file", () => navigate(`/vehicle-file/${menu.vehicleId}`)],
-              ["Copy VIN", () => {
-                if (!menu.vin) { toast.error("This vehicle has no VIN on file"); return; }
-                navigator.clipboard.writeText(menu.vin)
-                  .then(() => toast.success("VIN copied"), () => toast.error("Clipboard unavailable"));
-              }],
-            ] as [string, () => void][]).map(([label, fn]) => (
-              <button
-                key={label} type="button" role="menuitem"
-                onClick={() => { fn(); setMenu(null); }}
-                className="w-full text-left min-h-[44px] px-3 rounded-lg text-al-body font-medium text-foreground hover:bg-muted/60"
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
 
-      <p className="text-[12px] leading-[18px] text-adm-muted inline-flex items-center gap-1.5">
-        <Clock className="w-3.5 h-3.5" />
-        Descriptions generate automatically at ingest. Every count above is vehicles, not validation events.
+      <p className="text-[12px] leading-[18px] text-adm-muted">
+        Descriptions generate automatically at ingest. Counts are vehicles, not validation events.
+        {summary && summary.missing > 0 ? ` ${summary.missing} active vehicle${summary.missing === 1 ? "" : "s"} never started a description.` : ""}
+        {perms.canConfigure && (<> <button type="button" onClick={() => navigate("/admin?tab=merchandising-seo")} className="font-semibold text-adm-primary hover:underline">Automation settings</button></>)}
       </p>
     </PageBody>
   );
