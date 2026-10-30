@@ -70,10 +70,10 @@ function Composer({ tenantId, vin, onSent, disabledReason }: {
         rows={2}
         placeholder="Message sales manager"
         aria-label="Message sales manager"
-        className="w-full rounded-lg border border-border bg-background p-2.5 text-sm"
+        className="w-full rounded-lg border border-adm-border bg-adm-surface p-2.5 text-sm"
       />
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[10.5px] text-muted-foreground">{SUPPORT_NOTE}</p>
+        <p className="text-[10.5px] text-adm-muted">{SUPPORT_NOTE}</p>
         <span title={blocked ?? undefined}>
           <button
             type="button"
@@ -92,18 +92,18 @@ function Composer({ tenantId, vin, onSent, disabledReason }: {
 
 function MessageList({ rows, showVin }: { rows: ServiceMessageRow[]; showVin?: boolean }) {
   if (rows.length === 0) {
-    return <p className="text-[11.5px] text-muted-foreground py-2">No messages yet.</p>;
+    return <p className="text-[11.5px] text-adm-muted py-2">No messages yet.</p>;
   }
   return (
     <ul className="space-y-2.5 max-h-[320px] overflow-y-auto pr-1">
       {rows.map((m) => (
-        <li key={m.id} className="rounded-xl border border-border bg-muted/30 p-2.5">
-          <div className="flex items-center justify-between gap-2 text-[10.5px] text-muted-foreground">
-            <span className="font-semibold text-foreground">{m.author_name || "Team member"}</span>
+        <li key={m.id} className="rounded-xl border border-adm-border bg-adm-workspace p-2.5">
+          <div className="flex items-center justify-between gap-2 text-[10.5px] text-adm-muted">
+            <span className="font-semibold text-adm-ink">{m.author_name || "Team member"}</span>
             <span>{formatCommandDateTime(m.created_at) ?? ""}</span>
           </div>
-          {showVin ? <div className="font-mono text-[10px] text-muted-foreground mt-0.5">VIN …{m.vin.slice(-6)}</div> : null}
-          <p className="text-[12.5px] text-foreground mt-1 whitespace-pre-wrap break-words">{m.body}</p>
+          {showVin ? <div className="font-mono text-[10px] text-adm-muted mt-0.5">VIN …{m.vin.slice(-6)}</div> : null}
+          <p className="text-[12.5px] text-adm-ink mt-1 whitespace-pre-wrap break-words">{m.body}</p>
         </li>
       ))}
     </ul>
@@ -148,15 +148,15 @@ export function ManagerMessagesRail({ tenantId, vehicles }: {
   // permanent empty panel beside the queue.
   if ((rows ?? []).length === 0 && !composing) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-3.5 flex items-center justify-between gap-3">
+      <div className="rounded-2xl border border-adm-border bg-adm-surface p-3.5 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
-          <MessageSquare className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden="true" />
-          <p className="text-xs text-muted-foreground truncate">No manager messages</p>
+          <MessageSquare className="w-4 h-4 text-adm-muted shrink-0" aria-hidden="true" />
+          <p className="text-xs text-adm-muted truncate">No manager messages</p>
         </div>
         <button
           type="button"
           onClick={() => setComposing(true)}
-          className="h-9 px-3 rounded-lg border border-border text-xs font-semibold text-foreground hover:bg-muted shrink-0"
+          className="h-9 px-3 rounded-lg border border-adm-border text-xs font-semibold text-adm-ink hover:bg-adm-workspace shrink-0"
         >
           New message
         </button>
@@ -173,7 +173,7 @@ export function ManagerMessagesRail({ tenantId, vehicles }: {
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           aria-label="Filter messages by vehicle"
-          className="h-9 rounded-lg border border-border bg-background px-2 text-xs"
+          className="h-9 rounded-lg border border-adm-border bg-adm-surface px-2 text-xs"
         >
           <option value="all">All vehicles</option>
           {vinsWithMessages.map((vin) => (
@@ -185,14 +185,14 @@ export function ManagerMessagesRail({ tenantId, vehicles }: {
       <div className="space-y-3">
         <MessageList rows={visible} showVin={filter === "all"} />
         <div>
-          <label className="block text-al-meta font-bold uppercase tracking-wide text-muted-foreground mb-1" htmlFor="rail-msg-vin">
+          <label className="block text-[12px] leading-[18px] font-bold uppercase tracking-wide text-adm-muted mb-1" htmlFor="rail-msg-vin">
             About vehicle
           </label>
           <select
             id="rail-msg-vin"
             value={composeVin}
             onChange={(e) => setComposeVin(e.target.value)}
-            className="w-full h-10 rounded-lg border border-border bg-background px-2 text-sm mb-2"
+            className="w-full h-10 rounded-lg border border-adm-border bg-adm-surface px-2 text-sm mb-2"
           >
             <option value="">Choose a vehicle…</option>
             {vehicles.map((v) => (

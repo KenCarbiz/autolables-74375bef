@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
@@ -10,7 +10,8 @@ import {
   BTN_SECONDARY, EM_DASH, EmptyState, ErrorCard, LoadingCard, StatusPill,
   formatCommandDate, type Tone,
 } from "@/components/command/CommandPrimitives";
-import { ChevronDown, ChevronRight, ClipboardList, Headset } from "lucide-react";
+import { ChevronDown, ChevronRight, ClipboardList } from "lucide-react";
+import { LocalTabs, MetricStrip, PageBody, PageHeader, type LocalTab } from "@/components/product";
 import { cn } from "@/lib/utils";
 import { SERVICE_FLOOR_STATES, stateLabel, type ServiceFloorState } from "@/lib/lifecycle/states";
 
@@ -183,7 +184,9 @@ export default function ServiceWriterDesk() {
   const [rows, setRows] = useState<DeskRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [tab, setTab] = useState<TabKey>("all");
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const tab: TabKey = TABS.some((t) => t.key === tabParam) ? (tabParam as TabKey) : "all";
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const overdueHours = settings.service_overdue_hours || 24;
@@ -391,39 +394,28 @@ export default function ServiceWriterDesk() {
   }
 
   return (
-    <div className="max-w-[1200px] mx-auto p-4 md:p-6 space-y-5">
-      <header>
-        <div className="flex items-center gap-2">
-          <Headset className="w-5 h-5 text-primary" aria-hidden="true" />
-          <h1 className="text-al-page font-display text-foreground">Service writer desk</h1>
-        </div>
-        <p className="text-al-body text-muted-foreground mt-0.5">
-          {rows.length} {rows.length === 1 ? "vehicle" : "vehicles"} in the service pipeline &middot;{" "}
-          {metrics.inGetReady} inside get ready &middot; {metrics.retailReady} retail ready.
-        </p>
-      </header>
+    <PageBody width="wide">
+      <PageHeader
+        title="Service writer desk"
+        description={`${rows.length} ${rows.length === 1 ? "vehicle" : "vehicles"} in the service pipeline.`}
+      />
 
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 md:mx-0 md:px-0">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            aria-pressed={tab === t.key}
-            onClick={() => { setTab(t.key); setExpanded(null); }}
-            className={cn(
-              "min-h-[40px] shrink-0 rounded-xl border px-3 text-al-meta font-bold uppercase tracking-[0.08em] transition-colors",
-              tab === t.key
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-card text-muted-foreground hover:bg-muted",
-            )}
-          >
-            {t.label}
-            <span className="ml-2 tabular-nums">{counts[t.key]}</span>
-          </button>
-        ))}
-      </div>
+      <MetricStrip
+        label="Service pipeline summary"
+        metrics={[
+          { label: "In the pipeline", value: rows.length, hint: "all service stages" },
+          { label: "Unassigned", value: counts.unassigned, hint: `of ${rows.length}`, tone: counts.unassigned > 0 ? "warning" : "neutral" },
+          { label: "Inside get ready", value: metrics.inGetReady, hint: "current lifecycle state", tone: "info" },
+          { label: "Retail ready", value: metrics.retailReady, hint: "lifecycle state, not listing visibility", tone: "success" },
+        ]}
+      />
 
-      <p className="text-al-meta text-muted-foreground">
+      <LocalTabs
+        label="Service pipeline stages"
+        tabs={TABS.map((t): LocalTab => ({ key: t.key, label: t.label, to: `/service-desk?tab=${t.key}`, count: counts[t.key], active: t.key === tab }))}
+      />
+
+      <p className="text-[12px] leading-[18px] text-adm-muted">
         K-208 is shown here for visibility only. Certification authority comes from the store&apos;s K-208 policy and is
         enforced by the server &mdash; it is never granted by a job title, and nothing on this desk certifies a vehicle.
       </p>
@@ -431,8 +423,8 @@ export default function ServiceWriterDesk() {
       {visible.length === 0 ? (
         <EmptyState Icon={ClipboardList} title={TAB_EMPTY[tab].title} detail={TAB_EMPTY[tab].detail} />
       ) : (
-        <section className="rounded-2xl border border-border bg-card p-2 md:p-4">
-          <table className="w-full table-fixed text-al-body">
+        <section className="rounded-2xl border border-adm-border bg-adm-surface p-2 md:p-4">
+          <table className="w-full table-fixed text-[14px] leading-[20px]">
             <caption className="sr-only">Vehicles in the service pipeline, highest priority first</caption>
             <colgroup>
               <col className="w-[34%] md:w-[26%]" />
@@ -443,7 +435,7 @@ export default function ServiceWriterDesk() {
               <col className="w-[36%] md:w-[20%]" />
             </colgroup>
             <thead>
-              <tr className="text-al-meta uppercase tracking-[0.12em] text-muted-foreground border-b border-border">
+              <tr className="text-[12px] leading-[18px] uppercase tracking-[0.12em] text-adm-muted border-b border-adm-border">
                 <th scope="col" className="text-left font-bold py-2 pr-2">Vehicle</th>
                 <th scope="col" className="text-left font-bold py-2 pr-2">Current state</th>
                 <th scope="col" className="hidden md:table-cell text-left font-bold py-2 pr-2">Assigned to</th>
@@ -465,31 +457,31 @@ export default function ServiceWriterDesk() {
                         className="flex items-start gap-1.5 text-left min-h-[44px] w-full"
                       >
                         {open
-                          ? <ChevronDown className="w-4 h-4 mt-0.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                          : <ChevronRight className="w-4 h-4 mt-0.5 shrink-0 text-muted-foreground" aria-hidden="true" />}
+                          ? <ChevronDown className="w-4 h-4 mt-0.5 shrink-0 text-adm-muted" aria-hidden="true" />
+                          : <ChevronRight className="w-4 h-4 mt-0.5 shrink-0 text-adm-muted" aria-hidden="true" />}
                         <span className="min-w-0">
-                          <span className="block text-foreground font-semibold truncate">{r.ymm}</span>
-                          <span className="block font-mono text-al-meta text-muted-foreground">
+                          <span className="block text-adm-ink font-semibold truncate">{r.ymm}</span>
+                          <span className="block font-mono text-[12px] leading-[18px] text-adm-muted">
                             &hellip;{r.vin.slice(-8)}
                           </span>
                         </span>
                       </button>
                     </td>
                     <td className="py-2.5 pr-2 align-top">
-                      <span className="block text-foreground">{stateLabel(r.state)}</span>
+                      <span className="block text-adm-ink">{stateLabel(r.state)}</span>
                       <span className="mt-1 inline-block">
                         <StatusPill tone={STATUS_TONE[STATE_STATUS[r.state as ServiceFloorState] || "WAITING"]}>
                           {(STATE_STATUS[r.state as ServiceFloorState] || "WAITING").replace("_", " ")}
                         </StatusPill>
                       </span>
                     </td>
-                    <td className="hidden md:table-cell py-2.5 pr-2 align-top text-muted-foreground truncate">
+                    <td className="hidden md:table-cell py-2.5 pr-2 align-top text-adm-muted truncate">
                       {r.assignedName ?? "Unassigned"}
                     </td>
-                    <td className="hidden md:table-cell py-2.5 pr-2 align-top tabular-nums text-foreground whitespace-nowrap">
+                    <td className="hidden md:table-cell py-2.5 pr-2 align-top tabular-nums text-adm-ink whitespace-nowrap">
                       {durationLabel(r.ageHours)}
                     </td>
-                    <td className="hidden md:table-cell py-2.5 pr-2 align-top text-muted-foreground whitespace-nowrap">
+                    <td className="hidden md:table-cell py-2.5 pr-2 align-top text-adm-muted whitespace-nowrap">
                       {formatCommandDate(r.deliveryTarget) ?? EM_DASH}
                     </td>
                     <td className="py-2.5 align-top text-right">
@@ -502,47 +494,47 @@ export default function ServiceWriterDesk() {
                     </td>
                   </tr>,
                   open ? (
-                    <tr key={`${r.vehicleId}-detail`} className="bg-muted">
+                    <tr key={`${r.vehicleId}-detail`} className="bg-adm-workspace">
                       <td colSpan={6} className="p-3">
                         <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-3">
                           <div>
-                            <dt className="text-al-meta text-muted-foreground">Stock</dt>
-                            <dd className="text-al-body text-foreground">{r.stockNumber || EM_DASH}</dd>
+                            <dt className="text-[12px] leading-[18px] text-adm-muted">Stock</dt>
+                            <dd className="text-[14px] leading-[20px] text-adm-ink">{r.stockNumber || EM_DASH}</dd>
                           </div>
                           <div>
-                            <dt className="text-al-meta text-muted-foreground">VIN</dt>
-                            <dd className="text-al-body text-foreground font-mono break-all">{r.vin}</dd>
+                            <dt className="text-[12px] leading-[18px] text-adm-muted">VIN</dt>
+                            <dd className="text-[14px] leading-[20px] text-adm-ink font-mono break-all">{r.vin}</dd>
                           </div>
                           <div className="md:hidden">
-                            <dt className="text-al-meta text-muted-foreground">Assigned to</dt>
-                            <dd className="text-al-body text-foreground">{r.assignedName ?? "Unassigned"}</dd>
+                            <dt className="text-[12px] leading-[18px] text-adm-muted">Assigned to</dt>
+                            <dd className="text-[14px] leading-[20px] text-adm-ink">{r.assignedName ?? "Unassigned"}</dd>
                           </div>
                           <div className="md:hidden">
-                            <dt className="text-al-meta text-muted-foreground">Age in state</dt>
-                            <dd className="text-al-body text-foreground tabular-nums">{durationLabel(r.ageHours)}</dd>
+                            <dt className="text-[12px] leading-[18px] text-adm-muted">Age in state</dt>
+                            <dd className="text-[14px] leading-[20px] text-adm-ink tabular-nums">{durationLabel(r.ageHours)}</dd>
                           </div>
                           <div className="md:hidden">
-                            <dt className="text-al-meta text-muted-foreground">Delivery target</dt>
-                            <dd className="text-al-body text-foreground">
+                            <dt className="text-[12px] leading-[18px] text-adm-muted">Delivery target</dt>
+                            <dd className="text-[14px] leading-[20px] text-adm-ink">
                               {formatCommandDate(r.deliveryTarget) ?? EM_DASH}
                             </dd>
                           </div>
                           <div>
-                            <dt className="text-al-meta text-muted-foreground">Priority</dt>
-                            <dd className="text-al-body text-foreground flex flex-wrap items-center gap-1.5">
+                            <dt className="text-[12px] leading-[18px] text-adm-muted">Priority</dt>
+                            <dd className="text-[14px] leading-[20px] text-adm-ink flex flex-wrap items-center gap-1.5">
                               <StatusPill tone={PRIORITY_TONE[r.priority.level]}>{r.priority.level}</StatusPill>
-                              <span className="text-al-meta text-muted-foreground">{r.priority.label}</span>
+                              <span className="text-[12px] leading-[18px] text-adm-muted">{r.priority.label}</span>
                             </dd>
                           </div>
                           <div>
-                            <dt className="text-al-meta text-muted-foreground">Overdue</dt>
-                            <dd className="text-al-body text-foreground">
+                            <dt className="text-[12px] leading-[18px] text-adm-muted">Overdue</dt>
+                            <dd className="text-[14px] leading-[20px] text-adm-ink">
                               {r.overdue ? `Past ${durationLabel(overdueHours)} in this stage` : "Within the store threshold"}
                             </dd>
                           </div>
                           <div className="col-span-2">
-                            <dt className="text-al-meta text-muted-foreground">Delivery clearance</dt>
-                            <dd className="text-al-body text-foreground">
+                            <dt className="text-[12px] leading-[18px] text-adm-muted">Delivery clearance</dt>
+                            <dd className="text-[14px] leading-[20px] text-adm-ink">
                               {r.blocked
                                 ? (r.clearanceReasons.length
                                   ? r.clearanceReasons.map(clearanceReasonLabel).join(" · ")
@@ -551,8 +543,8 @@ export default function ServiceWriterDesk() {
                             </dd>
                           </div>
                           <div className="col-span-2 md:col-span-4">
-                            <dt className="text-al-meta text-muted-foreground">Open request</dt>
-                            <dd className="text-al-body text-foreground">
+                            <dt className="text-[12px] leading-[18px] text-adm-muted">Open request</dt>
+                            <dd className="text-[14px] leading-[20px] text-adm-ink">
                               {r.openRequest ?? "No estimate is waiting on a manager."}
                             </dd>
                           </div>
@@ -565,12 +557,12 @@ export default function ServiceWriterDesk() {
             </tbody>
           </table>
           {visible.length > 100 ? (
-            <p className="text-al-meta text-muted-foreground pt-3">
+            <p className="text-[12px] leading-[18px] text-adm-muted pt-3">
               Showing the 100 highest-priority of {visible.length}.
             </p>
           ) : null}
         </section>
       )}
-    </div>
+    </PageBody>
   );
 }

@@ -1,16 +1,16 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
-import { ShieldCheck, Settings, ClipboardCheck, ChevronRight } from "lucide-react";
+import { Settings } from "lucide-react";
+import { InlineNote, LocalTabs, PageBody, PageHeader, LinkButton } from "@/components/product";
 import NextStepBanner from "@/components/workflow/NextStepBanner";
 import ServiceQueue from "@/components/service/ServiceQueue";
 import { ManagerMessagesRail } from "@/components/service/ServiceMessages";
 import { CommandCapabilityProvider } from "@/components/command/CommandPrimitives";
-import { cn } from "@/lib/utils";
 
 // /service — the Service Desk landing, split by role:
 //   My Work  — the technician's default: their queues, tablet cards, one
@@ -34,13 +34,17 @@ export default function ServiceDesk() {
   // technicians default to My Work.
   const canAssign = isAdmin || hasDealerCapability(member?.role, "can_assign_service_work", isAdmin);
   const viewKey = `service_desk_view:${user?.id ?? "anon"}`;
-  const [view, setView] = useState<DeskView>(() => {
+  const [searchParams] = useSearchParams();
+  const urlView = searchParams.get("view");
+  const [storedView] = useState<DeskView>(() => {
     const stored = typeof localStorage !== "undefined" ? localStorage.getItem(viewKey) : null;
     if (stored === "my_work" || stored === "desk") return stored;
     return canAssign ? "desk" : "my_work";
   });
-  const pickView = (v: DeskView) => {
-    setView(v);
+  // A URL view wins (reload, back and shared links); otherwise the remembered
+  // per-person default applies.
+  const view: DeskView = urlView === "my_work" || urlView === "desk" ? urlView : storedView;
+  const rememberView = (v: DeskView) => {
     try { localStorage.setItem(viewKey, v); } catch { /* private mode */ }
   };
   const [railVehicles, setRailVehicles] = useState<{ vin: string; ymm: string }[]>([]);
@@ -72,45 +76,27 @@ export default function ServiceDesk() {
 
   return (
     <CommandCapabilityProvider role={member?.role} isAdmin={isAdmin}>
-      <div className="max-w-[1500px] mx-auto p-4 md:p-6 space-y-6">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div>
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-primary" aria-hidden="true" />
-              <h1 className="text-al-page font-display text-foreground">
-                {view === "my_work" ? "My Service Work" : "Service Desk"}
-              </h1>
-            </div>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              {view === "my_work"
-                ? "Your inspections and available vehicles, one action each."
-                : "Safety inspections, get-ready work, and K-208 execution."}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <div role="group" aria-label="Service Desk view" className="flex rounded-xl border border-border p-0.5">
-              {([["my_work", "My Work"], ["desk", "Full Desk"]] as [DeskView, string][]).map(([key, label]) => (
-                <button
-                  key={key}
-                  onClick={() => pickView(key)}
-                  aria-pressed={view === key}
-                  className={cn("h-10 px-3.5 rounded-[10px] text-xs font-semibold",
-                    view === key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            {canManageSettings && (
-              <Link
-                to="/service/settings"
-                aria-label="Service Desk settings — K-208 Policy"
-                className="w-11 h-11 grid place-items-center rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-muted"
-              >
-                <Settings className="w-5 h-5" aria-hidden="true" />
-              </Link>
-            )}
-          </div>
+      <PageBody width="wide">
+        <PageHeader
+          title={view === "my_work" ? "My Service Work" : "Service Desk"}
+          description={view === "my_work"
+            ? "Your inspections and available vehicles, one action each."
+            : "Safety inspections, get-ready work, and K-208 execution."}
+          actions={canManageSettings ? (
+            <LinkButton to="/service/settings" aria-label="Service Desk settings — K-208 Policy">
+              <Settings className="h-4 w-4" aria-hidden="true" /> Settings
+            </LinkButton>
+          ) : undefined}
+        />
+
+        <div onClick={(e) => { const a = (e.target as HTMLElement).closest("a[href*='view=']"); const m = a?.getAttribute("href")?.match(/view=(my_work|desk)/); if (m) rememberView(m[1] as DeskView); }}>
+          <LocalTabs
+            label="Service Desk views"
+            tabs={[
+              { key: "my_work", label: "My Work", to: "/service?view=my_work", active: view === "my_work" },
+              { key: "desk", label: "Full Desk", to: "/service?view=desk", active: view === "desk" },
+            ]}
+          />
         </div>
 
         {view === "my_work" ? (
@@ -119,20 +105,11 @@ export default function ServiceDesk() {
           <>
             <NextStepBanner stage="service" />
             {pendingApprovals > 0 && (
-              <Link
-                to="/service/approvals"
-                className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 hover:bg-amber-100/70"
-              >
-                <span className="flex items-center gap-2.5 min-w-0">
-                  <ClipboardCheck className="w-4 h-4 text-amber-700 shrink-0" aria-hidden="true" />
-                  <span className="text-sm font-semibold text-amber-900 truncate">
-                    {pendingApprovals} additional-work {pendingApprovals === 1 ? "request needs" : "requests need"} a manager decision
-                  </span>
-                </span>
-                <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-900 shrink-0">
-                  Review <ChevronRight className="w-4 h-4" aria-hidden="true" />
-                </span>
-              </Link>
+              <InlineNote
+                tone="warning"
+                title={`${pendingApprovals} additional-work ${pendingApprovals === 1 ? "request needs" : "requests need"} a manager decision`}
+                action={<LinkButton size="sm" to="/service/approvals">Review</LinkButton>}
+              />
             )}
             <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-5 items-start">
               <ServiceQueue />
@@ -142,7 +119,7 @@ export default function ServiceDesk() {
             </div>
           </>
         )}
-      </div>
+      </PageBody>
     </CommandCapabilityProvider>
   );
 }
