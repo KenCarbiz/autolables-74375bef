@@ -53,6 +53,22 @@ export function canonicalInboundPath(input: unknown): PathCheck {
 
 export const encodeApiPath = (path: string): string => path.split("/").map(encodeURIComponent).join("/");
 
+// The API user is jailed with its Files.com root folder set to INBOUND_FOLDER,
+// so REST paths are relative to that root. Canonical full paths stay the only
+// identity in the DB, webhook and policy; translation is exact, never a fallback.
+export const API_FOLDER_LIST_PATH = "folders/?per_page=1000";
+
+export function providerPath(canonical: string): string {
+  const p = canonicalInboundPath(canonical);
+  if (!p.ok || p.path !== canonical) throw new Error("provider_path_invalid");
+  return encodeURIComponent(p.fileName);
+}
+
+export function canonicalFromProvider(input: unknown): PathCheck {
+  if (typeof input !== "string" || input.includes("/")) return { ok: false, reason: "provider_path_not_root_file" };
+  return canonicalInboundPath(`${INBOUND_FOLDER}/${input}`);
+}
+
 export type NotifyEvent = { action: string; path: string; destination: string | null; at: string | null; size: number | null };
 export type NotifyParse = { ok: true; event: NotifyEvent } | { ok: false; reason: string };
 
@@ -103,7 +119,7 @@ export function checkDownloadedContent(before: RemoteMeta, after: RemoteMeta, by
   return { ok: true };
 }
 
-export const fileContentsUrl = (path: string): string => `${FILESCOM_ORIGIN}/api/rest/v1/file_contents/${encodeApiPath(path)}`;
+export const fileContentsUrl = (path: string): string => `${FILESCOM_ORIGIN}/api/rest/v1/file_contents/${providerPath(path)}`;
 export const DOWNLOAD_TIMEOUT_MS = 60_000;
 
 type Fetch = (url: string, init: RequestInit) => Promise<Response>;

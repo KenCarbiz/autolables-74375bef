@@ -1,7 +1,8 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
   FILESCOM_ORIGIN, INBOUND_FOLDER, MAX_CSV_BYTES, assertConnectorWrite, authorizePlatformAdmin, canonicalInboundPath,
-  approvalDecision, checkDownloadedContent, downloadFileContents, encodeApiPath, intakeStatus, remoteMeta, sha256Hex, type BindingStatus, type RemoteMeta,
+  approvalDecision, checkDownloadedContent, downloadFileContents, intakeStatus, remoteMeta, sha256Hex, type BindingStatus, type RemoteMeta,
+  API_FOLDER_LIST_PATH, canonicalFromProvider, providerPath,
 } from "../_shared/filescom/policy.ts";
 import { parseCsv } from "../_shared/filescom/csv.ts";
 import { compareIdentity, runDryRun, type TenantProfile } from "../_shared/filescom/dryRun.ts";
@@ -30,7 +31,7 @@ async function fcApi(key: string, path: string): Promise<unknown> {
   return await res.json();
 }
 
-const fileMeta = async (key: string, path: string): Promise<RemoteMeta> => remoteMeta(await fcApi(key, `file_actions/metadata/${encodeApiPath(path)}`));
+const fileMeta = async (key: string, path: string): Promise<RemoteMeta> => remoteMeta(await fcApi(key, `file_actions/metadata/${providerPath(path)}`));
 
 async function download(key: string, path: string): Promise<Uint8Array> {
   try { return await downloadFileContents(fetch, key, path); }
@@ -82,7 +83,7 @@ async function overview(db: SupabaseClient) {
 }
 
 async function discover(db: SupabaseClient, key: string) {
-  const list = (await fcApi(key, `folders/${encodeApiPath(INBOUND_FOLDER)}?per_page=1000`)) as unknown[];
+  const list = (await fcApi(key, API_FOLDER_LIST_PATH)) as unknown[];
   if (!Array.isArray(list)) throw new FcError("filescom_unexpected_response");
   const now = new Date().toISOString();
   let found = 0;
@@ -90,7 +91,7 @@ async function discover(db: SupabaseClient, key: string) {
   for (const item of list) {
     const o = item as { path?: unknown; type?: unknown };
     if (o.type !== "file") continue;
-    const p = canonicalInboundPath(o.path);
+    const p = canonicalFromProvider(o.path);
     if (!p.ok) { if (typeof o.path === "string") skipped.push(o.path.split("/").pop() ?? ""); continue; }
     const m = remoteMeta(item);
     const b = await bindingFor(db, p.path);
