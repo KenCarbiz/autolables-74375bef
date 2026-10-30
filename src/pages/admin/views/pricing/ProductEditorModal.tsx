@@ -89,7 +89,7 @@ export function ProductEditorModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B1A33]/55 p-4">
-      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby="product-editor-title" tabIndex={-1} onKeyDown={(e) => { if (e.key === "Escape") onCancel(); }} className="w-full max-w-5xl max-h-[92vh] flex overflow-hidden rounded-[12px] border border-adm-border bg-adm-surface shadow-2xl outline-none">
+      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby="product-editor-title" tabIndex={-1} onKeyDown={(e) => { if (e.key === "Escape") onCancel(); }} className="w-full max-w-5xl max-h-[92vh] flex overflow-hidden rounded-[8px] border border-adm-border bg-adm-surface shadow-2xl outline-none">
         <div className="flex-1 flex flex-col min-w-0">
           <div className="p-6 space-y-4 overflow-y-auto flex-1">
             <h2 id="product-editor-title" className="text-[18px] leading-[26px] font-semibold text-adm-ink">{editing.id ? "Edit product" : "Add product"}</h2>

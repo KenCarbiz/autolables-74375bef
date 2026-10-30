@@ -56,7 +56,7 @@ export const ReviewDialog = ({
         role="dialog"
         aria-modal="true"
         aria-labelledby="admin-review-dialog-title"
-        className={cn("w-full max-w-[900px] max-h-[calc(100dvh-48px)] flex flex-col rounded-[12px] bg-adm-surface border border-adm-border shadow-xl text-adm-ink", className)}
+        className={cn("w-full max-w-[900px] max-h-[calc(100dvh-48px)] flex flex-col rounded-[8px] bg-adm-surface border border-adm-border shadow-xl text-adm-ink", className)}
       >
         <header className="flex items-start justify-between gap-4 px-6 pt-5 pb-4 border-b border-adm-border">
           <div className="min-w-0">

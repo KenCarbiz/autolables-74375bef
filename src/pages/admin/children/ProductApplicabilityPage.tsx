@@ -308,7 +308,7 @@ export default function ProductApplicabilityPage() {
         <div className="grid grid-cols-1 min-[1536px]:grid-cols-[minmax(0,697fr)_minmax(0,583fr)] gap-[15px] items-start">
           <Panel title="Applicability rules" description="Choose which inventory is eligible for this product." bodyClassName="pl-[21px] pr-[19px] pb-1">
             {/* Reference rows: 81, 101 and 108px with dividers inset 16px from the box edge. */}
-            <div className="rounded-[8px] border border-adm-border bg-adm-surface" data-landmark="applicability-rules">
+            <div className="rounded-[6px] border border-adm-border bg-adm-surface" data-landmark="applicability-rules">
               <fieldset className="mx-4 pt-[9px] pb-[17px] border-b border-adm-border">
                 <legend className="float-left w-full p-0 text-[14px] leading-[20px] font-semibold text-adm-ink">Condition</legend>
                 <div className="clear-left pt-3 flex flex-wrap items-center gap-y-2">
@@ -378,7 +378,7 @@ export default function ProductApplicabilityPage() {
             </div>
 
             {/* The reference draws the proof note as the bottom band of the price box. */}
-            <div className="mt-4 rounded-[8px] border border-adm-border bg-adm-surface overflow-hidden" data-landmark="price-treatment">
+            <div className="mt-4 rounded-[6px] border border-adm-border bg-adm-surface overflow-hidden" data-landmark="price-treatment">
               <div className="px-4 pt-[13px] pb-[25px]">
                 <h4 className="text-[18px] leading-[24px] font-semibold text-adm-ink">Price treatment</h4>
                 <p className="mt-[3px] text-[13px] leading-[18px] text-adm-muted">Select how this product is priced and enter the amount.</p>
@@ -408,7 +408,7 @@ export default function ProductApplicabilityPage() {
 
           <div className="space-y-[11px]">
             <Panel title="Evidence checklist" description="Items required for this product before publication." bodyClassName="px-[17px] pb-[3px]">
-              <ul className="rounded-[8px] border border-adm-border bg-adm-surface divide-y divide-adm-border" data-landmark="evidence-checklist">
+              <ul className="rounded-[6px] border border-adm-border bg-adm-surface divide-y divide-adm-border" data-landmark="evidence-checklist">
                 {checklist.map((item) => {
                   const Icon = EVIDENCE_ICON[item.key];
                   return (
@@ -435,7 +435,7 @@ export default function ProductApplicabilityPage() {
               ) : vehicles.length === 0 ? (
                 <p className="text-[13px] text-adm-muted">No active vehicles to sample yet.</p>
               ) : (
-                <div className="rounded-[8px] border border-adm-border overflow-hidden" data-landmark="sample-results">
+                <div className="rounded-[6px] border border-adm-border overflow-hidden" data-landmark="sample-results">
                   <AdminTable caption="Sample vehicle results" minWidth={560} className="[&_th]:px-4 [&_td]:px-4 [&_th]:py-[10px] [&_th]:text-[13px] [&_th]:text-adm-ink [&_td]:py-[7px] [&_th]:border-r [&_td]:border-r [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0 [&_tbody_tr:last-child>td]:border-b-0">
                     <thead>
                       <tr>

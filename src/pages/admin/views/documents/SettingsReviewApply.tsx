@@ -275,7 +275,7 @@ export function SettingsReviewDialog<T extends object>({ review, title, descript
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) review.close(); }}>
-      <DialogContent onCloseAutoFocus={onCloseAutoFocus} className="sm:max-w-2xl rounded-[12px] p-0 gap-0">
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus} className="sm:max-w-2xl rounded-[8px] p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b border-adm-border text-left">
           <DialogTitle className="text-[18px] leading-[26px] font-semibold text-adm-ink">{title}</DialogTitle>
           <DialogDescription className="text-[13px] leading-[18px] text-adm-muted">

@@ -115,10 +115,10 @@ export const AdminShell = ({
 }) => (
   <AdminPageContainer>
     <div className="space-y-4">
-      <div className={activeSection.intro?.description ? undefined : "-mb-[9px]"}>
-        {activeSection.intro?.breadcrumb && <Breadcrumbs crumbs={[{ label: "Administration", href: "/admin" }, { label: activeSection.label }]} />}
-        <h1 className={cn("text-[28px] font-bold text-adm-ink", activeSection.intro?.breadcrumb ? "mt-3 leading-[40px]" : "leading-[36px]")}>Administration</h1>
-        {activeSection.intro?.description && <p className="mt-2 text-[14px] leading-[20px] text-adm-muted">{activeSection.description}</p>}
+      <div>
+        {activeSection.id !== "overview" && <Breadcrumbs crumbs={[{ label: "Administration", href: "/admin" }, { label: activeSection.label }]} />}
+        <h1 className={cn("text-[28px] leading-[36px] font-bold text-adm-ink", activeSection.id !== "overview" && "mt-1")}>{activeSection.id === "overview" ? "Administration" : activeSection.label}</h1>
+        <p className="mt-0.5 text-[14px] leading-[20px] text-adm-muted">{activeSection.description}</p>
       </div>
       <AdminSectionNav sections={sections} activeId={activeSection.id} tabFor={firstTabFor} />
       <AdminChildTabs tabs={tabsForSection} activeId={activeTab.id} ariaLabel={`${activeSection.label} views`} />

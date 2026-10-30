@@ -93,7 +93,7 @@ export default function InvitationsView() {
       </div>
 
       <AlertDialog open={!!revokeFor} onOpenChange={(o) => { if (!o) setRevokeFor(null); }}>
-        <AlertDialogContent className="rounded-[12px]" onCloseAutoFocus={onRevokeCloseAutoFocus}>
+        <AlertDialogContent className="rounded-[8px]" onCloseAutoFocus={onRevokeCloseAutoFocus}>
           <AlertDialogHeader>
             <AlertDialogTitle>Revoke the invitation for {revokeFor?.email}?</AlertDialogTitle>
             <AlertDialogDescription>The membership row is removed. You can invite this address again later.</AlertDialogDescription>

@@ -222,7 +222,7 @@ const cardTitle = (text: string, leading = "leading-[26px]") => <span className=
 // Notes drawn to the reference: the retry note on its peach tint with a 28px
 // mark beside the title line, the delivery note with a 20px mark.
 const RetryNote = () => (
-  <div role="status" className="flex items-start gap-[14px] rounded-[8px] border border-[#FDE1BB] bg-adm-warning-bg pl-[11px] pr-4 pt-[12px] pb-[11px]">
+  <div role="status" className="flex items-start gap-[14px] rounded-[6px] border border-[#FDE1BB] bg-adm-warning-bg pl-[11px] pr-4 pt-[12px] pb-[11px]">
     <AlertTriangle className="w-7 h-7 -mt-[2px] text-[#8B2D00] flex-shrink-0" aria-hidden="true" />
     <p className="min-w-0">
       <span className="block text-[15px] leading-[20px] font-semibold text-adm-ink">A failed notification stays eligible for retry.</span>
@@ -232,7 +232,7 @@ const RetryNote = () => (
 );
 
 const DeliveryNote = () => (
-  <div role="status" className="flex items-start gap-[11px] rounded-[8px] border border-adm-selected bg-adm-selected pl-3 pr-4 pt-[6px] pb-[3px]">
+  <div role="status" className="flex items-start gap-[11px] rounded-[6px] border border-adm-selected bg-adm-selected pl-3 pr-4 pt-[6px] pb-[3px]">
     <Info className="w-5 h-5 mt-px text-adm-primary flex-shrink-0" aria-hidden="true" />
     <p className="min-w-0">
       <span className="block text-[12px] leading-[16px] font-semibold text-adm-primary">Accepted does not mean delivered.</span>

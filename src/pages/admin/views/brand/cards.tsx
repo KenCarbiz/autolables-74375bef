@@ -129,7 +129,7 @@ export const AppearanceCard = ({ accent, onChange, editHref, error }: Appearance
           {BRAND_PALETTE.map((c) => (
             <li key={c.hex} className="flex flex-col items-start gap-1.5">
               <span
-                className={cn("block w-[50px] h-[50px] rounded-[8px] border", c.hex === "#FFFFFF" ? "border-adm-muted" : "border-transparent")}
+                className={cn("block w-[50px] h-[50px] rounded-[6px] border", c.hex === "#FFFFFF" ? "border-adm-muted" : "border-transparent")}
                 style={{ backgroundColor: c.hex }}
                 aria-hidden="true"
               />

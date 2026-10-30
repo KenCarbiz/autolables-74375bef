@@ -161,7 +161,7 @@ export default function PublishingReviewDialog(props: PublishingReviewDialogProp
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent onCloseAutoFocus={onCloseAutoFocus} className="max-w-[900px] max-h-[calc(100dvh-48px)] overflow-y-auto rounded-[12px] p-0" data-admin-v2="">
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus} className="max-w-[900px] max-h-[calc(100dvh-48px)] overflow-y-auto rounded-[8px] p-0" data-admin-v2="">
         <div className="px-6 pt-6">
           <DialogHeader>
             <DialogTitle className="text-[22px] leading-[28px] font-bold text-adm-ink">Review publishing policy change</DialogTitle>

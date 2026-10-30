@@ -150,7 +150,7 @@ const minutesLabel = (v: number | undefined | null, off: string): string => (v &
 const ScopeBadge = ({ count }: { count: number }) => (
   <div data-parity="scope" className="flex items-center gap-[14px]" title="Routing is stored once per account and applies to every rooftop.">
     <span className="text-[13px] leading-[18px] text-adm-muted">Scope</span>
-    <span className="inline-flex items-center gap-[11px] h-[42px] min-w-[191px] pl-[11px] pr-4 rounded-[8px] border border-adm-border bg-adm-surface text-[13px] leading-[18px] text-adm-ink">
+    <span className="inline-flex items-center gap-[11px] h-[42px] min-w-[191px] pl-[11px] pr-4 rounded-[6px] border border-adm-border bg-adm-surface text-[13px] leading-[18px] text-adm-ink">
       <Building className="w-[22px] h-[22px] text-adm-muted flex-shrink-0" aria-hidden="true" />
       {count > 1 ? `All rooftops (${count})` : "This rooftop"}
     </span>
@@ -294,7 +294,7 @@ export default function RoutingView() {
               </div>
             </div>
             {readiness.blockers.length > 0 && (
-              <div role="status" className="flex items-center gap-3 rounded-[8px] border border-[#F1D58A] bg-adm-warning-bg pl-[13px] pr-3 py-[7px] text-[12px] leading-[18px] text-adm-ink">
+              <div role="status" className="flex items-center gap-3 rounded-[6px] border border-[#F1D58A] bg-adm-warning-bg pl-[13px] pr-3 py-[7px] text-[12px] leading-[18px] text-adm-ink">
                 <TriangleAlert className="w-5 h-5 text-adm-warning flex-shrink-0" aria-hidden="true" />
                 <p className="min-w-0">
                   <span className="font-semibold">Add a valid fallback before enabling this route.</span>

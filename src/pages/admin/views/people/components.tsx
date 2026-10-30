@@ -487,7 +487,7 @@ export const MemberRoleReviewDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent onCloseAutoFocus={onCloseAutoFocus} className="sm:max-w-[640px] rounded-[12px] max-h-[calc(100dvh-24px)] overflow-y-auto overscroll-contain">
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus} className="sm:max-w-[640px] rounded-[8px] max-h-[calc(100dvh-24px)] overflow-y-auto overscroll-contain">
         <DialogHeader>
           <DialogTitle className="text-[18px] leading-[26px] font-semibold text-adm-ink">Review role change</DialogTitle>
           <DialogDescription className="text-[13px] text-adm-muted">

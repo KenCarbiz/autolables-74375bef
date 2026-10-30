@@ -416,7 +416,7 @@ export default function PriceRulesView() {
           <>
           <ul className="md:hidden mx-3 mt-[11px] space-y-2" aria-label="Price consistency by vehicle">
             {consistencyRows.map((row) => (
-              <li key={row.listing.id} className="rounded-[8px] border border-adm-border px-3 py-3">
+              <li key={row.listing.id} className="rounded-[6px] border border-adm-border px-3 py-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <Thumb url={row.listing.heroImageUrl} />
                   <div className="min-w-0">
@@ -458,7 +458,7 @@ export default function PriceRulesView() {
           <AdminTable
             caption="Price consistency by vehicle"
             inset
-            className="max-md:hidden mx-3 mt-[11px] mb-0 rounded-[8px] [&_th]:py-[9.5px] [&_td]:py-[6px] [&_th]:px-[13px] [&_td]:px-[13px] [&_td]:text-[13px] [&_th]:border-r [&_td]:border-r [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0 [&_tbody_tr:last-child>td]:border-b-0"
+            className="max-md:hidden mx-3 mt-[11px] mb-0 rounded-[6px] [&_th]:py-[9.5px] [&_td]:py-[6px] [&_th]:px-[13px] [&_td]:px-[13px] [&_td]:text-[13px] [&_th]:border-r [&_td]:border-r [&_th:last-child]:border-r-0 [&_td:last-child]:border-r-0 [&_tbody_tr:last-child>td]:border-b-0"
           >
             <thead>
               <tr>

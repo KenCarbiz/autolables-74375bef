@@ -56,7 +56,7 @@ function RuleEditorModal({ draft, products, onChange, onSave, onCancel }: { draf
   const set = (patch: RuleDraft) => onChange({ ...draft, ...patch });
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B1A33]/55 p-4">
-      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby="rule-editor-title" tabIndex={-1} onKeyDown={(e) => { if (e.key === "Escape") onCancel(); }} className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-[12px] border border-adm-border bg-adm-surface p-6 space-y-3 shadow-2xl outline-none">
+      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby="rule-editor-title" tabIndex={-1} onKeyDown={(e) => { if (e.key === "Escape") onCancel(); }} className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-[8px] border border-adm-border bg-adm-surface p-6 space-y-3 shadow-2xl outline-none">
         <h2 id="rule-editor-title" className="text-[18px] leading-[26px] font-semibold text-adm-ink">{draft._new ? "Add rule" : "Edit rule"}</h2>
         <Field label="Product" htmlFor="rule-product">
           <AdminSelect id="rule-product" value={draft.product_id || ""} onChange={(e) => set({ product_id: e.target.value })}>

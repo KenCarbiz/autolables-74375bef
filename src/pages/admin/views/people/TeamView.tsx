@@ -258,7 +258,7 @@ export default function TeamView() {
       )}
 
       <AlertDialog open={!!removeFor} onOpenChange={(o) => { if (!o) setRemoveFor(null); }}>
-        <AlertDialogContent className="rounded-[12px]" onCloseAutoFocus={onRemoveCloseAutoFocus}>
+        <AlertDialogContent className="rounded-[8px]" onCloseAutoFocus={onRemoveCloseAutoFocus}>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove {removeFor?.email} from the team?</AlertDialogTitle>
             <AlertDialogDescription>

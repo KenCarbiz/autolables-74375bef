@@ -37,7 +37,7 @@ const RolePreviewDialog = ({ open, onOpenChange, role }: { open: boolean; onOpen
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent onCloseAutoFocus={onCloseAutoFocus} className="sm:max-w-[640px] rounded-[12px] max-h-[calc(100dvh-24px)] overflow-y-auto overscroll-contain">
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus} className="sm:max-w-[640px] rounded-[8px] max-h-[calc(100dvh-24px)] overflow-y-auto overscroll-contain">
         <DialogHeader>
           <DialogTitle className="text-[18px] leading-[26px] font-semibold text-adm-ink flex items-center gap-2">
             Preview as {label}

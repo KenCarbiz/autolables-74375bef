@@ -106,7 +106,7 @@ const StepItem = ({ n, label, status, trailing = false, className }: { n: number
 // Reference tile: a 48px circle with a 26px glyph, a 24px count, a 14px
 // label and a 13px hint, 112px tall.
 const Tile = ({ icon: Icon, tone, value, label, hint, filled = false }: { icon: typeof CarFront; tone: "success" | "neutral"; value: string; label: string; hint: string; filled?: boolean }) => (
-  <div data-landmark="fee-impact-tile" className="flex items-start gap-5 rounded-[8px] border border-adm-border bg-adm-workspace pl-[17px] pr-4 pt-[14px] pb-[11px] min-h-[112px]">
+  <div data-landmark="fee-impact-tile" className="flex items-start gap-5 rounded-[6px] border border-adm-border bg-adm-workspace pl-[17px] pr-4 pt-[14px] pb-[11px] min-h-[112px]">
     <span aria-hidden="true" className={cn("-mt-[2px] w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0", tone === "success" ? "bg-adm-success-bg text-adm-success" : "bg-adm-border/50 text-adm-muted")}>
       <Icon className={cn("w-[26px] h-[26px]", filled && "fill-current")} />
     </span>
@@ -346,7 +346,7 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
         aria-labelledby="fee-review-title"
         tabIndex={-1}
         onKeyDown={onKeyDown}
-        className="z-50 rounded-[12px] border border-adm-border bg-adm-surface shadow-2xl outline-none text-adm-ink md:absolute md:top-[123px] md:left-1/2 md:-translate-x-1/2 lg:left-[calc(50%-18px)] md:w-[min(907px,calc(100%-32px))] md:px-[26px] md:pt-[22px] md:pb-6 max-md:fixed max-md:inset-x-3 max-md:top-3 max-md:max-h-[calc(100dvh-24px)] max-md:flex max-md:flex-col max-md:overflow-hidden"
+        className="z-50 rounded-[8px] border border-adm-border bg-adm-surface shadow-2xl outline-none text-adm-ink md:absolute md:top-[123px] md:left-1/2 md:-translate-x-1/2 lg:left-[calc(50%-18px)] md:w-[min(907px,calc(100%-32px))] md:px-[26px] md:pt-[22px] md:pb-6 max-md:fixed max-md:inset-x-3 max-md:top-3 max-md:max-h-[calc(100dvh-24px)] max-md:flex max-md:flex-col max-md:overflow-hidden"
       >
         <header className="flex items-start justify-between gap-4 max-md:flex-shrink-0 max-md:px-4 max-md:pt-4 max-md:pb-3 max-md:border-b max-md:border-adm-border">
           <div className="min-w-0">
@@ -413,7 +413,7 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
             <div className={cn("grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_312px] gap-7 items-start", state.phase === "conflict" || state.phase === "invalidated" || (state.error && state.phase === "reviewing") ? "mt-5" : "mt-7")}>
               <section aria-labelledby="fee-change-summary" data-landmark="fee-change-summary">
                 <h3 id="fee-change-summary" className="text-[16px] leading-[22px] font-semibold text-adm-ink">Change summary</h3>
-                <div className="mt-3 rounded-[8px] border border-adm-border overflow-hidden">
+                <div className="mt-3 rounded-[6px] border border-adm-border overflow-hidden">
                   <AdminTable caption="Before and after" className={cn(TABLE_CLASS, "[&_td]:py-[10px]")}>
                     <thead>
                       <tr>
@@ -455,7 +455,7 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
                 <>
                 <ul className="md:hidden mt-[11px] space-y-2" aria-label="Example vehicles">
                   {impact.samples.map((s) => (
-                    <li key={s.vinSuffix} className="rounded-[8px] border border-adm-border px-3 pt-3 pb-1">
+                    <li key={s.vinSuffix} className="rounded-[6px] border border-adm-border px-3 pt-3 pb-1">
                       <div className="flex items-center gap-3">
                         <Thumb />
                         <div className="min-w-0">
@@ -481,7 +481,7 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
                     </li>
                   ))}
                 </ul>
-                <div className="max-md:hidden mt-[11px] rounded-[8px] border border-adm-border overflow-hidden">
+                <div className="max-md:hidden mt-[11px] rounded-[6px] border border-adm-border overflow-hidden">
                   <AdminTable caption="Example vehicles" className={cn(TABLE_CLASS, "[&_th]:pt-[9px] [&_td]:py-[11px]")}>
                     <thead>
                       <tr>

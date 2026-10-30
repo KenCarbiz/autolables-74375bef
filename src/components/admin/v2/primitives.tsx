@@ -148,29 +148,27 @@ export const StatTile = ({
   tone?: Tone;
   ariaLabel?: string;
 }) => {
-  const iconWrap: Record<Tone, string> = {
-    neutral: "bg-adm-workspace text-adm-muted",
-    success: "bg-adm-success-bg text-adm-success",
-    warning: "bg-adm-warning-bg text-adm-warning",
-    danger: "bg-adm-danger-bg text-adm-danger",
-    info: "bg-adm-selected text-adm-primary",
+  // A tone bar, not an icon halo: the national product draws metrics flat.
+  const bar: Record<Tone, string> = {
+    neutral: "bg-adm-border",
+    success: "bg-adm-success",
+    warning: "bg-[#D98B00]",
+    danger: "bg-adm-danger",
+    info: "bg-adm-primary",
   };
   const body = (
     <>
-      {Icon && (
-        <span className={cn(ICON_BOX.circle, "flex items-center justify-center flex-shrink-0", iconWrap[tone])} aria-hidden="true">
-          <Icon className={ICON.inCircle} />
-        </span>
-      )}
+      <span className={cn("self-stretch w-[3px] rounded-[2px] flex-shrink-0", bar[tone])} aria-hidden="true" />
+      {Icon && <Icon className={cn(ICON.inline, "flex-shrink-0 text-adm-muted")} aria-hidden="true" />}
       <span className="min-w-0 flex-1">
         <span className="block text-[13px] leading-[18px] text-adm-muted">{label}</span>
-        <span className="block text-[28px] leading-[34px] font-bold text-adm-ink tabular-nums truncate">{value}</span>
+        <span className="block text-[24px] leading-[32px] font-bold text-adm-ink tabular-nums truncate">{value}</span>
         {hint && <span className="block text-[12px] leading-[18px] text-adm-muted mt-0.5 truncate">{hint}</span>}
       </span>
       {href && <ChevronRight className={cn(ICON.chevron, "text-adm-muted flex-shrink-0")} aria-hidden="true" />}
     </>
   );
-  const cls = "flex items-center gap-4 rounded-[6px] border border-adm-border bg-adm-surface px-4 py-[11px] min-h-[79px]";
+  const cls = "flex items-center gap-3 rounded-[6px] border border-adm-border bg-adm-surface px-4 py-3 min-h-[76px]";
   return href ? (
     <Link to={href} className={cn(cls, "hover:border-adm-primary/60 focus-visible:outline-2 focus-visible:outline-adm-primary")} aria-label={ariaLabel ?? `${label}: ${typeof value === "string" || typeof value === "number" ? value : ""}`}>
       {body}

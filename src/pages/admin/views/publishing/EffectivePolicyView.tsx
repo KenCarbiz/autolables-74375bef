@@ -78,7 +78,7 @@ export default function EffectivePolicyView() {
         bodyClassName="px-5 pt-[30px] pb-[21px]"
         action={
           draftPending ? (
-            <div data-parity="draft-status" className="rounded-[8px] bg-adm-warning-bg px-4 py-[7px] flex items-start gap-3">
+            <div data-parity="draft-status" className="rounded-[6px] bg-adm-warning-bg px-4 py-[7px] flex items-start gap-3">
               <FileText className={cn(ICON.inline, "text-adm-warning flex-shrink-0 mt-px")} aria-hidden="true" />
               <span className="min-w-0">
                 <span className="block text-[13px] leading-[18px] font-semibold text-adm-warning">Draft proposal</span>
@@ -95,7 +95,7 @@ export default function EffectivePolicyView() {
             Cells that depend on them read as unknown rather than as a default.
           </InlineNote>
         )}
-        <div className="rounded-[8px] border border-adm-border overflow-hidden">
+        <div className="rounded-[6px] border border-adm-border overflow-hidden">
           <AdminTable caption="Effective publishing policy by vehicle type" minWidth={760} className={MATRIX_TABLE_CLS}>
             <colgroup>{MATRIX_COLUMNS.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
             <thead>
@@ -133,7 +133,7 @@ export default function EffectivePolicyView() {
           </AdminTable>
         </div>
 
-        <section className="mt-4 rounded-[8px] border border-adm-border" aria-labelledby="publishing-class-detail">
+        <section className="mt-4 rounded-[6px] border border-adm-border" aria-labelledby="publishing-class-detail">
           <header className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4 px-5 pt-2 pb-[9px] border-b border-adm-border">
             <h3 id="publishing-class-detail" className="flex flex-wrap sm:flex-nowrap items-baseline gap-x-2 min-w-0 text-[18px] leading-[26px] font-semibold text-adm-primary">
               <span>{VEHICLE_CLASS_LABEL[selected]}</span>
@@ -158,7 +158,7 @@ export default function EffectivePolicyView() {
                         <p className="mt-0.5 min-h-[40px] text-[12px] leading-[20px] text-adm-muted">{c.summary}</p>
                       </div>
                     </div>
-                    <p className={cn("mt-[10px] rounded-[8px] px-4 py-[9px] text-[12px] leading-[20px]", tone.box)}>{c.explanation}</p>
+                    <p className={cn("mt-[10px] rounded-[6px] px-4 py-[9px] text-[12px] leading-[20px]", tone.box)}>{c.explanation}</p>
                   </article>
                 );
               })}

@@ -127,7 +127,7 @@ export default function AdminDesignFixture() {
 
   return (
     <AdminFixtureProvider fixture={entry.fixture}>
-      <div data-admin-fixture={screen} className="min-h-screen bg-adm-workspace flex">
+      <div data-admin-fixture={screen} data-product-surface="dealer" className="min-h-screen bg-adm-workspace flex">
         {chrome ? (
           <FixtureChrome railWidth={railWidth}>{body}</FixtureChrome>
         ) : (
