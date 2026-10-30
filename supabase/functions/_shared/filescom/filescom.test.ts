@@ -3,7 +3,7 @@ import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
-  assertConnectorWrite, authorizePlatformAdmin, canonicalInboundPath, intakeStatus, isSafeDownloadUrl,
+  assertConnectorWrite, authorizePlatformAdmin, canonicalInboundPath, intakeStatus, approvalDecision, checkDownloadedContent, downloadFileContents, FILESCOM_ORIGIN,
   parseNotifyBody, sameVersion, sha256Hex, verifySignatureV2,
 } from "./policy";
 import { parseCsv } from "./csv";
@@ -59,20 +59,10 @@ describe("inbound path and payload policy", () => {
     expect(parseNotifyBody(enc(BODY.replace('"file"', '"directory"')))).toEqual({ ok: false, reason: "type_not_file" });
     expect(parseNotifyBody(enc("x".repeat(17000))).ok).toBe(false);
   });
-  it("download URLs: public https only, no IPs, credentials or odd ports", () => {
-    expect(isSafeDownloadUrl("https://s3.amazonaws.com/bucket/obj?sig=1")).toBe(true);
-    expect(isSafeDownloadUrl("http://s3.amazonaws.com/x")).toBe(false);
-    expect(isSafeDownloadUrl("https://169.254.169.254/latest/meta-data")).toBe(false);
-    expect(isSafeDownloadUrl("https://[::1]/x")).toBe(false);
-    expect(isSafeDownloadUrl("https://localhost/x")).toBe(false);
-    expect(isSafeDownloadUrl("https://user:pw@example.com/x")).toBe(false);
-    expect(isSafeDownloadUrl("https://example.com:8443/x")).toBe(false);
-    expect(isSafeDownloadUrl("file:///etc/passwd")).toBe(false);
-  });
   it("detects an overwrite between the two metadata reads", () => {
-    expect(sameVersion({ size: 10, mtime: "a", checksum: "md5:1" }, { size: 10, mtime: "a", checksum: "md5:1" })).toBe(true);
-    expect(sameVersion({ size: 10, mtime: "a", checksum: "md5:1" }, { size: 10, mtime: "b", checksum: "md5:1" })).toBe(false);
-    expect(sameVersion({ size: 10, mtime: "a", checksum: "md5:1" }, { size: 11, mtime: "a", checksum: "md5:2" })).toBe(false);
+    expect(sameVersion({ size: 10, mtime: "a", checksum: "md5:1", sha256: null }, { size: 10, mtime: "a", checksum: "md5:1", sha256: null })).toBe(true);
+    expect(sameVersion({ size: 10, mtime: "a", checksum: "md5:1", sha256: null }, { size: 10, mtime: "b", checksum: "md5:1", sha256: null })).toBe(false);
+    expect(sameVersion({ size: 10, mtime: "a", checksum: "md5:1", sha256: null }, { size: 11, mtime: "a", checksum: "md5:2", sha256: null })).toBe(false);
   });
 });
 
@@ -164,12 +154,83 @@ describe("dry run", () => {
   });
 });
 
-describe("download path", () => {
-  it("streams via file_contents on the allowlisted origin with redirects refused", async () => {
-    const { readFileSync } = await import("node:fs");
-    const src = readFileSync("supabase/functions/files-inventory-admin/index.ts", "utf8");
-    expect(src).toMatch(/file_contents\//);
-    expect(src).not.toMatch(/download_uri/);
-    expect(src).not.toMatch(/redirect: "manual"|redirect: "follow"/);
+const M = (o: Partial<{ size: number | null; mtime: string | null; checksum: string | null; sha256: string | null }> = {}) => ({ size: 3, mtime: "t1", checksum: null, sha256: null, ...o });
+
+describe("version and content checks", () => {
+  it("rejects all-null metadata instead of treating it as the same version", () => {
+    const n = M({ size: null, mtime: null });
+    expect(sameVersion(n, n)).toBe(false);
+    expect(checkDownloadedContent(n, n, 3, "x")).toEqual({ ok: false, reason: "remote_version_unavailable" });
+  });
+  it("rejects an overwrite, a size mismatch and a sha256 mismatch", () => {
+    expect(checkDownloadedContent(M(), M({ mtime: "t2" }), 3, "x")).toEqual({ ok: false, reason: "file_changed_during_download" });
+    expect(checkDownloadedContent(M(), M(), 4, "x")).toEqual({ ok: false, reason: "size_mismatch" });
+    expect(checkDownloadedContent(M({ sha256: "a".repeat(64) }), M({ sha256: "a".repeat(64) }), 3, "b".repeat(64))).toEqual({ ok: false, reason: "sha256_mismatch" });
+    expect(checkDownloadedContent(M({ sha256: "a".repeat(64) }), M({ sha256: "a".repeat(64) }), 3, "a".repeat(64))).toEqual({ ok: true });
+  });
+});
+
+describe("single-stream download", () => {
+  const P = "prod/inventory/vauto/inbound/MP15395_inventory.csv";
+  it("calls only the fixed origin file_contents URL with redirects refused", async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const out = await downloadFileContents(async (url, init) => { calls.push({ url, init }); return new Response("a,b"); }, "k", P);
+    expect(new TextDecoder().decode(out)).toBe("a,b");
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe(`${FILESCOM_ORIGIN}/api/rest/v1/file_contents/${P}`);
+    expect(calls[0].init.redirect).toBe("error");
+    expect(calls[0].init.signal).toBeDefined();
+  });
+  it("fails closed when the fetch refuses a redirect, and on non-200", async () => {
+    await expect(downloadFileContents(async () => { throw new TypeError("redirect"); }, "k", P)).rejects.toThrow("download_refused_or_timeout");
+    await expect(downloadFileContents(async () => new Response("", { status: 302 }), "k", P)).rejects.toThrow("download_failed");
+    await expect(downloadFileContents(async () => new Response("", { status: 403 }), "k", P)).rejects.toThrow("filescom_auth_failed");
+  });
+});
+
+describe("binding approval", () => {
+  const b = { id: "b1", status: "pending" as const, tenant_id: "t1", proposed_at: "p1" };
+  const passed = { outcome: "passed", identity: { dealerId: "x" }, identities: 1, bindingProposedAt: "p1", identityReview: { verdict: "match" } };
+  const run = { id: "r1", status: "passed", binding_id: "b1", tenant_id: "t1", content_sha256: "s", remote_size: 3, remote_mtime: "t1", report: passed };
+  const file = { last_run_id: "r1", last_content_sha256: "s", remote_size: 3, remote_mtime: "t1" };
+  it("approves a passed dry run of the current version for this exact proposal", () => {
+    expect(approvalDecision(b, run, file, false)).toMatchObject({ ok: true, acknowledged: false });
+  });
+  it("refuses rejected or failed runs even with the identity box ticked", () => {
+    expect(approvalDecision(b, { ...run, status: "rejected", report: { ...passed, outcome: "rejected" } }, file, true)).toEqual({ ok: false, error: "dry_run_not_passed" });
+    expect(approvalDecision(b, { ...run, status: "failed" }, file, true)).toEqual({ ok: false, error: "dry_run_not_passed" });
+    expect(approvalDecision(b, { ...run, report: { ...passed, identities: 2 } }, file, true)).toEqual({ ok: false, error: "dealer_identity_not_single" });
+  });
+  it("refuses a stale proposal, another tenant, or a changed file", () => {
+    expect(approvalDecision({ ...b, proposed_at: "p2" }, run, file, true)).toEqual({ ok: false, error: "proposal_changed_since_dry_run" });
+    expect(approvalDecision({ ...b, tenant_id: "t2" }, run, file, true)).toEqual({ ok: false, error: "dry_run_against_proposed_dealer_required" });
+    expect(approvalDecision(b, run, { ...file, remote_mtime: "t9" }, true)).toEqual({ ok: false, error: "file_changed_since_dry_run" });
+    expect(approvalDecision(b, run, { ...file, last_content_sha256: "other" }, true)).toEqual({ ok: false, error: "file_changed_since_dry_run" });
+    expect(approvalDecision(b, run, { ...file, last_run_id: "r0" }, true)).toEqual({ ok: false, error: "file_changed_since_dry_run" });
+  });
+  it("needs explicit acknowledgement when identity does not match", () => {
+    const r = { ...run, report: { ...passed, identityReview: { verdict: "mismatch" } } };
+    expect(approvalDecision(b, r, file, false)).toEqual({ ok: false, error: "identity_not_confirmed" });
+    expect(approvalDecision(b, r, file, true)).toMatchObject({ ok: true, acknowledged: true });
+  });
+});
+
+describe("admin handler source guards", () => {
+  const src = readFileSync(resolve(__dirname, "../../files-inventory-admin/index.ts"), "utf8");
+  it("approval CAS pins id, status, tenant and proposed_at, and checks every connector write", () => {
+    expect(src).toMatch(/\.eq\("id", b!\.id\)\.eq\("status", "pending"\)\.eq\("tenant_id", b!\.tenant_id!\)\.eq\("proposed_at", b!\.proposed_at!\)/);
+    const unchecked = src.split("\n").filter((l) => /^\s*await write\(/.test(l));
+    expect(unchecked).toEqual([]);
+    expect(src).not.toMatch(/download_uri|redirect: "(manual|follow)"/);
+    expect(src).not.toMatch(/from\("vehicle_listings"\)\.(insert|update|upsert|delete)/);
+  });
+});
+
+describe("mixed dealer identity", () => {
+  it("rejects same dealer id and name with a different address", () => {
+    const row = (vin: string, addr: string) => VAUTO_HEADERS.map((h) => h === "VIN" ? vin : h === "DealerId" ? "MP1_inventory" : h === "Dealer Name" ? "Harte" : h === "Dealer Address" ? addr : h === "Price" ? "100" : "x");
+    const r = runDryRun([...VAUTO_HEADERS], [row("1HGCM82633A004352", "1 A St"), row("1HGCM82633A004353", "2 B St")], null);
+    expect(r.outcome).toBe("rejected");
+    expect(r.rejectReasons).toContain("mixed_dealer_identity");
   });
 });
