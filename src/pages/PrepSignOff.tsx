@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ShieldCheck, Camera, Check, X, AlertTriangle, Clock, CheckCircle2, ClipboardCheck, FileText, Image as ImageIcon, Upload, FileSignature, ArrowRight, Car, Wrench, ChevronLeft, Plus } from "lucide-react";
 import EmptyState from "@/components/ui/empty-state";
+import { LocalTabs, MetricStrip, PageBody, PageHeader, Button as ProductButton, Panel as ProductPanel, WorkTable, Th, Td, StatusText, type LocalTab } from "@/components/product";
 import { uploadPhoto } from "@/lib/storage";
 import NextStepBanner from "@/components/workflow/NextStepBanner";
 
@@ -31,10 +32,12 @@ const PrepSignOff = () => {
   // store row) have no currentStore — fall back to the tenant id, which is the
   // store key the Get-Ready / Service surfaces already use.
   const storeId = currentStore?.id || tenant?.id || "";
-  const { signOffs, pending, ready, createSignOff, signOff, reject, override, isListingAllowed } = usePrepSignOff(storeId);
+  const { signOffs, pending, ready, loading: signOffsLoading, createSignOff, signOff, reject, override, isListingAllowed } = usePrepSignOff(storeId);
   const { records: getReadyRecords } = useGetReady(storeId);
 
-  const [filter, setFilter] = useState<"all" | "pending" | "signed" | "rejected">("all");
+  const filterParam = searchParams.get("filter");
+  const filter: "all" | "pending" | "signed" | "rejected" =
+    filterParam === "pending" || filterParam === "signed" || filterParam === "rejected" ? filterParam : "all";
   const [newForm, setNewForm] = useState({
     vin: "",
     ymm: "",
@@ -97,24 +100,14 @@ const PrepSignOff = () => {
     );
 
   const viewTabs = (
-    <div className="mb-6 overflow-x-auto">
-      <div className="inline-flex items-center gap-1 rounded-xl border border-border bg-muted/60 p-1">
-        {([
-          { key: "list", label: "Sign-Offs" },
-          { key: "installs", label: "Install Proof" },
-        ] as const).map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setSearchParams(t.key === "list" ? {} : { view: t.key })}
-            className={`h-8 px-3.5 rounded-lg text-[13px] font-semibold whitespace-nowrap transition-all ${
-              (view === t.key || (t.key === "list" && view !== "installs")) ? "bg-card text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-    </div>
+    <LocalTabs
+      label="Prep views"
+      className="mb-6"
+      tabs={[
+        { key: "list", label: "Sign-Offs", to: "/prep", active: view !== "installs" },
+        { key: "installs", label: "Install Proof", to: "/prep?view=installs", active: view === "installs" },
+      ]}
+    />
   );
 
   // INSTALL PROOF VIEW — the get-ready work surface (moved from /admin?tab=getready)
@@ -131,125 +124,90 @@ const PrepSignOff = () => {
 
   // LIST VIEW
   if (view === "list") {
+    const loaded = !signOffsLoading;
     return (
-      <div className="min-h-screen bg-background p-6">
-        <div className="max-w-6xl mx-auto">
-          {viewTabs}
-          <div className="mb-6"><NextStepBanner stage="prep" /></div>
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-al-page text-foreground">Prep & Install Sign-Off</h1>
-              <p className="text-muted-foreground mt-2">Shop foreman approves every vehicle before it hits the lot.</p>
-            </div>
-            <button
-              onClick={() => setSearchParams({ view: "new" })}
-              className="h-10 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium"
-            >
-              + New Sign-Off Request
-            </button>
-          </div>
+      <PageBody width="wide" className="bg-background">
+        <div>{viewTabs}</div>
+        <NextStepBanner stage="prep" />
+        <PageHeader
+          title="Prep & Install Sign-Off"
+          description="Shop foreman approves every vehicle before it hits the lot."
+          actions={<ProductButton variant="primary" onClick={() => setSearchParams({ view: "new" })}>New sign-off request</ProductButton>}
+        />
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <div className="rounded-2xl bg-card border border-border p-6 shadow-premium">
-              <p className="text-muted-foreground text-sm font-medium">Pending sign-off</p>
-              <p className="text-3xl font-bold text-amber-500 mt-2">{pending.length}</p>
-            </div>
-            <div className="rounded-2xl bg-card border border-border p-6 shadow-premium">
-              <p className="text-muted-foreground text-sm font-medium">Signed off today</p>
-              <p className="text-3xl font-bold text-green-600 mt-2">{signedToday}</p>
-            </div>
-            <div className="rounded-2xl bg-card border border-border p-6 shadow-premium">
-              <p className="text-muted-foreground text-sm font-medium">Rejected this week</p>
-              <p className="text-3xl font-bold text-red-600 mt-2">{rejectedThisWeek}</p>
-            </div>
-            <div className="rounded-2xl bg-card border border-border p-6 shadow-premium">
-              <p className="text-muted-foreground text-sm font-medium">Ready for listing</p>
-              <p className="text-3xl font-bold text-foreground mt-2">{ready.length}</p>
-            </div>
-          </div>
+        <MetricStrip
+          label="Prep sign-off summary"
+          metrics={[
+            { label: "Pending sign-off", value: loaded ? pending.length : null, loading: !loaded, tone: "warning", hint: `of ${signOffs.length} requests` },
+            { label: "Signed off today", value: loaded ? signedToday : null, loading: !loaded, tone: "success" },
+            { label: "Rejected this week", value: loaded ? rejectedThisWeek : null, loading: !loaded, tone: "danger" },
+            { label: "Ready for listing", value: loaded ? ready.length : null, loading: !loaded, tone: "info", hint: "signed off and unlocked" },
+          ]}
+        />
 
-          <div className="flex gap-2 mb-6">
-            {["all", "pending", "signed", "rejected"].map(f => (
-              <button
-                key={f}
-                onClick={() => setFilter(f as any)}
-                className={`px-4 py-2 rounded-md font-medium transition ${
-                  filter === f ? "bg-blue-600 text-white" : "bg-card border border-border text-foreground hover:border-blue-300"
-                }`}
-              >
-                {f.charAt(0).toUpperCase() + f.slice(1)}
-              </button>
-            ))}
-          </div>
+        <LocalTabs
+          label="Sign-off status filters"
+          tabs={(["all", "pending", "signed", "rejected"] as const).map((f): LocalTab => ({
+            key: f,
+            label: f.charAt(0).toUpperCase() + f.slice(1),
+            to: f === "all" ? "/prep" : `/prep?filter=${f}`,
+            active: filter === f,
+          }))}
+        />
 
-          {filtered.length === 0 ? (
-            <EmptyState
-              icon={ClipboardCheck}
-              title="No prep sign-offs yet"
-              description="Request one when a vehicle is ready for final inspection. Sign-offs unlock publishing and attach an install audit to every addendum."
-            />
-          ) : (
-            <div className="rounded-2xl bg-card border border-border shadow-premium overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-muted border-b border-border">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Status</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Vehicle</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Accessories</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Photos</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Foreman</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Updated</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">Action</th>
+        {!loaded ? (
+          <div role="status" aria-label="Loading" className="rounded-[6px] border border-adm-border bg-adm-surface p-6 text-[14px] text-adm-muted">Loading sign-offs…</div>
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            icon={ClipboardCheck}
+            title={filter === "all" ? "No prep sign-offs yet" : `No ${filter} sign-offs`}
+            description={filter === "all"
+              ? "Request one when a vehicle is ready for final inspection. Sign-offs unlock publishing and attach an install audit to every addendum."
+              : `This filter shows ${filter} sign-offs only; ${signOffs.length} ${signOffs.length === 1 ? "request exists" : "requests exist"} in total.`}
+          />
+        ) : (
+          <ProductPanel flush title={`${filtered.length} ${filtered.length === 1 ? "sign-off" : "sign-offs"}`}>
+            <WorkTable caption="Prep sign-offs" minWidth={900}>
+              <thead>
+                <tr>
+                  <Th>Status</Th>
+                  <Th>Vehicle</Th>
+                  <Th>Accessories</Th>
+                  <Th>Photos</Th>
+                  <Th>Foreman</Th>
+                  <Th>Updated</Th>
+                  <Th>Action</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(s => (
+                  <tr key={s.id}>
+                    <Td>
+                      <StatusText tone={s.status === "pending" ? "warning" : s.status === "signed" ? "success" : s.status === "rejected" ? "danger" : "neutral"} icon>
+                        {s.status.charAt(0).toUpperCase() + s.status.slice(1)}
+                      </StatusText>
+                    </Td>
+                    <Td>
+                      <p className="font-semibold text-adm-ink">{s.vin}</p>
+                      <p className="text-adm-muted">{s.ymm} • {s.stock_number}</p>
+                    </Td>
+                    <Td>{s.accessories_installed.filter(a => a.installed_date).length} of {s.accessories_installed.length}</Td>
+                    <Td>{s.install_photos?.length || 0}</Td>
+                    <Td>{s.foreman_name}</Td>
+                    <Td className="text-adm-muted">{format(new Date(s.updated_at), "MMM d, h:mm a")}</Td>
+                    <Td>
+                      <div className="flex items-center gap-2">
+                        <ProductButton size="sm" variant="primary" onClick={() => setSearchParams({ view: "detail", id: s.id })}>Review & Sign</ProductButton>
+                        <ProductButton size="sm" onClick={() => navigate(`/prep/${s.vin}`)} title="Open the QR mobile work-event flow for this VIN">Mobile flow</ProductButton>
+                      </div>
+                    </Td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filtered.map(s => (
-                    <tr key={s.id} className="hover:bg-muted/50 transition">
-                      <td className="px-6 py-4">
-                        <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                          s.status === "pending" ? "bg-amber-100 text-amber-800" :
-                          s.status === "signed" ? "bg-green-100 text-green-800" :
-                          s.status === "rejected" ? "bg-red-100 text-red-800" :
-                          "bg-orange-100 text-orange-800"
-                        }`}>
-                          {s.status.charAt(0).toUpperCase() + s.status.slice(1)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm">
-                        <p className="font-medium text-foreground">{s.vin}</p>
-                        <p className="text-muted-foreground">{s.ymm} • {s.stock_number}</p>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-foreground">
-                        {s.accessories_installed.filter(a => a.installed_date).length} of {s.accessories_installed.length}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-foreground">{s.install_photos?.length || 0}</td>
-                      <td className="px-6 py-4 text-sm text-foreground">{s.foreman_name}</td>
-                      <td className="px-6 py-4 text-sm text-muted-foreground">{format(new Date(s.updated_at), "MMM d, h:mm a")}</td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setSearchParams({ view: "detail", id: s.id })}
-                            className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 font-medium"
-                          >
-                            Review & Sign
-                          </button>
-                          <button
-                            onClick={() => navigate(`/prep/${s.vin}`)}
-                            className="px-3 py-1 border border-border text-sm rounded-md text-foreground hover:border-blue-300 font-medium"
-                            title="Open the QR mobile work-event flow for this VIN"
-                          >
-                            Mobile flow
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
+                ))}
+              </tbody>
+            </WorkTable>
+          </ProductPanel>
+        )}
+      </PageBody>
     );
   }
 

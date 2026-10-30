@@ -524,7 +524,7 @@ export default function ServiceQueue({ mode = "desk" }: { mode?: "my_work" | "de
           <div className="flex items-center gap-1.5 overflow-x-auto" aria-label="Queue status filters">
             {TABS.map((f) => (
               <button key={f.key} onClick={() => setTab(f.key)} aria-pressed={tab === f.key}
-                className={cn("h-11 px-3.5 rounded-full text-xs font-semibold whitespace-nowrap shrink-0",
+                className={cn("h-11 px-3.5 rounded-md text-xs font-semibold whitespace-nowrap shrink-0",
                   tab === f.key ? "bg-primary text-primary-foreground" : "text-adm-muted bg-adm-workspace")}>
                 {f.label}
               </button>
@@ -581,7 +581,7 @@ export default function ServiceQueue({ mode = "desk" }: { mode?: "my_work" | "de
         <div className="px-4 pt-3 flex items-center gap-1.5 overflow-x-auto">
           {TABS.map((f) => (
             <button key={f.key} onClick={() => setTab(f.key)} aria-pressed={tab === f.key}
-              className={cn("h-11 px-3 rounded-full text-xs font-semibold whitespace-nowrap",
+              className={cn("h-11 px-3 rounded-md text-xs font-semibold whitespace-nowrap",
                 tab === f.key ? "bg-primary text-primary-foreground" : "text-adm-muted hover:bg-adm-workspace")}>
               {f.label}
             </button>
