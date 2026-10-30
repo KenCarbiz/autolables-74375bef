@@ -4,7 +4,7 @@ import { summarizeReadiness } from "./readinessSummary";
 describe("summarizeReadiness (F04)", () => {
   it("keeps mean completeness separate from the complete rate", () => {
     // 130 vehicles: 2 fully complete, the rest part-way. Mean is high, rate is low.
-    const scores = [...Array(2).fill(100), ...Array(128).fill(71)];
+    const scores = [...Array(2).fill(100), ...Array(128).fill(72)];
     const s = summarizeReadiness(scores);
     expect(s.total).toBe(130);
     expect(s.complete).toBe(2);
