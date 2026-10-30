@@ -28,11 +28,9 @@ const renderAt = (url: string) =>
 describe("Platform Console local navigation", () => {
   it("lists every platform section as a link, without needing the palette", () => {
     renderAt("/platform-admin");
-    const nav = screen.getByRole("navigation", { name: "Platform sections" });
-    const links = Array.from(nav.querySelectorAll("a"));
+    const links = Array.from(document.querySelectorAll("nav[aria-label='Platform sections'] a, nav[aria-label='Platform tools'] a"));
     expect(links).toHaveLength(11);
     expect(links.map((a) => a.getAttribute("href"))).toContain("/platform-admin?tab=budgets");
-    expect(screen.getByText("Platform scope: every dealership")).toBeTruthy();
   });
 
   it("marks the section named in the URL as current and renders it", () => {

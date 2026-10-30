@@ -173,16 +173,16 @@ export interface Metric {
 
 /** Four or fewer primary metrics in one strip, each with its own denominator. */
 export const MetricStrip = ({ metrics, label, className, action }: { metrics: Metric[]; label: string; className?: string; action?: ReactNode }) => {
-  const shown = metrics.slice(0, 4);
+  const shown = metrics.slice(0, 6);
   return (
     <section aria-label={label} className={cn("border-y border-adm-border", className)}>
       <div className="flex flex-col lg:flex-row lg:items-stretch">
-        <dl className={cn("grid flex-1 grid-cols-2", shown.length >= 4 ? "lg:grid-cols-4" : shown.length === 3 ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
+        <dl className={cn("grid flex-1 grid-cols-2", shown.length >= 6 ? "lg:grid-cols-6" : shown.length >= 4 ? "lg:grid-cols-4" : shown.length === 3 ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
           {shown.map((m, i) => {
             const body = (
               <>
                 <dt className="text-[12px] leading-[18px] font-medium text-adm-muted">{m.label}</dt>
-                <dd className={cn("mt-0.5 text-[24px] leading-[32px] font-bold tabular-nums", m.tone === "danger" ? "text-adm-danger" : "text-adm-ink")}>
+                <dd className={cn("mt-0.5 font-bold tabular-nums", shown.length >= 6 ? "truncate text-[20px] leading-[28px]" : "text-[24px] leading-[32px]", m.tone === "danger" ? "text-adm-danger" : "text-adm-ink")}>
                   {m.loading ? <SkeletonBlock className="h-7 w-16" /> : <ValueOrUnknown value={m.value} />}
                 </dd>
                 {m.hint && <dd className="truncate text-[12px] leading-[18px] text-adm-muted">{m.hint}</dd>}

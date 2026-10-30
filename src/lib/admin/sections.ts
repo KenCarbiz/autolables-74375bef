@@ -45,8 +45,10 @@ export interface AdminSection {
   id: AdminSectionId;
   label: string;
   description: string;
-  /** Page title when it differs from the section label. */
+  /** Page title when the approved mock does not title the page "Administration". */
   heading?: string;
+  /** Second heading the mock draws between the section row and the child tabs. */
+  subheading?: string;
   /** Header lines the approved mock draws above the section row; the h1 is always shown. */
   intro?: { breadcrumb?: boolean; description?: boolean };
   tabs: AdminChildTab[];
@@ -63,6 +65,7 @@ export const ADMIN_SECTIONS: readonly AdminSection[] = [
   {
     id: "brand",
     label: "Dealership & Brand",
+    heading: "Dealership & Brand",
     description: "Dealer identity and public brand configuration.",
     tabs: [
       { id: "identity", label: "Identity", aliases: ["branding"], legacyTab: "branding" },
@@ -77,6 +80,7 @@ export const ADMIN_SECTIONS: readonly AdminSection[] = [
   {
     id: "people",
     label: "People & Access",
+    heading: "People & Access",
     description: "Team membership, roles, scope and readiness.",
     tabs: [
       { id: "team", label: "Team", aliases: ["team"], legacyTab: "team" },
@@ -113,6 +117,7 @@ export const ADMIN_SECTIONS: readonly AdminSection[] = [
   {
     id: "publishing",
     label: "Publishing",
+    heading: "Publishing policy",
     description: "Effective listing, document and signing policies.",
     intro: { breadcrumb: true, description: true },
     tabs: [
@@ -125,6 +130,7 @@ export const ADMIN_SECTIONS: readonly AdminSection[] = [
   {
     id: "documents",
     label: "Documents & Service",
+    heading: "Documents & Service",
     description: "Document, service, approval and version policy.",
     intro: { breadcrumb: true },
     tabs: [
@@ -137,13 +143,13 @@ export const ADMIN_SECTIONS: readonly AdminSection[] = [
   {
     id: "integrations",
     label: "Integrations",
-    heading: "Integrations & Data",
+    subheading: "Integrations & Data",
     description: "System, provider, feed and job health center.",
     tabs: [
       { id: "inventory-feed", label: "Inventory feed", aliases: ["inventory"], capabilities: ["can_manage_settings"] },
       { id: "providers", label: "Providers", capabilities: ["can_manage_settings"] },
       { id: "data-quality", label: "Data quality", capabilities: ["can_manage_settings", "can_view_compliance"] },
-      { id: "jobs", label: "Jobs & Pipelines", capabilities: ["can_manage_settings"] },
+      { id: "jobs", label: "Jobs & Pipelines", capabilities: ["can_manage_settings"], unpictured: true },
       { id: "activity", label: "Activity", aliases: ["audit"], legacyTab: "audit" },
       { id: "vehicle-files", label: "Vehicle files", aliases: ["files"], legacyTab: "files", unpictured: true },
       { id: "plan-features", label: "Plan & features", aliases: ["features"], legacyTab: "features", unpictured: true },

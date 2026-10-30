@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import {
   AlertTriangle, ArrowRight, Building2, Car, FileCheck, FileLock, FileSearch,
-  FileText, FileX, Gauge, KeyRound, Layers, Lock, Package, Printer, QrCode,
+  FileText, FileX, KeyRound, Layers, Lock, Package, Printer, QrCode,
   Tag,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -52,6 +52,7 @@ export default function DocumentsPrintCenter() {
   const [busy, setBusy] = useState<"packet" | "stock" | null>(null);
   // One in-flight row action at a time — the hook enforces it, this names it.
   const [busyRow, setBusyRow] = useState<{ id: string; kind: "reprint" | "generate" } | null>(null);
+  const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ id: string; row: DocRow; trigger: HTMLElement } | null>(null);
 
   const runPrint = async (which: "packet" | "stock") => {
@@ -237,8 +238,17 @@ export default function DocumentsPrintCenter() {
   ].filter(Boolean).join("  ·  ");
 
   const printAction = (
-    <CommandAction Icon={Gauge} capability="can_view_inventory" href={`/vin-command/${vehicle.id}`}>VIN Command Center</CommandAction>
+    <CommandAction
+      variant="primary"
+      capability="can_print"
+      Icon={Printer}
+      busy={busy === "packet"}
+      disabledReason={packetReason}
+      onClick={() => runPrint("packet")}>
+      Print bundle
+    </CommandAction>
   );
+  const previewDoc = documents.find((d) => d.id === selectedDoc) ?? documents[0] ?? null;
 
   return shell(
     <>
@@ -252,12 +262,14 @@ export default function DocumentsPrintCenter() {
               <span className="font-semibold">{vehicleLine}</span>
               {vehicleMeta ? <span className="text-adm-muted">{`  ·  ${vehicleMeta}`}</span> : null}
             </span>
+            <Link to="/inventory" className="shrink-0 text-[14px] font-semibold text-adm-primary hover:underline">Change vehicle</Link>
           </div>
         </div>
         <div className="min-w-0">
           <p className="mb-1 text-[13px] leading-[18px] font-semibold text-adm-ink">Printer profile</p>
           <div className="flex min-h-[44px] items-center justify-between gap-3 rounded-[6px] border border-adm-border bg-adm-surface px-3 text-[14px] leading-[20px]">
             <span className="truncate text-adm-ink">Browser print dialog</span>
+            <Link to="/admin/documents/print-calibration" className="shrink-0 font-semibold text-adm-primary hover:underline">Manage</Link>
           </div>
         </div>
       </div>
@@ -289,7 +301,7 @@ export default function DocumentsPrintCenter() {
                     const reprinting = busyRow?.id === d.id && busyRow.kind === "reprint";
                     const generating = busyRow?.id === d.id && busyRow.kind === "generate";
                     return (
-                      <tr key={d.id} className="h-14 hover:bg-adm-workspace">
+                      <tr key={d.id} className={`h-14 cursor-pointer ${previewDoc?.id === d.id ? "bg-adm-selected" : "hover:bg-adm-workspace"}`} onClick={() => setSelectedDoc(d.id)}>
                         <Td className="max-w-[190px]">
                           <span className="inline-flex max-w-full items-center gap-2">
                             <span className="truncate text-[14px] font-semibold text-adm-ink">{d.label}</span>
@@ -356,18 +368,25 @@ export default function DocumentsPrintCenter() {
         aside={
           <>
             <Panel title="Preview">
-              {passportPreview.length === 0 ? (
-                <p className="text-[14px] leading-[20px] text-adm-muted">No documents are shared to the customer Passport yet.</p>
+              {previewDoc ? (
+                <div className="flex flex-col gap-3">
+                  <div className="mx-auto flex aspect-[8.5/11] w-full max-w-[220px] flex-col justify-between rounded-[4px] border border-adm-border bg-white p-4 text-left">
+                    <div>
+                      <p className="text-[11px] leading-[16px] text-adm-muted">{vehicleLine}</p>
+                      <p className="mt-1 text-[15px] leading-[20px] font-bold text-adm-ink">{previewDoc.label}</p>
+                      <p className="text-[12px] leading-[18px] text-adm-muted">{previewDoc.version}</p>
+                    </div>
+                    <p className="text-[11px] leading-[16px] text-adm-muted">{vehicle.vin}</p>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 text-[13px] leading-[18px]">
+                    <span className="min-w-0 truncate text-adm-muted">{previewDoc.internalStatus.label} · {previewDoc.passportVisibility.label}</span>
+                    {previewDoc.href && (previewDoc.href.startsWith("/")
+                      ? <Link to={previewDoc.href} className="shrink-0 font-semibold text-adm-primary hover:underline">Open document</Link>
+                      : <a href={previewDoc.href} target="_blank" rel="noreferrer" className="shrink-0 font-semibold text-adm-primary hover:underline">Open document</a>)}
+                  </div>
+                </div>
               ) : (
-                <ul className="divide-y divide-adm-border">
-                  {passportPreview.map((p) => (
-                    <li key={`${p.label}-${p.version}`} className="flex items-center gap-2.5 py-2">
-                      <FileText className="h-5 w-5 shrink-0 text-adm-muted" aria-hidden="true" />
-                      <span className="min-w-0 flex-1 truncate text-[14px] text-adm-ink">{p.label}</span>
-                      <span className="whitespace-nowrap text-[13px] text-adm-muted">{p.version}</span>
-                    </li>
-                  ))}
-                </ul>
+                <p className="text-[14px] leading-[20px] text-adm-muted">Select a document to preview it.</p>
               )}
               <div className="mt-3 border-t border-adm-border pt-3">
                 <CommandAction
@@ -405,17 +424,6 @@ export default function DocumentsPrintCenter() {
                 </CommandCallout>
               )}
               <div className="mt-3 flex flex-col gap-2">
-                <CommandAction
-                  variant="primary"
-                  capability="can_print"
-                  Icon={Printer}
-                  busy={busy === "packet"}
-                  disabledReason={packetReason}
-                  className="w-full"
-                  wrapperClassName="flex w-full"
-                  onClick={() => runPrint("packet")}>
-                  Print bundle
-                </CommandAction>
                 <CommandAction
                   capability="can_print"
                   Icon={Printer}

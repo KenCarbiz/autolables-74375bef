@@ -57,3 +57,26 @@ export function activityTone(action: string | null | undefined): HealthTone {
   if (/complete|success|verified|published|signed/.test(a)) return "success";
   return "neutral";
 }
+
+const PAST_TENSE: Readonly<Record<string, string>> = {
+  publish: "published", verify: "verified", sign: "signed", generate: "generated", approve: "approved", decline: "declined",
+  create: "created", update: "updated", delete: "deleted", invite: "invited", send: "sent", upload: "uploaded", review: "reviewed",
+  archive: "archived", export: "exported", import: "imported", print: "printed", open: "opened", view: "viewed", apply: "applied",
+};
+
+const capital = (s: string) => s.replace(/^\w/, (c) => c.toUpperCase());
+
+/** "listing.publish" reads "Listing published"; unknown verbs keep their own words. */
+export const activityLabel = (action: string | null | undefined): string => {
+  const words = (action ?? "").toLowerCase().split(/[._\s]+/).filter(Boolean);
+  if (words.length === 0) return "Event";
+  const last = words[words.length - 1];
+  if (words.length > 1 && PAST_TENSE[last]) return capital([...words.slice(0, -1), PAST_TENSE[last]].join(" "));
+  return capital(words.join(" "));
+};
+
+/** The record kind in words ("Vehicle listing"), never the internal table name or id. */
+export const entityKindLabel = (type: string | null | undefined): string => {
+  const t = (type ?? "").replace(/[_.]+/g, " ").trim();
+  return t ? capital(t) : "Unknown record";
+};

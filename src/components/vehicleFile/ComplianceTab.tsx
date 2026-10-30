@@ -13,14 +13,17 @@ import { useVehicleTruth, type VehicleTruth } from "@/hooks/useVehicleTruth";
 import { useDealRecord, dealDocStatus } from "@/hooks/useDealRecord";
 import { useVehicleEvidence } from "@/lib/stickerStudio/useVehicleEvidence";
 import { useRecallTask } from "@/hooks/useRecallTask";
-import { Card, EmptyNote, Pair, TabHeader, btn, btnLarge, fmtWhen } from "./primitives";
+import { Card, EmptyNote, Pair, btn, fmtWhen } from "./primitives";
+import { VehicleSubHeader } from "./SubPageHeader";
+import { useComplianceFacts } from "./useComplianceFacts";
 import RecallCard from "./RecallCard";
 import PriceIntegrityCards from "./PriceIntegrityCard";
 import SignaturesSection, { useVehicleSignatures } from "./SignaturesSection";
 import { type ReadinessSummary, type VehicleRow } from "./types";
 import { deriveStatusFacts, recallFact } from "./statusFacts";
 import type { LifecycleResult } from "./lifecycle";
-import { StatusText, WorkTable, Th, Td } from "@/components/product";
+import { Button, StatusText, WorkTable, Th, Td } from "@/components/product";
+import type { ReactNode } from "react";
 
 const TruthConflictsCard = ({ truth, loading }: { truth: VehicleTruth; loading: boolean }) => {
   const blocking = truth.conflicts.filter((c) => c.blocks_generation);
@@ -97,7 +100,8 @@ const OfficialFormsCard = ({ vehicle }: { vehicle: VehicleRow }) => {
   );
 };
 
-export const ComplianceTab = ({ vehicle, ready, recall, lifecycle, onReload }: {
+export const ComplianceTab = ({ vehicle, ready, recall, lifecycle, onReload, strip }: {
+  strip?: ReactNode;
   vehicle: VehicleRow;
   ready: ReadinessSummary;
   lifecycle: LifecycleResult;
@@ -113,6 +117,7 @@ export const ComplianceTab = ({ vehicle, ready, recall, lifecycle, onReload }: {
   const facts = deriveStatusFacts({ vehicle, ready, lifecycle });
   const recallLine = recallFact(vehicle);
   const readiness = { label: facts.retail.value };
+  const cf = useComplianceFacts(vehicle);
 
   // The defense packet is the whole compliance state of one VIN in a single
   // file: what was checked, what was signed, what was advertised, and the
@@ -198,25 +203,35 @@ export const ComplianceTab = ({ vehicle, ready, recall, lifecycle, onReload }: {
 
   return (
     <div className="space-y-6">
-      <TabHeader
-        title="Compliance"
-        description="Everything that has to be true, checked and signed for this VIN — and the evidence that proves it."
-        action={
-          <button onClick={buildPacket} disabled={building || events.length === 0} className={btnLarge}>
-            <FolderCheck className="w-4 h-4" /> Build VIN defense packet
-          </button>
+      <VehicleSubHeader
+        vehicle={vehicle}
+        section="Compliance"
+        title="Vehicle compliance"
+        description="Review compliance status and resolve any blockers."
+        strip={strip}
+        actions={
+          <Button variant="primary" onClick={() => document.getElementById("vf-compliance-blockers")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+            Review blocker
+          </Button>
         }
       />
 
       <div className="space-y-3">
         <h3 className="text-[15px] leading-[22px] font-semibold text-adm-ink">Compliance status</h3>
-        <dl className="grid grid-cols-2 lg:grid-cols-4 gap-3" aria-label="Compliance status">
-          {[recallLine, facts.signing, facts.delivery, facts.retail].map((f) => (
+        <dl className="grid grid-cols-2 lg:grid-cols-5 gap-3" aria-label="Compliance status">
+          {[
+            { f: recallLine, to: "#vf-recall-card" },
+            { f: cf.price, to: "#vf-price-card" },
+            { f: cf.safety, to: "#vf-forms-card" },
+            { f: cf.delivery, to: "#vf-delivery-card" },
+            { f: cf.title, to: "#vf-title-card" },
+          ].map(({ f, to }) => (
             <div key={f.label} className="min-w-0 rounded-[6px] border border-adm-border bg-adm-surface p-3">
               <dt className="text-[13px] leading-[18px] text-adm-ink">{f.label}</dt>
-              <dd className="mt-0.5">
-                <StatusText tone={f.tone} icon={f.tone !== "neutral" && f.tone !== "info"}>{f.value}</StatusText>
-                {f.detail && <span className="block text-[12px] leading-[18px] text-adm-muted mt-0.5">{f.detail}</span>}
+              <dd className="mt-1 flex flex-col items-start gap-1">
+                <StatusText tone={f.tone}>{f.value}</StatusText>
+                <span className="block min-h-[36px] text-[12px] leading-[18px] text-adm-muted">{f.detail}</span>
+                <a href={to} className="text-[13px] font-semibold text-adm-primary hover:underline">View details</a>
               </dd>
             </div>
           ))}
@@ -224,28 +239,30 @@ export const ComplianceTab = ({ vehicle, ready, recall, lifecycle, onReload }: {
 
         <div id="vf-compliance-blockers" className="scroll-mt-24">
           <p className="text-[15px] leading-[22px] font-semibold text-adm-ink mb-2">
-            Current blockers and open items ({ready.remaining.length + (recallLine.tone === "neutral" ? 1 : 0)})
+            Current blockers ({ready.remaining.length + (recallLine.tone === "neutral" ? 1 : 0)})
           </p>
           {ready.remaining.length === 0 && recallLine.tone !== "neutral" ? (
             <p className="text-[14px] leading-[20px] text-adm-muted">Every tracked item on this vehicle is complete.</p>
           ) : (
-            <WorkTable caption="Current blockers" minWidth={520}>
+            <WorkTable caption="Current blockers" minWidth={640}>
               <thead>
-                <tr><Th>Item</Th><Th>Effect</Th><Th>Where to resolve</Th></tr>
+                <tr><Th>Item</Th><Th>Details</Th><Th>Evidence</Th><Th>Updated</Th></tr>
               </thead>
               <tbody>
                 {recallLine.tone === "neutral" && (
                   <tr>
-                    <Td>Recall: Unknown for this VIN</Td>
-                    <Td><StatusText tone="neutral">Not cleared</StatusText></Td>
-                    <Td><a className="text-adm-primary hover:underline" href="#vf-recall-card">Recall card below</a></Td>
+                    <Td className="font-semibold">Recall status unknown</Td>
+                    <Td className="text-adm-muted">No VIN-level recall check has answered.</Td>
+                    <Td><a className="text-adm-primary hover:underline" href="#vf-recall-card">View recall card</a></Td>
+                    <Td className="text-adm-muted">{fmtWhen(vehicle.recall_checked_at) ?? "-"}</Td>
                   </tr>
                 )}
                 {ready.remaining.map((c) => (
                   <tr key={c.label}>
-                    <Td>{c.label}</Td>
-                    <Td>{c.blocks ? <StatusText tone="danger" icon>Blocks publish</StatusText> : <StatusText tone="warning">Open item</StatusText>}</Td>
-                    <Td className="text-adm-muted">On this tab</Td>
+                    <Td className="font-semibold">{c.label}</Td>
+                    <Td className="text-adm-muted">{c.blocks ? "Blocks publishing." : "Open item."}</Td>
+                    <Td className="text-adm-muted">-</Td>
+                    <Td className="text-adm-muted">{fmtWhen(c.when) ?? "-"}</Td>
                   </tr>
                 ))}
               </tbody>
@@ -259,13 +276,19 @@ export const ComplianceTab = ({ vehicle, ready, recall, lifecycle, onReload }: {
         )}
       </div>
 
-      <PriceIntegrityCards vehicle={vehicle} />
+      <div className="flex justify-start">
+        <button onClick={buildPacket} disabled={building || events.length === 0} className={btn}>
+          <FolderCheck className="w-5 h-5" /> Build VIN defense packet
+        </button>
+      </div>
+
+      <div id="vf-price-card" className="scroll-mt-24"><PriceIntegrityCards vehicle={vehicle} /></div>
 
       <div id="vf-recall-card" className="scroll-mt-24"><RecallCard vehicle={vehicle} recall={recall} /></div>
 
-      <OfficialFormsCard vehicle={vehicle} />
+      <div id="vf-forms-card" className="scroll-mt-24"><OfficialFormsCard vehicle={vehicle} /></div>
 
-      <DeliverySignoffs vin={vehicle.vin} tenantId={vehicle.tenant_id} condition={vehicle.condition} />
+      <div id="vf-delivery-card" className="scroll-mt-24"><DeliverySignoffs vin={vehicle.vin} tenantId={vehicle.tenant_id} condition={vehicle.condition} /></div>
 
       <SignaturesSection vehicle={vehicle} record={signatures} />
 
@@ -276,7 +299,7 @@ export const ComplianceTab = ({ vehicle, ready, recall, lifecycle, onReload }: {
         <InstallProofList vin={vehicle.vin} />
       </Card>
 
-      <TitleMcoPanel vin={vehicle.vin} tenantId={vehicle.tenant_id} condition={vehicle.condition} />
+      <div id="vf-title-card" className="scroll-mt-24"><TitleMcoPanel vin={vehicle.vin} tenantId={vehicle.tenant_id} condition={vehicle.condition} /></div>
 
       <TitleVerificationPanel
         listingId={vehicle.id}

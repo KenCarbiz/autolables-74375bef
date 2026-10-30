@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
@@ -11,7 +11,7 @@ import {
   formatCommandDate, type Tone,
 } from "@/components/command/CommandPrimitives";
 import { ClipboardList } from "lucide-react";
-import { LocalTabs, MetricStrip, PageBody, PageHeader, StatusText, Td, Th, WorkTable, type LocalTab, type Tone as ProductTone } from "@/components/product";
+import { LinkButton, LocalTabs, MetricStrip, PageBody, PageHeader, StatusText, Td, Th, WorkTable, type LocalTab, type Tone as ProductTone } from "@/components/product";
 import { cn } from "@/lib/utils";
 import { SERVICE_FLOOR_STATES, stateLabel, type ServiceFloorState } from "@/lib/lifecycle/states";
 
@@ -164,6 +164,7 @@ interface DeskRow {
   vin: string;
   ymm: string;
   stockNumber: string | null;
+  photo: string | null;
   state: string;
   ageHours: number;
   overdue: boolean;
@@ -217,7 +218,7 @@ export default function ServiceWriterDesk() {
       const [vRes, siRes, grRes, clrRes, reqRes, memRes] = await Promise.all([
         ids.length
           ? sb().from("vehicle_listings")
-            .select("id, ymm, status, deal_processed_at")
+            .select("id, ymm, status, deal_processed_at, hero_image_url")
             .eq("tenant_id", tenantId).in("id", ids).neq("status", "archived")
           : none,
         vins.length
@@ -247,11 +248,12 @@ export default function ServiceWriterDesk() {
         sb().rpc("list_tenant_members", { p_tenant_id: tenantId }),
       ]);
 
-      const vehicleById = new Map<string, { ymm: string; sold: boolean }>();
+      const vehicleById = new Map<string, { ymm: string; sold: boolean; photo: string | null }>();
       for (const v of (((vRes.data as Record<string, unknown>[]) || []))) {
         vehicleById.set(String(v.id || ""), {
           ymm: String(v.ymm || "Vehicle"),
           sold: v.deal_processed_at != null || String(v.status || "") === "sold",
+          photo: (v.hero_image_url as string) || null,
         });
       }
 
@@ -321,6 +323,7 @@ export default function ServiceWriterDesk() {
           vin: r.vin,
           ymm: v?.ymm || "Vehicle",
           stockNumber: inspection?.stockNumber || getReady?.stockNumber || null,
+          photo: v?.photo ?? null,
           state: r.state,
           ageHours,
           overdue,
@@ -400,6 +403,13 @@ export default function ServiceWriterDesk() {
       <PageHeader
         title="Service Writer Desk"
         description="Every vehicle in the service pipeline, highest priority first."
+        actions={
+          visible.length > 0 ? (
+            <LinkButton variant="primary" to={`/service/vehicle/${encodeURIComponent((visible.find((r) => !r.assignedName) ?? visible[0]).vin)}`}>
+              Assign to technician
+            </LinkButton>
+          ) : undefined
+        }
       />
 
       <LocalTabs label="Service pipeline stages" tabs={tabs} />
@@ -418,7 +428,7 @@ export default function ServiceWriterDesk() {
         <EmptyState Icon={ClipboardList} title={TAB_EMPTY[tab].title} detail={TAB_EMPTY[tab].detail} />
       ) : (
         <div>
-          <WorkTable caption="Vehicles in the service pipeline, highest priority first" minWidth={900}>
+          <WorkTable caption="Vehicles in the service pipeline, highest priority first" minWidth={960}>
             <thead>
               <tr>
                 <Th>Vehicle</Th>
@@ -427,14 +437,22 @@ export default function ServiceWriterDesk() {
                 <Th align="right">Age</Th>
                 <Th>Delivery target</Th>
                 <Th>Next action</Th>
+                <Th align="right"><span className="sr-only">Action</span></Th>
               </tr>
             </thead>
             <tbody>
               {visible.slice(0, 100).map((r) => (
                 <tr key={r.vehicleId} className="h-14 hover:bg-adm-workspace">
                   <Td className="max-w-[300px]">
-                    <p className="truncate font-semibold text-adm-ink">{r.ymm}</p>
-                    <p className="truncate font-mono text-[12px] leading-[18px] text-adm-muted">{r.stockNumber ? `${r.stockNumber} / ` : ""}{r.vin}</p>
+                    <div className="flex items-center gap-3">
+                      {r.photo
+                        ? <img src={r.photo} alt="" className="h-10 w-14 shrink-0 rounded-[4px] border border-adm-border object-cover" />
+                        : <span className="h-10 w-14 shrink-0 rounded-[4px] bg-adm-workspace" aria-hidden="true" />}
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-adm-ink">{r.ymm}</p>
+                        <p className="truncate font-mono text-[12px] leading-[18px] text-adm-muted">{r.stockNumber ? `${r.stockNumber} / ` : ""}{r.vin}</p>
+                      </div>
+                    </div>
                   </Td>
                   <Td className="whitespace-nowrap">
                     <StatusText tone={PRODUCT_TONE[STATE_STATUS[r.state as ServiceFloorState] || "WAITING"]}>{stateLabel(r.state)}</StatusText>
@@ -442,10 +460,9 @@ export default function ServiceWriterDesk() {
                   <Td className="text-adm-muted">{r.assignedName ?? "Unassigned"}</Td>
                   <Td align="right" className="tabular-nums whitespace-nowrap">{durationLabel(r.ageHours)}</Td>
                   <Td className="text-adm-muted whitespace-nowrap">{formatCommandDate(r.deliveryTarget) ?? EM_DASH}</Td>
-                  <Td className="whitespace-nowrap">
-                    <Link to={`/service/vehicle/${encodeURIComponent(r.vin)}`} className="font-semibold text-adm-primary hover:underline">
-                      {NEXT_ACTION[r.state as ServiceFloorState] || "Open file"}
-                    </Link>
+                  <Td className="whitespace-nowrap">{NEXT_ACTION[r.state as ServiceFloorState] || "Open file"}</Td>
+                  <Td align="right">
+                    <LinkButton size="sm" to={`/service/vehicle/${encodeURIComponent(r.vin)}`}>{r.assignedName ? "View" : "Assign"}</LinkButton>
                   </Td>
                 </tr>
               ))}

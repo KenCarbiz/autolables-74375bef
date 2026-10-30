@@ -25,6 +25,8 @@ import { buildConsentRecord, hashPayload, fetchClientIp } from "@/lib/esign";
 import { uploadPhoto } from "@/lib/storage";
 import { RequestAdditionalWorkButton, ServiceApprovalsPanel } from "@/components/service/AdditionalWork";
 import { ServiceMessagesThread } from "@/components/service/ServiceMessages";
+import { FindingDetail, FindingsTable } from "@/components/service/InspectionFindings";
+import { buildFindings } from "@/lib/service/inspectionFindings";
 import {
   CommandCard, CommandCapabilityProvider, CommandCallout, VehicleIdentityStrip, StatusPill,
   LoadingCard, ErrorCard, EmptyState, TimelineRail, DisabledReason,
@@ -129,6 +131,7 @@ export default function ServiceVehicleWorkspace() {
   const [clearance, setClearance] = useState<Clearance | null>(null);
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
+  const [selectedFinding, setSelectedFinding] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!tenantId || !vin) { setLoading(false); return; }
@@ -237,6 +240,9 @@ export default function ServiceVehicleWorkspace() {
   // transition_safety_inspection void gate) + a documented reason.
   const canVoid = isAdmin || hasDealerCapability(role, "can_void_inspection", isAdmin);
   const newestAny = inspections[0] ?? null;
+  const findings = useMemo(() => buildFindings((newestSigned ?? newestActive)?.checklist), [newestSigned, newestActive]);
+  const activeFinding = findings.find((f) => f.id === selectedFinding) ?? findings.find((f) => f.result === "failed") ?? findings[0] ?? null;
+  const activeFailure = activeFinding ? failures.find((f) => f.item_id === activeFinding.id) : undefined;
 
   const grItems: GetReadyItem[] = useMemo(() => (gr?.items || []).filter(Boolean), [gr]);
   const grStarted = !!gr && (gr.status !== "pending" || grItems.some((i) => i.status === "complete"));
@@ -361,11 +367,12 @@ export default function ServiceVehicleWorkspace() {
             </>
           }
         />
-        <WorkspaceTabs />
+        <WorkspaceTabs findings={findings.length} repairs={failures.length} approvals={pendingRequests} />
 
         <DetailLayout
           main={
             <>
+              <FindingsTable findings={findings} selectedId={activeFinding?.id ?? null} onSelect={setSelectedFinding} />
               <div id="k208" />
               {newestAny?.status === "voided" && (
                 <CommandCallout tone="amber" Icon={AlertTriangle} title="A K-208 on this VIN was voided">
@@ -447,6 +454,12 @@ export default function ServiceVehicleWorkspace() {
           }
           aside={
             <>
+              <FindingDetail
+                finding={activeFinding}
+                repairLabel={activeFailure ? REPAIR_STATE_LABELS[activeFailure.repair_state as RepairState] ?? null : null}
+                photos={Array.isArray(activeFailure?.photos) ? activeFailure.photos : []}
+                vehicleFileHref={`/vehicle-file/${veh.id}`}
+              />
               <div id="summary">
                 <SummaryCard newestSigned={newestSigned} openFailures={openFailures.length} clearance={clearance} items={grItems} />
               </div>
@@ -1739,13 +1752,13 @@ function TitleMcoUpload({ tenantId, veh }: { tenantId: string; veh: { id: string
 
 // Flat jump tabs over the sections this page already has. They scroll to an
 // existing section; they do not add or hide any work.
-function WorkspaceTabs() {
+function WorkspaceTabs({ findings, repairs, approvals }: { findings: number; repairs: number; approvals: number }) {
   const { hash } = useLocation();
   const current = hash || "#inspection";
   const tabs = [
-    { key: "inspection", label: "Inspection findings", to: "#inspection" },
-    { key: "failures", label: "Repairs", to: "#failures" },
-    { key: "approvals", label: "Approvals", to: "#approvals" },
+    { key: "inspection", label: "Inspection findings", to: "#inspection", count: findings },
+    { key: "failures", label: "Repairs", to: "#failures", count: repairs },
+    { key: "approvals", label: "Approvals", to: "#approvals", count: approvals },
     { key: "summary", label: "History", to: "#summary" },
   ];
   return <LocalTabs label="Workspace sections" tabs={tabs.map((t) => ({ ...t, active: t.to === current }))} />;

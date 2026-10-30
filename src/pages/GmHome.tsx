@@ -356,7 +356,7 @@ const GmHome = () => {
     if (!data || stamps.length === 0) return null;
     const newest = Math.max(...stamps);
     const hours = (Date.now() - newest) / 3_600_000;
-    return hours > 48 ? { hours, at: new Date(newest) } : null;
+    return hours > 24 ? { hours, at: new Date(newest) } : null;
   }, [data]);
 
   const greeting = (() => {
@@ -392,6 +392,7 @@ const GmHome = () => {
               ? "Nothing needs a decision from you right now."
               : `${greeting}, ${name}. ${attention} item${attention === 1 ? "" : "s"} need${attention === 1 ? "s" : ""} you today: ${approvals.length} awaiting a decision, ${stuck.length} vehicle${stuck.length === 1 ? "" : "s"} stuck, ${systemIssues} system issue${systemIssues === 1 ? "" : "s"}.`
         }
+        meta={reading ? undefined : `Last updated ${new Date().toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}`}
         actions={canViewInventory ? <LinkButton to="#today-work" variant="primary">Review work</LinkButton> : undefined}
       />
 
@@ -405,7 +406,7 @@ const GmHome = () => {
           title="Inventory feed may be stale"
           action={<LinkButton to="/admin?tab=inventory-feed" size="sm">Review feed health</LinkButton>}
         >
-          Newest listing sync {feedNote.at.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}, {Math.floor(feedNote.hours / 24)} days ago.
+          Newest listing sync {feedNote.at.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}, {feedNote.hours < 48 ? `${Math.floor(feedNote.hours)} hours ago` : `${Math.floor(feedNote.hours / 24)} days ago`}. Some data may be out of date.
         </InlineNote>
       )}
 

@@ -60,6 +60,8 @@ const inTab = (deal: DealEntry, tab: DealTab): boolean => {
 
 const dateLabel = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 
+const ageDays = (iso: string) => `${Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000))}d`;
+
 const Deals = () => {
   const navigate = useNavigate();
   const { book, loading, error, refetch } = useCustomerBook();
@@ -198,14 +200,15 @@ const Deals = () => {
             <table className="w-full table-fixed text-left">
               <thead className="bg-adm-workspace">
                 <tr className="text-[12px] leading-[18px] text-adm-muted">
-                  <th className="font-semibold px-4 py-2.5 w-[9%]">Date</th>
-                  <th className="font-semibold py-2.5 w-[20%]">Vehicle</th>
-                  <th className="font-semibold py-2.5 w-[13%]">Customer</th>
+                  <th className="font-semibold px-4 py-2.5 w-[9%]">Stock #</th>
+                  <th className="font-semibold py-2.5 w-[19%]">Vehicle</th>
+                  <th className="font-semibold py-2.5 w-[12%]">Customer</th>
                   <th className="font-semibold py-2.5 w-[9%] text-right pr-4">Amount</th>
                   <th className="font-semibold py-2.5 w-[13%]">Document state</th>
-                  <th className="font-semibold py-2.5 w-[14%]">Price integrity</th>
-                  <th className="font-semibold py-2.5 w-[16%]">Next action</th>
-                  <th className="font-semibold py-2.5 pr-3 w-[7%]"><span className="sr-only">Actions</span></th>
+                  <th className="font-semibold py-2.5 w-[13%]">Price integrity</th>
+                  <th className="font-semibold py-2.5 pl-3 w-[6%]">Age</th>
+                  <th className="font-semibold py-2.5 w-[14%]">Next action</th>
+                  <th className="font-semibold py-2.5 pr-3 w-[5%]"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -213,14 +216,19 @@ const Deals = () => {
                   const customer = deal.customerId ? customerById.get(deal.customerId) || null : null;
                   return (
                     <tr key={deal.id} className="h-14 border-t border-adm-border hover:bg-adm-workspace transition-colors">
-                      <td className="px-4 text-[13px] text-adm-muted tabular-nums whitespace-nowrap">{dateLabel(deal.createdAt)}</td>
+                      <td className="px-4 pr-3 text-[13px] text-adm-muted truncate">{deal.stock || "Unknown"}</td>
                       <td className="pr-3 text-[14px] truncate">
                         <Link to={`/deals/${encodeURIComponent(deal.id)}`} className="font-semibold text-adm-primary hover:underline">{deal.vehicleLabel}</Link>
                       </td>
-                      <td className="pr-3 text-[14px] text-adm-ink truncate">{deal.customerName || "No customer"}</td>
+                      <td className="pr-3 text-[14px] text-adm-ink truncate">
+                        {deal.customerName && deal.customerId
+                          ? <Link to={`/customers/${encodeURIComponent(deal.customerId)}`} className="text-adm-primary hover:underline">{deal.customerName}</Link>
+                          : deal.customerName || "No customer"}
+                      </td>
                       <td className="pr-4 text-[14px] text-adm-ink text-right tabular-nums truncate">{money(deal.amount)}</td>
                       <td className="pr-3 whitespace-nowrap"><Chip tone={dealStateTone(deal.state)}>{deal.stateLabel}</Chip></td>
                       <td className="pr-3 whitespace-nowrap"><PriceIntegrityChip integrity={deal.priceIntegrity} /></td>
+                      <td className="pl-3 pr-3 text-[13px] text-adm-muted tabular-nums whitespace-nowrap">{ageDays(deal.createdAt)}</td>
                       <td className="pr-3 text-[14px] truncate">
                         <Link to={`/deals/${encodeURIComponent(deal.id)}`} className="text-adm-primary hover:underline">{deal.nextAction.headline}</Link>
                       </td>

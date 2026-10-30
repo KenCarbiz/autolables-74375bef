@@ -559,7 +559,7 @@ export default function ServiceQueue({ mode = "desk", onCounts }: { mode?: "my_w
                       ? <StatusText tone="warning">Awaiting approval</StatusText>
                       : <StatusText tone={G.tone}>{G.label}{r.openFailures > 0 ? ` (${r.openFailures})` : ""}</StatusText>}
                   </Td>
-                  <Td className="max-w-[170px]">
+                  <Td className="max-w-[200px]">
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); setDrawer(r); }}
@@ -570,7 +570,7 @@ export default function ServiceQueue({ mode = "desk", onCounts }: { mode?: "my_w
                     </button>
                     <p className="truncate text-[12px] leading-[16px] text-adm-muted">{r.stock ? `Stock ${r.stock}` : "No stock number"} · {r.vin.slice(-6)}</p>
                   </Td>
-                  <Td className={cn("whitespace-nowrap", mode === "my_work" && "max-w-[120px] truncate")}>
+                  <Td className={cn("whitespace-nowrap", mode === "my_work" && "max-w-[170px] truncate")}>
                     {mode === "my_work"
                       ? <span className="block truncate">{r.nextTask}</span>
                       : <span className={cn("tabular-nums", r.overdue ? "font-semibold text-adm-danger" : "text-adm-ink")}>{ageDisplay(r)}</span>}

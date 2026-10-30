@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { LocalTabs, PageBody, PageHeader } from "@/components/product";
 import { useAuth } from "@/contexts/AuthContext";
 import PlatformTenants from "@/components/admin/PlatformTenants";
@@ -42,6 +42,8 @@ const TABS: { id: PlatformTab; label: string; icon: typeof Store }[] = [
   { id: "budgets",      label: "Budgets & alerts", icon: Wallet },
 ];
 
+const PRIMARY: PlatformTab[] = ["tenants", "members", "entitlements", "templates", "audit"];
+
 const PlatformAdmin = () => {
   const { user, isAdmin, loading } = useAuth();
   const navigate = useNavigate();
@@ -56,20 +58,28 @@ const PlatformAdmin = () => {
 
   if (loading) return null;
   if (!isAdmin) return null;
+  const primaryTabs = PRIMARY.map((id) => TABS.find((t) => t.id === id)!);
 
   return (
     <div data-product-surface="platform">
       <PageBody>
         <PageHeader
-          scope="Platform scope: every dealership"
           title="Platform Console"
           description="Dealers, seats, app entitlements, provider cost, template libraries and the platform audit log."
         />
         <LocalTabs
           label="Platform sections"
           defaultKey="tenants"
-          tabs={TABS.map((t) => ({ key: t.id, label: t.label, to: `/platform-admin?tab=${t.id}`, active: t.id === tab }))}
+          tabs={primaryTabs.map((t) => ({ key: t.id, label: t.label, to: `/platform-admin?tab=${t.id}`, active: t.id === tab }))}
         />
+        <details className="group" open={!PRIMARY.includes(tab)}>
+          <summary className="cursor-pointer list-none text-[14px] font-semibold text-adm-primary hover:underline">More platform tools</summary>
+          <nav aria-label="Platform tools" className="mt-2 flex flex-wrap gap-x-6 gap-y-1">
+            {TABS.filter((t) => !PRIMARY.includes(t.id)).map((t) => (
+              <Link key={t.id} to={`/platform-admin?tab=${t.id}`} aria-current={t.id === tab ? "page" : undefined} className={t.id === tab ? "text-[14px] font-semibold text-adm-primary" : "text-[14px] text-adm-muted hover:text-adm-ink"}>{t.label}</Link>
+            ))}
+          </nav>
+        </details>
 
         <section aria-label={TABS.find((t) => t.id === tab)?.label} className="flex flex-col gap-4">
           {tab === "tenants"      && <PlatformTenants />}

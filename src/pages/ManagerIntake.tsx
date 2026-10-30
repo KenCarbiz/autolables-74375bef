@@ -8,7 +8,7 @@ import { useEntitlements } from "@/hooks/useEntitlements";
 import { canDispatchGetReady } from "@/lib/commandCenter/dispatchAuthority";
 import { cn } from "@/lib/utils";
 import { Search, X } from "lucide-react";
-import { LocalTabs, MetricStrip, PageBody, PageHeader, QueryState, StatusText, Td, Th, WorkTable, type LocalTab, type Tone } from "@/components/product";
+import { Button, LocalTabs, MetricStrip, PageBody, PageHeader, QueryState, StatusText, Td, Th, WorkTable, type LocalTab, type Tone } from "@/components/product";
 
 // /get-ready-command — the used-car manager's fleet-level intake queue.
 // Reads the STORED vehicle_lifecycle (never a client derivation) and issues
@@ -199,6 +199,11 @@ export default function ManagerIntake() {
       <PageHeader
         title="Manager Intake"
         description="Vehicles waiting for authorization before get-ready work starts."
+        actions={
+          <Button variant="primary" disabled={visible.length === 0} onClick={() => { setDrawer(visible[0]); setReason(""); }}>
+            Review vehicle
+          </Button>
+        }
       />
 
       <LocalTabs label="Intake queue filters" tabs={tabs} />
@@ -257,7 +262,7 @@ export default function ManagerIntake() {
                       </div>
                     </Td>
                     <Td align="right" className="whitespace-nowrap">{r.ageDays}</Td>
-                    <Td className="capitalize">{r.condition.toLowerCase()}</Td>
+                    <Td>{/^cpo$/i.test(r.condition) ? "CPO" : r.condition ? r.condition.charAt(0).toUpperCase() + r.condition.slice(1).toLowerCase() : "Unknown"}</Td>
                     <Td>
                       {dnd ? <StatusText tone="danger">Do-not-drive</StatusText>
                         : r.recall ? <span className="text-adm-muted capitalize">{r.recall.replace(/_/g, " ")}</span>
@@ -265,7 +270,7 @@ export default function ManagerIntake() {
                     </Td>
                     <Td align="right">{r.price != null ? `$${r.price.toLocaleString("en-US")}` : <span className="text-adm-muted">Unknown</span>}</Td>
                     <Td align="right">
-                      <button type="button" onClick={(e) => { e.stopPropagation(); setDrawer(r); setReason(""); }} aria-label={`Review ${r.ymm}`} className="text-[14px] font-semibold text-adm-primary hover:underline">Review</button>
+                      <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setDrawer(r); setReason(""); }} aria-label={`Review ${r.ymm}`}>Review</Button>
                     </Td>
                   </tr>
                 );

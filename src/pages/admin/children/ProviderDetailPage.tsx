@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { ADMIN_CHILD_ROUTES, adminTabHref } from "@/lib/admin/sections";
-import { HEALTH_META } from "@/lib/admin/health";
+import { HEALTH_META, describeAge } from "@/lib/admin/health";
 import { PROVIDER_CARDS, providerDrillIn, aggregateEvents, type ProviderEventRow } from "@/lib/admin/integrations/providers";
 import { ChildPageFrame } from "@/components/admin/v2/AdminShell";
 import { EmptyState, KeyValueList, LinkButton, LocalTabs, MetricStrip, Panel, SkeletonBlock, StatusText, Td, Th, WorkTable } from "@/components/product";
@@ -81,13 +81,14 @@ export default function ProviderDetailPage() {
           metrics={[
             { label: "Entitlement", value: ENTITLEMENT_LABEL[card.entitlement], tone: card.entitlement === "entitled" ? "success" : card.entitlement === "unknown" || card.entitlement === "not_applicable" ? "neutral" : "danger" },
             { label: "Health", value: meta.label, tone: meta.tone },
-            { label: "Last success", value: card.lastSuccessAt ? formatAt(card.lastSuccessAt) : "None recorded" },
+            { label: "Last outcome", value: agg?.lastOutcome ? agg.lastOutcome.replace(/_/g, " ") : "None recorded" },
+            { label: "Last success", value: card.lastSuccessAt ? formatAt(card.lastSuccessAt) : "None recorded", hint: card.lastSuccessAt ? describeAge(card.lastSuccessAt, Date.now()) : undefined },
             { label: "Freshness window", value: freshness ?? "Not set" },
+            { label: "30-day calls", value: card.attempts === null ? "Unknown" : String(card.attempts) },
           ]}
         />
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px] items-start">
-          <div className="flex flex-col gap-4 min-w-0">
-            {tab === "overview" && (
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_320px] items-start">
+          {tab === "overview" ? (
               <Panel title="Capability details" titleSize="md" inset="sm">
                 <KeyValueList
                   rows={[
@@ -101,7 +102,7 @@ export default function ProviderDetailPage() {
                   ]}
                 />
               </Panel>
-            )}
+          ) : <div className="hidden xl:block" />}
             <Panel title="Recent attempts" titleSize="md" inset="sm" flush>
               {attempts.length === 0 ? (
                 <EmptyState title={data.events === null ? "Calls could not be read" : "No calls recorded"} detail={data.events === null ? "The call ledger did not answer. Nothing here is current." : "No call to this provider is recorded in the last 30 days."} compact />
@@ -123,9 +124,8 @@ export default function ProviderDetailPage() {
                 </WorkTable>
               )}
             </Panel>
-          </div>
           <aside aria-label="Guidance">
-            <Panel title="Status and guidance" titleSize="md" inset="sm">
+            <Panel title="Quota and guidance" titleSize="md" inset="sm">
               <div className="space-y-3">
                 <StatusText tone={meta.tone}>{meta.label}</StatusText>
                 <p className="text-[14px] font-semibold text-adm-ink">{card.verdict.headline}</p>

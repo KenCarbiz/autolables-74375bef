@@ -759,6 +759,17 @@ export default function FactoryStickerWorkspace({
                     Review publication
                   </button>
                 )}
+                {manager && !currentDoc && (
+                  <button
+                    type="button"
+                    onClick={() => act("orchestrate", { allowSourceFetch: true })}
+                    disabled={!!busy}
+                    className="inline-flex items-center gap-2 min-h-[40px] px-4 rounded-[6px] bg-adm-primary hover:bg-adm-primary-hover text-white text-[14px] font-semibold disabled:opacity-50"
+                  >
+                    {busy === "orchestrate" ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+                    Retrieve vehicle data
+                  </button>
+                )}
                 {manager && genStatus === "PUBLISHED" && (
                   <button
                     type="button"
@@ -781,7 +792,7 @@ export default function FactoryStickerWorkspace({
           <div className={fullscreen
             ? "fixed inset-0 z-50 bg-slate-900/95 p-6 overflow-auto"
             : "rounded-[6px] border border-adm-border bg-adm-surface p-4 space-y-3"}>
-            <div className={`flex items-center justify-between gap-2 flex-wrap ${fullscreen ? "mb-3" : ""}`}>
+            {pageSvg && <div className={`flex items-center justify-between gap-2 flex-wrap ${fullscreen ? "mb-3" : ""}`}>
               <div className="flex items-center gap-1.5 flex-wrap">
                 {([
                   ["Fit", "fit"],
@@ -849,7 +860,7 @@ export default function FactoryStickerWorkspace({
                   </>
                 )}
               </div>
-            </div>
+            </div>}
             {pageSvg ? (
               <div className={zoom === "fit" ? "" : "overflow-auto"}>
                 <div

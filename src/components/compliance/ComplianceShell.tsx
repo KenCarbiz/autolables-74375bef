@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo } from "react";
-import { Navigate, useLocation, useSearchParams } from "react-router-dom";
-import { RefreshCw } from "lucide-react";
+import { Link, Navigate, useLocation, useSearchParams } from "react-router-dom";
+import { Lock, RefreshCw } from "lucide-react";
 import { Button, InlineNote, LocalTabs, PageBody, PageHeader, type LocalTab } from "@/components/product";
 import { useTenant } from "@/contexts/TenantContext";
 import { COMPLIANCE_SECTIONS, isComplianceSection, type ComplianceSectionId } from "./complianceData";
@@ -88,17 +88,26 @@ export const ComplianceShell = ({ defaultSection }: { defaultSection: Compliance
 
   if (section === "vin-defense" && vinParam.length >= 11) return <Navigate to={vinDefenseHref(vinParam)} replace />;
 
+  const own = section === "titles" || section === "audit" || section === "library";
+  const header = {
+    titles: { title: "Titles & MCO", description: "Track ownership documents and title status for in-stock vehicles." },
+    audit: { title: "Audit Log", description: "The immutable event record for this store." },
+    library: { title: "Compliance Library", description: "Requirements the platform builds into your documents, with the authority behind each. Reference material, not legal advice: verify against the official source before relying on a row." },
+  }[section as "titles" | "audit" | "library"];
+
   return (
     <PageBody width="wide">
       <PageHeader
-        title={section === "audit" ? "Audit Log" : "Compliance"}
-        description={
-          section === "audit"
-            ? "The immutable event record for this store."
-            : "Monitor deal readiness, identify blockers, and manage regulatory requirements."
-        }
+        scope={own ? <Link to="/compliance" className="text-adm-primary hover:underline">Compliance</Link> : undefined}
+        title={own ? header.title : "Compliance"}
+        description={own ? header.description : "Monitor deal readiness, identify blockers, and manage regulatory requirements."}
         actions={
-          section === "audit" || section === "vin-defense" ? undefined : (
+          section === "titles" ? (
+            <div role="note" className="flex max-w-[420px] items-start gap-3 rounded-[6px] border border-[#F3B4AE] bg-adm-danger-bg px-4 py-2.5 text-[13px] leading-[18px] text-adm-danger">
+              <Lock className="mt-0.5 h-5 w-5 flex-shrink-0" aria-hidden="true" />
+              <span>Internal use only. These are private ownership documents. Do not share outside the dealership.</span>
+            </div>
+          ) : own || section === "vin-defense" ? undefined : (
             <Button onClick={data.refresh} disabled={data.loading}>
               <RefreshCw className={`h-5 w-5 ${data.loading ? "animate-spin" : ""}`} aria-hidden="true" /> Refresh
             </Button>
@@ -106,7 +115,7 @@ export const ComplianceShell = ({ defaultSection }: { defaultSection: Compliance
         }
       />
 
-      <LocalTabs label="Compliance sections" tabs={tabs} />
+      {!own && <LocalTabs label="Compliance sections" tabs={tabs} />}
 
       {data.error && (
         <InlineNote

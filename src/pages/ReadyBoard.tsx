@@ -25,7 +25,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 interface Row {
   id: string; vin: string; ymm: string | null; condition: string | null; status: string | null;
   recall_check: { do_not_drive?: boolean; checked_at?: string } | null; orchestrated_at: string | null;
-  deal_processed_at: string | null;
+  deal_processed_at: string | null; hero_image_url?: string | null;
 }
 const isUsed = (c: string | null) => ["used", "cpo", "certified"].includes(String(c || "used").toLowerCase());
 
@@ -72,7 +72,7 @@ export default function ReadyBoard() {
     setLoading(true);
     setLoadError(false);
     const [list, si, fails, ds, ps, rr, re, prof, lc] = await Promise.all([
-      (supabase as any).from("vehicle_listings").select("id, vin, ymm, condition, status, recall_check, orchestrated_at, deal_processed_at").eq("tenant_id", tenantId).neq("status", "archived").limit(500),
+      (supabase as any).from("vehicle_listings").select("id, vin, ymm, condition, status, recall_check, orchestrated_at, deal_processed_at, hero_image_url").eq("tenant_id", tenantId).neq("status", "archived").limit(500),
       // All signed rows, reduced through the ONE executed predicate — a signed
       // FAIL (or a stale pass behind a newer signed failure) must not read as
       // station-complete on the board.
@@ -371,12 +371,19 @@ export default function ReadyBoard() {
                 return (
                   <tr key={r.vin} className="h-14 hover:bg-adm-workspace">
                     <Td className="max-w-[300px]">
-                      <div className="flex items-center gap-2 font-semibold text-adm-ink">
-                        <span className="truncate">{r.ymm || "Vehicle"}</span>
-                        {isToday(r) && <StatusText tone="info">New</StatusText>}
-                        {staleVins.has(r.vin) && <span title="Get-Ready changed since acceptance"><StatusText tone="warning">Changed</StatusText></span>}
+                      <div className="flex items-center gap-3">
+                        {r.hero_image_url
+                          ? <img src={r.hero_image_url} alt="" className="h-10 w-14 shrink-0 rounded-[4px] border border-adm-border object-cover" />
+                          : <span className="h-10 w-14 shrink-0 rounded-[4px] bg-adm-workspace" aria-hidden="true" />}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 font-semibold text-adm-ink">
+                            <span className="truncate">{r.ymm || "Vehicle"}</span>
+                            {isToday(r) && <StatusText tone="info">New</StatusText>}
+                            {staleVins.has(r.vin) && <span title="Get-Ready changed since acceptance"><StatusText tone="warning">Changed</StatusText></span>}
+                          </div>
+                          <div className="truncate font-mono text-[12px] text-adm-muted">{r.vin}</div>
+                        </div>
                       </div>
-                      <div className="truncate font-mono text-[12px] text-adm-muted">{r.vin}</div>
                     </Td>
                     <Td className="whitespace-nowrap">{stage}</Td>
                     <Td className="whitespace-nowrap tabular-nums text-adm-muted">{done} of {stations.length}</Td>
@@ -393,13 +400,13 @@ export default function ReadyBoard() {
                     </Td>
                     <Td className="whitespace-nowrap">
                       {primary ? (
-                        <button type="button" onClick={primary.run} disabled={primary.busy} className="text-[14px] font-semibold text-adm-primary hover:underline disabled:opacity-50">
+                        <Button size="sm" variant="outline" onClick={primary.run} disabled={primary.busy}>
                           {primary.busy ? "Working…" : primary.label}
-                        </button>
+                        </Button>
                       ) : bucketOf(r) === "ready" && r.deal_processed_at ? (
                         <StatusText tone="success">Filed</StatusText>
                       ) : (
-                        <button type="button" onClick={() => navigate(`/vehicle-file/${r.id}?tab=getready`)} className="text-[14px] font-semibold text-adm-primary hover:underline">View</button>
+                        <Button size="sm" onClick={() => navigate(`/vehicle-file/${r.id}?tab=getready`)}>View</Button>
                       )}
                     </Td>
                     <Td align="right">

@@ -37,6 +37,7 @@ const PagePreview = ({ type, cal, active }: { type: StickerType; cal: PrintCalib
   const w = spec.widthIn * PX_PER_IN;
   const h = spec.heightIn * PX_PER_IN;
   const pad = 34;
+  const narrow = w < 150;
   const inset = Math.max(cal.leftSafeMarginIn, 0) * PX_PER_IN;
   const top = Math.max(cal.topSafeMarginIn, 0) * PX_PER_IN;
   const dx = num(cal.xOffsetIn) * PX_PER_IN;
@@ -48,8 +49,12 @@ const PagePreview = ({ type, cal, active }: { type: StickerType; cal: PrintCalib
         <rect x={pad} y={pad} width={w} height={h} fill="#fff" stroke="#8A94A6" />
         <g transform={`translate(${dx} ${dy})`}>
           <rect x={pad + inset} y={pad + top} width={Math.max(w - inset * 2, 0) * s} height={Math.max(h - top * 2, 0) * s} fill="#F3F6FC" stroke="#2457D6" strokeDasharray="4 3" />
-          <text x={pad + w / 2} y={pad + h / 2 - 6} textAnchor="middle" fontSize="11" fontWeight="600" fill="#1D2433">AutoLabels Test Page</text>
-          <text x={pad + w / 2} y={pad + h / 2 + 10} textAnchor="middle" fontSize="9" fill="#5B6578">Margins match the printed output</text>
+          {(narrow ? ["AutoLabels", "Test Page"] : ["AutoLabels Test Page"]).map((line, i) => (
+            <text key={line} x={pad + w / 2} y={pad + h / 2 - 6 + i * 13} textAnchor="middle" fontSize="11" fontWeight="600" fill="#1D2433">{line}</text>
+          ))}
+          {(narrow ? ["Margins match", "the printed output"] : ["Margins match the printed output"]).map((line, i) => (
+            <text key={line} x={pad + w / 2} y={pad + h / 2 + (narrow ? 22 : 10) + i * 11} textAnchor="middle" fontSize="9" fill="#5B6578">{line}</text>
+          ))}
         </g>
         <line x1={pad} y1={pad - 14} x2={pad + w} y2={pad - 14} stroke="#8A94A6" />
         <text x={pad + w / 2} y={pad - 19} textAnchor="middle" fontSize="11" fill="#1D2433">{spec.widthIn} in</text>

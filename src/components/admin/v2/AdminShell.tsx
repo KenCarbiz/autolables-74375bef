@@ -1,12 +1,13 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AdminChildTab, AdminSection, AdminSectionId } from "@/lib/admin/sections";
-import { adminTabHref } from "@/lib/admin/sections";
+import { ADMIN_SECTIONS, adminTabHref, firstVisibleTab, visibleSections } from "@/lib/admin/sections";
+import { useAdminVisibility } from "./useAdminVisibility";
 import { ScrollRegion } from "./ScrollRegion";
 
-// One Administration page: one h1, at most one row of child tabs, then content. The breadcrumb and description show only on the
+// One Administration page: one h1, the eight-section row, at most one row of child tabs, then content. The breadcrumb and description show only on the
 // sections whose approved mock draws them (AdminSection.intro). Child detail screens use
 // ChildPageFrame, which carries its own h1 and breadcrumb, so a page never has
 // two titles or two navigation systems.
@@ -40,12 +41,15 @@ export const AdminSectionNav = ({ sections, activeId, tabFor, ariaLabel = "Admin
 );
 
 export const AdminChildTabs = ({ tabs, activeId, ariaLabel }: { tabs: AdminChildTab[]; activeId: string; ariaLabel: string }) => {
+  const [showMore, setShowMore] = useState(false);
   if (tabs.length <= 1) return null;
+  const shown = tabs.filter((t) => showMore || !t.unpictured || t.id === activeId);
+  const more = tabs.filter((t) => t.unpictured && t.id !== activeId);
   return (
     <nav aria-label={ariaLabel} className="border-b border-adm-border">
       <ScrollRegion label={ariaLabel} tone="workspace" revealSelector='[aria-current="page"]'>
       <ul className="flex items-stretch gap-9 min-w-max">
-        {tabs.map((t) => {
+        {shown.map((t) => {
           const active = t.id === activeId;
           return (
             <li key={t.id}>
@@ -62,6 +66,11 @@ export const AdminChildTabs = ({ tabs, activeId, ariaLabel }: { tabs: AdminChild
             </li>
           );
         })}
+        {more.length > 0 && !showMore && (
+          <li>
+            <button type="button" onClick={() => setShowMore(true)} className="inline-flex items-center h-10 text-[14px] leading-[20px] font-medium text-adm-muted hover:text-adm-ink whitespace-nowrap">More</button>
+          </li>
+        )}
       </ul>
       </ScrollRegion>
     </nav>
@@ -97,33 +106,47 @@ export const AdminPageContainer = ({ children, className }: { children: ReactNod
 );
 
 export const AdminShell = ({
+  sections,
   activeSection,
   activeTab,
   tabsForSection,
+  firstTabFor,
   children,
 }: {
-  sections?: AdminSection[];
+  sections: AdminSection[];
   activeSection: AdminSection;
   activeTab: AdminChildTab;
   tabsForSection: AdminChildTab[];
-  firstTabFor?: (s: AdminSection) => AdminChildTab | null;
+  firstTabFor: (s: AdminSection) => AdminChildTab | null;
   children: ReactNode;
-}) => (
-  <AdminPageContainer>
-    <div className="space-y-4">
-      <div>
-        {activeSection.id !== "overview" && <Breadcrumbs crumbs={[{ label: "Administration", href: "/admin" }, { label: activeSection.label }]} />}
-        <h1 className={cn("text-[28px] leading-[36px] font-bold text-adm-ink", activeSection.id !== "overview" && "mt-1")}>{activeSection.id === "overview" ? "Administration" : activeSection.heading ?? activeSection.label}</h1>
-        <p className="mt-0.5 text-[14px] leading-[20px] text-adm-muted">{activeSection.description}</p>
+}) => {
+  const isOverview = activeSection.id === "overview";
+  const title = activeSection.heading ?? "Administration";
+  return (
+    <AdminPageContainer>
+      <div className="space-y-4">
+        <div>
+          {activeSection.intro?.breadcrumb && <Breadcrumbs crumbs={[{ label: "Administration", href: "/admin" }, { label: isOverview ? "Overview" : activeSection.label }]} />}
+          <h1 className={cn("text-[28px] leading-[36px] lg:text-[32px] lg:leading-[40px] font-bold text-adm-ink", activeSection.intro?.breadcrumb && "mt-1")}>{title}</h1>
+          {activeSection.intro?.description && <p className="mt-0.5 text-[14px] leading-[20px] text-adm-muted">{activeSection.description}</p>}
+        </div>
+        <AdminSectionNav sections={sections} activeId={activeSection.id} tabFor={firstTabFor} />
+        {activeSection.subheading && <h2 className="text-[24px] leading-[32px] font-bold text-adm-ink !mt-5">{activeSection.subheading}</h2>}
+        <AdminChildTabs tabs={tabsForSection} activeId={activeTab.id} ariaLabel={`${activeSection.label} views`} />
+        <div>{children}</div>
       </div>
-      <AdminChildTabs tabs={tabsForSection} activeId={activeTab.id} ariaLabel={`${activeSection.label} views`} />
-      <div>{children}</div>
-    </div>
-  </AdminPageContainer>
-);
+    </AdminPageContainer>
+  );
+};
 
-// Child detail screens: breadcrumb, the child's h1 and back link, then the
-// child's own single tab row and content.
+const ChildSectionNav = ({ section }: { section: AdminSectionId }) => {
+  const { ctx } = useAdminVisibility();
+  const visible = visibleSections(ctx);
+  return <AdminSectionNav sections={visible.length ? visible : [...ADMIN_SECTIONS]} activeId={section} tabFor={(s) => firstVisibleTab(s, ctx) ?? s.tabs[0]} />;
+};
+
+// Child detail screens: optionally the section row (sectionRow), then breadcrumb, the
+// child's h1 and back link, then the child's own tabs and content.
 export const ChildPageFrame = ({
   crumbs,
   title,
@@ -131,6 +154,8 @@ export const ChildPageFrame = ({
   subtitle,
   backHref,
   backLabel,
+  section,
+  sectionRow,
   tabs,
   actions,
   children,
@@ -143,6 +168,8 @@ export const ChildPageFrame = ({
   backLabel?: string;
   /** The parent section the breadcrumb leads back to. */
   section?: AdminSectionId;
+  /** Where the approved mock draws the section row: under an "Administration" title above the breadcrumb, or between the child header and its tabs. */
+  sectionRow?: "above" | "below";
   /** A child's own tab row, when it has one. */
   tabs?: ReactNode;
   actions?: ReactNode;
@@ -150,6 +177,12 @@ export const ChildPageFrame = ({
 }) => (
   <AdminPageContainer>
     <div className="space-y-4">
+      {section && sectionRow === "above" && (
+        <>
+          <div className="text-[28px] leading-[36px] lg:text-[32px] lg:leading-[40px] font-bold text-adm-ink">Administration</div>
+          <ChildSectionNav section={section} />
+        </>
+      )}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <Breadcrumbs crumbs={crumbs} />
@@ -169,6 +202,7 @@ export const ChildPageFrame = ({
           )}
         </div>
       </div>
+      {section && sectionRow === "below" && <ChildSectionNav section={section} />}
       {tabs}
       <div className="pt-1">{children}</div>
     </div>

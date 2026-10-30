@@ -4,7 +4,6 @@ import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { resolveOperatingState } from "@/lib/dealerState";
 import { Button, EmptyState, Panel, StatusText, Td, Th, WorkTable, type Tone } from "@/components/product";
-import { SectionHeading } from "./primitives";
 import { ALL, filterLibrary, libraryRows, type LibraryType } from "./libraryData";
 
 const TYPE_TONE: Record<LibraryType, Tone> = {
@@ -37,11 +36,6 @@ export const LibrarySection = () => {
 
   return (
     <div className="space-y-4">
-      <SectionHeading
-        title="Library"
-        description="Requirements the platform builds into your documents, with the authority behind each. Reference material, not legal advice: verify against the official source before relying on a row."
-      />
-
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-[14px] text-adm-muted">
           Jurisdiction

@@ -131,13 +131,22 @@ export const SectionTitle = ({ title, description, action, as: Tag = "h2" }: { t
   </div>
 );
 
+const STAT_ACCENT = {
+  blue: "bg-[#E8EFFD] text-[#2457D6]",
+  green: "bg-[#E3F5EB] text-[#1E8E4E]",
+  purple: "bg-[#EEE9FB] text-[#6B4FC9]",
+  red: "bg-[#FDE7E5] text-[#C62828]",
+} as const;
+
+export type StatAccent = keyof typeof STAT_ACCENT;
+
 export const StatTile = ({
   icon: Icon,
   label,
   value,
   hint,
   href,
-  tone = "neutral",
+  accent = "blue",
   ariaLabel,
 }: {
   icon?: typeof Info;
@@ -145,21 +154,25 @@ export const StatTile = ({
   value: ReactNode;
   hint?: ReactNode;
   href?: string;
-  tone?: Tone;
+  accent?: StatAccent;
   ariaLabel?: string;
 }) => {
   const body = (
     <>
-      {Icon && <Icon className={cn(ICON.inline, "flex-shrink-0 text-adm-muted")} aria-hidden="true" />}
+      {Icon && (
+        <span className={cn("flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full", STAT_ACCENT[accent])}>
+          <Icon className={ICON.inCircle} aria-hidden="true" />
+        </span>
+      )}
       <span className="min-w-0 flex-1">
-        <span className="block text-[13px] leading-[18px] text-adm-muted">{label}</span>
-        <span className={cn("block text-[24px] leading-[32px] font-bold tabular-nums truncate", tone === "danger" ? "text-adm-danger" : "text-adm-ink")}>{value}</span>
-        {hint && <span className="block text-[12px] leading-[18px] text-adm-muted mt-0.5 truncate">{hint}</span>}
+        <span className="block text-[14px] leading-[20px] text-adm-muted">{label}</span>
+        <span className="block text-[30px] leading-[36px] font-bold tabular-nums truncate text-adm-ink">{value}</span>
+        {hint && <span className="block text-[12px] leading-[18px] text-adm-muted truncate">{hint}</span>}
       </span>
       {href && <ChevronRight className={cn(ICON.chevron, "text-adm-muted flex-shrink-0")} aria-hidden="true" />}
     </>
   );
-  const cls = "flex items-center gap-3 border-l border-adm-border px-5 py-2 min-h-[64px] first:border-l-0";
+  const cls = "flex items-center gap-4 rounded-[6px] border border-adm-border bg-adm-surface px-4 py-3 min-h-[80px]";
   return href ? (
     <Link to={href} className={cn(cls, "hover:border-adm-primary/60 focus-visible:outline-2 focus-visible:outline-adm-primary")} aria-label={ariaLabel ?? `${label}: ${typeof value === "string" || typeof value === "number" ? value : ""}`}>
       {body}

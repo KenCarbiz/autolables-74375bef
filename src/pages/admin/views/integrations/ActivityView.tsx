@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Download, ShieldCheck } from "lucide-react";
 import { useViewFixture } from "@/lib/admin/dataSource";
-import { ACTIVITY_KIND_META, activityTone, actorLabel, classifyAuditAction, entityLabel, humanizeAction, type ActivityKind, type AuditRow } from "@/lib/admin/integrations/activity";
+import { ACTIVITY_KIND_META, activityTone, actorLabel, classifyAuditAction, activityLabel, entityKindLabel, type ActivityKind, type AuditRow } from "@/lib/admin/integrations/activity";
 import { pageSlice, pageWindow } from "@/lib/admin/integrations/feed";
 import { loadActivityExport, loadActivityPage, verifyAuditChain, type ChainVerification } from "@/lib/admin/integrations/queries";
 import { AdminButton, AdminCard, AdminTable, InlineNote, SectionTitle, SkeletonBlock, StatusChip, Td, Th } from "@/components/admin/v2/primitives";
@@ -157,8 +157,8 @@ export default function ActivityView() {
                     <tr key={r.id}>
                       <Td className="whitespace-nowrap tabular-nums">{formatAt(r.created_at, { withSeconds: true })}</Td>
                       <Td><StatusChip tone={ACTIVITY_KIND_META[k].tone}>{ACTIVITY_KIND_META[k].label}</StatusChip></Td>
-                      <Td><span className={cn("font-semibold", tone === "warning" ? "text-adm-warning" : tone === "success" ? "text-adm-success" : "text-adm-ink")}>{humanizeAction(r.action)}</span></Td>
-                      <Td className="text-adm-muted font-mono text-[12px]">{entityLabel(r)}</Td>
+                      <Td><span className={cn("font-semibold", tone === "warning" ? "text-adm-warning" : tone === "success" ? "text-adm-success" : "text-adm-ink")}>{activityLabel(r.action)}</span></Td>
+                      <Td className="text-adm-muted text-[13px]">{entityKindLabel(r.entity_type)}</Td>
                       <Td className="text-adm-muted">{actorLabel(r)}</Td>
                     </tr>
                   );

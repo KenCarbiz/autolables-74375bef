@@ -5,10 +5,9 @@ import { AlertTriangle, ArrowUpRight, CheckCircle2, ChevronRight } from "lucide-
 import VehicleTruthCard from "@/components/vehicle/VehicleTruthCard";
 import { listingGallery } from "@/lib/photos";
 import { Link } from "react-router-dom";
-import { FactStrip, SummaryList } from "@/components/detail/parts";
+import { SummaryList } from "@/components/detail/parts";
 import { Card, EmptyNote, StatRow, btn, fmtWhen } from "./primitives";
 import { type LifecycleResult } from "./lifecycle";
-import { STATE_LABEL, STATE_NEXT_ACTION, STATE_OWNER } from "@/lib/lifecycle/states";
 import DescriptionCard from "./DescriptionCard";
 import { type ReadinessSummary, type TabId, type VehicleRow } from "./types";
 
@@ -58,16 +57,15 @@ export const OverviewTab = ({ vehicle, ready, lifecycle, stockNumber, onTab, onR
   onTab: (t: TabId) => void;
   onReload: () => void;
 }) => {
-  const { row: lifecycleRow, loading: lifecycleLoading, tracked } = lifecycle;
+  const { tracked } = lifecycle;
   const interest = useCustomerInterest(vehicle);
   const [repulling, setRepulling] = useState(false);
   const gallery = listingGallery(vehicle);
   const videos = vehicle.videos || [];
-  const state = lifecycleRow?.state ?? null;
 
   const infoPairs: { label: string; value: React.ReactNode }[] = [
     { label: "VIN", value: <span className="font-mono">{vehicle.vin}</span> },
-    { label: "Year / make / model", value: vehicle.ymm || "Needs VIN decode" },
+    { label: "Model", value: vehicle.ymm || "Needs VIN decode" },
     { label: "Trim", value: vehicle.trim || "Not decoded" },
     { label: "Stock #", value: stockNumber || "Not on the feed" },
     { label: "Condition", value: <span className="capitalize">{vehicle.condition || "unknown"}</span> },
@@ -100,24 +98,8 @@ export const OverviewTab = ({ vehicle, ready, lifecycle, stockNumber, onTab, onR
     }
   };
 
-  const daysInStock = Math.max(0, Math.floor((Date.now() - new Date(vehicle.created_at).getTime()) / 86400000));
-  const nextAction = state ? STATE_NEXT_ACTION[state] : tracked ? "Wait for the first lifecycle recompute after intake" : "Build this vehicle's documents and publish it";
-
   return (
     <div className="space-y-6">
-      <FactStrip
-        label="Vehicle summary"
-        className="lg:grid-cols-6"
-        facts={[
-          { label: "Owner", value: state ? STATE_OWNER[state] : tracked ? "Inventory intake" : "Merchandising" },
-          { label: "Condition", value: <span className="capitalize">{vehicle.condition || "Unknown"}</span> },
-          { label: "State", value: lifecycleLoading ? "Reading" : !tracked ? "Not tracked" : state ? STATE_LABEL[state] : "No record" },
-          { label: "Price", value: vehicle.price != null ? `$${vehicle.price.toLocaleString()}` : "Not priced" },
-          { label: "Days in inventory", value: String(daysInStock) },
-          { label: "Next action", value: nextAction },
-        ]}
-      />
-
       <div className="grid gap-6 lg:grid-cols-3 lg:items-start">
         <Card title="Vehicle details" action={
           <button onClick={repullMarket} disabled={repulling} className="text-[14px] font-semibold text-adm-primary hover:underline disabled:opacity-50" title="Re-pull market value, comparables, days-supply, recalls, VIN history and Black Book for this VIN">

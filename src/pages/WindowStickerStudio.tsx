@@ -39,6 +39,8 @@ interface VehicleHit {
   status: string | null;
   slug: string | null;
   stock_number?: string | null;
+  mileage?: number | null;
+  hero_image_url?: string | null;
 }
 
 interface HistoryRow {
@@ -79,7 +81,7 @@ function StepRail({ active }: { active: number }) {
         return (
           <li key={s.n} aria-current={state === "current" ? "step" : undefined} className={`flex items-center gap-2 ${i < STEPS.length - 1 ? "flex-1" : ""}`}>
             <span aria-hidden className={`w-8 h-8 rounded-full grid place-items-center text-[14px] font-bold shrink-0 border ${
-              state === "done" ? "bg-adm-success border-adm-success text-white" : state === "current" ? "bg-adm-primary border-adm-primary text-white" : "bg-adm-surface border-adm-border text-adm-muted"
+              state === "done" ? "bg-adm-selected border-adm-primary text-adm-primary" : state === "current" ? "bg-adm-primary border-adm-primary text-white" : "bg-adm-surface border-adm-border text-adm-muted"
             }`}>
               {state === "done" ? <Check className="w-5 h-5" /> : s.n}
             </span>
@@ -158,7 +160,7 @@ export default function WindowStickerStudio() {
       // deno-lint-ignore no-explicit-any
       let q = (supabase as any)
         .from("vehicle_listings")
-        .select("id, vin, ymm, condition, status, slug")
+        .select("id, vin, ymm, condition, status, slug, mileage, hero_image_url")
         .eq("tenant_id", tenantId)
         .order("updated_at", { ascending: false })
         .limit(25);
@@ -255,6 +257,7 @@ export default function WindowStickerStudio() {
   const modeTabs: LocalTab[] = [
     { key: "inventory", label: "Search inventory", to: "#", active: mode === "inventory" },
     { key: "vin", label: "Create by VIN", to: "#", active: mode === "vin" },
+    { key: "history", label: "History", to: "#", active: false },
   ];
 
   return (
@@ -262,9 +265,7 @@ export default function WindowStickerStudio() {
       <PageHeader
         title="Window Sticker Studio"
         description="Create and publish factory window stickers for your inventory."
-        actions={tab === "history"
-          ? <Button onClick={() => setTab("create")}>Back to studio</Button>
-          : <Button onClick={() => setTab("history")}>History</Button>}
+        actions={tab === "history" ? <Button onClick={() => setTab("create")}>Back to studio</Button> : undefined}
       />
 
       {tab === "create" && (
@@ -291,7 +292,7 @@ export default function WindowStickerStudio() {
               <h2 className="text-[17px] leading-[24px] font-semibold text-adm-ink">Select vehicle</h2>
               <nav aria-label="Vehicle source" className="flex gap-6 border-b border-adm-border">
                 {modeTabs.map((t) => (
-                  <button key={t.key} type="button" onClick={() => setMode(t.key as "inventory" | "vin")} aria-current={t.active ? "page" : undefined}
+                  <button key={t.key} type="button" onClick={() => (t.key === "history" ? setTab("history") : setMode(t.key as "inventory" | "vin"))} aria-current={t.active ? "page" : undefined}
                     className={`-mb-px h-10 border-b-2 text-[14px] font-semibold ${t.active ? "border-adm-primary text-adm-primary" : "border-transparent text-adm-muted hover:text-adm-ink"}`}>
                     {t.label}
                   </button>
@@ -330,11 +331,14 @@ export default function WindowStickerStudio() {
 
                   {picked ? (
                     <div className="flex items-center justify-between gap-4 rounded-[6px] border border-adm-border bg-adm-surface px-4 py-3">
-                      <div className="min-w-0">
+                      {picked.hero_image_url
+                        ? <img src={picked.hero_image_url} alt="" className="h-[64px] w-[96px] shrink-0 rounded-[4px] border border-adm-border object-cover" />
+                        : <span className="h-[64px] w-[96px] shrink-0 rounded-[4px] bg-adm-workspace" aria-hidden="true" />}
+                      <div className="min-w-0 flex-1">
                         <p className="text-[12px] leading-[18px] text-adm-muted">{picked.stock_number ? `Stock ${picked.stock_number}` : "No stock number"}</p>
                         <p className="text-[17px] leading-[24px] font-semibold text-adm-ink truncate">{picked.ymm || "Vehicle"}</p>
                         <p className="text-[13px] leading-[18px] text-adm-muted truncate">
-                          VIN {picked.vin || "Unknown"}{picked.condition ? ` | ${humanize(picked.condition)}` : ""}
+                          VIN {picked.vin || "Unknown"}{picked.condition ? ` | ${humanize(picked.condition)}` : ""}{picked.mileage != null ? ` | ${picked.mileage.toLocaleString("en-US")} mi` : ""}
                         </p>
                       </div>
                       <Button onClick={() => setPicked(null)}>Change</Button>
@@ -352,9 +356,13 @@ export default function WindowStickerStudio() {
                           onClick={() => setPicked(v)}
                           className="w-full text-left h-14 px-4 hover:bg-adm-workspace flex items-center justify-between gap-3"
                         >
+                          {v.hero_image_url
+                            ? <img src={v.hero_image_url} alt="" className="h-10 w-14 shrink-0 rounded-[4px] border border-adm-border object-cover" />
+                            : <span className="h-10 w-14 shrink-0 rounded-[4px] bg-adm-workspace" aria-hidden="true" />}
                           <span className="min-w-0 flex-1 truncate text-[14px] leading-[20px] font-semibold text-adm-ink">{v.ymm || "Vehicle"}</span>
-                          <span className="hidden sm:block w-[280px] truncate text-[13px] text-adm-muted font-mono">{v.vin || "no VIN"}</span>
-                          <span className="hidden md:block w-[120px] truncate text-[13px] text-adm-muted">{v.condition ? humanize(v.condition) : "Unknown"}</span>
+                          <span className="hidden md:block w-[100px] truncate text-[13px] text-adm-muted tabular-nums">{v.mileage != null ? `${v.mileage.toLocaleString("en-US")} mi` : "Unknown"}</span>
+                          <span className="hidden sm:block w-[200px] truncate text-[13px] text-adm-muted font-mono">{v.vin || "no VIN"}</span>
+                          <span className="hidden md:block w-[100px] truncate text-[13px] text-adm-muted">{v.condition ? (v.condition === "cpo" ? "CPO" : humanize(v.condition)) : "Unknown"}</span>
                           <ArrowRight className="w-5 h-5 text-adm-muted shrink-0" />
                         </button>
                       ))}

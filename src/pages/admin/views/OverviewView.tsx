@@ -9,6 +9,7 @@ import { useViewFixture, useAdminNow } from "@/lib/admin/dataSource";
 import { ADMIN_SECTIONS, adminTabHref } from "@/lib/admin/sections";
 import { buildAttentionQueue, ATTENTION_STATUS_META, type AttentionItem } from "@/lib/admin/attention";
 import { deriveEffectivePolicy, deriveRoutingReadiness, type EffectivePolicyRow } from "@/lib/admin/effectivePolicy";
+import { activityLabel, entityKindLabel } from "@/lib/admin/integrations/activity";
 import { classifyRunOutcome, countDisplay, deriveFeedHealth, describeAge, HEALTH_META, knownCount, needsAttention, type CountValue, type HealthVerdict, type HealthTone } from "@/lib/admin/health";
 import { AdminCard, AdminLinkButton, AdminTable, InlineNote, StatTile, StatusChip, Td, Th } from "@/components/admin/v2/primitives";
 
@@ -69,7 +70,6 @@ const toneForAction = (action: string): ActivityRow["tone"] => {
   return "neutral";
 };
 
-const humanize = (s: string) => s.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 
 /** The activity list's short relative time: 24m ago, 2h ago, 1d ago. */
 const compactAge = (iso: string, now: number): string => {
@@ -119,8 +119,8 @@ async function loadOverview(tenantId: string, now: number): Promise<LiveOverview
     const { data } = await db.from("audit_log").select("id, action, entity_type, entity_id, created_at, details").eq("store_id", tenantId).order("created_at", { ascending: false }).limit(5);
     activity = ((data as Array<{ id: string; action: string; entity_type: string | null; entity_id: string | null; created_at: string }>) ?? []).map((r) => ({
       id: r.id,
-      action: humanize(r.action),
-      detail: [r.entity_type, r.entity_id ? r.entity_id.slice(0, 8) : null].filter(Boolean).join(" · "),
+      action: activityLabel(r.action),
+      detail: entityKindLabel(r.entity_type),
       at: r.created_at,
       tone: toneForAction(r.action),
     }));
@@ -246,10 +246,10 @@ export default function OverviewView() {
         )}
 
         <div className={TILE_GRID}>
-          <StatTile icon={CarFront} label="Active inventory" value={countDisplay(activeInventory)} href="/inventory" tone="info" />
-          <StatTile icon={SquareCheckBig} label="Setup" value={setup ? `${setup.done} of ${setup.total}` : "Unknown"} href={adminTabHref("identity")} tone="success" />
-          <StatTile icon={FileText} label="Policy reviews" value={countDisplay(policyReviews)} href="/dashboard/document-review" tone="info" />
-          <StatTile icon={AlertTriangle} label="Open exceptions" value={countDisplay(openExceptions)} href="/admin/exceptions" tone="danger" />
+          <StatTile icon={CarFront} label="Active inventory" value={countDisplay(activeInventory)} href="/inventory" accent="blue" />
+          <StatTile icon={SquareCheckBig} label="Setup" value={setup ? `${setup.done} of ${setup.total}` : "Unknown"} href={adminTabHref("identity")} accent="green" />
+          <StatTile icon={FileText} label="Policy reviews" value={countDisplay(policyReviews)} href="/dashboard/document-review" accent="purple" />
+          <StatTile icon={AlertTriangle} label="Open exceptions" value={countDisplay(openExceptions)} href="/admin/exceptions" accent="red" />
         </div>
       </div>
 

@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import type { ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   AlertTriangle, ArrowUpRight, CheckCircle2, Clock, Lock, Unlock, Wrench,
 } from "lucide-react";
-import { Card, DeepLink, EmptyNote, Pair, Section, TabHeader, btn, fmtWhen, sinceLabel } from "./primitives";
+import { Card, DeepLink, EmptyNote, Section, btn, fmtWhen } from "./primitives";
+import { VehicleSubHeader } from "./SubPageHeader";
+import { Button } from "@/components/product";
 import {
   OFF_RAIL, RAIL, stageStates, type LifecycleResult, type StageState,
 } from "./lifecycle";
-import {
-  STATE_LABEL, STATE_NEXT_ACTION, STATE_OWNER, type LifecycleState,
-} from "@/lib/lifecycle/states";
+import { STATE_LABEL, type LifecycleState } from "@/lib/lifecycle/states";
 import type { ReadinessSummary, VehicleRow } from "./types";
 
 interface PrepRow {
@@ -37,9 +38,9 @@ interface GateEvent {
 }
 
 const STAGE_DOT: Record<StageState, string> = {
-  done: "bg-emerald-500 text-emerald-50 border-emerald-500",
-  current: "bg-primary text-primary-foreground border-primary",
-  future: "bg-muted text-muted-foreground border-border",
+  done: "bg-adm-selected text-adm-primary border-adm-primary",
+  current: "bg-adm-primary text-white border-adm-primary",
+  future: "bg-adm-workspace text-adm-muted border-adm-border",
 };
 
 const RailStrip = ({ state }: { state: LifecycleState | null }) => {
@@ -51,21 +52,19 @@ const RailStrip = ({ state }: { state: LifecycleState | null }) => {
         return (
           <li key={stage.key} className="flex-1 min-w-0 flex sm:flex-col items-center sm:items-stretch gap-3 sm:gap-0">
             <div className="flex items-center sm:justify-center gap-0 shrink-0">
-              {i > 0 && <span className={`hidden sm:block h-0.5 flex-1 ${s === "future" ? "bg-border" : "bg-emerald-500"}`} />}
-              <span className={`w-7 h-7 rounded-full border-2 inline-flex items-center justify-center shrink-0 ${STAGE_DOT[s]}`}>
-                {s === "done"
-                  ? <CheckCircle2 className="w-4 h-4" />
-                  : <span className="text-al-meta font-bold tabular-nums">{i + 1}</span>}
+              {i > 0 && <span className={`hidden sm:block h-0.5 flex-1 ${s === "future" ? "bg-adm-border" : "bg-adm-primary"}`} />}
+              <span className={`w-8 h-8 rounded-full border inline-flex items-center justify-center shrink-0 ${STAGE_DOT[s]}`}>
+                <span className="text-[13px] font-bold tabular-nums">{i + 1}</span>
               </span>
-              {i < RAIL.length - 1 && <span className={`hidden sm:block h-0.5 flex-1 ${states[RAIL[i + 1].key] === "future" ? "bg-border" : "bg-emerald-500"}`} />}
+              {i < RAIL.length - 1 && <span className={`hidden sm:block h-0.5 flex-1 ${states[RAIL[i + 1].key] === "future" ? "bg-adm-border" : "bg-adm-primary"}`} />}
             </div>
             <div className="min-w-0 sm:text-center sm:mt-2">
               <p className={`text-al-body font-semibold truncate ${
-                s === "current" ? "text-foreground" : s === "done" ? "text-emerald-700" : "text-muted-foreground"
+                s === "current" ? "text-adm-ink" : s === "done" ? "text-adm-ink" : "text-adm-muted"
               }`}>
                 {stage.label}
               </p>
-              <p className="text-al-meta text-muted-foreground truncate">
+              <p className="text-[12px] leading-[18px] text-adm-muted truncate">
                 {s === "done" ? "Confirmed" : s === "current" ? "In progress" : "Not started"}
               </p>
             </div>
@@ -115,7 +114,7 @@ const PrepCard = ({ row, onOpen }: { row: PrepRow; onOpen: () => void }) => {
   );
 };
 
-export const GetReadyTab = ({ vehicle, lifecycle, ready }: { vehicle: VehicleRow; lifecycle: LifecycleResult; ready?: ReadinessSummary }) => {
+export const GetReadyTab = ({ vehicle, lifecycle, ready, strip }: { vehicle: VehicleRow; lifecycle: LifecycleResult; ready?: ReadinessSummary; strip?: ReactNode }) => {
   const navigate = useNavigate();
   const { row, loading, error, tracked } = lifecycle;
   const [prep, setPrep] = useState<PrepRow[]>([]);
@@ -155,13 +154,16 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready }: { vehicle: VehicleRow
   const unlocked = !!latestPrep?.listing_unlocked;
 
   const header = (
-    <TabHeader
-      title="Get Ready"
-      description={<>Where this vehicle stands in the stored lifecycle, who owns the current stage, and what has to happen next. The work itself is done on the specialist screens.</>}
-      action={
-        <button onClick={() => navigate(`/get-ready-command/${vehicle.id}`)} className={btn}>
-          Open Get Ready Command <ArrowUpRight className="w-3.5 h-3.5" />
-        </button>
+    <VehicleSubHeader
+      vehicle={vehicle}
+      section="Get ready"
+      title="Vehicle get ready"
+      description="Move this vehicle through each stage to become retail ready."
+      strip={strip}
+      actions={
+        <Button variant="primary" onClick={() => navigate(`/get-ready-command/${vehicle.id}`)}>
+          Open Get Ready Command <ArrowUpRight className="w-5 h-5" />
+        </Button>
       }
     />
   );
@@ -231,7 +233,7 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready }: { vehicle: VehicleRow
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
             <div className="min-w-0 flex flex-col gap-4">
           {ready && (
-        <Card title="Checklist">
+        <Card title="Checklist" action={<span className="text-[13px] text-adm-muted tabular-nums">{ready.done} of {ready.checks.length} complete</span>}>
           <ul className="divide-y divide-adm-border">
             {ready.checks.map((c) => (
               <li key={c.label} className="flex items-center justify-between gap-3 py-2 text-[14px] leading-[20px]">
@@ -251,37 +253,6 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready }: { vehicle: VehicleRow
       )}
             </div>
             <div className="min-w-0 flex flex-col gap-4">
-          <Card title="Current stage">
-            <div className="grid grid-cols-2 gap-4">
-              <Pair label="Lifecycle state" value={STATE_LABEL[state]} />
-              <Pair label="Owner" value={STATE_OWNER[state]} />
-              <Pair label="Time in stage" value={sinceLabel(row?.state_changed_at) ?? "Unknown"} />
-              <Pair label="Since" value={fmtWhen(row?.state_changed_at) ?? "Unknown"} />
-            </div>
-            <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2">
-              <div>
-                <p className="text-al-meta font-semibold text-muted-foreground">Next action</p>
-                <p className="text-al-body text-foreground mt-0.5">{STATE_NEXT_ACTION[state]}</p>
-              </div>
-              <div>
-                <p className="text-al-meta font-semibold text-muted-foreground">Blocker</p>
-                <p className="text-al-body text-foreground mt-0.5">
-                  {row?.gate_reason
-                    ? row.gate_reason
-                    : offRail
-                      ? "A manager gate is holding this vehicle."
-                      : state === "RETAIL_READY"
-                        ? "None — the vehicle has cleared get ready."
-                        : `Nothing beyond the stage itself. ${STATE_OWNER[state]} owns the next move.`}
-                </p>
-              </div>
-            </div>
-            {(state === "K208_READY_TO_CERTIFY" || state === "K208_FINALIZED") && (
-              <p className="text-al-meta text-muted-foreground">
-                Shown for visibility only. K-208 certification authority comes from the store's K-208 policy and is enforced server-side — never from a job title.
-              </p>
-            )}
-          </Card>
       <Card title="Notes">
         {historyLoading ? (
           <p className="text-[14px] text-adm-muted">Loading notes...</p>

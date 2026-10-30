@@ -1,7 +1,10 @@
 import { useMemo, useState } from "react";
 import { CheckCircle2, Search } from "lucide-react";
 import TitleMcoPanel from "@/components/vehicle/TitleMcoPanel";
-import { CountTile, EmptyState, Panel, RowAction, SectionHeading, StateBadge, TableShell, formatDate } from "./primitives";
+import { Link } from "react-router-dom";
+import { Panel, Td, Th, WorkTable } from "@/components/product";
+import { adminTabHref } from "@/lib/admin/sections";
+import { EmptyState, StateBadge, formatDate } from "./primitives";
 import { TITLE_STATE_LABEL, type TitleRow } from "./complianceData";
 
 export const TitlesSection = ({
@@ -18,8 +21,6 @@ export const TitlesSection = ({
   const [openVin, setOpenVin] = useState<string | null>(null);
 
   const outstanding = useMemo(() => rows.filter((r) => r.state !== "on_file"), [rows]);
-  const aged = outstanding.filter((r) => (r.ageDays ?? 0) >= 30).length;
-  const owner = rows.find((r) => r.owner)?.owner ?? null;
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -30,109 +31,85 @@ export const TitlesSection = ({
 
   const selected = rows.find((r) => r.vin === openVin) ?? null;
 
-  return (
-    <div className="space-y-5">
-      <SectionHeading
-        title="Titles & MCO"
-        description="Ownership documents on in-stock vehicles: the title front and back for a used car, the Manufacturer's Certificate of Origin for a new one. Files are dealer-only and never reach the customer packet."
-      />
+  const tabCls = (on: boolean) =>
+    `-mb-px inline-flex min-h-[40px] items-center gap-1.5 border-b-2 px-0.5 text-[14px] leading-[20px] whitespace-nowrap ${on ? "border-adm-primary font-semibold text-adm-primary" : "border-transparent font-medium text-adm-muted hover:text-adm-ink"}`;
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <CountTile loading={loading}
-          label="Outstanding"
-          value={outstanding.length}
-          tone={outstanding.length > 0 ? "attention" : "clear"}
-          means="In-stock vehicles missing one or both sides of the required document."
-        />
-        <CountTile loading={loading}
-          label="Over 30 days"
-          value={aged}
-          tone={aged > 0 ? "critical" : "neutral"}
-          means="Outstanding vehicles that have been in stock 30 days or more without their document on file."
-        />
-        <CountTile loading={loading}
-          label="Owner"
-          value={owner ? "Assigned" : "Unassigned"}
-          means={
-            owner
-              ? `Title requests route to ${owner}, set as the title clerk in Settings.`
-              : "No title clerk email is configured, so no one owns these requests yet."
-          }
-        />
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-adm-border">
+        <div role="tablist" aria-label="Title documents" className="flex items-stretch gap-6">
+          <button type="button" role="tab" aria-selected={!showComplete} onClick={() => setShowComplete(false)} className={tabCls(!showComplete)}>
+            Open documents <span className="tabular-nums">({outstanding.length})</span>
+          </button>
+          <button type="button" role="tab" aria-selected={showComplete} onClick={() => setShowComplete(true)} className={tabCls(showComplete)}>
+            Completed <span className="tabular-nums">({rows.length - outstanding.length})</span>
+          </button>
+        </div>
+        <div className="flex items-center gap-4 pb-1">
+          <label className="relative block w-56">
+            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-adm-muted" aria-hidden="true" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search vehicle, stock, VIN"
+              aria-label="Search title documents"
+              className="h-9 w-full rounded-md border border-adm-border bg-adm-surface pl-10 pr-3 text-[14px] leading-[20px] text-adm-ink outline-none focus:ring-2 focus:ring-adm-primary"
+            />
+          </label>
+          <Link to={adminTabHref("store-settings")} className="text-[14px] font-semibold text-adm-primary hover:underline">Configure clerk</Link>
+        </div>
       </div>
 
-      <Panel
-        title={`${filtered.length.toLocaleString()} vehicle${filtered.length === 1 ? "" : "s"}`}
-        action={
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="inline-flex items-center gap-2 text-[12px] leading-[18px] font-bold text-adm-ink">
-              <input
-                type="checkbox"
-                checked={showComplete}
-                onChange={(e) => setShowComplete(e.target.checked)}
-                className="h-3.5 w-3.5 accent-foreground"
-              />
-              Include vehicles with documents on file
-            </label>
-            <div className="relative w-full max-w-xs">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-adm-muted" />
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Search vehicle, stock, VIN"
-                className="h-9 w-full rounded-lg border border-adm-border bg-adm-surface pl-9 pr-3 text-[14px] leading-[20px] text-adm-ink outline-none focus:ring-2 focus:ring-adm-primary"
-              />
-            </div>
-          </div>
-        }
-      >
+      <Panel flush>
         {loading ? (
-          <p className="px-4 py-10 text-center text-[14px] leading-[20px] text-adm-muted">Loading vehicles…</p>
+          <p className="px-4 py-10 text-center text-[14px] leading-[20px] text-adm-muted">Loading vehicles...</p>
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={CheckCircle2}
             tone={q ? "neutral" : "clear"}
-            headline={q ? "No vehicles match that search." : "Every in-stock vehicle has required title/MCO documentation."}
-            body={
-              q
-                ? "Try a different stock number, VIN, or vehicle name."
-                : "Nothing is outstanding. Tick the box above to review the documents already on file."
-            }
+            headline={q ? "No vehicles match that search." : showComplete ? "No completed title documents yet." : "Every in-stock vehicle has required title/MCO documentation."}
+            body={q ? "Try a different stock number, VIN, or vehicle name." : "Nothing is outstanding."}
           />
         ) : (
-          <TableShell headers={["Vehicle", "Requirement", "Current state", "Age", "Owner", "Action"]}>
-            {filtered.map((r) => (
-              <tr key={r.vehicleId} className="hover:bg-adm-workspace">
-                <td className="px-4 py-3">
-                  <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{r.title}</p>
-                  <p className="font-mono text-[12px] leading-[18px] text-adm-muted">{r.stockNumber || r.vin}</p>
-                </td>
-                <td className="px-4 py-3 text-[14px] leading-[20px] text-adm-ink">{r.requirement.label}</td>
-                <td className="px-4 py-3">
-                  <StateBadge tone={r.state === "on_file" ? "clear" : r.state === "not_received" ? "attention" : "neutral"}>
-                    {TITLE_STATE_LABEL[r.state]}
-                  </StateBadge>
-                  {r.receivedAt && (
-                    <p className="mt-1 text-[12px] leading-[18px] text-adm-muted">Last upload {formatDate(r.receivedAt)}</p>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-[14px] leading-[20px] tabular-nums text-adm-ink">
-                  {r.ageDays == null ? "—" : `${r.ageDays}d`}
-                  <span className="ml-1 text-[12px] leading-[18px] text-adm-muted">in stock</span>
-                </td>
-                <td className="px-4 py-3 text-[12px] leading-[18px] text-adm-muted">
-                  {r.owner || "No title clerk configured"}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <RowAction onClick={() => setOpenVin(r.vin === openVin ? null : r.vin)}>
-                    {r.vin === openVin ? "Close" : "Open documents"}
-                  </RowAction>
-                </td>
+          <WorkTable caption="Titles and MCO" minWidth={980}>
+            <thead>
+              <tr>
+                <Th>Vehicle</Th>
+                <Th>VIN</Th>
+                <Th>Document</Th>
+                <Th>Received</Th>
+                <Th>Age (days)</Th>
+                <Th>Clerk</Th>
+                <Th>Status</Th>
+                <Th align="right">Actions</Th>
               </tr>
-            ))}
-          </TableShell>
+            </thead>
+            <tbody>
+              {filtered.map((r) => (
+                <tr key={r.vehicleId}>
+                  <Td className="max-w-[220px] truncate font-semibold">{r.title}</Td>
+                  <Td className="font-mono text-[12px] text-adm-muted whitespace-nowrap">{r.vin}</Td>
+                  <Td className="whitespace-nowrap">{r.requirement.label}</Td>
+                  <Td className="whitespace-nowrap text-adm-muted">{r.receivedAt ? formatDate(r.receivedAt) : "Unknown"}</Td>
+                  <Td className="tabular-nums">{r.ageDays == null ? "Unknown" : r.ageDays}</Td>
+                  <Td className="max-w-[160px] truncate text-adm-muted">{r.owner || "Unassigned"}</Td>
+                  <Td className="whitespace-nowrap">
+                    <StateBadge tone={r.state === "on_file" ? "clear" : r.state === "not_received" ? "attention" : "neutral"}>
+                      {TITLE_STATE_LABEL[r.state]}
+                    </StateBadge>
+                  </Td>
+                  <Td align="right" className="whitespace-nowrap">
+                    <button type="button" onClick={() => setOpenVin(r.vin === openVin ? null : r.vin)} className="text-[14px] font-semibold text-adm-primary hover:underline">
+                      {r.vin === openVin ? "Close" : "Open"}
+                    </button>
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </WorkTable>
         )}
       </Panel>
+      <p className="text-[13px] leading-[18px] text-adm-muted">Showing {filtered.length.toLocaleString()} of {(showComplete ? rows.length : outstanding.length).toLocaleString()}</p>
 
       {selected && <TitleMcoPanel vin={selected.vin} tenantId={tenantId} condition={selected.condition} />}
     </div>

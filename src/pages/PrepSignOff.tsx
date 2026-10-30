@@ -124,10 +124,12 @@ const PrepSignOff = () => {
   // LIST VIEW
   if (view === "list") {
     const loaded = !signOffsLoading;
-    const selected = filtered.find((x) => x.id === searchParams.get("sel")) ?? null;
+    const selParam = searchParams.get("sel");
+    const wide = typeof window !== "undefined" && window.innerWidth >= 1024;
+    const selected = (selParam === null ? (wide ? filtered[0] : null) : filtered.find((x) => x.id === selParam)) ?? null;
     const select = (sid: string | null) => {
       const n = new URLSearchParams(searchParams);
-      if (sid) n.set("sel", sid); else n.delete("sel");
+      n.set("sel", sid ?? "");
       setSearchParams(n, { replace: true });
     };
     return (
@@ -175,7 +177,7 @@ const PrepSignOff = () => {
         ) : (
           <div className={selected ? "grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start" : ""}>
             <div className="min-w-0">
-            <WorkTable caption="Prep sign-offs" minWidth={selected ? 520 : 760}>
+            <WorkTable caption="Prep sign-offs" minWidth={selected ? 480 : 760}>
               <thead>
                 <tr>
                   <Th>Vehicle</Th>
@@ -183,7 +185,7 @@ const PrepSignOff = () => {
                   <Th>Accessories</Th>
                   <Th>Foreman</Th>
                   <Th>Updated</Th>
-                  <Th align="right"><span className="sr-only">Next action</span></Th>
+                  {!selected && <Th align="right"><span className="sr-only">Next action</span></Th>}
                 </tr>
               </thead>
               <tbody>
@@ -200,12 +202,12 @@ const PrepSignOff = () => {
                     </Td>
                     <Td className="whitespace-nowrap">{s.accessories_installed.filter(a => a.installed_date).length} of {s.accessories_installed.length}</Td>
                     <Td className="whitespace-nowrap">{s.foreman_name}</Td>
-                    <Td className="whitespace-nowrap text-adm-muted">{format(new Date(s.updated_at), "MMM d, h:mm a")}</Td>
-                    <Td align="right">
+                    <Td className="whitespace-nowrap text-adm-muted">{format(new Date(s.updated_at), selected ? "MMM d" : "MMM d, h:mm a")}</Td>
+                    {!selected && <Td align="right">
                       <button type="button" className="text-[14px] font-semibold text-adm-primary hover:underline whitespace-nowrap" onClick={(e) => { e.stopPropagation(); select(s.id); }}>
                         {s.status === "pending" ? "Review" : "View"}
                       </button>
-                    </Td>
+                    </Td>}
                   </tr>
                 ))}
               </tbody>
@@ -222,7 +224,7 @@ const PrepSignOff = () => {
                 </div>
                 <div className="space-y-4 px-4 py-4 text-[14px] leading-[20px]">
                   {selected.install_photos?.[0]?.url ? (
-                    <img src={selected.install_photos[0].url} alt={selected.install_photos[0].caption || "Install photo"} className="w-full max-h-[180px] rounded-[4px] border border-adm-border object-cover" />
+                    <img src={selected.install_photos[0].url} alt={selected.install_photos[0].caption || "Install photo"} className="w-full max-h-[180px] rounded-[4px] border border-adm-border object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                   ) : (
                     <p className="rounded-[4px] border border-dashed border-adm-border px-3 py-6 text-center text-adm-muted">No install photo on file</p>
                   )}

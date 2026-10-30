@@ -465,11 +465,6 @@ export default function DescriptionOperations() {
         description="Which vehicles have a description, and which ones need a person."
         actions={
           <>
-            {perms.canGenerate && (
-              <Button onClick={runReconcile} disabled={syncing}>
-                {syncing ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />} Review reconciliation
-              </Button>
-            )}
             <Button variant="primary" onClick={() => applyStateFilter("needs_review")}>
               Review vehicles{kpis.needs_review > 0 ? ` (${kpis.needs_review})` : ""}
             </Button>
@@ -484,7 +479,7 @@ export default function DescriptionOperations() {
       )}
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[220px] max-w-md">
+        <div className="relative flex-1 min-w-[180px] max-w-[220px]">
           <Search className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             value={query}
@@ -531,6 +526,11 @@ export default function DescriptionOperations() {
         >
           Clear filters
         </button>
+        {perms.canGenerate && (
+          <Button className="ml-auto" onClick={runReconcile} disabled={syncing}>
+            {syncing ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />} Review reconciliation
+          </Button>
+        )}
       </div>
 
       <div className={drawer ? "grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start" : ""}>
@@ -568,7 +568,7 @@ export default function DescriptionOperations() {
           <>
             <table className="w-full table-fixed text-left border-collapse">
               <colgroup>
-                <col className="w-[30%]" /><col className="w-[12%]" /><col className="w-[19%]" /><col className="w-[17%]" /><col className="w-[9%]" /><col className="w-[13%]" />
+                <col className="w-[26%]" /><col className="w-[11%]" /><col className="w-[19%]" /><col className="w-[22%]" /><col className="w-[9%]" /><col className="w-[13%]" />
               </colgroup>
               <thead>
                 <tr className="text-[12px] leading-[18px] font-semibold text-adm-muted bg-adm-workspace border-b border-adm-border">
@@ -600,8 +600,8 @@ export default function DescriptionOperations() {
                       <td className="px-3 text-[14px] text-adm-muted truncate">{stock || "Unknown"}</td>
                       <td className="px-3"><StatusText tone={state.tone}>{state.label}</StatusText></td>
                       <td className="px-3 text-[14px] text-adm-ink truncate">{r.issue || "None"}</td>
-                      <td className="px-3 text-[14px] tabular-nums text-adm-ink">
-                        {configuredChannels.length === 0 ? "Unknown" : `${r.channelsPresent.length}/${configuredChannels.length}`}
+                      <td className="px-3 text-[14px] tabular-nums text-adm-ink truncate">
+                        {configuredChannels.length === 0 ? "None" : `${r.channelsPresent.length}/${configuredChannels.length}`}
                       </td>
                       <td className="px-3 text-[13px] text-adm-muted whitespace-nowrap">
                         {r.updatedAt ? new Date(r.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "Unknown"}

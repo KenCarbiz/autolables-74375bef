@@ -72,8 +72,6 @@ const CustomerRecord = () => {
         description="One customer, assembled from leads, document requests, tracked engagement and deals."
         path={`/customers/${customerId}`}
       />
-      <Crumbs items={[{ label: "Customers", to: "/customers" }, { label: title }]} />
-
       <PageHeader
         title={
           <span className="inline-flex flex-wrap items-center gap-3">
@@ -95,7 +93,9 @@ const CustomerRecord = () => {
 
       <div className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)_320px] lg:items-start">
         <div className="flex min-w-0 flex-col gap-6">
-          <Panel title="Contact information">
+          <Panel className="[&>div]:flex [&>div]:flex-col [&>div]:gap-5">
+            <section aria-label="Contact information">
+            <h3 className="mb-2 text-[16px] leading-[22px] font-semibold text-adm-ink">Contact information</h3>
             <SummaryList
               rows={[
                 { label: "Name", value: customer.identified ? customer.name || "Not given" : "Unidentified" },
@@ -115,15 +115,18 @@ const CustomerRecord = () => {
                 This shopper is a browser session, not a person on file. Nothing here may be attributed to a named customer.
               </p>
             )}
-          </Panel>
-          <Panel title="Communication consent">
-            <SummaryList rows={[{ label: "Email", value: "Unknown" }, { label: "SMS", value: "Unknown" }, { label: "Phone", value: "Unknown" }]} />
-          </Panel>
-          <Panel title="Assigned to">
-            <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">
-              {customer.assignedEmployee ? customer.assignedEmployee.name : "Unassigned"}
-            </p>
-            {customer.assignedEmployee && <p className="text-[13px] leading-[18px] text-adm-muted">{customer.assignedEmployee.source}</p>}
+            </section>
+            <section aria-label="Communication consent" className="border-t border-adm-border pt-4">
+              <h3 className="mb-2 text-[16px] leading-[22px] font-semibold text-adm-ink">Communication consent</h3>
+              <SummaryList dense rows={[{ label: "Email", value: "Unknown" }, { label: "SMS", value: "Unknown" }, { label: "Phone", value: "Unknown" }]} />
+            </section>
+            <section aria-label="Assigned to" className="border-t border-adm-border pt-4">
+              <h3 className="mb-1 text-[16px] leading-[22px] font-semibold text-adm-ink">Assigned to</h3>
+              <p className="text-[14px] leading-[20px] text-adm-ink">
+                {customer.assignedEmployee ? customer.assignedEmployee.name : "Unassigned"}
+              </p>
+              {customer.assignedEmployee && <p className="text-[13px] leading-[18px] text-adm-muted">{customer.assignedEmployee.source}</p>}
+            </section>
           </Panel>
         </div>
 

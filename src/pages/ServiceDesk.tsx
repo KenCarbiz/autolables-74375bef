@@ -73,8 +73,12 @@ export default function ServiceDesk() {
       <PageBody width="wide">
         <PageHeader
           title="Service Desk"
-          meta={today}
-          actions={canManageSettings ? <LinkButton to="/service/settings" aria-label="Service Desk settings, K-208 Policy">Settings</LinkButton> : undefined}
+          actions={
+            <>
+              <span className="text-[13px] leading-[18px] text-adm-muted">{today}</span>
+              {canManageSettings && <LinkButton to="/service/settings" aria-label="Service Desk settings, K-208 Policy">Settings</LinkButton>}
+            </>
+          }
         />
 
         <div onClick={(e) => { const a = (e.target as HTMLElement).closest("a[href*='view=']"); const m = a?.getAttribute("href")?.match(/view=(my_work|desk)/); if (m) rememberView(m[1] as DeskView); }}>
@@ -87,7 +91,7 @@ export default function ServiceDesk() {
           />
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-5 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
           <ServiceQueue key={view} mode={view} onCounts={setCounts} />
           <div className="xl:sticky xl:top-4">
             <ManagerMessagesRail tenantId={tenantId} vehicles={railVehicles} />

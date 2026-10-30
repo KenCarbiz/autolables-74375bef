@@ -7,7 +7,8 @@ import {
   ArrowLeft, Car, ChevronRight, Copy, ExternalLink, Globe,
 } from "lucide-react";
 import { PageBody, LocalTabs, Button, LinkButton, StatusText, EmptyState, SkeletonBlock, type LocalTab } from "@/components/product";
-import { Crumbs } from "@/components/detail/parts";
+import { FactStrip } from "@/components/detail/parts";
+import { IdentityStrip, lifecycleFacts } from "@/components/vehicleFile/SubPageHeader";
 import { useRecallTask } from "@/hooks/useRecallTask";
 import VehicleHistoryFacts from "@/components/vehicle/VehicleHistoryFacts";
 import { listingGallery } from "@/lib/photos";
@@ -214,6 +215,19 @@ const VehicleFile = () => {
   };
 
   const summary: StatusFact[] = [facts.publication, facts.retail, recallLine];
+  const lc = lifecycleFacts(vehicle, lifecycle);
+  const subPage = tab === "documents" || tab === "getready" || tab === "compliance";
+  const strip = (
+    <IdentityStrip
+      vehicle={vehicle}
+      facts={[
+        { label: "Owner", value: lc.owner },
+        { label: "Days in inventory", value: String(lc.days) },
+        { label: "Current state", value: lc.state },
+        { label: "Next action", value: lc.nextAction },
+      ]}
+    />
+  );
 
   const tabs: LocalTab[] = TABS.map((t) => ({
     key: t.id,
@@ -224,9 +238,7 @@ const VehicleFile = () => {
 
   return (
     <PageBody width="wide" className="pb-24 lg:pb-8 gap-4">
-      <Crumbs items={[{ label: "Vehicles", to: "/inventory" }, { label: vehicle.ymm || vehicle.vin }]} />
-
-      <section aria-label="Vehicle identity">
+      {!subPage && <section aria-label="Vehicle identity">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
           <div className="sm:w-[132px] shrink-0">
             <div className="h-[88px] rounded-[4px] overflow-hidden bg-adm-workspace flex items-center justify-center">
@@ -315,16 +327,31 @@ const VehicleFile = () => {
             </div>
           </div>
         </div>
-      </section>
+      </section>}
 
-      <LocalTabs tabs={tabs} label="Vehicle file sections" />
+      {!subPage && tab === "overview" && (
+        <FactStrip
+          label="Vehicle summary"
+          className="lg:grid-cols-6"
+          facts={[
+            { label: "Owner", value: lc.owner },
+            { label: "Condition", value: <span className="capitalize">{vehicle.condition || "Unknown"}</span> },
+            { label: "State", value: lc.state },
+            { label: "Price", value: vehicle.price != null ? `$${vehicle.price.toLocaleString()}` : "Not priced" },
+            { label: "Days in inventory", value: String(lc.days) },
+            { label: "Next action", value: lc.nextAction },
+          ]}
+        />
+      )}
+
+      {!subPage && <LocalTabs tabs={tabs} label="Vehicle file sections" />}
 
       <div>
         {tab === "overview" && <OverviewTab vehicle={vehicle} ready={ready} lifecycle={lifecycle} stockNumber={stockNo} onTab={setTab} onReload={load} />}
-        {tab === "documents" && <DocumentsTab vehicle={vehicle} onReload={load} />}
-        {tab === "getready" && <GetReadyTab vehicle={vehicle} lifecycle={lifecycle} ready={ready} />}
+        {tab === "documents" && <DocumentsTab vehicle={vehicle} onReload={load} strip={strip} />}
+        {tab === "getready" && <GetReadyTab vehicle={vehicle} lifecycle={lifecycle} ready={ready} strip={strip} />}
         {tab === "customer" && <CustomerTab vehicle={vehicle} stockNumber={stockNo} />}
-        {tab === "compliance" && <ComplianceTab vehicle={vehicle} ready={ready} recall={recall} lifecycle={lifecycle} onReload={load} />}
+        {tab === "compliance" && <ComplianceTab vehicle={vehicle} ready={ready} recall={recall} lifecycle={lifecycle} onReload={load} strip={strip} />}
         {tab === "history" && <HistoryTab vehicle={vehicle} lifecycle={lifecycle} />}
       </div>
 

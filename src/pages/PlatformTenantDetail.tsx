@@ -257,9 +257,6 @@ const PlatformTenantDetail = () => {
             { label: "Active apps", value: tenant.active_apps },
           ]}
         />
-        <div className="mt-4">
-          <Button size="sm" variant={tenant.is_active ? "danger" : "secondary"} onClick={toggleActive}>{tenant.is_active ? "Suspend tenant" : "Reactivate tenant"}</Button>
-        </div>
       </Panel>
       {drafting && (
         <Panel title="Plan change (draft)" titleSize="md" inset="sm">
@@ -310,23 +307,30 @@ const PlatformTenantDetail = () => {
             { key: "audit", label: "Audit", to: "/platform-admin?tab=audit", active: false },
           ]}
         />
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px] items-start">
-          <div className="flex flex-col gap-4 min-w-0">
-            {tab === "overview" && (
-              <>
-                {dealershipPanel}
-                {providerPanel}
-                {membersPanel(5)}
-              </>
-            )}
-            {tab === "entitlements" && entitlementsPanel}
-            {tab === "members" && membersPanel()}
-            {tab === "integrations" && providerPanel}
-          </div>
+        {tab === "overview" ? (
           <div className="flex flex-col gap-4">
-            {summary}
-            {tab === "overview" && entitlementsCompact}
+            <div className="grid gap-4 xl:grid-cols-3 items-start">
+              {dealershipPanel}
+              {summary}
+              {entitlementsCompact}
+            </div>
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] items-start">
+              {providerPanel}
+              {membersPanel(5)}
+            </div>
           </div>
+        ) : (
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px] items-start">
+            <div className="flex flex-col gap-4 min-w-0">
+              {tab === "entitlements" && entitlementsPanel}
+              {tab === "members" && membersPanel()}
+              {tab === "integrations" && providerPanel}
+            </div>
+            {summary}
+          </div>
+        )}
+        <div className="flex justify-end">
+          <button type="button" onClick={toggleActive} className={`text-[14px] font-semibold hover:underline ${tenant.is_active ? "text-adm-danger" : "text-adm-primary"}`}>{tenant.is_active ? "Suspend tenant" : "Reactivate tenant"}</button>
         </div>
       </PageBody>
     </div>

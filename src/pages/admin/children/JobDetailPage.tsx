@@ -1,9 +1,9 @@
 import { useParams } from "react-router-dom";
 import { ADMIN_CHILD_ROUTES, adminTabHref } from "@/lib/admin/sections";
-import { HEALTH_META, describeAge, type HealthTone } from "@/lib/admin/health";
+import { HEALTH_META, describeAge, needsAttention, type HealthTone } from "@/lib/admin/health";
 import { describeCron, JOB_CATALOG } from "@/lib/admin/integrations/jobs";
 import { ChildPageFrame } from "@/components/admin/v2/AdminShell";
-import { EmptyState, KeyValueList, LinkButton, Panel, SkeletonBlock, StatusText } from "@/components/product";
+import { EmptyState, InlineNote, KeyValueList, LinkButton, Panel, SkeletonBlock, StatusText } from "@/components/product";
 import { cn } from "@/lib/utils";
 import { useJobsData } from "@/pages/admin/views/integrations/JobsView";
 
@@ -13,11 +13,14 @@ import { useJobsData } from "@/pages/admin/views/integrations/JobsView";
 
 const DOT: Record<HealthTone, string> = { neutral: "bg-adm-muted", success: "bg-adm-success", warning: "bg-[#D98B00]", danger: "bg-adm-danger", info: "bg-adm-primary" };
 
-const Step = ({ tone, title, children, last = false }: { tone: HealthTone; title: string; children: React.ReactNode; last?: boolean }) => (
-  <li className="relative pl-6 pb-4 last:pb-0">
-    {!last && <span aria-hidden="true" className="absolute left-[3px] top-3 bottom-0 w-px bg-adm-border" />}
-    <span aria-hidden="true" className={cn("absolute left-0 top-[7px] h-[7px] w-[7px] rounded-full", DOT[tone])} />
-    <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{title}</p>
+const Step = ({ n, tone, title, time, children, last = false }: { n: number; tone: HealthTone; title: string; time?: string; children: React.ReactNode; last?: boolean }) => (
+  <li className="relative pl-9 pb-5 last:pb-0">
+    {!last && <span aria-hidden="true" className="absolute left-[9px] top-6 bottom-0 w-0.5 bg-adm-border" />}
+    <span aria-hidden="true" className={cn("absolute left-0 top-[2px] h-5 w-5 rounded-full ring-4 ring-white", DOT[tone])} />
+    <div className="flex items-baseline justify-between gap-3">
+      <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{n}. {title}</p>
+      {time && <p className="text-[13px] leading-[18px] text-adm-muted whitespace-nowrap">{time}</p>}
+    </div>
     <div className="text-[13px] leading-[18px] text-adm-muted">{children}</div>
   </li>
 );
@@ -57,15 +60,16 @@ export default function JobDetailPage() {
   const succeeded = row.lastOutcome?.toLowerCase() === "ok" || row.lastOutcome?.toLowerCase() === "succeeded" || row.lastOutcome?.toLowerCase() === "success";
   const outcomeTone: HealthTone = !row.lastOutcome ? "neutral" : succeeded ? "success" : "danger";
 
+  const banner = scheduler.label === "Paused" || needsAttention(row.verdict.state);
   return (
     <ChildPageFrame
       section="integrations"
       crumbs={crumbs}
-      title={spec.label}
-      subtitle={row.verdict.headline}
+      title={row.verdict.headline}
+      subtitle={`${spec.label}, scheduled job detail${row.lastAttemptAt ? `. Last invocation ${formatAt(row.lastAttemptAt)}` : ""}`}
       backHref={jobsHref}
       backLabel="Back to jobs"
-      actions={<LinkButton variant="primary" to={spec.drillIn}>{spec.drillInLabel}</LinkButton>}
+      actions={banner ? undefined : <LinkButton variant="primary" to={spec.drillIn}>{spec.drillInLabel}</LinkButton>}
     >
       <div className="grid gap-4 lg:grid-cols-3 items-start">
         <Panel title="Job configuration" titleSize="md" inset="sm">
@@ -84,16 +88,16 @@ export default function JobDetailPage() {
         </Panel>
         <Panel title="Run timeline" titleSize="md" inset="sm">
           <ol>
-            <Step tone={scheduler.tone} title="Scheduler">
+            <Step n={1} tone={scheduler.tone} title="Scheduler">
               {scheduler.label}{row.schedule ? `, ${describeCron(row.schedule)}` : ""}
             </Step>
-            <Step tone={row.lastAttemptAt ? "success" : "neutral"} title="Last invocation">
+            <Step n={2} tone={row.lastAttemptAt ? "success" : "neutral"} title="Last invocation">
               {row.lastAttemptAt ? `${formatAt(row.lastAttemptAt)} (${describeAge(row.lastAttemptAt, now)})` : "No invocation recorded"}
             </Step>
-            <Step tone={outcomeTone} title="Provider or job result">
+            <Step n={3} tone={outcomeTone} title="Provider or job result">
               {row.lastOutcome ? row.lastOutcome.replace(/_/g, " ") : "No result recorded"}
             </Step>
-            <Step tone={row.lastSuccessAt ? "success" : "neutral"} title="Last usable output" last>
+            <Step n={4} tone={row.lastSuccessAt ? "success" : "neutral"} title="Last usable output" last>
               {row.lastSuccessAt ? `${formatAt(row.lastSuccessAt)}${row.evidence === "scheduler" ? ", scheduler record for all rooftops" : ""}` : "No successful output recorded"}
             </Step>
           </ol>
@@ -111,6 +115,16 @@ export default function JobDetailPage() {
           <p className="mt-3 text-[13px] leading-[18px] text-adm-muted">{row.verdict.detail}</p>
         </Panel>
       </div>
+      {banner && (
+        <InlineNote
+          tone="warning"
+          className="mt-4"
+          title={scheduler.label === "Paused" ? "This scheduled job is paused." : row.verdict.headline}
+          action={<LinkButton variant="outline" to={spec.drillIn}>{spec.drillInLabel}</LinkButton>}
+        >
+          {row.verdict.detail}
+        </InlineNote>
+      )}
     </ChildPageFrame>
   );
 }

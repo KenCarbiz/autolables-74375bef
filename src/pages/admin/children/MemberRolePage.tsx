@@ -163,6 +163,7 @@ export default function MemberRolePage() {
       backHref={backHref}
       backLabel={backLabel}
       section="people"
+      sectionRow="below"
     >
       <div className="grid grid-cols-1 min-[1536px]:grid-cols-[minmax(0,1fr)_524px] gap-3">
         <AdminCard

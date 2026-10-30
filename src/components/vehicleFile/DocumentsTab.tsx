@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ChevronRight, FilePlus2, Printer } from "lucide-react";
 import { useTenant } from "@/contexts/TenantContext";
@@ -7,8 +7,10 @@ import { resolveOperatingState } from "@/lib/dealerState";
 import FactoryStickerCard from "@/components/vehicle/FactoryStickerCard";
 import GeneratedDocumentsSection from "@/components/vehicle/GeneratedDocumentsSection";
 import DealDocumentsPanel from "@/components/vehicle/DealDocumentsPanel";
-import { Card, TabHeader, btnLarge } from "./primitives";
-import { WorkTable, Th, Td, StatusText, type Tone } from "@/components/product";
+import { Card } from "./primitives";
+import { VehicleSubHeader } from "./SubPageHeader";
+import { vehicleStockNumber } from "@/lib/vehicleStockNumber";
+import { Button, WorkTable, Th, Td, StatusText, type Tone } from "@/components/product";
 import { useDealRecord, dealDocStatus } from "@/hooks/useDealRecord";
 import { useVehicleDocuments } from "@/lib/stickerStudio/useVehicleDocuments";
 import { STATUS_META } from "@/lib/stickerStudio/documentWorkflow";
@@ -67,7 +69,7 @@ const DocumentRegister = ({ vehicle }: { vehicle: VehicleRow }) => {
   const { documents: generated } = useVehicleDocuments(vehicle.id);
   const isUsed = vehicle.condition !== "new";
   const modules = vehicle.packet_modules || {};
-  const packetFor = (key: string) => (key in modules ? (modules[key] ? "Included" : "Not included") : "Unknown");
+  const packetFor = (key: string) => (key in modules ? (modules[key] ? "Public" : "Internal only") : "Unknown");
   const oem = (vehicle as unknown as { oem_sticker_url?: string | null }).oem_sticker_url ?? null;
 
   const rows: RegisterRow[] = [
@@ -76,8 +78,8 @@ const DocumentRegister = ({ vehicle }: { vehicle: VehicleRow }) => {
   if (isUsed) {
     const docs = record ? dealDocStatus(record) : null;
     rows.push(
-      { key: "bg", group: "Sales & Disclosure", name: "FTC Buyers Guide", status: loading ? "Reading" : docs?.buyersGuide ? `Filed${record?.buyersGuide?.version != null ? ` (v${record.buyersGuide.version})` : ""}` : "Not filed", tone: docs?.buyersGuide ? "success" : "warning", packet: "Internal record" },
-      { key: "k208", group: "Sales & Disclosure", name: "Safety inspection", status: loading ? "Reading" : docs?.k208 ? "Executed" : "Not executed", tone: docs?.k208 ? "success" : "warning", packet: "Internal record" },
+      { key: "bg", group: "Sales & Disclosure", name: "FTC Buyers Guide", status: loading ? "Reading" : docs?.buyersGuide ? `Filed${record?.buyersGuide?.version != null ? ` (v${record.buyersGuide.version})` : ""}` : "Not filed", tone: docs?.buyersGuide ? "success" : "warning", packet: "Internal only" },
+      { key: "k208", group: "Sales & Disclosure", name: "Safety inspection", status: loading ? "Reading" : docs?.k208 ? "Executed" : "Not executed", tone: docs?.k208 ? "success" : "warning", packet: "Internal only" },
     );
   }
   (vehicle.documents || []).forEach((d, i) => {
@@ -95,7 +97,7 @@ const DocumentRegister = ({ vehicle }: { vehicle: VehicleRow }) => {
       updated: d.created_at ?? null,
       status: STATUS_META[d.document_status]?.label || d.document_status,
       tone: GENERATED_TONE[d.document_status] || "neutral",
-      packet: "Stored version",
+      packet: d.document_status === "published" ? "Public" : "Internal only",
       to: `/vehicle-file/${vehicle.id}/documents/${d.id}`,
     });
   });
@@ -127,7 +129,7 @@ const DocumentRegister = ({ vehicle }: { vehicle: VehicleRow }) => {
         </tbody>
       </WorkTable>
       <p className="text-[12px] leading-[18px] text-adm-muted">
-        Customer packet shows Unknown where the packet settings do not name the document. Titles, registrations and identity documents are private and are not listed here.
+        Visibility shows Unknown where the packet settings do not name the document. Titles, registrations and identity documents are private and are not listed here.
       </p>
     </div>
   );
@@ -151,7 +153,7 @@ interface Producible {
   to?: string;
 }
 
-export const DocumentsTab = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: () => void }) => {
+export const DocumentsTab = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: () => void; strip?: ReactNode }) => {
   const navigate = useNavigate();
   const [picker, setPicker] = useState(false);
   const { settings } = useDealerSettings();
@@ -183,13 +185,15 @@ export const DocumentsTab = ({ vehicle, onReload }: { vehicle: VehicleRow; onRel
 
   return (
     <div className="space-y-6">
-      <TabHeader
-        title="Documents"
-        description="Every document this vehicle needs — produced, versioned, printed and filed against its VIN."
-        action={
-          <button onClick={() => setPicker((v) => !v)} aria-expanded={picker} className={btnLarge}>
-            <FilePlus2 className="w-4 h-4" /> Generate document
-          </button>
+      <VehicleSubHeader
+        vehicle={vehicle}
+        section="Documents"
+        title="Vehicle documents"
+        description={`Manage documents for ${vehicle.ymm || vehicle.vin}${vehicleStockNumber(vehicle) ? ` (Stock # ${vehicleStockNumber(vehicle)})` : ""}`}
+        actions={
+          <Button variant="primary" onClick={() => setPicker((v) => !v)} aria-expanded={picker}>
+            <FilePlus2 className="w-5 h-5" /> Generate document
+          </Button>
         }
       />
 

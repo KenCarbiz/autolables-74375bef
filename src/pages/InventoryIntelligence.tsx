@@ -1,16 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { toast } from "sonner";
 import {
   Search,
 } from "lucide-react";
+import { downloadCsv } from "@/lib/csvExport";
+import { vehicleStockNumber } from "@/lib/vehicleStockNumber";
 import { PageBody, PageHeader, Panel, WorkTable, Th, Td, Button, StatusText, InlineNote, QueryState, type Tone } from "@/components/product";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
-import { useEntitlements } from "@/hooks/useEntitlements";
-import { hasWindowStickerPermission } from "@/lib/permissions/windowStickerPermissions";
-import { useWindowSticker } from "@/hooks/useWindowSticker";
 import {
   buildIntelligenceRow, STAGE_TONE, type PipelineStage, type VehicleIntelligenceRow,
 } from "@/lib/documents/inventoryIntelligence";
@@ -51,6 +48,7 @@ interface Vehicle {
   status: string | null;
   updated_at: string | null;
   mc_attributes: Record<string, unknown> | null;
+  sticker_snapshot?: Record<string, unknown> | null;
 }
 
 interface StickerRecord {
@@ -78,17 +76,13 @@ const fmtWhen = (d?: string | null) =>
 
 export default function InventoryIntelligence() {
   const { tenant } = useTenant();
-  const { isAdmin } = useAuth();
-  const { member } = useEntitlements();
   const tenantId = tenant?.id && tenant.id !== "house" ? tenant.id : null;
-  const canRegenerate = hasWindowStickerPermission(member?.role, "window_sticker.regenerate", isAdmin);
-  const { generate, busy } = useWindowSticker();
 
   const [rows, setRows] = useState<Row[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [onlyBlocked, setOnlyBlocked] = useState(false);
-  const [working, setWorking] = useState<string | null>(null);
+  const [condition, setCondition] = useState("all");
 
   const load = useCallback(async () => {
     if (!tenantId) return;
@@ -97,7 +91,7 @@ export default function InventoryIntelligence() {
       // deno-lint-ignore no-explicit-any
       const { data: vehicles, error: vErr } = await (supabase as any)
         .from("vehicle_listings")
-        .select("id, vin, ymm, condition, status, updated_at, mc_attributes")
+        .select("id, vin, ymm, condition, status, updated_at, mc_attributes, sticker_snapshot")
         .eq("tenant_id", tenantId)
         .order("updated_at", { ascending: false })
         .limit(150);
@@ -158,23 +152,24 @@ export default function InventoryIntelligence() {
     const term = query.trim().toLowerCase();
     return rows.filter((r) => {
       if (onlyBlocked && !r.intel.blocker) return false;
+      if (condition !== "all" && r.vehicle.condition !== condition) return false;
       if (!term) return true;
       return `${r.vehicle.vin ?? ""} ${r.vehicle.ymm ?? ""}`.toLowerCase().includes(term);
     });
-  }, [rows, query, onlyBlocked]);
+  }, [rows, query, onlyBlocked, condition]);
 
-  const processVin = async (vehicleId: string) => {
-    if (!tenantId) return;
-    setWorking(vehicleId);
-    try {
-      await generate(tenantId, vehicleId);
-      toast.success("Processed — the pipeline state below is refreshed.");
-      await load();
-    } catch (e) {
-      toast.error(`Couldn't process that vehicle: ${String((e as Error).message || e)}`);
-    } finally {
-      setWorking(null);
-    }
+  const exportCsv = () => {
+    if (!filtered) return;
+    const head = ["Stock #", "Vehicle", "VIN", "Source data", ...DOCUMENT_FAMILY_IDS.map((id) => DOCUMENT_FAMILIES[id].adminTitle), "Blocker"];
+    const body = filtered.map(({ vehicle, intel }) => [
+      vehicleStockNumber(vehicle) ?? "",
+      vehicle.ymm ?? "",
+      vehicle.vin ?? "",
+      intel.sourceStage,
+      ...DOCUMENT_FAMILY_IDS.map((id) => intel.families.find((x) => x.family === id)?.stage ?? ""),
+      intel.blocker ?? "",
+    ]);
+    downloadCsv("inventory-intelligence.csv", [head, ...body]);
   };
 
   if (!tenantId) {
@@ -193,7 +188,12 @@ export default function InventoryIntelligence() {
       <PageHeader
         title="Inventory Intelligence"
         description="Document status and source data for each vehicle."
-        actions={<Button onClick={load}>Refresh</Button>}
+        actions={
+          <>
+            <Button onClick={load}>Refresh</Button>
+            <Button variant="primary" onClick={exportCsv} disabled={!filtered || filtered.length === 0}>Export</Button>
+          </>
+        }
       />
 
       <div className="flex items-center gap-2 flex-wrap">
@@ -207,10 +207,26 @@ export default function InventoryIntelligence() {
             aria-label="Filter inventory"
           />
         </div>
-        <label className="inline-flex items-center gap-2 text-[14px] text-adm-ink min-h-[36px]">
-          <input type="checkbox" checked={onlyBlocked} onChange={(e) => setOnlyBlocked(e.target.checked)} />
-          Needs attention only{blockedCount ? ` (${blockedCount})` : ""}
-        </label>
+        <select
+          value={condition}
+          onChange={(e) => setCondition(e.target.value)}
+          aria-label="Filter by condition"
+          className="min-h-[36px] rounded-md border border-adm-border bg-adm-surface px-3 text-[14px]"
+        >
+          <option value="all">All conditions</option>
+          <option value="new">New</option>
+          <option value="used">Used</option>
+          <option value="cpo">Certified</option>
+        </select>
+        <select
+          value={onlyBlocked ? "attention" : "all"}
+          onChange={(e) => setOnlyBlocked(e.target.value === "attention")}
+          aria-label="Filter by status"
+          className="min-h-[36px] rounded-md border border-adm-border bg-adm-surface px-3 text-[14px]"
+        >
+          <option value="all">All statuses</option>
+          <option value="attention">{`Needs attention${blockedCount ? ` (${blockedCount})` : ""}`}</option>
+        </select>
       </div>
 
       {error && (
@@ -225,9 +241,10 @@ export default function InventoryIntelligence() {
           emptyTitle="No vehicles match"
           emptyDetail="Clear the search or the attention filter to widen the list."
         >
-          <WorkTable className="[&_th]:px-2 [&_td]:px-2 [&_td]:py-2.5" caption="Document pipeline by vehicle and family" minWidth={1000}>
+          <WorkTable className="[&_th]:px-2 [&_td]:px-2 [&_td]:py-2.5" caption="Document pipeline by vehicle and family" minWidth={960}>
             <thead>
               <tr>
+                <Th className="whitespace-nowrap">Stock #</Th>
                 <Th>Vehicle</Th>
                 <Th>Source data</Th>
                 {DOCUMENT_FAMILY_IDS.map((id) => (
@@ -240,6 +257,7 @@ export default function InventoryIntelligence() {
             <tbody>
               {filtered?.map(({ vehicle, intel }) => (
                 <tr key={vehicle.id} className="hover:bg-adm-workspace">
+                  <Td className="whitespace-nowrap font-mono text-[12px]">{vehicleStockNumber(vehicle) ?? "Unknown"}</Td>
                   <Td className="max-w-[190px]">
                     <span className="block truncate font-semibold text-adm-ink">{vehicle.ymm || "Vehicle"}</span>
                     <span className="block truncate font-mono text-[12px] leading-[16px] text-adm-muted">{vehicle.vin || "no VIN"}</span>
@@ -257,16 +275,6 @@ export default function InventoryIntelligence() {
                   <Td align="right">
                     <div className="flex items-center justify-end gap-3 whitespace-nowrap text-[14px] font-semibold">
                       <Link to={`/vehicle-file/${vehicle.id}`} className="text-adm-primary hover:underline">Review</Link>
-                      {canRegenerate && (
-                        <button
-                          type="button"
-                          onClick={() => processVin(vehicle.id)}
-                          disabled={busy || working === vehicle.id}
-                          className="text-adm-primary hover:underline disabled:opacity-50"
-                        >
-                          {working === vehicle.id ? "Processing" : "Process"}
-                        </button>
-                      )}
                     </div>
                   </Td>
                 </tr>

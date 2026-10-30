@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button, Panel, QueryState, Td, Th, WorkTable } from "@/components/product";
+import { activityLabel, entityKindLabel } from "@/lib/admin/integrations/activity";
 import { formatDateTime } from "./primitives";
 
 // deno-lint-ignore no-explicit-any
@@ -110,7 +111,7 @@ export const AuditLogSection = ({ tenantId }: { tenantId: string | null }) => {
 
   return (
     <div className="flex flex-col gap-6">
-      <Panel inset="sm" bodyClassName="pt-4">
+      <div>
         <div className="flex flex-wrap items-end gap-4">
           <FilterField label="Date range">
             <select className={selectCls} value={draft.days} onChange={(e) => setDraft({ ...draft, days: Number(e.target.value) })}>
@@ -126,13 +127,13 @@ export const AuditLogSection = ({ tenantId }: { tenantId: string | null }) => {
           <FilterField label="Action">
             <select className={selectCls} value={draft.action} onChange={(e) => setDraft({ ...draft, action: e.target.value })}>
               <option value="all">All</option>
-              {options.actions.map((a) => <option key={a} value={a}>{a}</option>)}
+              {options.actions.map((a) => <option key={a} value={a}>{activityLabel(a)}</option>)}
             </select>
           </FilterField>
           <FilterField label="Entity">
             <select className={selectCls} value={draft.entity} onChange={(e) => setDraft({ ...draft, entity: e.target.value })}>
               <option value="all">All</option>
-              {options.entities.map((a) => <option key={a} value={a}>{a}</option>)}
+              {options.entities.map((a) => <option key={a} value={a}>{entityKindLabel(a)}</option>)}
             </select>
           </FilterField>
           <div className="flex items-center gap-4">
@@ -140,7 +141,7 @@ export const AuditLogSection = ({ tenantId }: { tenantId: string | null }) => {
             <Button variant="primary" onClick={apply}>Apply filters</Button>
           </div>
         </div>
-      </Panel>
+      </div>
 
       <Panel flush inset="sm">
         <QueryState
@@ -167,8 +168,8 @@ export const AuditLogSection = ({ tenantId }: { tenantId: string | null }) => {
                   <tr>
                     <Td className="whitespace-nowrap text-adm-muted">{formatDateTime(r.created_at)}</Td>
                     <Td className="max-w-[200px] truncate">{r.user_email || "System"}</Td>
-                    <Td>{r.action}</Td>
-                    <Td className="max-w-[200px] truncate">{r.entity_type}</Td>
+                    <Td className="whitespace-nowrap">{activityLabel(r.action)}</Td>
+                    <Td className="max-w-[200px] truncate">{entityKindLabel(r.entity_type)}</Td>
                     <Td className="max-w-[280px] truncate text-adm-muted">{detailText(r)}</Td>
                     <Td align="right">
                       <button type="button" aria-expanded={open === r.id} aria-label="Show event detail" onClick={() => setOpen(open === r.id ? null : r.id)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-adm-primary hover:bg-adm-selected">
@@ -179,7 +180,7 @@ export const AuditLogSection = ({ tenantId }: { tenantId: string | null }) => {
                   {open === r.id && (
                     <tr>
                       <td colSpan={6} className="border-b border-adm-border bg-adm-workspace px-3 py-3 text-[13px] leading-[18px] text-adm-muted">
-                        <p>Entity id <span className="font-mono text-adm-ink">{r.entity_id}</span></p>
+                        <p>Record reference <span className="font-mono text-adm-ink">{r.entity_id || "Unknown"}</span></p>
                         <p>Hash <span className="font-mono text-adm-ink">{r.content_hash || r.row_hash || "Unknown"}</span></p>
                       </td>
                     </tr>

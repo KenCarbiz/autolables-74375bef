@@ -314,13 +314,6 @@ const WorkQueue = () => {
       <PageHeader
         title="Work Queue"
         description="Your tasks and items across the team."
-        actions={
-          <>
-            <Button variant="primary" onClick={confirmBuild} disabled={creating}>
-              {creating ? "Building queue..." : "Review and build from inventory"}
-            </Button>
-          </>
-        }
       />
 
       <LocalTabs tabs={queueTabs} label="Work queue" />
@@ -354,6 +347,9 @@ const WorkQueue = () => {
           {filtersActive && (
             <Button size="sm" variant="ghost" onClick={() => { setStatus("all"); setDepartment("all"); setQ(""); }}>Clear filters</Button>
           )}
+          <Button className="ml-auto" onClick={confirmBuild} disabled={creating}>
+            {creating ? "Building queue..." : "Review and build from inventory"}
+          </Button>
         </div>
       )}
 
@@ -394,9 +390,10 @@ const WorkQueue = () => {
                 : undefined
             }
           >
-            <WorkTable caption="Work items" minWidth={820}>
+            <WorkTable caption="Work items" minWidth={880}>
               <thead>
                 <tr>
+                  <Th>Age</Th>
                   <Th>Task</Th>
                   <Th>Vehicle</Th>
                   <Th>Department</Th>
@@ -428,6 +425,12 @@ const WorkQueue = () => {
   );
 };
 
+const ageLabel = (iso?: string | null): string => {
+  if (!iso) return "Unknown";
+  const days = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000));
+  return days === 0 ? "Today" : `${days} day${days === 1 ? "" : "s"}`;
+};
+
 function RowMenu({ children, label }: { children: ReactNode; label: string }) {
   return (
     <DropdownMenu>
@@ -456,11 +459,12 @@ function HumanTaskRow({ item, currentUserId, previews, onOpen, onUpdate }: {
 
   return (
     <tr className="h-14 hover:bg-adm-workspace">
-      <Td className="max-w-[320px] truncate font-semibold text-adm-ink">
+      <Td className="whitespace-nowrap text-adm-muted">{ageLabel(item.created_at)}</Td>
+      <Td className="max-w-[250px] truncate font-semibold text-adm-ink">
         {item.title}
         {urgent && <StatusText tone="danger" className="ml-2">{item.priority}</StatusText>}
       </Td>
-      <Td className="max-w-[220px] truncate">{vehicleLabel(item)}</Td>
+      <Td className="max-w-[180px] truncate">{vehicleLabel(item)}</Td>
       <Td className="text-adm-muted capitalize truncate">{item.department || "inventory"}</Td>
       <Td className="text-adm-muted">{owner}</Td>
       <Td className="whitespace-nowrap">
@@ -496,8 +500,9 @@ function ExceptionRow({ item, onOpen, onDismiss }: {
 
   return (
     <tr className="h-14 hover:bg-adm-workspace" title={[copy.why, showDetail ? detail : ""].filter(Boolean).join(" ")}>
-      <Td className="max-w-[320px] truncate font-semibold text-adm-ink">{copy.label}</Td>
-      <Td className="max-w-[220px] truncate">{vehicleLabel(item)}{departed ? " (left the lot)" : ""}</Td>
+      <Td className="whitespace-nowrap text-adm-muted">{ageLabel(item.created_at)}</Td>
+      <Td className="max-w-[250px] truncate font-semibold text-adm-ink">{copy.label}</Td>
+      <Td className="max-w-[180px] truncate">{vehicleLabel(item)}{departed ? " (left the lot)" : ""}</Td>
       <Td className="text-adm-muted">System</Td>
       <Td className="text-adm-muted">System</Td>
       <Td className="whitespace-nowrap text-adm-muted">
