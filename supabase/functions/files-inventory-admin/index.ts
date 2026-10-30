@@ -128,9 +128,9 @@ async function discover(db: SupabaseClient, key: string) {
 
 async function validate(db: SupabaseClient, key: string, path: string, uid: string) {
   const binding = await bindingFor(db, path);
-  const { data: file } = await db.from("inventory_feed_files").select("id,status").eq("provider", "filescom").eq("path", path).maybeSingle();
+  const { data: file } = await db.from("inventory_feed_files").select("id,status,updated_at").eq("provider", "filescom").eq("path", path).maybeSingle();
   if (!file) throw new FcError("file_not_discovered");
-  if (file.status === "validating") throw new FcError("already_validating");
+  if (file.status === "validating" && Date.now() - Date.parse(file.updated_at) < 10 * 60_000) throw new FcError("already_validating");
   const { data: run, error } = await write(db, "inventory_feed_runs").insert({
     file_id: file.id, path, binding_id: binding?.id ?? null, binding_status: binding?.status ?? "unmapped", tenant_id: binding?.tenant_id ?? null, triggered_by: uid,
   }).select("id").single();
@@ -269,7 +269,7 @@ Deno.serve(async (req) => {
         return json(400, { error: "unknown_action" });
     }
   } catch (e) {
-    if (e instanceof FcError) return json(e.http && e.http < 500 && e.http >= 400 && e.code.startsWith("path") ? 400 : 502, { error: e.code, status: e.http ?? null });
+    if (e instanceof FcError) return json(e.http === 400 ? 400 : e.code === "already_validating" || e.code === "file_not_discovered" ? 409 : 502, { error: e.code, status: e.http === 400 ? null : e.http ?? null });
     console.error("files-inventory-admin error");
     return json(500, { error: "internal_error" });
   }
