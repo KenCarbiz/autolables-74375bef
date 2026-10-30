@@ -110,7 +110,8 @@ async function loadOverview(tenantId: string, now: number): Promise<LiveOverview
     countOf(db.from("vehicle_listings").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).is("archived_at", null).is("advertised_price_before_doc", null).not("price", "is", null)),
     countOf(db.from("vehicle_listings").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).is("archived_at", null).eq("price_parse_status", "warning")),
     countOf(db.from("description_jobs").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("status", "failed")),
-    countOf(db.from("vehicle_listings").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).is("archived_at", null).eq("status", "pending_review")),
+    // The same population the Policy reviews tile opens: open stale-document flags.
+    countOf(db.from("stale_document_flags").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("status", "open")),
   ]);
 
   let activity: ActivityRow[] = [];
