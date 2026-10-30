@@ -181,18 +181,8 @@ const QUEUE_CHIP: Record<HealthTone, string> = {
 
 const POLICY_ICON: Record<string, typeof Tag> = { price_basis: Tag, publishing: Globe, used_cpo: CarFront };
 
-// Summary tiles, measured on the reference: 52px icon circle on a 14px inset,
-// 81px tall, the value 5px under the label, and the Policy reviews tile in
-// violet. StatTile takes no className, so the geometry is set from here.
-const TILE_GRID = [
-  "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[311fr_315fr_320fr_327fr] gap-3",
-  "[&>a]:min-h-[81px] [&>a]:px-3.5",
-  "[&>a>span:first-child]:w-[52px] [&>a>span:first-child]:h-[52px]",
-  "[&_.tabular-nums]:mt-[5px]",
-  "[&>a:first-child>span:first-child>svg]:w-[30px] [&>a:first-child>span:first-child>svg]:h-[30px]",
-  "[&>a:nth-child(2)>span:first-child>svg]:w-6 [&>a:nth-child(2)>span:first-child>svg]:h-6",
-  "[&>a:nth-child(3)>span:first-child]:bg-[#F1ECFE] [&>a:nth-child(3)>span:first-child]:text-[#6A3DE8]",
-].join(" ");
+// One flat row of four summary tiles; each names its population.
+const TILE_GRID = "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3";
 
 export default function OverviewView() {
   const fixture = useViewFixture<OverviewFixture>("overview");
