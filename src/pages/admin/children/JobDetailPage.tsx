@@ -15,8 +15,8 @@ const DOT: Record<HealthTone, string> = { neutral: "bg-adm-muted", success: "bg-
 
 const Step = ({ n, tone, title, time, children, last = false }: { n: number; tone: HealthTone; title: string; time?: string; children: React.ReactNode; last?: boolean }) => (
   <li className="relative pl-9 pb-5 last:pb-0">
-    {!last && <span aria-hidden="true" className="absolute left-[9px] top-6 bottom-0 w-0.5 bg-adm-border" />}
-    <span aria-hidden="true" className={cn("absolute left-0 top-[2px] h-5 w-5 rounded-full ring-4 ring-white", DOT[tone])} />
+    {!last && <span aria-hidden="true" className="absolute left-[9px] top-5 bottom-0 w-0.5 bg-adm-border" />}
+    <span aria-hidden="true" className={cn("absolute left-[3px] top-[4px] h-3.5 w-3.5 rounded-full ring-4 ring-white", DOT[tone])} />
     <div className="flex items-baseline justify-between gap-3">
       <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{n}. {title}</p>
       {time && <p className="text-[13px] leading-[18px] text-adm-muted whitespace-nowrap">{time}</p>}
@@ -68,8 +68,6 @@ export default function JobDetailPage() {
       crumbs={crumbs}
       title={row.lastOutcome ? (succeeded ? "Invocation completed" : "Invocation failed") : row.verdict.headline}
       subtitle={`${spec.label}, scheduled job detail${row.lastAttemptAt ? `. Last invocation ${formatAt(row.lastAttemptAt)}` : ""}`}
-      backHref={jobsHref}
-      backLabel="Back to jobs"
       actions={banner ? undefined : <LinkButton variant="primary" to={spec.drillIn}>{spec.drillInLabel}</LinkButton>}
     >
       <div className="grid gap-4 lg:grid-cols-3 items-start">
@@ -106,7 +104,6 @@ export default function JobDetailPage() {
         <Panel title="Outcome" titleSize="md" inset="sm">
           <KeyValueList
             rows={[
-              { label: "Health", value: <StatusText tone={meta.tone}>{meta.label}</StatusText> },
               { label: "Last outcome", value: row.lastOutcome ? <>{outcomeText}{row.lastOutcome && !row.lastSuccessAt && succeeded ? " (scheduler run)" : ""}</> : <span className="text-adm-muted">None recorded</span> },
               { label: "Last success", value: row.lastSuccessAt ? formatAt(row.lastSuccessAt) : <span className="text-adm-muted">{succeeded ? "No output confirmed for this rooftop" : "None recorded"}</span> },
               { label: "Evidence", value: row.evidence === "rooftop_ledger" ? "This rooftop's ledger" : row.evidence === "scheduler" ? "Scheduler record" : "None" },

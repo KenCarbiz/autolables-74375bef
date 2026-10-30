@@ -79,13 +79,16 @@ export const daysInInventory = (vehicle: Pick<VehicleRow, "created_at">): number
   Math.max(0, Math.floor((Date.now() - new Date(vehicle.created_at).getTime()) / 86400000));
 
 /** Owner, state and next action for a vehicle, from the stored lifecycle row only. */
-export const lifecycleFacts = (vehicle: VehicleRow, lifecycle: LifecycleResult) => {
+export const lifecycleFacts = (vehicle: VehicleRow, lifecycle: LifecycleResult, openBlockers = 0) => {
   const { row, loading, tracked } = lifecycle;
   const state = row?.state ?? null;
+  const contradicted = state === "RETAIL_READY" && openBlockers > 0;
   return {
     owner: state ? STATE_OWNER[state] : tracked ? "Inventory intake" : "Merchandising",
-    state: loading ? "Reading" : !tracked ? "Not tracked" : state ? STATE_LABEL[state] : "No record",
-    nextAction: state ? STATE_NEXT_ACTION[state] : tracked ? "Wait for the first lifecycle recompute after intake" : "Build this vehicle's documents and publish it",
+    state: loading ? "Reading" : !tracked ? "Not tracked" : contradicted ? "Not retail ready" : state ? STATE_LABEL[state] : "No record",
+    nextAction: contradicted
+      ? `Clear ${openBlockers} open blocker${openBlockers === 1 ? "" : "s"}`
+      : state ? STATE_NEXT_ACTION[state] : tracked ? "Wait for the first lifecycle recompute after intake" : "Build this vehicle's documents and publish it",
     days: daysInInventory(vehicle),
   };
 };

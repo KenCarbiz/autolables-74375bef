@@ -155,33 +155,6 @@ const CustomerRecord = () => {
             )}
           </Panel>
 
-          <Panel title={`Deals (${customer.deals.length})`}>
-            {customer.deals.length === 0 ? (
-              <p className="text-[14px] leading-[20px] text-adm-muted">No addendum on this store carries this customer's name or email.</p>
-            ) : (
-              <ul className="divide-y divide-adm-border">
-                {customer.deals.map((deal) => (
-                  <li key={deal.id} className="space-y-1 py-3 first:pt-0 last:pb-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="min-w-0 truncate text-[14px] leading-[20px] font-semibold text-adm-ink">{deal.vehicleLabel}</p>
-                      <span className="shrink-0 whitespace-nowrap"><Chip tone={dealStateTone(deal.state)}>{deal.stateLabel}</Chip></span>
-                    </div>
-                    <p className="text-[13px] leading-[18px] text-adm-muted">
-                      {money(deal.amount)}{deal.employeeName ? ` · Sold by ${deal.employeeName}` : ""}
-                    </p>
-                    {deal.returnInfo && <p className="text-[13px] leading-[18px] text-adm-ink">{deal.returnInfo.label}</p>}
-                    {deal.state === "out_for_signature" && (
-                      <details>
-                        <summary className="cursor-pointer text-[13px] font-semibold text-adm-primary">Signing status</summary>
-                        <div className="mt-2"><AddendumStatusTimeline addendumId={deal.id} /></div>
-                      </details>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Panel>
-
           <Panel title="Intent timeline">
             {customer.activity.length === 0 ? (
               <p className="text-[14px] leading-[20px] text-adm-muted">Nothing has been captured for this customer yet.</p>
@@ -237,6 +210,33 @@ const CustomerRecord = () => {
                   <SummaryList rows={customer.engagement.modules.map((m) => ({ label: m.label, value: mmss(m.seconds) }))} />
                 )}
               </div>
+            )}
+          </Panel>
+
+          <Panel title={`Deals (${customer.deals.length})`}>
+            {customer.deals.length === 0 ? (
+              <p className="text-[14px] leading-[20px] text-adm-muted">No addendum on this store carries this customer's name or email.</p>
+            ) : (
+              <ul className="divide-y divide-adm-border">
+                {customer.deals.map((deal) => (
+                  <li key={deal.id} className="space-y-1 py-3 first:pt-0 last:pb-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="min-w-0 truncate text-[14px] leading-[20px] font-semibold text-adm-ink">{deal.vehicleLabel}</p>
+                      <span className="shrink-0 whitespace-nowrap"><Chip tone={dealStateTone(deal.state)}>{deal.stateLabel}</Chip></span>
+                    </div>
+                    <p className="text-[13px] leading-[18px] text-adm-muted">
+                      {money(deal.amount)}{deal.employeeName ? ` · Sold by ${deal.employeeName}` : ""}
+                    </p>
+                    {deal.returnInfo && <p className="text-[13px] leading-[18px] text-adm-ink">{deal.returnInfo.label}</p>}
+                    {deal.state === "out_for_signature" && (
+                      <details>
+                        <summary className="cursor-pointer text-[13px] font-semibold text-adm-primary">Signing status</summary>
+                        <div className="mt-2"><AddendumStatusTimeline addendumId={deal.id} /></div>
+                      </details>
+                    )}
+                  </li>
+                ))}
+              </ul>
             )}
           </Panel>
         </div>

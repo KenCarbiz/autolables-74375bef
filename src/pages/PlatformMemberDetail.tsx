@@ -157,7 +157,7 @@ const PlatformMemberDetail = () => {
                 />
               </Panel>
             ) : tab === "entitlements" ? (
-              <Panel title="Effective access" titleSize="md" inset="sm" description="Derived from the seat's role and each tenant's AutoLabels entitlement. Read only." flush>
+              <Panel title="Effective access" titleSize="md" inset="sm" flush>
                 <WorkTable caption="Effective access by tenant">
                   <thead>
                     <tr>
@@ -168,10 +168,10 @@ const PlatformMemberDetail = () => {
                   <tbody>
                     {MATRIX.map((row, i) => (
                       <tr key={row.label}>
-                        <Td className="whitespace-nowrap">{row.label}</Td>
+                        <Td className="whitespace-nowrap !py-2.5">{row.label}</Td>
                         {entitledSeats.map(({ seat, ent }) => {
                           const level = levels(seat, isEntitled(ent))[i];
-                          return <Td key={seat.id}><StatusText tone={LEVEL_TONE[level]}>{level}</StatusText></Td>;
+                          return <Td key={seat.id} className="!py-2.5"><StatusText tone={LEVEL_TONE[level]}>{level}</StatusText></Td>;
                         })}
                       </tr>
                     ))}
@@ -244,7 +244,7 @@ const PlatformMemberDetail = () => {
                 </div>
               )}
             </Panel>
-            {tab !== "overview" && (
+            {tab !== "overview" && tab !== "entitlements" && (
             <Panel title="Member" titleSize="md" inset="sm">
               <KeyValueList
                 className="grid-cols-[1fr_auto]"

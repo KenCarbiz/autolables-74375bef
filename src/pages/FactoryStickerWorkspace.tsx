@@ -731,52 +731,16 @@ export default function FactoryStickerWorkspace({
             </span>
           ) : undefined}
           actions={
-            !fixture ? (
-              <>
-                {pdfUrl && (
-                  <a
-                    href={pdfUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center min-h-[40px] px-4 rounded-[6px] border border-adm-border bg-adm-surface text-[14px] font-semibold hover:bg-adm-workspace"
-                  >
-                    Preview PDF
-                  </a>
-                )}
-                {manager && genStatus !== "PUBLISHED" && !!currentDoc && (
-                  <button
-                    type="button"
-                    onClick={() => act("approve_publish")}
-                    disabled={!!busy || !currentDoc}
-                    className="inline-flex items-center gap-2 min-h-[40px] px-4 rounded-[6px] bg-adm-primary hover:bg-adm-primary-hover text-white text-[14px] font-semibold disabled:opacity-50"
-                  >
-                    {busy === "approve_publish" ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-                    Review publication
-                  </button>
-                )}
-                {manager && !currentDoc && (
-                  <button
-                    type="button"
-                    onClick={() => act("orchestrate", { allowSourceFetch: true })}
-                    disabled={!!busy}
-                    className="inline-flex items-center gap-2 min-h-[40px] px-4 rounded-[6px] bg-adm-primary hover:bg-adm-primary-hover text-white text-[14px] font-semibold disabled:opacity-50"
-                  >
-                    {busy === "orchestrate" ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-                    Retrieve vehicle data
-                  </button>
-                )}
-                {manager && genStatus === "PUBLISHED" && (
-                  <button
-                    type="button"
-                    onClick={() => act("unpublish")}
-                    disabled={!!busy}
-                    className="inline-flex items-center gap-2 min-h-[40px] px-4 rounded-[6px] border border-adm-border bg-adm-surface text-[14px] font-semibold hover:bg-adm-workspace disabled:opacity-50"
-                  >
-                    {busy === "unpublish" ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-                    Unpublish
-                  </button>
-                )}
-              </>
+            !fixture && manager && !currentDoc ? (
+              <button
+                type="button"
+                onClick={() => act("orchestrate", { allowSourceFetch: true })}
+                disabled={!!busy}
+                className="inline-flex items-center gap-2 min-h-[40px] px-4 rounded-[6px] bg-adm-primary hover:bg-adm-primary-hover text-white text-[14px] font-semibold disabled:opacity-50"
+              >
+                {busy === "orchestrate" ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+                Retrieve vehicle data
+              </button>
             ) : undefined
           }
         />
@@ -905,18 +869,18 @@ export default function FactoryStickerWorkspace({
           {/* LEFT — vehicle and data status */}
           <div className="space-y-4">
             <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4 space-y-3">
-              {hero ? (
-                <img src={hero} alt="Vehicle" className="w-full h-[180px] object-cover rounded-[6px] border border-border" />
-              ) : (
-                <div className="w-full h-[120px] rounded-[6px] border border-dashed border-border bg-muted/30 flex items-center justify-center text-[11px] text-muted-foreground">
-                  {fixture ? "Fixture vehicle — no photo" : "No photo on file"}
+              <div className="flex items-center gap-3">
+                {hero ? (
+                  <img src={hero} alt="Vehicle" className="h-14 w-[84px] shrink-0 object-cover rounded-[6px] border border-border" />
+                ) : (
+                  <div aria-hidden="true" className="h-14 w-[84px] shrink-0 rounded-[6px] border border-adm-border bg-adm-workspace" />
+                )}
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-foreground">
+                    {data ? `${data.identity.year} ${data.identity.make} ${data.identity.model}` : vehicle?.ymm || "Unknown"}
+                  </p>
+                  {data?.identity.trim && <p className="text-[12px] text-muted-foreground">{data.identity.trim}</p>}
                 </div>
-              )}
-              <div>
-                <p className="text-sm font-bold text-foreground">
-                  {data ? `${data.identity.year} ${data.identity.make} ${data.identity.model}` : "—"}
-                </p>
-                {data?.identity.trim && <p className="text-[11px] text-muted-foreground">{data.identity.trim}</p>}
               </div>
               <div className="space-y-0">
                 <StatusRow label="VIN" value={<span className="font-mono">{data?.vin || vehicle?.vin || "—"}</span>} />
@@ -988,7 +952,7 @@ export default function FactoryStickerWorkspace({
                 isPlatformAdmin={isAdmin}
                 busy={!!busy}
                 onRegenerate={() => act(record ? "regenerate" : "orchestrate")}
-                onRetrieveSourceData={() => act("orchestrate", { allowSourceFetch: true })}
+                onRetrieveSourceData={manager && !currentDoc ? undefined : () => act("orchestrate", { allowSourceFetch: true })}
               />
             )}
 
@@ -1174,6 +1138,42 @@ export default function FactoryStickerWorkspace({
               </>
             )}
             </div>
+            {!fixture && !!currentDoc && (
+              <div className="grid grid-cols-2 gap-3 border-t border-adm-border p-4">
+                {pdfUrl ? (
+                  <a
+                    href={pdfUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center justify-center min-h-[40px] px-4 rounded-[6px] border border-adm-border bg-adm-surface text-[14px] font-semibold hover:bg-adm-workspace"
+                  >
+                    Preview PDF
+                  </a>
+                ) : <span />}
+                {manager && genStatus !== "PUBLISHED" && (
+                  <button
+                    type="button"
+                    onClick={() => act("approve_publish")}
+                    disabled={!!busy}
+                    className="inline-flex items-center justify-center gap-2 min-h-[40px] px-4 rounded-[6px] bg-adm-primary hover:bg-adm-primary-hover text-white text-[14px] font-semibold disabled:opacity-50"
+                  >
+                    {busy === "approve_publish" ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+                    Review publication
+                  </button>
+                )}
+                {manager && genStatus === "PUBLISHED" && (
+                  <button
+                    type="button"
+                    onClick={() => act("unpublish")}
+                    disabled={!!busy}
+                    className="inline-flex items-center justify-center gap-2 min-h-[40px] px-4 rounded-[6px] border border-adm-border bg-adm-surface text-[14px] font-semibold hover:bg-adm-workspace disabled:opacity-50"
+                  >
+                    {busy === "unpublish" ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+                    Unpublish
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
             {oemOriginalUrl && (

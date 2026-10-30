@@ -123,6 +123,7 @@ export const PlatformTenants = () => {
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px] items-start">
       <div className="space-y-4 min-w-0">
+      {(tenants.data?.length ?? 0) > 10 || q !== "" || filter !== "all" ? (
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
           <div className="relative">
@@ -147,6 +148,7 @@ export const PlatformTenants = () => {
           </select>
         </div>
       </div>
+      ) : null}
 
       {creating && (
         <CreateTenantForm
@@ -227,7 +229,7 @@ export const PlatformTenants = () => {
                     </Td>
                     <Td>
                       <div className="flex items-center gap-2">
-                        <span className="whitespace-nowrap">{TIER_LABEL[current] ?? current}</span>
+                        <span className="whitespace-nowrap">{TIER_LABEL[current] ?? String(current).replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase())}</span>
                         {mc?.allowed && (
                           <span title={`MarketCheck scrape ${mc.enabled ? "on" : "granted, dealer not enabled yet"}${mc.last_run_at ? ` · last run ${formatDate(mc.last_run_at)}` : ""}`} className={mc.enabled ? "text-adm-success" : "text-adm-warning"}>
                             <Database className="w-5 h-5" aria-hidden="true" />
@@ -248,7 +250,7 @@ export const PlatformTenants = () => {
               })}
             </tbody>
           </AdminTable>
-          <TablePagination
+          {sortPag.totalPages > 1 && <TablePagination
             page={sortPag.page}
             totalPages={sortPag.totalPages}
             pageSize={sortPag.pageSize}
@@ -258,7 +260,7 @@ export const PlatformTenants = () => {
             setPageSize={sortPag.setPageSize}
             onExportCsv={handleExport}
             exportLabel="Export CSV"
-          />
+          />}
         </div>
       )}
       </div>

@@ -27,7 +27,7 @@ const FORMATS: Array<{ key: StickerType; label: string }> = [
 ];
 
 const fieldCls = "h-10 w-full rounded-md border border-adm-border bg-adm-surface px-3 text-[14px] text-adm-ink outline-none focus:ring-2 focus:ring-adm-primary";
-const labelCls = "flex flex-col gap-1 text-[13px] leading-[18px] text-adm-ink";
+const labelCls = "flex flex-col justify-end gap-1 text-[13px] leading-[18px] text-adm-ink";
 const num = (v: number) => (Number.isFinite(v) ? v : 0);
 
 const PX_PER_IN = 22;
@@ -44,8 +44,8 @@ const PagePreview = ({ type, cal, active }: { type: StickerType; cal: PrintCalib
   const dy = num(cal.yOffsetIn) * PX_PER_IN;
   const s = num(cal.scalePct) / 100 || 1;
   return (
-    <AdminCard inset="sm" title={type === "window" ? "Page preview (8.5 x 11)" : "Alternate format (4.5 x 11)"} className={cn(active && "border-adm-primary")}>
-      <svg role="img" aria-label={`${spec.widthIn} by ${spec.heightIn} inch page preview`} width={w + pad + 56} height={h + pad * 2} viewBox={`0 0 ${w + pad + 56} ${h + pad * 2}`} className="mx-auto block h-auto max-w-full">
+    <AdminCard inset="sm" title={type === "window" ? "Page preview (8.5 x 11)" : "Alternate format (4.5 x 11)"}>
+      <svg role="img" aria-label={`${spec.widthIn} by ${spec.heightIn} inch page preview`} width={w + pad + 96} height={h + pad * 2} viewBox={`0 0 ${w + pad + 96} ${h + pad * 2}`} className="mx-auto block h-auto max-w-full">
         <rect x={pad} y={pad} width={w} height={h} fill="#fff" stroke="#8A94A6" />
         <g transform={`translate(${dx} ${dy})`}>
           <rect x={pad + inset} y={pad + top} width={Math.max(w - inset * 2, 0) * s} height={Math.max(h - top * 2, 0) * s} fill="#F3F6FC" stroke="#2457D6" strokeDasharray="4 3" />
@@ -57,9 +57,13 @@ const PagePreview = ({ type, cal, active }: { type: StickerType; cal: PrintCalib
           ))}
         </g>
         <line x1={pad} y1={pad - 14} x2={pad + w} y2={pad - 14} stroke="#8A94A6" />
-        <text x={pad + w / 2} y={pad - 19} textAnchor="middle" fontSize="11" fill="#1D2433">{spec.widthIn} in</text>
+        <text x={pad + w / 2} y={pad - 19} textAnchor="middle" fontSize="11" fill="#1D2433">{spec.widthIn} in ({Math.round(spec.widthIn * 96)} px at 96 dpi)</text>
         <line x1={pad + w + 14} y1={pad} x2={pad + w + 14} y2={pad + h} stroke="#8A94A6" />
-        <text x={pad + w + 20} y={pad + h / 2} fontSize="11" fill="#1D2433">{spec.heightIn} in</text>
+        <text x={pad + w + 20} y={pad + h / 2} fontSize="11" fill="#1D2433">
+          <tspan x={pad + w + 20}>{spec.heightIn} in</tspan>
+          <tspan x={pad + w + 20} dy="13">{Math.round(spec.heightIn * 96)} px</tspan>
+          <tspan x={pad + w + 20} dy="13">at 96 dpi</tspan>
+        </text>
       </svg>
     </AdminCard>
   );
@@ -136,7 +140,7 @@ export default function PrintCalibrationPage() {
                     Printer
                     <input className={fieldCls} value={cal.printerName || ""} onChange={(e) => set({ printerName: e.target.value })} placeholder="Printer name, for example Lobby HP LaserJet" />
                   </label>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-3 items-end gap-3">
                     <label className={labelCls}>Horizontal offset (in)<input type="number" step="0.01" className={fieldCls} value={num(cal.xOffsetIn)} onChange={(e) => set({ xOffsetIn: parseFloat(e.target.value) })} /></label>
                     <label className={labelCls}>Vertical offset (in)<input type="number" step="0.01" className={fieldCls} value={num(cal.yOffsetIn)} onChange={(e) => set({ yOffsetIn: parseFloat(e.target.value) })} /></label>
                     <label className={labelCls}>Scale (%)<input type="number" step="0.5" className={fieldCls} value={num(cal.scalePct)} onChange={(e) => set({ scalePct: parseFloat(e.target.value) })} /></label>

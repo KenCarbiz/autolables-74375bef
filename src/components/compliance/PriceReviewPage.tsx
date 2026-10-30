@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { Crumbs, DetailLayout, FactStrip, fmtDateTime } from "@/components/detail/parts";
+import { Crumbs, DetailLayout, fmtDateTime } from "@/components/detail/parts";
 import { LinkButton, LocalTabs, PageBody, PageHeader, Panel, QueryState, StatusText, Td, Th, WorkTable, type Tone } from "@/components/product";
 import { PRICE_STATE_LABEL, money, type PriceRow, type PriceState } from "./complianceData";
 import { useComplianceCenterData } from "./useComplianceCenterData";
@@ -138,9 +138,24 @@ export default function PriceReviewPage() {
     <PageBody width="wide">
       <Crumbs items={crumbs} />
       <PageHeader
-        title={row ? `Price review — ${row.title}` : "Price review"}
+        title={row ? `Price review — ${row.title.split(" ").slice(0, 3).join(" ")}` : "Price review"}
         description={<span className="font-mono">VIN {vin}</span>}
-        
+        meta={row && (
+          <dl className="flex flex-wrap items-start gap-x-6 gap-y-1 text-left">
+            {[
+              { label: "Review reason", value: <span title={row.currentIssue ?? undefined} className="block max-w-[200px] truncate">{row.currentIssue ?? "No open issue"}</span> },
+              { label: "Review status", value: <StatusText tone={STATE_TONE[row.state]}>{PRICE_STATE_LABEL[row.state]}</StatusText> },
+              { label: "Open document flags", value: row.openFlags },
+              { label: "Last checked", value: fmtDateTime(row.lastCheckedAt) },
+              { label: "Stock number", value: row.stockNumber ?? "Unknown" },
+            ].map((f) => (
+              <div key={f.label}>
+                <dt className="text-[12px] leading-[18px] text-adm-muted">{f.label}</dt>
+                <dd className="text-[13px] leading-[18px] font-semibold text-adm-ink">{f.value}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
       />
       <QueryState
         status={status}
@@ -153,16 +168,6 @@ export default function PriceReviewPage() {
       >
         {row && (
           <>
-            <FactStrip
-              label="Review summary"
-              facts={[
-                { label: "Review reason", value: row.currentIssue ?? "No open issue" },
-                { label: "Review status", value: <StatusText tone={STATE_TONE[row.state]}>{PRICE_STATE_LABEL[row.state]}</StatusText> },
-                { label: "Open document flags", value: row.openFlags },
-                { label: "Last checked", value: fmtDateTime(row.lastCheckedAt) },
-                { label: "Stock number", value: row.stockNumber ?? "Unknown" },
-              ]}
-            />
             <LocalTabs
               label="Price review"
               tabs={[

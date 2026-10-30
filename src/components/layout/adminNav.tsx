@@ -225,11 +225,11 @@ export function buildAdminNavSections({ badges, anyAdminTab, role }: BuildNavOpt
           // but is reached from Inventory, so it keeps the parent lit.
           // VIN Command Center is per-vehicle and has no top-level row, so it
           // keeps Inventory lit the same way the vehicle file does.
-          match: (p) =>
+          match: (p, s) =>
             underSegment("/inventory")(p) ||
             p === "/inventory-v2" ||
             p === "/add-inventory" ||
-            p.startsWith("/vehicle-file/") ||
+            (p.startsWith("/vehicle-file/") && !/[?&]tab=(getready|compliance)\b/.test(s)) ||
             underSegment("/vin-command")(p),
         },
         {
@@ -286,7 +286,7 @@ export function buildAdminNavSections({ badges, anyAdminTab, role }: BuildNavOpt
       title: "Get Ready",
       icon: Wrench,
       items: [
-        { label: "Get Ready Command", assetIcon: "013AC", path: "/get-ready-command", icon: Rocket, capability: "can_view_get_ready", match: underSegment("/get-ready-command") },
+        { label: "Get Ready Command", assetIcon: "013AC", path: "/get-ready-command", icon: Rocket, capability: "can_view_get_ready", match: (p, s) => underSegment("/get-ready-command")(p) || (p.startsWith("/vehicle-file/") && /[?&]tab=getready\b/.test(s)) },
         // The writer's own desk. Narrowly gated so it appears for the people who
         // dispatch service work and for nobody else.
         { label: "Service Writer Desk", assetIcon: "062AC", path: "/service-desk", icon: ClipboardCheck, capability: "can_assign_service_work", match: underSegment("/service-desk") },
@@ -334,7 +334,8 @@ export function buildAdminNavSections({ badges, anyAdminTab, role }: BuildNavOpt
           icon: ShieldCheck,
           capability: "can_view_compliance",
           badge: badgeOrUndefined(badges.complianceTasks + badges.priceChangeReview),
-          match: (p) =>
+          match: (p, s) =>
+            (p.startsWith("/vehicle-file/") && /[?&]tab=compliance\b/.test(s)) ||
             underSegment("/compliance")(p) ||
             underSegment("/compliance-center")(p) ||
             underSegment("/titles")(p) ||

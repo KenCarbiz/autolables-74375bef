@@ -254,6 +254,8 @@ export default function DocumentsPrintCenter() {
       Icon={Printer}
       busy={busy === "packet"}
       disabledReason={packetReason}
+      className="w-full"
+      wrapperClassName="flex w-full"
       onClick={() => runPrint("packet")}>
       Print bundle
     </CommandAction>
@@ -301,7 +303,7 @@ export default function DocumentsPrintCenter() {
                     <Th>Document</Th>
                     <Th>Version</Th>
                     <Th className="whitespace-nowrap">Internal status</Th>
-                    <Th>Passport</Th>
+                    <Th>Visibility</Th>
                     <Th className="whitespace-nowrap">Print status</Th>
                     <Th align="right">Action</Th>
                   </tr>
@@ -312,7 +314,7 @@ export default function DocumentsPrintCenter() {
                     const reprinting = busyRow?.id === d.id && busyRow.kind === "reprint";
                     const generating = busyRow?.id === d.id && busyRow.kind === "generate";
                     return (
-                      <tr key={d.id} className={`h-14 cursor-pointer ${previewDoc?.id === d.id ? "bg-adm-selected" : "hover:bg-adm-workspace"}`} onClick={() => setSelectedDoc(d.id)}>
+                      <tr key={d.id} className={`h-12 cursor-pointer ${previewDoc?.id === d.id ? "bg-adm-selected" : "hover:bg-adm-workspace"}`} onClick={() => setSelectedDoc(d.id)}>
                         <Td className="w-10" >
                           <input
                             type="checkbox"
@@ -367,13 +369,6 @@ export default function DocumentsPrintCenter() {
                                 Generate
                               </CommandAction>
                             ) : null}
-                            <CommandKebab
-                              label={`More actions for ${d.label}`}
-                              expanded={menu?.id === d.id}
-                              onOpen={(trigger) =>
-                                setMenu((m) => (m?.id === d.id ? null : { id: d.id, row: d, trigger }))
-                              }
-                            />
                           </span>
                         </Td>
                       </tr>

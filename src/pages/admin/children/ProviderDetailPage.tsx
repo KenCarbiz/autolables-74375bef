@@ -70,8 +70,6 @@ export default function ProviderDetailPage() {
       crumbs={crumbs}
       title={spec.label}
       subtitle={spec.affectedOutput}
-      backHref={providersHref}
-      backLabel="Back to providers"
       actions={<LinkButton variant="primary" to={providerDrillIn(spec, data.latestRunId)}>{spec.drillInLabel}</LinkButton>}
       tabs={
         <LocalTabs
@@ -103,7 +101,7 @@ export default function ProviderDetailPage() {
             <Panel title={tab === "data" ? "Data and cache" : tab === "configuration" ? "Configuration" : "Capability details"} titleSize="md" inset="sm">
               <KeyValueList
                 rows={[
-                  { label: "Affects", value: spec.affectedOutput },
+                  ...(tab === "data" ? [{ label: "Affects", value: spec.affectedOutput }] : []),
                   ...(tab !== "data" && spec.registryKeys.length ? [{ label: "Registry keys", value: <span className="font-mono text-[13px]">{spec.registryKeys.join(", ")}</span> }] : []),
                   ...(tab !== "data" ? [{ label: "Mode", value: spec.manual ? "Manual, on request" : "Automatic" }] : []),
                   { label: "Last attempt", value: card.lastAttemptAt ? formatAt(card.lastAttemptAt) : <span className="text-adm-muted">None recorded</span> },
@@ -116,25 +114,27 @@ export default function ProviderDetailPage() {
           )}
           {(tab === "overview" || tab === "attempts") && (
             <Panel title="Recent attempts" titleSize="md" inset="sm" flush>
-              {attempts.length === 0 ? (
-                <EmptyState title={data.events === null ? "Calls could not be read" : "No calls recorded"} detail={data.events === null ? "The call ledger did not answer. Nothing here is current." : "No call to this provider is recorded in the last 30 days."} compact />
-              ) : (
-                <WorkTable caption="Recent provider calls">
-                  <thead>
-                    <tr><Th>Date and time</Th><Th>Product</Th><Th>Outcome</Th><Th align="right">HTTP</Th></tr>
-                  </thead>
-                  <tbody>
-                    {(tab === "attempts" ? attempts : attempts.slice(0, 5)).map((e, i) => (
+              <WorkTable caption="Recent provider calls">
+                <thead>
+                  <tr><Th>Date and time</Th><Th>Product</Th><Th>Outcome</Th><Th align="right">HTTP</Th></tr>
+                </thead>
+                <tbody>
+                  {attempts.length === 0 ? (
+                    <tr>
+                      <Td colSpan={4} className="text-adm-muted">{data.events === null ? "The call ledger did not answer. Nothing here is current." : "No call to this provider is recorded in the last 30 days."}</Td>
+                    </tr>
+                  ) : (
+                    (tab === "attempts" ? attempts : attempts.slice(0, 5)).map((e, i) => (
                       <tr key={`${e.at}-${i}`}>
                         <Td className="whitespace-nowrap">{formatAt(e.at)}</Td>
                         <Td className="font-mono text-[13px]">{e.product}</Td>
                         <Td><StatusText tone={OUTCOME_TONE(e.outcome)}>{e.outcome ? e.outcome.replace(/_/g, " ") : "Not recorded"}</StatusText></Td>
                         <Td align="right">{e.http_status ?? <span className="text-adm-muted">None</span>}</Td>
                       </tr>
-                    ))}
-                  </tbody>
-                </WorkTable>
-              )}
+                    ))
+                  )}
+                </tbody>
+              </WorkTable>
             </Panel>
           )}
           {(tab === "overview" || tab === "quota") && (
@@ -145,7 +145,6 @@ export default function ProviderDetailPage() {
                   <p className="text-[14px] font-semibold text-adm-ink">{card.verdict.headline}</p>
                   <p className="text-[13px] leading-[18px] text-adm-muted">{card.verdict.detail}</p>
                   {card.attempts !== null && <p className="text-[13px] leading-[18px] text-adm-muted">{`${card.attempts} calls in the last 30 days${card.refusals ? `, ${card.refusals} refused` : ""}.`}</p>}
-                  <LinkButton to={providerDrillIn(spec, data.latestRunId)}>{spec.drillInLabel}</LinkButton>
                 </div>
               </Panel>
             </aside>

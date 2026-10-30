@@ -37,7 +37,7 @@ export const ICON_BOX = {
 } as const;
 
 const TONE_CHIP: Record<Tone, string> = {
-  neutral: "bg-adm-workspace text-adm-muted border border-adm-border",
+  neutral: "bg-adm-workspace text-adm-muted",
   success: "bg-adm-success-bg text-adm-success",
   warning: "bg-adm-warning-bg text-adm-warning",
   danger: "bg-adm-danger-bg text-adm-danger",

@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { Crumbs } from "@/components/detail/parts";
-import { AdminButton, StatusChip } from "@/components/admin/v2/primitives";
+import { FileText } from "lucide-react";
+import { AdminButton } from "@/components/admin/v2/primitives";
 import { PageBody, PageHeader } from "@/components/product";
-import { adminTabHref } from "@/lib/admin/sections";
 
 // Dealer-only picker for the served customer Passport. It sets the preview
 // parameters the served page already understands and loads that page in a
@@ -31,14 +30,13 @@ export default function CustomerPreviewPage() {
 
   return (
     <PageBody width="wide">
-      <Crumbs items={[{ label: "Administration", to: "/admin" }, { label: "Customer Experience", to: adminTabHref("routing") }, { label: "Customer previews", to: adminTabHref("customer-previews") }, { label: "Dealer view" }]} />
       <PageHeader
-        title={<span className="inline-flex flex-wrap items-center gap-3">Customer Passport Preview (Admin) <StatusChip tone="info">Dealer view only</StatusChip></span>}
+        title="Customer Passport Preview: dealer view only"
         description="This preview uses the existing production component. The customer-facing Passport design is unchanged."
       />
       <form
         aria-label="Preview settings"
-        className="flex flex-wrap items-end gap-4 rounded-[6px] border border-adm-border bg-adm-surface p-4"
+        className="flex flex-wrap items-end gap-4"
         onSubmit={(e) => {
           e.preventDefault();
           setSrc(previewSrc(scenario, state));
@@ -68,9 +66,10 @@ export default function CustomerPreviewPage() {
         {src ? (
           <iframe title="Customer Passport preview" src={src} className="block h-[760px] w-full border-0" />
         ) : (
-          <div className="flex h-[360px] flex-col items-center justify-center gap-2 bg-adm-workspace text-center">
+          <div className="flex h-[240px] flex-col items-center justify-center gap-2 bg-adm-workspace text-center">
+            <FileText className="h-10 w-10 text-adm-muted" strokeWidth={1.5} aria-hidden="true" />
             <p className="text-[20px] leading-[28px] font-semibold text-adm-ink">Existing approved customer Passport renders here</p>
-            <p className="text-[14px] leading-[20px] text-adm-muted">Choose a scenario and select Generate preview. The current production component is unchanged.</p>
+            <p className="text-[14px] leading-[20px] text-adm-muted">Choose a scenario and select Generate preview.</p>
           </div>
         )}
       </section>

@@ -372,9 +372,9 @@ export default function DescriptionOperations() {
   const loadingRows = allRows === null;
   const metricList = [
     { label: "Active vehicles", value: metricsLoading || metricsError ? null : metrics.activeInventory, loading: metricsLoading },
-    { label: "Published", value: loadingRows ? null : kpis.published, loading: loadingRows, tone: "success" as Tone },
-    { label: "Needs review", value: loadingRows ? null : kpis.needs_review, loading: loadingRows, tone: "warning" as Tone },
-    { label: "Failed generation", value: loadingRows ? null : kpis.failed, loading: loadingRows, tone: "danger" as Tone },
+    { label: "Published", value: loadingRows ? null : kpis.published, loading: loadingRows },
+    { label: "Needs review", value: loadingRows ? null : kpis.needs_review, loading: loadingRows },
+    { label: "Failed generation", value: loadingRows ? null : kpis.failed, loading: loadingRows },
   ];
 
   const selectedRow = (allRows || []).find((r) => r.vehicleId === selectedId) ?? null;
@@ -526,11 +526,6 @@ export default function DescriptionOperations() {
         >
           Clear filters
         </button>
-        {perms.canGenerate && (
-          <Button className="ml-auto" onClick={runReconcile} disabled={syncing}>
-            {syncing ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />} Review reconciliation
-          </Button>
-        )}
       </div>
 
       <div className={drawer ? "grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start" : ""}>
@@ -569,8 +564,8 @@ export default function DescriptionOperations() {
             <table className="w-full table-fixed text-left border-collapse">
               <colgroup>
                 {drawer
-                  ? <><col className="w-[34%]" /><col className="w-[14%]" /><col className="w-[24%]" /><col className="w-[28%]" /></>
-                  : <><col className="w-[26%]" /><col className="w-[11%]" /><col className="w-[19%]" /><col className="w-[22%]" /><col className="w-[9%]" /><col className="w-[13%]" /></>}
+                  ? <><col className="w-[38%]" /><col className="w-[12%]" /><col className="w-[22%]" /><col className="w-[28%]" /></>
+                  : <><col className="w-[24%]" /><col className="w-[10%]" /><col className="w-[16%]" /><col className="w-[20%]" /><col className="w-[16%]" /><col className="w-[8%]" /><col className="w-[6%]" /></>}
               </colgroup>
               <thead>
                 <tr className="text-[12px] leading-[18px] font-semibold text-adm-muted bg-adm-workspace border-b border-adm-border">
@@ -578,6 +573,7 @@ export default function DescriptionOperations() {
                   <th className="px-3 py-2.5">Stock #</th>
                   <SortHead k="state">Description state</SortHead>
                   <th className="px-3 py-2.5">Primary issue</th>
+                  {!drawer && <th className="px-3 py-2.5">Latest attempt</th>}
                   {!drawer && <th className="px-3 py-2.5">Channels</th>}
                   {!drawer && <SortHead k="updated">Updated</SortHead>}
                 </tr>
@@ -602,6 +598,9 @@ export default function DescriptionOperations() {
                       <td className="px-3 text-[14px] text-adm-muted truncate">{stock || "Unknown"}</td>
                       <td className="px-3"><StatusText tone={state.tone}>{state.label}</StatusText></td>
                       <td className="px-3 text-[14px] text-adm-ink truncate">{r.issue || "None"}</td>
+                      {!drawer && <td className="px-3 text-[13px] text-adm-muted truncate">
+                        {r.caseRow?.last_orchestrated_at ? new Date(r.caseRow.last_orchestrated_at as string).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "None"}
+                      </td>}
                       {!drawer && (
                         <td className="px-3 text-[14px] tabular-nums text-adm-ink truncate">
                           {configuredChannels.length === 0 ? "None" : `${r.channelsPresent.length}/${configuredChannels.length}`}
@@ -674,6 +673,7 @@ export default function DescriptionOperations() {
       <p className="text-[12px] leading-[18px] text-adm-muted">
         Descriptions generate automatically at ingest. Counts are vehicles, not validation events.
         {summary && summary.missing > 0 ? ` ${summary.missing} active vehicle${summary.missing === 1 ? "" : "s"} never started a description.` : ""}
+        {perms.canGenerate && (<> <button type="button" onClick={runReconcile} disabled={syncing} className="font-semibold text-adm-primary hover:underline disabled:opacity-50">{syncing ? "Reconciling" : "Review reconciliation"}</button></>)}
         {perms.canConfigure && (<> <button type="button" onClick={() => navigate("/admin?tab=merchandising-seo")} className="font-semibold text-adm-primary hover:underline">Automation settings</button></>)}
       </p>
     </PageBody>

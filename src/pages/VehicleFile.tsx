@@ -216,7 +216,7 @@ const VehicleFile = () => {
   };
 
   const summary: StatusFact[] = [facts.publication, facts.retail, recallLine];
-  const lc = lifecycleFacts(vehicle, lifecycle);
+  const lc = lifecycleFacts(vehicle, lifecycle, ready.blockers.length);
   const subPage = tab === "documents" || tab === "getready" || tab === "compliance";
   const strip = (
     <IdentityStrip

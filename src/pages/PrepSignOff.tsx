@@ -158,17 +158,16 @@ const PrepSignOff = () => {
               active: filter === f,
               count: loaded ? (f === "all" ? signOffs.length : signOffs.filter((x) => x.status === f).length) : null,
             })),
-            { key: "installs", label: "Install proof", to: "/prep?view=installs", active: false },
           ]}
         />
 
         <MetricStrip
           label="Prep sign-off summary"
           metrics={[
-            { label: "Pending sign-off", value: loaded ? pending.length : null, loading: !loaded, tone: "warning" },
-            { label: "Signed off today", value: loaded ? signedToday : null, loading: !loaded, tone: "success" },
-            { label: "Rejected this week", value: loaded ? rejectedThisWeek : null, loading: !loaded, tone: "danger" },
-            { label: "Ready for listing", value: loaded ? ready.length : null, loading: !loaded, tone: "info" },
+            { label: "Pending sign-off", value: loaded ? pending.length : null, loading: !loaded },
+            { label: "Signed off today", value: loaded ? signedToday : null, loading: !loaded },
+            { label: "Rejected this week", value: loaded ? rejectedThisWeek : null, loading: !loaded },
+            { label: "Ready for listing", value: loaded ? ready.length : null, loading: !loaded },
           ]}
         />
 
@@ -185,13 +184,13 @@ const PrepSignOff = () => {
         ) : (
           <div className={selected ? "grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start" : ""}>
             <div className="min-w-0">
-            <WorkTable caption="Prep sign-offs" minWidth={selected ? 520 : 860}>
+            <WorkTable caption="Prep sign-offs" minWidth={selected ? 440 : 860}>
               <thead>
                 <tr>
                   <Th>Vehicle</Th>
                   <Th>Task</Th>
                   <Th>Vendor</Th>
-                  <Th className="whitespace-nowrap">Proof needed</Th>
+                  {!selected && <Th className="whitespace-nowrap">Proof needed</Th>}
                   <Th>Status</Th>
                   {!selected && <Th>Updated</Th>}
                   {!selected && <Th align="right"><span className="sr-only">Next action</span></Th>}
@@ -208,7 +207,7 @@ const PrepSignOff = () => {
                       <p className="truncate">{taskLabel(s.accessories_installed)}</p>
                     </Td>
                     <Td className="whitespace-nowrap"><p>{vendorLabel(s.accessories_installed)}</p></Td>
-                    <Td className="whitespace-nowrap text-adm-muted">{s.install_photos?.length ? `${s.install_photos.length} ${s.install_photos.length === 1 ? "photo" : "photos"}` : "Install photo"}</Td>
+                    {!selected && <Td className="whitespace-nowrap text-adm-muted">{s.install_photos?.length ? `${s.install_photos.length} ${s.install_photos.length === 1 ? "photo" : "photos"}` : "Install photo"}</Td>}
                     <Td>
                       <StatusText tone={s.status === "pending" ? "warning" : s.status === "signed" ? "success" : s.status === "rejected" ? "danger" : "neutral"}>
                         {s.status.charAt(0).toUpperCase() + s.status.slice(1)}

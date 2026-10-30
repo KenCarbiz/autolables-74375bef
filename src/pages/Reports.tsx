@@ -98,8 +98,8 @@ const ViewHeader = ({ title, scope }: { title: string; scope: string }) => (
 const DailyChart = ({ title, data, days }: { title: string; data: { day: string; count: number }[]; days: number }) => {
   const total = data.reduce((n, d) => n + d.count, 0);
   const max = Math.max(1, ...data.map((d) => d.count));
-  const W = 640;
-  const H = 220;
+  const W = 760;
+  const H = 190;
   const L = 36;
   const B = 24;
   const step = data.length > 1 ? (W - L - 8) / (data.length - 1) : 0;
@@ -131,10 +131,10 @@ const DailyChart = ({ title, data, days }: { title: string; data: { day: string;
 };
 
 const weeklyRows = (data: { day: string; count: number }[]) => {
-  const rows: { range: string; count: number }[] = [];
+  const rows: { range: string; count: number; days: number }[] = [];
   for (let i = 0; i < data.length; i += 7) {
     const chunk = data.slice(i, i + 7);
-    rows.push({ range: `${chunk[0].day} to ${chunk[chunk.length - 1].day}`, count: chunk.reduce((n, d) => n + d.count, 0) });
+    rows.push({ range: `${chunk[0].day} to ${chunk[chunk.length - 1].day}`, count: chunk.reduce((n, d) => n + d.count, 0), days: chunk.length });
   }
   return rows;
 };
@@ -201,33 +201,33 @@ const Reports = () => {
         <section className="flex flex-col gap-4">
           <form
             aria-label="Report filters"
-            className="flex flex-wrap items-end gap-4"
+            className="flex flex-wrap items-center gap-x-5 gap-y-3"
             onSubmit={(e) => {
               e.preventDefault();
               setDays(draftDays);
             }}
           >
-            <label className="flex min-w-[180px] flex-col gap-1 text-[13px] leading-[18px] text-adm-ink">
+            <label className="flex items-center gap-2 text-[13px] leading-[18px] text-adm-ink">
               Timezone
-              <select className="h-10 rounded-md border border-adm-border bg-adm-surface px-3 text-[14px]" disabled value="local">
+              <select className="h-10 min-w-[170px] rounded-md border border-adm-border bg-adm-surface px-3 text-[14px]" disabled value="local">
                 <option value="local">{Intl.DateTimeFormat().resolvedOptions().timeZone}</option>
               </select>
             </label>
-            <label className="flex min-w-[200px] flex-col gap-1 text-[13px] leading-[18px] text-adm-ink">
+            <label className="flex items-center gap-2 text-[13px] leading-[18px] text-adm-ink">
               Scope
-              <select className="h-10 rounded-md border border-adm-border bg-adm-surface px-3 text-[14px]" disabled value="store">
+              <select className="h-10 min-w-[170px] rounded-md border border-adm-border bg-adm-surface px-3 text-[14px]" disabled value="store">
                 <option value="store">{currentStore?.name || tenant?.name || "This dealership"}</option>
               </select>
             </label>
-            <label className="flex min-w-[180px] flex-col gap-1 text-[13px] leading-[18px] text-adm-ink">
+            <label className="flex items-center gap-2 text-[13px] leading-[18px] text-adm-ink">
               Date range
-              <select className="h-10 rounded-md border border-adm-border bg-adm-surface px-3 text-[14px]" value={draftDays} onChange={(e) => setDraftDays(Number(e.target.value))}>
+              <select className="h-10 min-w-[170px] rounded-md border border-adm-border bg-adm-surface px-3 text-[14px]" value={draftDays} onChange={(e) => setDraftDays(Number(e.target.value))}>
                 <option value={7}>Last 7 days</option>
                 <option value={30}>Last 30 days</option>
                 <option value={90}>Last 90 days</option>
               </select>
             </label>
-            <Button type="submit" variant="primary" className="min-h-[40px] px-6">Run report</Button>
+            <Button type="submit" variant="primary" className="ml-auto min-h-[40px] px-6">Run report</Button>
           </form>
           {r.loading ? (
             <p className="text-[14px] leading-[20px] text-adm-muted">Loading the last {days} days…</p>
@@ -240,7 +240,7 @@ const Reports = () => {
                 <Kpi label="Pending approval" value={r.pendingApproval} scope={CREATED_30.replace("30", String(days))} />
               </Strip>
 
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)] items-start">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,460px)] items-start">
                 <DailyChart title="Documents generated" data={r.genByDay} days={days} />
                 <section className="rounded-[6px] border border-adm-border bg-adm-surface">
                   <h3 className="px-4 pt-4 text-[16px] leading-[22px] font-semibold text-adm-ink">Activity by week</h3>
@@ -249,6 +249,7 @@ const Reports = () => {
                       <tr className="bg-adm-workspace text-[12px] leading-[18px] font-semibold text-adm-muted">
                         <th className="px-4 py-2.5">Week</th>
                         <th className="px-4 py-2.5 text-right">Generated</th>
+                        <th className="px-4 py-2.5 text-right">Daily average</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -256,6 +257,7 @@ const Reports = () => {
                         <tr key={w.range} className="border-t border-adm-border">
                           <td className="px-4 py-2.5 text-adm-ink">{w.range}</td>
                           <td className="px-4 py-2.5 text-right tabular-nums text-adm-ink">{w.count.toLocaleString()}</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-adm-ink">{(w.count / w.days).toFixed(1)}</td>
                         </tr>
                       ))}
                     </tbody>

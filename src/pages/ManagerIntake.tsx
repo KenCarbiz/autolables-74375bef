@@ -8,7 +8,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { canDispatchGetReady } from "@/lib/commandCenter/dispatchAuthority";
 import { cn } from "@/lib/utils";
-import { Search, X } from "lucide-react";
+import { ChevronDown, Search, X } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button, LocalTabs, MetricStrip, PageBody, PageHeader, QueryState, StatusText, Td, Th, WorkTable, type LocalTab, type Tone } from "@/components/product";
 
 // /get-ready-command — the used-car manager's fleet-level intake queue.
@@ -212,10 +213,10 @@ export default function ManagerIntake() {
       <MetricStrip
         label="Intake queue summary"
         metrics={[
-          { label: "Awaiting authorization", value: ready ? counts.awaiting : null, loading, tone: "warning", href: "/get-ready-command?gate=awaiting" },
-          { label: "Holds", value: ready ? counts.holds : null, loading, tone: "neutral", href: "/get-ready-command?gate=holds" },
-          { label: "Exceptions", value: ready ? counts.exceptions : null, loading, tone: "danger", href: "/get-ready-command?gate=exceptions" },
-          { label: "Authorized today", value: ready ? authorizedToday : null, loading, tone: "success" },
+          { label: "Awaiting authorization", value: ready ? counts.awaiting : null, loading, href: "/get-ready-command?gate=awaiting" },
+          { label: "Holds", value: ready ? counts.holds : null, loading, href: "/get-ready-command?gate=holds" },
+          { label: "Exceptions", value: ready ? counts.exceptions : null, loading, href: "/get-ready-command?gate=exceptions" },
+          { label: "Authorized today", value: ready ? authorizedToday : null, loading },
         ]}
       />
 
@@ -292,7 +293,7 @@ export default function ManagerIntake() {
         <>
           <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setDrawer(null)} aria-hidden />
           <aside role="dialog" aria-modal="true" aria-label={`${drawer.ymm} intake review`}
-            className="fixed right-0 top-0 bottom-0 z-50 flex w-full max-w-[560px] flex-col border-l border-adm-border bg-adm-surface">
+            className="fixed right-0 top-0 bottom-0 z-50 flex w-full max-w-[740px] flex-col border-l border-adm-border bg-adm-surface">
             <div className="flex items-center justify-between px-5 py-3 border-b border-adm-border">
               <h3 className="text-[17px] leading-[24px] font-semibold text-adm-ink">Review vehicle</h3>
               <button onClick={() => setDrawer(null)} aria-label="Close review" className="w-10 h-10 grid place-items-center text-adm-muted hover:text-adm-ink"><X className="w-5 h-5" /></button>
@@ -365,12 +366,15 @@ export default function ManagerIntake() {
                   Authorize for Get Ready
                 </button>
                 <button onClick={() => void decide(drawer, "hold")} disabled={busy || !canDecide} className={cn(BTN_SECONDARY, (busy || !canDecide) && "opacity-50")}>Hold</button>
-                <button onClick={() => navigate(`/get-ready-command/${drawer.vehicleId}`)} className={BTN_SECONDARY}>Open detail</button>
-              </div>
-              <div className="flex gap-4 text-[14px]">
-                <button onClick={() => void decide(drawer, "info")} disabled={busy || !canDecide} className="font-semibold text-adm-primary hover:underline disabled:opacity-50">Request information</button>
-                <button onClick={() => void decide(drawer, "wholesale")} disabled={busy || !canDecide} className="font-semibold text-adm-primary hover:underline disabled:opacity-50">Wholesale</button>
-                <button onClick={() => void decide(drawer, "remove")} disabled={busy || !canDecide} className="font-semibold text-adm-primary hover:underline disabled:opacity-50">Remove</button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger className={cn(BTN_SECONDARY, "gap-1")}>More <ChevronDown className="h-5 w-5" aria-hidden="true" /></DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onSelect={() => navigate(`/get-ready-command/${drawer.vehicleId}`)}>Open detail</DropdownMenuItem>
+                    <DropdownMenuItem disabled={busy || !canDecide} onSelect={() => void decide(drawer, "info")}>Request information</DropdownMenuItem>
+                    <DropdownMenuItem disabled={busy || !canDecide} onSelect={() => void decide(drawer, "wholesale")}>Wholesale</DropdownMenuItem>
+                    <DropdownMenuItem disabled={busy || !canDecide} onSelect={() => void decide(drawer, "remove")}>Remove</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           </aside>

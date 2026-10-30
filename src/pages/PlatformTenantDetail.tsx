@@ -130,12 +130,9 @@ const PlatformTenantDetail = () => {
       <KeyValueList
         rows={[
           { label: "Legal name", value: profile.data?.display_name || tenant.name },
-          { label: "Slug", value: tenant.slug },
           { label: "Domain", value: <ValueOrUnknown value={tenant.domain} /> },
           { label: "Location", value: <ValueOrUnknown value={location} /> },
           { label: "Phone", value: <ValueOrUnknown value={profile.data?.phone} /> },
-          { label: "Source", value: <span className="capitalize">{tenant.source}</span> },
-          { label: "Created", value: <ValueOrUnknown value={formatDate(tenant.created_at)} /> },
         ]}
       />
     </Panel>
@@ -233,10 +230,14 @@ const PlatformTenantDetail = () => {
       ) : (
         <KeyValueList
           className="grid-cols-[1fr_auto]"
-          rows={tenantEntitlements.map((e) => ({
-            label: <span className="capitalize">{e.app_slug}</span>,
-            value: <span className="inline-flex items-center gap-2">{planLabel(e.plan_tier)}<StatusText tone={ENTITLEMENT_TONE[e.status]}>{ENTITLEMENT_LABEL[e.status]}</StatusText></span>,
-          }))}
+          rows={[
+            ...tenantEntitlements.map((e) => ({
+              label: <span className="capitalize">{e.app_slug}</span>,
+              value: <span className="inline-flex items-center gap-2">{planLabel(e.plan_tier)}<StatusText tone={ENTITLEMENT_TONE[e.status]}>{ENTITLEMENT_LABEL[e.status]}</StatusText></span>,
+            })),
+            { label: "Members", value: tenant.member_count },
+            { label: "Active apps", value: tenant.active_apps },
+          ]}
         />
       )}
     </Panel>
@@ -250,11 +251,8 @@ const PlatformTenantDetail = () => {
           rows={[
             { label: "Current plan", value: <span className="font-semibold">{planLabel(currentTier) ?? "Unknown"}</span> },
             { label: "Status", value: <StatusText tone={tenant.is_active ? "success" : "neutral"}>{tenant.is_active ? "Active" : "Suspended"}</StatusText> },
-            { label: "Entitlement", value: labelsEntitlement ? <StatusText tone={ENTITLEMENT_TONE[labelsEntitlement.status]}>{ENTITLEMENT_LABEL[labelsEntitlement.status]}</StatusText> : <span className="text-adm-muted">None</span> },
             { label: "Effective date", value: <ValueOrUnknown value={formatDate(labelsEntitlement?.activated_at)} /> },
             { label: "Next renewal", value: <ValueOrUnknown value={formatDate(labelsEntitlement?.expires_at)} unknownLabel="Not set" /> },
-            { label: "Members", value: tenant.member_count },
-            { label: "Active apps", value: tenant.active_apps },
           ]}
         />
       </Panel>
@@ -296,7 +294,7 @@ const PlatformTenantDetail = () => {
                 <StatusText tone={tenant.is_active ? "success" : "neutral"}>{tenant.is_active ? "Active" : "Suspended"}</StatusText>
               </span>
             }
-            description={<>Dealership{location ? ` · ${location}` : ""} · Tenant ID: <span className="font-mono text-[13px]">{tenant.id}</span></>}
+            description={<>Dealership{location ? ` · ${location}` : ""} · Tenant ID: <span className="font-mono text-[13px]">{tenant.id.slice(0, 8)}</span></>}
             actions={<Button variant="primary" onClick={() => setDrafting(true)} disabled={drafting}>Review plan change</Button>}
           />
         </div>

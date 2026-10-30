@@ -2,9 +2,9 @@ import { useMemo, useState } from "react";
 import { CheckCircle2, Search } from "lucide-react";
 import TitleMcoPanel from "@/components/vehicle/TitleMcoPanel";
 import { Link } from "react-router-dom";
-import { Panel, Td, Th, WorkTable } from "@/components/product";
+import { Panel, StatusText, Td, Th, WorkTable } from "@/components/product";
 import { adminTabHref } from "@/lib/admin/sections";
-import { EmptyState, StateBadge, formatDate } from "./primitives";
+import { EmptyState, formatDate } from "./primitives";
 import { TITLE_STATE_LABEL, type TitleRow } from "./complianceData";
 
 export const TitlesSection = ({
@@ -78,7 +78,7 @@ export const TitlesSection = ({
                 <Th>VIN</Th>
                 <Th>Document</Th>
                 <Th>Received</Th>
-                <Th>Age (days)</Th>
+                <Th className="whitespace-nowrap">Age (days)</Th>
                 <Th>Clerk</Th>
                 <Th>Status</Th>
                 <Th align="right">Actions</Th>
@@ -86,17 +86,15 @@ export const TitlesSection = ({
             </thead>
             <tbody>
               {filtered.map((r) => (
-                <tr key={r.vehicleId}>
-                  <Td className="max-w-[220px] truncate font-semibold">{r.title}</Td>
+                <tr key={r.vehicleId} className="[&>td]:!py-2.5">
+                  <Td className="max-w-[300px] truncate font-semibold">{r.title}</Td>
                   <Td className="font-mono text-[12px] text-adm-muted whitespace-nowrap">{r.vin}</Td>
                   <Td className="whitespace-nowrap">{r.requirement.label}</Td>
                   <Td className="whitespace-nowrap text-adm-muted">{r.receivedAt ? formatDate(r.receivedAt) : "Unknown"}</Td>
                   <Td className="tabular-nums">{r.ageDays == null ? "Unknown" : r.ageDays}</Td>
                   <Td className="max-w-[160px] truncate text-adm-muted">{r.owner || "Unassigned"}</Td>
                   <Td className="whitespace-nowrap">
-                    <StateBadge tone={r.state === "on_file" ? "clear" : r.state === "not_received" ? "attention" : "neutral"}>
-                      {TITLE_STATE_LABEL[r.state]}
-                    </StateBadge>
+                    <StatusText tone={r.state === "on_file" ? "success" : r.state === "not_received" ? "danger" : "neutral"}>{TITLE_STATE_LABEL[r.state]}</StatusText>
                   </Td>
                   <Td align="right" className="whitespace-nowrap">
                     <button type="button" onClick={() => setOpenVin(r.vin === openVin ? null : r.vin)} className="text-[14px] font-semibold text-adm-primary hover:underline">

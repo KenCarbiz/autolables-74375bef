@@ -69,7 +69,7 @@ const CornerCount = ({ count }: { count: number | undefined }) => {
   return (
     <span
       aria-hidden="true"
-      className="absolute -right-2.5 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[10px] font-semibold leading-none tabular-nums text-adm-sidebar"
+      className="absolute -right-2.5 -top-1.5 hidden h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[10px] font-semibold leading-none tabular-nums text-adm-sidebar"
     >
       {text}
     </span>
@@ -86,7 +86,7 @@ const LeafBadge = ({ count, label }: { count: number | undefined; label: string 
     <>
       <span
         aria-hidden="true"
-        className="ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-white/15 px-1.5 text-[11px] font-semibold leading-none tabular-nums text-white"
+        className="ml-auto hidden h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-white/15 px-1.5 text-[11px] font-semibold leading-none tabular-nums text-white"
       >
         {text}
       </span>

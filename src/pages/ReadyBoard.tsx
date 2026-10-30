@@ -319,10 +319,10 @@ export default function ReadyBoard() {
       <MetricStrip
         label="Ready Board summary"
         metrics={[
-          { label: "Waiting for acceptance", value: ready ? bucketCounts.acceptance : null, loading, tone: "warning", href: "/ready-board?view=acceptance" },
-          { label: "Waiting for Get-Ready", value: ready ? bucketCounts.getready : null, loading, tone: "info", href: "/ready-board?view=getready" },
-          { label: "Ready", value: ready ? bucketCounts.ready : null, loading, tone: "success", href: "/ready-board?view=ready" },
-          { label: "Recall review", value: stats ? stats.recallBlocked : null, loading, tone: stats && stats.recallBlocked > 0 ? "danger" : "neutral" },
+          { label: "Waiting for acceptance", value: ready ? bucketCounts.acceptance : null, loading, href: "/ready-board?view=acceptance" },
+          { label: "Waiting for Get-Ready", value: ready ? bucketCounts.getready : null, loading, href: "/ready-board?view=getready" },
+          { label: "Ready", value: ready ? bucketCounts.ready : null, loading, href: "/ready-board?view=ready" },
+          { label: "Recall review", value: stats ? stats.recallBlocked : null, loading },
         ]}
       />
       <div className="flex flex-col gap-3">
@@ -334,9 +334,9 @@ export default function ReadyBoard() {
             aria-label="Search the board"
             className="h-10 w-full max-w-[320px] rounded-[6px] border border-adm-border bg-adm-surface px-3 text-[14px]"
           />
-          <Button onClick={() => setTodayOnly((v) => !v)} aria-pressed={todayOnly}>
+          <button type="button" onClick={() => setTodayOnly((v) => !v)} aria-pressed={todayOnly} className="text-[14px] font-semibold text-adm-primary hover:underline">
             {todayOnly ? "Showing today's intake" : "Today's intake only"}
-          </Button>
+          </button>
         </div>
         <QueryState
           status={status}
@@ -381,7 +381,7 @@ export default function ReadyBoard() {
                         ? { label: "Open deal", run: () => navigate(`/vehicle-file/${r.id}?tab=deal`), busy: false }
                         : null;
                 return (
-                  <tr key={r.vin} className="h-14 hover:bg-adm-workspace">
+                  <tr key={r.vin} className="h-12 hover:bg-adm-workspace">
                     <Td className="max-w-[340px]">
                       <div className="flex items-center gap-3">
                         {r.hero_image_url
@@ -397,7 +397,7 @@ export default function ReadyBoard() {
                         </div>
                       </div>
                     </Td>
-                    <Td className="whitespace-nowrap">{stage}</Td>
+                    <Td className="whitespace-nowrap"><StatusText tone="neutral">{stage}</StatusText></Td>
                     <Td className="whitespace-nowrap tabular-nums text-adm-muted">{days == null ? "Unknown" : days}</Td>
                     <Td className="whitespace-nowrap">
                       {primary ? (
@@ -413,9 +413,9 @@ export default function ReadyBoard() {
                     <Td className="whitespace-nowrap text-adm-muted">{owners.get(r.vin) || "Unassigned"}</Td>
                     <Td className="whitespace-nowrap">
                       {recallReview.has(r.vin) ? <StatusText tone="danger">Review</StatusText>
-                        : rc === "ok" ? <span className="text-adm-muted">Current</span>
+                        : rc === "ok" ? <StatusText tone="success">Current</StatusText>
                         : rc === "dnd" ? <StatusText tone="danger">Do not drive</StatusText>
-                        : <span className="text-adm-muted">Unknown</span>}
+                        : <StatusText tone="neutral">Unknown</StatusText>}
                     </Td>
                     <Td align="right">
                       <DropdownMenu>

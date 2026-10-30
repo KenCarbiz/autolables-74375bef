@@ -1762,7 +1762,7 @@ function WorkspaceTabs({ findings, repairs, reinspections, k208, approvals }: { 
     { key: "failures", label: "Repairs", to: "#failures", count: repairs },
     { key: "reinspection", label: "Reinspection", to: "#reinspection", count: reinspections },
     { key: "k208", label: "K-208", to: "#k208", count: k208 },
-    { key: "approvals", label: "Approvals", to: "#approvals", count: approvals },
+    ...(approvals > 0 ? [{ key: "approvals", label: "Approvals", to: "#approvals", count: approvals }] : []),
     { key: "summary", label: "History", to: "#summary" },
   ];
   return <LocalTabs label="Workspace sections" tabs={tabs.map((t) => ({ ...t, active: t.to === current }))} />;
