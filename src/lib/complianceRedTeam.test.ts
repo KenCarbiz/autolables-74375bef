@@ -277,6 +277,9 @@ describe("summarizeRedTeam blocker flag", () => {
     const findings = runComplianceRedTeam({
       ...baseDraft,
       docFeeAmount: 0,
+      // CA's 3-day return notice became mandatory under $50,000 once its
+      // effective date passed; acknowledge it so only the soft warns remain.
+      threeDayAck: true,
     });
     const summary = summarizeRedTeam(findings);
     expect(summary.blocker).toBe(false);

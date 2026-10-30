@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
+import { LocalTabs, PageBody, PageHeader, type LocalTab } from "@/components/product";
 import { format } from "date-fns";
 import {
   AlertTriangle, ArrowLeft, ArrowUpRight, BarChart3, Car, CheckCircle2, Download, DollarSign,
@@ -63,21 +64,21 @@ interface KpiProps {
 }
 
 const Kpi = ({ label, value, scope, icon: Icon, money: isMoney }: KpiProps) => (
-  <div className="rounded-2xl border border-border bg-card p-4">
-    <p className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground inline-flex items-center gap-1">
+  <div className="rounded-2xl border border-adm-border bg-adm-surface p-4">
+    <p className="text-[12px] leading-[18px] font-bold uppercase tracking-wider text-adm-muted inline-flex items-center gap-1">
       {Icon && <Icon className="w-3 h-3" />} {label}
     </p>
-    <p className="text-al-page text-foreground mt-1 tabular-nums">
+    <p className="text-[28px] leading-[36px] font-bold text-adm-ink mt-1 tabular-nums">
       {typeof value === "number" ? (isMoney ? money(value) : value.toLocaleString()) : value}
     </p>
-    <p className="text-al-meta text-muted-foreground mt-1">{scope}</p>
+    <p className="text-[12px] leading-[18px] text-adm-muted mt-1">{scope}</p>
   </div>
 );
 
 const ViewHeader = ({ title, scope }: { title: string; scope: string }) => (
   <div>
-    <h2 className="text-al-section text-foreground">{title}</h2>
-    <p className="text-al-meta text-muted-foreground mt-0.5">{scope}</p>
+    <h2 className="text-[17px] leading-[24px] font-semibold text-adm-ink">{title}</h2>
+    <p className="text-[12px] leading-[18px] text-adm-muted mt-0.5">{scope}</p>
   </div>
 );
 
@@ -87,13 +88,13 @@ const DailyChart = ({ title, data }: { title: string; data: { day: string; count
   const first = data[0]?.day;
   const last = data[data.length - 1]?.day;
   return (
-    <div className="rounded-2xl border border-border bg-card p-4">
-      <h3 className="text-al-card text-foreground">{title}</h3>
-      <p className="text-al-meta text-muted-foreground mt-0.5">
+    <div className="rounded-2xl border border-adm-border bg-adm-surface p-4">
+      <h3 className="text-[14px] leading-[20px] font-semibold text-adm-ink">{title}</h3>
+      <p className="text-[12px] leading-[18px] text-adm-muted mt-0.5">
         Daily count, last {WINDOW_DAYS} days - {total.toLocaleString()} total
       </p>
       {total === 0 ? (
-        <p className="text-al-body text-muted-foreground mt-4">{NO_DATA}</p>
+        <p className="text-[14px] leading-[20px] text-adm-muted mt-4">{NO_DATA}</p>
       ) : (
         <>
           <div className="flex items-end gap-0.5 h-24 mt-3" role="img"
@@ -104,7 +105,7 @@ const DailyChart = ({ title, data }: { title: string; data: { day: string; count
               </div>
             ))}
           </div>
-          <div className="flex items-center justify-between text-al-meta text-muted-foreground mt-1.5">
+          <div className="flex items-center justify-between text-[12px] leading-[18px] text-adm-muted mt-1.5">
             <span>{first}</span>
             <span>peak {max}/day</span>
             <span>{last}</span>
@@ -116,14 +117,11 @@ const DailyChart = ({ title, data }: { title: string; data: { day: string; count
 };
 
 const Reports = () => {
-  const navigate = useNavigate();
   const { tenant, currentStore } = useTenant();
   const { user } = useAuth();
   const tenantId = tenant?.id && tenant.id !== "house" ? tenant.id : null;
   const [searchParams, setSearchParams] = useSearchParams();
   const view = resolveView(searchParams.get("tab"));
-  const setView = (v: ReportView) =>
-    setSearchParams(v === "operations" ? {} : { tab: v }, { replace: true });
 
   const r = useAutoLabelsReports(WINDOW_DAYS);
   const { metrics, loading: metricsLoading, error: metricsError } = useOperatingMetrics(tenantId);
@@ -166,50 +164,25 @@ const Reports = () => {
       : null;
 
   return (
-    <div className="p-4 lg:p-6 max-w-[1100px] mx-auto space-y-5">
-      <div>
-        <button
-          type="button"
-          onClick={() => navigate("/dashboard")}
-          className="text-al-meta font-semibold text-primary hover:underline inline-flex items-center gap-1"
-        >
-          <ArrowLeft className="w-3 h-3" /> Dashboard
-        </button>
-        <h1 className="text-al-page text-foreground inline-flex items-center gap-2">
-          <BarChart3 className="w-5 h-5 text-primary" /> Reports
-        </h1>
-        <p className="text-al-body text-muted-foreground mt-1">
-          Every number states what it counted and the window it covers. Period totals and current
-          snapshots are never mixed in one row.
-        </p>
-      </div>
+    <PageBody width="wide">
+      <PageHeader
+        title="Reports"
+        description="Every number states what it counted and the period it covers. Period totals and current snapshots are never mixed in one row."
+      />
 
-      <div className="overflow-x-auto">
-        <div className="inline-flex items-center gap-1 rounded-xl border border-border bg-muted/60 p-1">
-          {VIEWS.map((v) => (
-            <button
-              key={v.id}
-              type="button"
-              onClick={() => setView(v.id)}
-              aria-current={view === v.id ? "page" : undefined}
-              className={`h-9 px-3.5 rounded-lg text-al-meta font-semibold whitespace-nowrap transition-colors duration-hover ease-standard motion-reduce:transition-none ${
-                view === v.id ? "bg-card text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {v.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <LocalTabs
+        label="Report views"
+        tabs={VIEWS.map((v): LocalTab => ({ key: v.id, label: v.label, to: v.id === "operations" ? "/dashboard/reports" : `/dashboard/reports?tab=${v.id}`, active: view === v.id }))}
+      />
 
       {view === "operations" && (
         <section className="space-y-4">
           <ViewHeader
             title="Document operations"
-            scope={`Documents this dealership produced. Population: generated_documents. Window: ${LAST_30.toLowerCase()}.`}
+            scope={`Documents this dealership produced, counted per document. Period: ${LAST_30.toLowerCase()}.`}
           />
           {r.loading ? (
-            <p className="text-al-body text-muted-foreground">Loading the last {WINDOW_DAYS} days…</p>
+            <p className="text-[14px] leading-[20px] text-adm-muted">Loading the last {WINDOW_DAYS} days…</p>
           ) : (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -221,24 +194,24 @@ const Reports = () => {
 
               <DailyChart title="Documents generated" data={r.genByDay} />
 
-              <div className="rounded-2xl border border-border bg-card p-4">
-                <h3 className="text-al-card text-foreground">Documents by type</h3>
-                <p className="text-al-meta text-muted-foreground mt-0.5">{LAST_30}</p>
+              <div className="rounded-2xl border border-adm-border bg-adm-surface p-4">
+                <h3 className="text-[14px] leading-[20px] font-semibold text-adm-ink">Documents by type</h3>
+                <p className="text-[12px] leading-[18px] text-adm-muted mt-0.5">{LAST_30}</p>
                 {docTypes.length === 0 ? (
-                  <p className="text-al-body text-muted-foreground mt-3">{NO_DATA}</p>
+                  <p className="text-[14px] leading-[20px] text-adm-muted mt-3">{NO_DATA}</p>
                 ) : (
                   <table className="w-full mt-3">
                     <thead>
-                      <tr className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground text-left border-b border-border">
+                      <tr className="text-[12px] leading-[18px] font-bold uppercase tracking-wide text-adm-muted text-left border-b border-adm-border">
                         <th className="py-1.5 pr-3">Document type</th>
                         <th className="py-1.5 pl-2 text-right">Generated</th>
                       </tr>
                     </thead>
                     <tbody>
                       {docTypes.map(([type, count]) => (
-                        <tr key={type} className="border-b border-border last:border-0">
-                          <td className="py-1.5 pr-3 text-al-body text-foreground capitalize">{type.replace(/_/g, " ")}</td>
-                          <td className="py-1.5 pl-2 text-right text-al-body tabular-nums text-foreground">{count.toLocaleString()}</td>
+                        <tr key={type} className="border-b border-adm-border last:border-0">
+                          <td className="py-1.5 pr-3 text-[14px] leading-[20px] text-adm-ink capitalize">{type.replace(/_/g, " ")}</td>
+                          <td className="py-1.5 pl-2 text-right text-[14px] leading-[20px] tabular-nums text-adm-ink">{count.toLocaleString()}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -254,12 +227,12 @@ const Reports = () => {
         <section className="space-y-4">
           <ViewHeader
             title="Inventory"
-            scope="Vehicles on the lot right now. Population: listings whose status is not archived. Window: current snapshot, not a period total."
+            scope="Vehicles on the lot right now, excluding archived listings. This is a current snapshot, not a period total."
           />
           {snapshotUnavailable ? (
-            <p className="text-al-body text-muted-foreground">{snapshotUnavailable}</p>
+            <p className="text-[14px] leading-[20px] text-adm-muted">{snapshotUnavailable}</p>
           ) : metricsLoading ? (
-            <p className="text-al-body text-muted-foreground">Loading the current snapshot…</p>
+            <p className="text-[14px] leading-[20px] text-adm-muted">Loading the current snapshot…</p>
           ) : (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -268,7 +241,7 @@ const Reports = () => {
                 <Kpi icon={Car} label="Used and CPO" value={metrics.usedInventory} scope={`${SNAPSHOT} - condition used or CPO`} />
                 <Kpi icon={ShieldCheck} label="Published listings" value={metrics.publishedInventory} scope={`${SNAPSHOT} - status published`} />
               </div>
-              <p className="text-al-meta text-muted-foreground">
+              <p className="text-[12px] leading-[18px] text-adm-muted">
                 Active inventory is measured on listing status. A publication date stays set after a
                 vehicle is archived, so it is historical evidence and never a test of what is on the lot today.
               </p>
@@ -281,12 +254,12 @@ const Reports = () => {
         <section className="space-y-4">
           <ViewHeader
             title="Get Ready"
-            scope="Where active used vehicles sit in the reconditioning lifecycle. Population: active inventory joined to vehicle_lifecycle. Window: current snapshot."
+            scope="Where active used vehicles sit in the reconditioning process right now. This is a current snapshot, not a period total."
           />
           {snapshotUnavailable ? (
-            <p className="text-al-body text-muted-foreground">{snapshotUnavailable}</p>
+            <p className="text-[14px] leading-[20px] text-adm-muted">{snapshotUnavailable}</p>
           ) : metricsLoading ? (
-            <p className="text-al-body text-muted-foreground">Loading the current snapshot…</p>
+            <p className="text-[14px] leading-[20px] text-adm-muted">Loading the current snapshot…</p>
           ) : (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -300,12 +273,12 @@ const Reports = () => {
                 <Kpi icon={Wrench} label="Open recon estimates" value={metrics.getReadyRecon} scope={`${SNAPSHOT} - distinct vehicles with a submitted estimate`} />
               </div>
               {metrics.gated > 0 && (
-                <p className="text-al-meta text-muted-foreground">
+                <p className="text-[12px] leading-[18px] text-adm-muted">
                   {metrics.gated} active vehicle{metrics.gated === 1 ? " is" : "s are"} on hold or marked wholesale and are outside the retail lifecycle.
                 </p>
               )}
               {metrics.usedMissingLifecycle > 0 && (
-                <p className="text-al-body text-amber-700 inline-flex items-start gap-1.5">
+                <p className="text-[14px] leading-[20px] text-adm-warning inline-flex items-start gap-1.5">
                   <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                   {metrics.usedMissingLifecycle} used or CPO vehicle{metrics.usedMissingLifecycle === 1 ? " has" : "s have"} no
                   lifecycle record, so {metrics.usedMissingLifecycle === 1 ? "it is" : "they are"} missing from every bucket above.
@@ -323,7 +296,7 @@ const Reports = () => {
             scope="What shoppers did with the packets and signing links this dealership sent."
           />
           {r.loading ? (
-            <p className="text-al-body text-muted-foreground">Loading the last {WINDOW_DAYS} days…</p>
+            <p className="text-[14px] leading-[20px] text-adm-muted">Loading the last {WINDOW_DAYS} days…</p>
           ) : (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -334,7 +307,7 @@ const Reports = () => {
             </>
           )}
           <div className="space-y-4">
-            <h3 className="text-al-card text-foreground">Signing funnel</h3>
+            <h3 className="text-[14px] leading-[20px] font-semibold text-adm-ink">Signing funnel</h3>
             <SigningFunnelWidget />
             <OpenSigningsList />
           </div>
@@ -345,7 +318,7 @@ const Reports = () => {
         <section className="space-y-4">
           <ViewHeader
             title="Compliance activity"
-            scope="Addendum evidence recorded in the audit log. Population: the 500 most recent audit events for this store. Window: whatever period those events span."
+            scope="Addendum activity recorded for this store. These counts cover only the most recent recorded events, so they are a recent sample and not a full-period total."
           />
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <Kpi icon={FileText} label="Addendums created" value={auditCount("addendum_created")} scope="Most recent 500 audit events" />
@@ -354,22 +327,22 @@ const Reports = () => {
             <Kpi icon={CheckCircle2} label="Printed" value={auditCount("addendum_printed")} scope="Most recent 500 audit events" />
           </div>
 
-          <div className="rounded-2xl border border-border bg-card p-4">
-            <h3 className="text-al-card text-foreground">Recent compliance events</h3>
-            <p className="text-al-meta text-muted-foreground mt-0.5">Newest 20 of the loaded audit events</p>
+          <div className="rounded-2xl border border-adm-border bg-adm-surface p-4">
+            <h3 className="text-[14px] leading-[20px] font-semibold text-adm-ink">Recent compliance events</h3>
+            <p className="text-[12px] leading-[18px] text-adm-muted mt-0.5">Newest 20 of the loaded audit events</p>
             {storeEntries.length === 0 ? (
-              <p className="text-al-body text-muted-foreground mt-3">
+              <p className="text-[14px] leading-[20px] text-adm-muted mt-3">
                 No audit events recorded for this store yet. Creating, sending or signing an addendum writes one.
               </p>
             ) : (
               <div className="space-y-2 max-h-64 overflow-y-auto mt-3">
                 {storeEntries.slice(-20).reverse().map((e) => (
-                  <div key={e.id} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
+                  <div key={e.id} className="flex items-center justify-between py-1.5 border-b border-adm-border last:border-0">
                     <div className="min-w-0">
-                      <p className="text-al-body font-medium text-foreground capitalize">{e.action.replace(/_/g, " ")}</p>
-                      <p className="text-al-meta text-muted-foreground truncate">{e.entity_type} - {e.entity_id || "—"}</p>
+                      <p className="text-[14px] leading-[20px] font-medium text-adm-ink capitalize">{e.action.replace(/_/g, " ")}</p>
+                      <p className="text-[12px] leading-[18px] text-adm-muted truncate">{e.entity_type} - {e.entity_id || "—"}</p>
                     </div>
-                    <span className="text-al-meta text-muted-foreground tabular-nums shrink-0">
+                    <span className="text-[12px] leading-[18px] text-adm-muted tabular-nums shrink-0">
                       {format(new Date(e.created_at), "M/d h:mm a")}
                     </span>
                   </div>
@@ -384,10 +357,10 @@ const Reports = () => {
         <section className="space-y-4">
           <ViewHeader
             title="Platform ROI"
-            scope={`Optional add-ons shown on addendums and what shoppers accepted. Population: addendums created in the last ${WINDOW_DAYS} days.`}
+            scope={`Optional add-ons shown on addendums and what shoppers accepted, for addendums created in the last ${WINDOW_DAYS} days.`}
           />
           {r.loading ? (
-            <p className="text-al-body text-muted-foreground">Loading the last {WINDOW_DAYS} days…</p>
+            <p className="text-[14px] leading-[20px] text-adm-muted">Loading the last {WINDOW_DAYS} days…</p>
           ) : (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -402,27 +375,27 @@ const Reports = () => {
                 />
               </div>
 
-              <div className="rounded-2xl border border-border bg-card p-4">
+              <div className="rounded-2xl border border-adm-border bg-adm-surface p-4">
                 <div className="flex items-center justify-between gap-3 mb-1">
-                  <h3 className="text-al-card text-foreground">Add-on acceptance</h3>
+                  <h3 className="text-[14px] leading-[20px] font-semibold text-adm-ink">Add-on acceptance</h3>
                   <FeatureGate feature="qr_tracking" variant="hide">
                     <button
                       type="button"
                       onClick={exportCsv}
-                      className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border text-al-meta font-semibold hover:bg-muted"
+                      className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-adm-border text-[12px] leading-[18px] font-semibold hover:bg-adm-workspace"
                     >
                       <Download className="w-3.5 h-3.5" /> Export CSV
                     </button>
                   </FeatureGate>
                 </div>
-                <p className="text-al-meta text-muted-foreground">{CREATED_30}</p>
+                <p className="text-[12px] leading-[18px] text-adm-muted">{CREATED_30}</p>
                 {r.addons.length === 0 ? (
-                  <p className="text-al-body text-muted-foreground mt-3">{NO_DATA}</p>
+                  <p className="text-[14px] leading-[20px] text-adm-muted mt-3">{NO_DATA}</p>
                 ) : (
                   <div className="overflow-x-auto mt-3">
                     <table className="w-full">
                       <thead>
-                        <tr className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground text-left border-b border-border">
+                        <tr className="text-[12px] leading-[18px] font-bold uppercase tracking-wide text-adm-muted text-left border-b border-adm-border">
                           <th className="py-1.5 pr-3">Add-on</th>
                           <th className="py-1.5 px-2 text-right">Shown</th>
                           <th className="py-1.5 px-2 text-right">Accepted</th>
@@ -433,15 +406,15 @@ const Reports = () => {
                       </thead>
                       <tbody>
                         {r.addons.map((a) => (
-                          <tr key={a.id} className="border-b border-border last:border-0">
-                            <td className="py-1.5 pr-3 text-al-body font-medium text-foreground">{a.name}</td>
-                            <td className="py-1.5 px-2 text-right text-al-body tabular-nums text-muted-foreground">{a.shown}</td>
-                            <td className="py-1.5 px-2 text-right text-al-body tabular-nums text-foreground">{a.accepted}</td>
-                            <td className="py-1.5 px-2 text-right text-al-body tabular-nums">
-                              <span className={a.rate >= 50 ? "text-emerald-700" : "text-muted-foreground"}>{a.rate}%</span>
+                          <tr key={a.id} className="border-b border-adm-border last:border-0">
+                            <td className="py-1.5 pr-3 text-[14px] leading-[20px] font-medium text-adm-ink">{a.name}</td>
+                            <td className="py-1.5 px-2 text-right text-[14px] leading-[20px] tabular-nums text-adm-muted">{a.shown}</td>
+                            <td className="py-1.5 px-2 text-right text-[14px] leading-[20px] tabular-nums text-adm-ink">{a.accepted}</td>
+                            <td className="py-1.5 px-2 text-right text-[14px] leading-[20px] tabular-nums">
+                              <span className={a.rate >= 50 ? "text-adm-success" : "text-adm-muted"}>{a.rate}%</span>
                             </td>
-                            <td className="py-1.5 px-2 text-right text-al-body tabular-nums text-foreground">{money(a.revenue)}</td>
-                            <td className="py-1.5 pl-2 text-right text-al-body tabular-nums text-muted-foreground">{money(a.avgPrice)}</td>
+                            <td className="py-1.5 px-2 text-right text-[14px] leading-[20px] tabular-nums text-adm-ink">{money(a.revenue)}</td>
+                            <td className="py-1.5 pl-2 text-right text-[14px] leading-[20px] tabular-nums text-adm-muted">{money(a.avgPrice)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -453,7 +426,7 @@ const Reports = () => {
           )}
         </section>
       )}
-    </div>
+    </PageBody>
   );
 };
 

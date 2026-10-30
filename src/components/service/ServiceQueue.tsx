@@ -109,22 +109,22 @@ const TABS: { key: string; label: string }[] = [
 ];
 
 const GR_CHIP: Record<Row["grState"], { label: string; cls: string; Icon: typeof Circle }> = {
-  not_started: { label: "Not started", cls: "text-muted-foreground", Icon: Circle },
-  in_progress: { label: "In progress", cls: "text-blue-600", Icon: CircleDot },
-  complete: { label: "Work complete", cls: "text-emerald-600", Icon: CheckCircle2 },
-  failed: { label: "Failed items", cls: "text-red-600", Icon: XCircle },
+  not_started: { label: "Not started", cls: "text-adm-muted", Icon: Circle },
+  in_progress: { label: "In progress", cls: "text-adm-primary", Icon: CircleDot },
+  complete: { label: "Work complete", cls: "text-adm-success", Icon: CheckCircle2 },
+  failed: { label: "Failed items", cls: "text-adm-danger", Icon: XCircle },
 };
 const K208_CHIP: Record<Row["k208State"], { label: string; cls: string; Icon: typeof Circle }> = {
-  waiting: { label: "Waiting", cls: "text-muted-foreground", Icon: Clock },
-  ready: { label: "Ready to certify", cls: "text-blue-600", Icon: Clock },
-  blocked: { label: "Blocked", cls: "text-red-600", Icon: AlertTriangle },
-  executed: { label: "Executed", cls: "text-emerald-600", Icon: CheckCircle2 },
+  waiting: { label: "Waiting", cls: "text-adm-muted", Icon: Clock },
+  ready: { label: "Ready to certify", cls: "text-adm-primary", Icon: Clock },
+  blocked: { label: "Blocked", cls: "text-adm-danger", Icon: AlertTriangle },
+  executed: { label: "Executed", cls: "text-adm-success", Icon: CheckCircle2 },
   // "superseded" is deliberately unbuilt: nothing in this repo writes it yet.
-  voided: { label: "Voided", cls: "text-muted-foreground", Icon: XCircle },
+  voided: { label: "Voided", cls: "text-adm-muted", Icon: XCircle },
 };
 
 const PRIORITY_ICON = { High: ArrowUp, Medium: Minus, Low: ArrowDown } as const;
-const PRIORITY_CLS = { High: "text-red-600", Medium: "text-amber-600", Low: "text-muted-foreground" } as const;
+const PRIORITY_CLS = { High: "text-adm-danger", Medium: "text-adm-warning", Low: "text-adm-muted" } as const;
 
 export default function ServiceQueue({ mode = "desk" }: { mode?: "my_work" | "desk" }) {
   const { tenant } = useTenant();
@@ -440,26 +440,26 @@ export default function ServiceQueue({ mode = "desk" }: { mode?: "my_work" | "de
       <div className="space-y-5">
         <div className="flex items-center gap-2 flex-wrap">
           <div className="relative flex-1 min-w-[220px]">
-            <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
+            <Search className="w-4 h-4 text-adm-muted absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search VIN or stock #"
               aria-label="Search VIN or stock number"
-              className="w-full h-11 pl-9 pr-3 rounded-lg border border-border bg-background text-sm" />
+              className="w-full h-11 pl-9 pr-3 rounded-lg border border-adm-border bg-adm-surface text-sm" />
           </div>
-          <button onClick={openScan} className="h-11 px-4 rounded-lg border border-border text-sm font-semibold inline-flex items-center gap-2 hover:bg-muted">
+          <button onClick={openScan} className="h-11 px-4 rounded-lg border border-adm-border text-sm font-semibold inline-flex items-center gap-2 hover:bg-adm-workspace">
             <QrCode className="w-4 h-4" aria-hidden="true" /> Scan Service QR
           </button>
         </div>
         {total === 0 ? (
-          <div className="rounded-2xl border border-border bg-card p-6">
+          <div className="rounded-2xl border border-adm-border bg-adm-surface p-6">
             <EmptyState Icon={CheckCircle2} title="No work in your queues"
               detail="Nothing is assigned to you and no unassigned vehicles are waiting. Scan a Service QR or switch to the full desk." />
           </div>
         ) : sections.map((s) => s.items.length > 0 && (
           <section key={s.title} aria-label={s.title}>
             <div className="flex items-baseline gap-2 mb-2.5">
-              <h2 className="text-body font-bold text-foreground">{s.title}</h2>
-              <span className="text-xs font-semibold text-muted-foreground">{s.items.length}</span>
-              <span className="text-[11px] text-muted-foreground hidden sm:inline">· {s.hint}</span>
+              <h2 className="text-body font-bold text-adm-ink">{s.title}</h2>
+              <span className="text-xs font-semibold text-adm-muted">{s.items.length}</span>
+              <span className="text-[11px] text-adm-muted hidden sm:inline">· {s.hint}</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {s.items.map((r) => (
@@ -480,12 +480,12 @@ export default function ServiceQueue({ mode = "desk" }: { mode?: "my_work" | "de
     <div className="space-y-5">
       <div className="flex items-center gap-2 flex-wrap">
         <div className="relative flex-1 min-w-[220px]">
-          <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
+          <Search className="w-4 h-4 text-adm-muted absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search VIN or stock #"
             aria-label="Search VIN or stock number"
-            className="w-full h-11 pl-9 pr-3 rounded-lg border border-border bg-background text-sm" />
+            className="w-full h-11 pl-9 pr-3 rounded-lg border border-adm-border bg-adm-surface text-sm" />
         </div>
-        <button onClick={openScan} className="h-11 px-4 rounded-lg border border-border text-sm font-semibold inline-flex items-center gap-2 hover:bg-muted">
+        <button onClick={openScan} className="h-11 px-4 rounded-lg border border-adm-border text-sm font-semibold inline-flex items-center gap-2 hover:bg-adm-workspace">
           <QrCode className="w-4 h-4" aria-hidden="true" /> Scan Service QR
         </button>
       </div>
@@ -498,15 +498,15 @@ export default function ServiceQueue({ mode = "desk" }: { mode?: "my_work" | "de
       </div>
 
       {attention.length > 0 && (
-        <div className="rounded-2xl border border-border bg-card p-4">
-          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Needs attention</p>
+        <div className="rounded-2xl border border-adm-border bg-adm-surface p-4">
+          <p className="text-xs font-bold uppercase tracking-wider text-adm-muted mb-3">Needs attention</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {attention.map((r) => (
-              <div key={r.id} className="flex items-center gap-3 rounded-xl border border-border p-3">
+              <div key={r.id} className="flex items-center gap-3 rounded-xl border border-adm-border p-3">
                 <VehThumb r={r} />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-foreground truncate">{r.ymm}</p>
-                  <p className="text-xs font-semibold text-red-600">{r.priority.label}</p>
+                  <p className="text-sm font-bold text-adm-ink truncate">{r.ymm}</p>
+                  <p className="text-xs font-semibold text-adm-danger">{r.priority.label}</p>
                 </div>
                 <button onClick={() => openWorkspace(r)} className="min-h-[44px] px-3 rounded-lg bg-primary text-primary-foreground text-xs font-semibold shrink-0">
                   {r.next.label}
@@ -520,25 +520,25 @@ export default function ServiceQueue({ mode = "desk" }: { mode?: "my_work" | "de
       {/* Mobile (<lg): stacked vehicle cards under a sticky filter row —
           never the squeezed 1020px table. */}
       <div className="lg:hidden">
-        <div className="sticky top-0 z-20 -mx-4 px-4 py-2 bg-background/95 backdrop-blur border-b border-border space-y-2">
+        <div className="sticky top-0 z-20 -mx-4 px-4 py-2 bg-adm-surface/95 backdrop-blur border-b border-adm-border space-y-2">
           <div className="flex items-center gap-1.5 overflow-x-auto" aria-label="Queue status filters">
             {TABS.map((f) => (
               <button key={f.key} onClick={() => setTab(f.key)} aria-pressed={tab === f.key}
-                className={cn("h-11 px-3.5 rounded-full text-xs font-semibold whitespace-nowrap shrink-0",
-                  tab === f.key ? "bg-primary text-primary-foreground" : "text-muted-foreground bg-muted/60")}>
+                className={cn("h-11 px-3.5 rounded-md text-xs font-semibold whitespace-nowrap shrink-0",
+                  tab === f.key ? "bg-primary text-primary-foreground" : "text-adm-muted bg-adm-workspace")}>
                 {f.label}
               </button>
             ))}
           </div>
           <div className="flex items-center gap-2">
             <select value={techFilter} onChange={(e) => setTechFilter(e.target.value)} aria-label="Filter by technician"
-              className="h-11 min-w-0 flex-1 rounded-lg border border-border bg-background px-2 text-xs">
+              className="h-11 min-w-0 flex-1 rounded-lg border border-adm-border bg-adm-surface px-2 text-xs">
               <option value="any">Technician: any</option>
               <option value="unassigned">Unassigned</option>
               {technicians.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
             </select>
             <select value={urgencyFilter} onChange={(e) => setUrgencyFilter(e.target.value)} aria-label="Filter by delivery urgency"
-              className="h-11 min-w-0 flex-1 rounded-lg border border-border bg-background px-2 text-xs">
+              className="h-11 min-w-0 flex-1 rounded-lg border border-adm-border bg-adm-surface px-2 text-xs">
               <option value="any">Delivery: any</option>
               <option value="today">Delivery today</option>
               <option value="scheduled">Delivery scheduled</option>
@@ -551,7 +551,7 @@ export default function ServiceQueue({ mode = "desk" }: { mode?: "my_work" | "de
             <MobileVehicleCard key={r.id} r={r} onOpen={() => setDrawer(r)} onPrimary={() => openWorkspace(r)} />
           ))}
           {visible.length === 0 && (
-            <div className="rounded-2xl border border-border bg-card p-4">
+            <div className="rounded-2xl border border-adm-border bg-adm-surface p-4">
               <EmptyState Icon={CheckCircle2} title="All caught up"
                 detail="No vehicles in this view. Change the filters, scan a Service QR, or search a VIN." />
             </div>
@@ -559,18 +559,18 @@ export default function ServiceQueue({ mode = "desk" }: { mode?: "my_work" | "de
         </div>
       </div>
 
-      <div className="hidden lg:block rounded-2xl border border-border bg-card overflow-hidden">
+      <div className="hidden lg:block rounded-2xl border border-adm-border bg-adm-surface overflow-hidden">
         <div className="px-4 pt-4 flex items-center justify-between gap-3 flex-wrap">
-          <h2 className="text-body font-bold text-foreground">Vehicles requiring service action</h2>
+          <h2 className="text-body font-bold text-adm-ink">Vehicles requiring service action</h2>
           <div className="flex items-center gap-2 flex-wrap">
             <select value={techFilter} onChange={(e) => setTechFilter(e.target.value)} aria-label="Filter by technician"
-              className="h-11 rounded-lg border border-border bg-background px-2 text-xs">
+              className="h-11 rounded-lg border border-adm-border bg-adm-surface px-2 text-xs">
               <option value="any">Technician: any</option>
               <option value="unassigned">Unassigned</option>
               {technicians.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
             </select>
             <select value={urgencyFilter} onChange={(e) => setUrgencyFilter(e.target.value)} aria-label="Filter by delivery urgency"
-              className="h-11 rounded-lg border border-border bg-background px-2 text-xs">
+              className="h-11 rounded-lg border border-adm-border bg-adm-surface px-2 text-xs">
               <option value="any">Delivery: any</option>
               <option value="today">Delivery today</option>
               <option value="scheduled">Delivery scheduled</option>
@@ -581,8 +581,8 @@ export default function ServiceQueue({ mode = "desk" }: { mode?: "my_work" | "de
         <div className="px-4 pt-3 flex items-center gap-1.5 overflow-x-auto">
           {TABS.map((f) => (
             <button key={f.key} onClick={() => setTab(f.key)} aria-pressed={tab === f.key}
-              className={cn("h-11 px-3 rounded-full text-xs font-semibold whitespace-nowrap",
-                tab === f.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}>
+              className={cn("h-11 px-3 rounded-md text-xs font-semibold whitespace-nowrap",
+                tab === f.key ? "bg-primary text-primary-foreground" : "text-adm-muted hover:bg-adm-workspace")}>
               {f.label}
             </button>
           ))}
@@ -590,11 +590,11 @@ export default function ServiceQueue({ mode = "desk" }: { mode?: "my_work" | "de
         <div className="mt-3 overflow-auto max-h-[600px]">
           <table className="w-full text-sm min-w-[1020px]">
             <thead>
-              <tr className="text-al-meta uppercase tracking-wide text-muted-foreground border-b border-border">
+              <tr className="text-[12px] leading-[18px] uppercase tracking-wide text-adm-muted border-b border-adm-border">
                 {["Priority", "Vehicle", "Stock / VIN", "Age (since intake)", "Assigned to", "Get Ready", "K-208", "Delivery"].map((h) => (
-                  <th key={h} className="text-left font-semibold px-4 py-2.5 sticky top-0 bg-card z-10">{h}</th>
+                  <th key={h} className="text-left font-semibold px-4 py-2.5 sticky top-0 bg-adm-surface z-10">{h}</th>
                 ))}
-                <th className="text-right font-semibold px-4 py-2.5 sticky top-0 bg-card z-10">Next action</th>
+                <th className="text-right font-semibold px-4 py-2.5 sticky top-0 bg-adm-surface z-10">Next action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
@@ -608,51 +608,51 @@ export default function ServiceQueue({ mode = "desk" }: { mode?: "my_work" | "de
                 return (
                   <tr
                     key={r.id}
-                    className="hover:bg-muted/40 cursor-pointer"
+                    className="hover:bg-adm-workspace cursor-pointer"
                     onClick={() => setDrawer(r)}
                   >
                     <td className="px-4 py-2.5">
                       <span className={cn("inline-flex items-center gap-1 text-xs font-bold", PRIORITY_CLS[r.priority.level])}>
                         <P className="w-3.5 h-3.5" aria-hidden="true" /> {r.priority.level}
                       </span>
-                      <p className="text-[10.5px] text-muted-foreground">{r.priority.label}</p>
+                      <p className="text-[10.5px] text-adm-muted">{r.priority.label}</p>
                     </td>
                     <td className="px-4 py-2.5"><div className="flex items-center gap-2.5 min-w-0"><VehThumb r={r} /><div className="min-w-0">
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); setDrawer(r); }}
                         aria-label={`Open service preview for ${r.ymm}`}
-                        className="block max-w-full font-semibold text-foreground truncate text-left hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary rounded-sm"
+                        className="block max-w-full font-semibold text-adm-ink truncate text-left hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary rounded-sm"
                       >
                         {r.ymm}
                       </button>
-                      <p className="text-[11px] text-muted-foreground">{r.condition}{r.trim ? ` · ${r.trim}` : ""}</p>
+                      <p className="text-[11px] text-adm-muted">{r.condition}{r.trim ? ` · ${r.trim}` : ""}</p>
                     </div></div></td>
-                    <td className="px-4 py-2.5"><p className="font-mono text-[12px] text-foreground">{r.stock || "—"}</p><p className="font-mono text-[11px] text-muted-foreground">…{r.vin.slice(-6)}</p></td>
+                    <td className="px-4 py-2.5"><p className="font-mono text-[12px] text-adm-ink">{r.stock || "—"}</p><p className="font-mono text-[11px] text-adm-muted">…{r.vin.slice(-6)}</p></td>
                     <td className="px-4 py-2.5">
-                      <span className={cn("text-xs font-semibold tabular-nums", r.overdue ? "text-red-600" : "text-foreground")}>{ageDisplay(r)}</span>
-                      {r.overdue && <p className="text-[10px] text-muted-foreground">{ageLabel(r.ageHours)} since intake</p>}
+                      <span className={cn("text-xs font-semibold tabular-nums", r.overdue ? "text-adm-danger" : "text-adm-ink")}>{ageDisplay(r)}</span>
+                      {r.overdue && <p className="text-[10px] text-adm-muted">{ageLabel(r.ageHours)} since intake</p>}
                     </td>
                     <td className="px-4 py-2.5">
                       {r.assignedName ? (
-                        <span className="inline-flex items-center gap-1.5 text-xs text-foreground">
+                        <span className="inline-flex items-center gap-1.5 text-xs text-adm-ink">
                           <span className="w-6 h-6 rounded-full bg-primary/10 text-primary grid place-items-center text-[10px] font-black">{r.assignedName.slice(0, 2).toUpperCase()}</span>
                           {r.assignedName}
                         </span>
-                      ) : <span className="text-xs text-muted-foreground">Unassigned</span>}
+                      ) : <span className="text-xs text-adm-muted">Unassigned</span>}
                     </td>
                     <td className="px-4 py-2.5">{r.awaiting
-                      ? <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-600"><AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" /> Awaiting approval</span>
+                      ? <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-adm-warning"><AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" /> Awaiting approval</span>
                       : <span className={cn("inline-flex items-center gap-1.5 text-xs font-semibold", G.cls)}><G.Icon className="w-3.5 h-3.5" aria-hidden="true" /> {G.label}{r.openFailures > 0 ? ` (${r.openFailures})` : ""}</span>}</td>
                     <td className="px-4 py-2.5"><span className={cn("inline-flex items-center gap-1.5 text-xs font-semibold", K.cls)}><K.Icon className="w-3.5 h-3.5" aria-hidden="true" /> {K.label}</span></td>
                     <td className="px-4 py-2.5">
-                      <span className={cn("text-xs font-medium", r.delivery === "Delivery blocked" ? "text-red-600" : r.delivery === "Cleared" ? "text-emerald-600" : "text-muted-foreground")}>{r.delivery}</span>
-                      {r.deliveryTarget && <p className="text-[10px] text-muted-foreground">{formatCommandDateTime(r.deliveryTarget)}</p>}
+                      <span className={cn("text-xs font-medium", r.delivery === "Delivery blocked" ? "text-adm-danger" : r.delivery === "Cleared" ? "text-adm-success" : "text-adm-muted")}>{r.delivery}</span>
+                      {r.deliveryTarget && <p className="text-[10px] text-adm-muted">{formatCommandDateTime(r.deliveryTarget)}</p>}
                     </td>
                     <td className="px-4 py-2.5 text-right">
                       <button onClick={(e) => { e.stopPropagation(); openWorkspace(r); }}
                         className={cn("min-h-[40px] px-3 rounded-lg text-xs font-semibold inline-flex items-center gap-1",
-                          r.next.tone === "danger" ? "bg-red-600 text-white" : r.next.tone === "ghost" ? "border border-border text-foreground hover:bg-muted" : "bg-primary text-primary-foreground")}>
+                          r.next.tone === "danger" ? "bg-red-600 text-white" : r.next.tone === "ghost" ? "border border-adm-border text-adm-ink hover:bg-adm-workspace" : "bg-primary text-primary-foreground")}>
                         {r.next.tone === "ghost" ? null : <Wrench className="w-3.5 h-3.5" aria-hidden="true" />} {r.next.label} <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
                       </button>
                     </td>
@@ -687,12 +687,12 @@ function MobileVehicleCard({ r, onOpen, onPrimary }: { r: Row; onOpen: () => voi
   const G = GR_CHIP[r.grState]; const K = K208_CHIP[r.k208State];
   const P = PRIORITY_ICON[r.priority.level];
   return (
-    <article className="rounded-2xl border border-border bg-card p-3.5 space-y-2.5">
+    <article className="rounded-2xl border border-adm-border bg-adm-surface p-3.5 space-y-2.5">
       <div className="flex items-start gap-3">
         <VehThumb r={r} />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-foreground truncate">{r.ymm}</p>
-          <p className="font-mono text-[11px] text-muted-foreground">Stock {r.stock || "—"} · …{r.vin.slice(-6)} · {r.condition}</p>
+          <p className="text-sm font-bold text-adm-ink truncate">{r.ymm}</p>
+          <p className="font-mono text-[11px] text-adm-muted">Stock {r.stock || "—"} · …{r.vin.slice(-6)} · {r.condition}</p>
         </div>
         <span className={cn("inline-flex items-center gap-1 text-[11px] font-bold shrink-0", PRIORITY_CLS[r.priority.level])}>
           <P className="w-3.5 h-3.5" aria-hidden="true" /> {r.priority.level}
@@ -705,22 +705,22 @@ function MobileVehicleCard({ r, onOpen, onPrimary }: { r: Row; onOpen: () => voi
         <span className={cn("inline-flex items-center gap-1 font-semibold", K.cls)}>
           <K.Icon className="w-3.5 h-3.5" aria-hidden="true" /> K-208: {K.label}
         </span>
-        <span className={cn("font-medium", r.delivery === "Delivery blocked" ? "text-red-600" : r.delivery === "Cleared" ? "text-emerald-600" : "text-muted-foreground")}>
+        <span className={cn("font-medium", r.delivery === "Delivery blocked" ? "text-adm-danger" : r.delivery === "Cleared" ? "text-adm-success" : "text-adm-muted")}>
           {r.delivery}{r.deliveryTarget ? ` · ${formatCommandDateTime(r.deliveryTarget)}` : ""}
         </span>
-        <span className={cn("tabular-nums", r.overdue ? "text-red-600 font-semibold" : "text-muted-foreground")}>
+        <span className={cn("tabular-nums", r.overdue ? "text-adm-danger font-semibold" : "text-adm-muted")}>
           {ageDisplay(r)}
         </span>
-        <span className="text-muted-foreground">{r.assignedName ?? "Unassigned"}</span>
+        <span className="text-adm-muted">{r.assignedName ?? "Unassigned"}</span>
         {r.sold && <StatusPill tone="blue">Sold</StatusPill>}
       </div>
-      <p className="text-[11.5px] text-muted-foreground">{r.priority.label}</p>
+      <p className="text-[11.5px] text-adm-muted">{r.priority.label}</p>
       <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={onPrimary}
           className={cn("flex-1 min-h-[44px] rounded-xl text-sm font-semibold inline-flex items-center justify-center gap-1.5",
-            r.next.tone === "danger" ? "bg-red-600 text-white" : r.next.tone === "ghost" ? "border border-border text-foreground" : "bg-primary text-primary-foreground")}
+            r.next.tone === "danger" ? "bg-red-600 text-white" : r.next.tone === "ghost" ? "border border-adm-border text-adm-ink" : "bg-primary text-primary-foreground")}
         >
           {r.next.label} <ChevronRight className="w-4 h-4" aria-hidden="true" />
         </button>
@@ -728,7 +728,7 @@ function MobileVehicleCard({ r, onOpen, onPrimary }: { r: Row; onOpen: () => voi
           type="button"
           onClick={onOpen}
           aria-label={`Open service preview for ${r.ymm}`}
-          className="min-h-[44px] px-3.5 rounded-xl border border-border text-sm font-semibold text-foreground shrink-0"
+          className="min-h-[44px] px-3.5 rounded-xl border border-adm-border text-sm font-semibold text-adm-ink shrink-0"
         >
           Details
         </button>
@@ -799,17 +799,17 @@ function RowDrawer({ r, members, canAssign, onAssigned, onClose, onOpenWorkspace
     <>
       <div className="fixed inset-0 z-40 bg-black/30" onClick={onClose} aria-hidden />
       <aside ref={asideRef} role="dialog" aria-modal="true" aria-label={`${r.ymm} service preview`}
-        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-[400px] bg-card border-l border-border shadow-xl overflow-y-auto">
-        <div className="flex items-center justify-between p-4 border-b border-border sticky top-0 bg-card z-10">
-          <h3 className="text-sm font-bold text-foreground">Service preview</h3>
-          <button ref={closeRef} onClick={onClose} aria-label="Close preview" className="w-11 h-11 grid place-items-center text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-[400px] bg-adm-surface border-l border-adm-border shadow-xl overflow-y-auto">
+        <div className="flex items-center justify-between p-4 border-b border-adm-border sticky top-0 bg-adm-surface z-10">
+          <h3 className="text-sm font-bold text-adm-ink">Service preview</h3>
+          <button ref={closeRef} onClick={onClose} aria-label="Close preview" className="w-11 h-11 grid place-items-center text-adm-muted hover:text-adm-ink"><X className="w-4 h-4" /></button>
         </div>
         <div className="p-4 space-y-4">
           <div className="flex items-center gap-3">
             <VehThumb r={r} />
             <div className="min-w-0">
-              <p className="font-bold text-foreground truncate">{r.ymm}</p>
-              <p className="font-mono text-[11px] text-muted-foreground">Stock {r.stock || "—"} · …{r.vin.slice(-6)}</p>
+              <p className="font-bold text-adm-ink truncate">{r.ymm}</p>
+              <p className="font-mono text-[11px] text-adm-muted">Stock {r.stock || "—"} · …{r.vin.slice(-6)}</p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -818,15 +818,15 @@ function RowDrawer({ r, members, canAssign, onAssigned, onClose, onOpenWorkspace
             {r.sold && <StatusPill tone="blue">Sold</StatusPill>}
           </div>
 
-          <div className="rounded-xl border border-border bg-muted/30 p-3.5 space-y-2.5">
+          <div className="rounded-xl border border-adm-border bg-adm-workspace p-3.5 space-y-2.5">
             <div>
-              <p className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground">Next required task</p>
-              <p className="text-sm font-bold text-foreground mt-0.5">{r.nextTask}</p>
+              <p className="text-[12px] leading-[18px] font-bold uppercase tracking-wider text-adm-muted">Next required task</p>
+              <p className="text-sm font-bold text-adm-ink mt-0.5">{r.nextTask}</p>
             </div>
             {r.nextWhy && (
               <div>
-                <p className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground">Why it is waiting</p>
-                <p className="text-[12.5px] text-foreground mt-0.5">{r.nextWhy}</p>
+                <p className="text-[12px] leading-[18px] font-bold uppercase tracking-wider text-adm-muted">Why it is waiting</p>
+                <p className="text-[12.5px] text-adm-ink mt-0.5">{r.nextWhy}</p>
               </div>
             )}
             <button onClick={onOpenWorkspace} className={cn(BTN_PRIMARY, "w-full")}>
@@ -837,15 +837,15 @@ function RowDrawer({ r, members, canAssign, onAssigned, onClose, onOpenWorkspace
           <dl className="space-y-1.5 text-[12.5px]">
             <DrawerRow label="K-208" value={<span className={cn("inline-flex items-center gap-1 font-semibold", K.cls)}><K.Icon className="w-3.5 h-3.5" aria-hidden="true" /> {K.label}</span>} />
             <DrawerRow label="Get Ready" value={<span className={cn("inline-flex items-center gap-1 font-semibold", G.cls)}><G.Icon className="w-3.5 h-3.5" aria-hidden="true" /> {G.label}</span>} />
-            <DrawerRow label="Failed items open" value={<span className={r.openFailures ? "text-red-700 font-semibold" : ""}>{r.openFailures}</span>} />
+            <DrawerRow label="Failed items open" value={<span className={r.openFailures ? "text-adm-danger font-semibold" : ""}>{r.openFailures}</span>} />
             <DrawerRow label="Assigned to" value={r.assignedName ?? "Unassigned"} />
             <DrawerRow label="Time in service" value={ageLabel(r.ageHours)} />
             <DrawerRow label="Delivery target" value={r.deliveryTarget ? formatCommandDateTime(r.deliveryTarget) : "Not scheduled"} />
           </dl>
           {r.clearanceReasons.length > 0 && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-3">
-              <p className="text-[11px] font-bold text-red-800 uppercase tracking-wide mb-1">Delivery blockers</p>
-              <ul className="text-[11.5px] text-red-700 list-disc pl-4 space-y-0.5">
+            <div className="rounded-xl border border-adm-border bg-adm-danger-bg p-3">
+              <p className="text-[11px] font-bold text-adm-danger uppercase tracking-wide mb-1">Delivery blockers</p>
+              <ul className="text-[11.5px] text-adm-danger list-disc pl-4 space-y-0.5">
                 {r.clearanceReasons.map((code) => <li key={code}>{clearanceReasonLabel(code)}</li>)}
               </ul>
             </div>
@@ -858,8 +858,8 @@ function RowDrawer({ r, members, canAssign, onAssigned, onClose, onOpenWorkspace
               </button>
             )}
             {canReassign && assigning && (
-              <div className="rounded-xl border border-border p-3 space-y-2">
-                <label className="block text-al-meta font-bold uppercase tracking-wide text-muted-foreground" htmlFor="drawer-assign">
+              <div className="rounded-xl border border-adm-border p-3 space-y-2">
+                <label className="block text-[12px] leading-[18px] font-bold uppercase tracking-wide text-adm-muted" htmlFor="drawer-assign">
                   Assign to
                 </label>
                 <select
@@ -867,7 +867,7 @@ function RowDrawer({ r, members, canAssign, onAssigned, onClose, onOpenWorkspace
                   defaultValue={r.assignedTo ?? ""}
                   disabled={assignBusy}
                   onChange={(e) => void assign(e.target.value || null)}
-                  className="w-full h-11 rounded-lg border border-border bg-background px-2 text-sm"
+                  className="w-full h-11 rounded-lg border border-adm-border bg-adm-surface px-2 text-sm"
                 >
                   <option value="">Unassigned</option>
                   {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
@@ -887,14 +887,14 @@ function RowDrawer({ r, members, canAssign, onAssigned, onClose, onOpenWorkspace
 function DrawerRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="text-foreground">{value}</dd>
+      <dt className="text-adm-muted">{label}</dt>
+      <dd className="text-adm-ink">{value}</dd>
     </div>
   );
 }
 
 function VehThumb({ r }: { r: Pick<Row, "photo"> }) {
   return r.photo
-    ? <img src={r.photo} alt="" className="w-12 h-9 rounded-md object-cover border border-border shrink-0" />
-    : <span className="w-12 h-9 rounded-md bg-muted grid place-items-center text-muted-foreground shrink-0"><Wrench className="w-4 h-4" aria-hidden="true" /></span>;
+    ? <img src={r.photo} alt="" className="w-12 h-9 rounded-md object-cover border border-adm-border shrink-0" />
+    : <span className="w-12 h-9 rounded-md bg-adm-workspace grid place-items-center text-adm-muted shrink-0"><Wrench className="w-4 h-4" aria-hidden="true" /></span>;
 }

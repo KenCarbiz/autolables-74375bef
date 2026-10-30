@@ -65,8 +65,8 @@ describe("legacy routes still resolve", () => {
 });
 
 describe("superseded routes redirect instead of disappearing", () => {
-  it("sends the price-change review to the price section of the compliance surface", () => {
-    expect(routeFor("/dashboard/document-review")).toBe('<ComplianceTabRedirect tab="price" />');
+  it("keeps the policy-review shortcut on the named review queue, not the price tab", () => {
+    expect(routeFor("/dashboard/document-review")).toBe("<DocumentReview />");
   });
 
   it("sends the old compliance action center to the issues section", () => {

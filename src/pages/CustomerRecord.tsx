@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Mail, Phone } from "lucide-react";
 import Seo from "@/components/Seo";
+import { PageBody, PageHeader, QueryState } from "@/components/product";
 import AddendumStatusTimeline from "@/components/addendum/AddendumStatusTimeline";
 import {
   BUCKET_LABEL,
@@ -40,28 +41,28 @@ const CustomerRecord = () => {
 
   if (loading && !customer) {
     return (
-      <div className="max-w-5xl mx-auto p-4 lg:p-6">
-        <p className="text-al-body text-muted-foreground">Loading customer...</p>
-      </div>
+      <PageBody width="form">
+        <QueryState status="loading" />
+      </PageBody>
     );
   }
 
   if (!customer) {
     return (
-      <div className="max-w-5xl mx-auto p-4 lg:p-6 space-y-4">
+      <PageBody width="form">
         <BackLink />
         <EmptyBlock
           title="Customer not found"
           body="This record is not in the current customer window. It may be older than the activity window, or it may belong to another store."
         />
-      </div>
+      </PageBody>
     );
   }
 
   const bridged = customer.documentRequests.filter((r) => r.visitor_id).length > 0;
 
   return (
-    <div className="max-w-5xl mx-auto p-4 lg:p-6 space-y-5">
+    <PageBody width="form">
       <Seo
         title={customer.identified ? `${customer.name || "Customer"} - Customer record` : "Unidentified shopper"}
         description="One customer, assembled from leads, document requests, tracked engagement and deals."
@@ -69,22 +70,18 @@ const CustomerRecord = () => {
       />
       <BackLink />
 
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-al-page font-display text-foreground">
-            {customer.identified ? customer.name || customer.email || "Unnamed customer" : "Unidentified shopper"}
-          </h1>
-          <p className="text-al-body text-muted-foreground mt-1">
-            {customer.identified ? "Contact captured" : "No contact captured"} · Last activity {relativeTime(customer.lastActivityAt)}
-          </p>
-        </div>
-        <Chip tone={customer.bucket === "hot" ? "attention" : customer.bucket === "won" ? "good" : "neutral"}>
-          {BUCKET_LABEL[customer.bucket]}
-        </Chip>
-      </header>
+      <PageHeader
+        title={customer.identified ? customer.name || customer.email || "Unnamed customer" : "Unidentified shopper"}
+        description={`${customer.identified ? "Contact captured" : "No contact captured"} · Last activity ${relativeTime(customer.lastActivityAt)}`}
+        meta={
+          <Chip tone={customer.bucket === "hot" ? "attention" : customer.bucket === "won" ? "good" : "neutral"}>
+            {BUCKET_LABEL[customer.bucket]}
+          </Chip>
+        }
+      />
 
-      <div className="bg-card rounded-2xl border border-border shadow-premium p-5">
-        <p className="text-al-meta uppercase tracking-wider text-muted-foreground">Next action</p>
+      <div className="bg-adm-surface rounded-2xl border border-adm-border shadow-premium p-5">
+        <p className="text-[12px] leading-[18px] uppercase tracking-wider text-adm-muted">Next action</p>
         <div className="mt-1.5">
           <NextActionCell action={customer.nextAction} />
         </div>
@@ -92,7 +89,7 @@ const CustomerRecord = () => {
           {customer.phone && (
             <a
               href={`tel:${customer.phone.replace(/[^\d+]/g, "")}`}
-              className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-primary text-primary-foreground text-al-body font-semibold hover:brightness-110 transition-all"
+              className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-primary text-primary-foreground text-[14px] leading-[20px] font-semibold hover:brightness-110 transition-all"
             >
               <Phone className="w-4 h-4" /> Call {customer.phone}
             </a>
@@ -100,7 +97,7 @@ const CustomerRecord = () => {
           {customer.email && (
             <a
               href={`mailto:${customer.email}`}
-              className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md border border-border text-al-body font-semibold hover:bg-muted transition-colors"
+              className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md border border-adm-border text-[14px] leading-[20px] font-semibold hover:bg-adm-workspace transition-colors"
             >
               <Mail className="w-4 h-4" /> Email
             </a>
@@ -134,7 +131,7 @@ const CustomerRecord = () => {
           />
         </dl>
         {!customer.identified && (
-          <p className="text-al-body text-muted-foreground mt-4 border-t border-border pt-4">
+          <p className="text-[14px] leading-[20px] text-adm-muted mt-4 border-t border-adm-border pt-4">
             This shopper is a browser session, not a person on file. The clickstream carries a visitor id only - no name, phone or email
             was ever submitted - so nothing here may be attributed to a named customer. Work the vehicle instead.
           </p>
@@ -147,10 +144,10 @@ const CustomerRecord = () => {
         ) : (
           <ul className="space-y-3">
             {customer.vehicles.map((v) => (
-              <li key={v.vin || v.label} className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-border p-4">
+              <li key={v.vin || v.label} className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-adm-border p-4">
                 <div className="min-w-0">
-                  <p className="text-al-card text-foreground">{v.label}</p>
-                  <p className="text-al-meta text-muted-foreground mt-0.5">
+                  <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{v.label}</p>
+                  <p className="text-[12px] leading-[18px] text-adm-muted mt-0.5">
                     {v.stock ? `Stock ${v.stock}` : "No stock number"}
                     {v.vin ? ` · VIN ${v.vin}` : ""}
                   </p>
@@ -166,7 +163,7 @@ const CustomerRecord = () => {
                       href={`/v/${v.slug}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center h-8 px-3 rounded-md border border-border text-al-meta font-semibold hover:bg-muted transition-colors"
+                      className="inline-flex items-center h-8 px-3 rounded-md border border-adm-border text-[12px] leading-[18px] font-semibold hover:bg-adm-workspace transition-colors"
                     >
                       Passport
                     </a>
@@ -175,7 +172,7 @@ const CustomerRecord = () => {
                     <button
                       type="button"
                       onClick={() => navigate(`/vehicle-file/${v.listingId}`)}
-                      className="inline-flex items-center h-8 px-3 rounded-md border border-border text-al-meta font-semibold hover:bg-muted transition-colors"
+                      className="inline-flex items-center h-8 px-3 rounded-md border border-adm-border text-[12px] leading-[18px] font-semibold hover:bg-adm-workspace transition-colors"
                     >
                       Vehicle file
                     </button>
@@ -198,7 +195,7 @@ const CustomerRecord = () => {
               body="Passport activity is keyed on an anonymous visitor id. A lead form does not capture that id, so this person's browsing cannot be proven. A document request from the passport does capture it - that is the only bridge that exists today."
             />
             {sameVehicleShoppers > 0 && (
-              <p className="text-al-body text-muted-foreground">
+              <p className="text-[14px] leading-[20px] text-adm-muted">
                 {sameVehicleShoppers} anonymous {sameVehicleShoppers === 1 ? "shopper is" : "shoppers are"} active on the same vehicle. They
                 are not this person - treat it as competition for the car, and move on price and availability.
               </p>
@@ -214,18 +211,18 @@ const CustomerRecord = () => {
             </dl>
 
             <div>
-              <h3 className="text-al-card text-foreground">What they did, and what to do about it</h3>
+              <h3 className="text-[14px] leading-[20px] font-semibold text-adm-ink">What they did, and what to do about it</h3>
               <ul className="mt-2 divide-y divide-border">
                 {customer.engagement.facts.map((f) => (
                   <li key={f.key} className="py-3 flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-al-body font-semibold text-foreground">
+                      <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">
                         {f.label}
                         {f.count > 1 ? ` x${f.count}` : ""}
                       </p>
-                      <p className="text-al-meta text-muted-foreground mt-0.5">{f.action}</p>
+                      <p className="text-[12px] leading-[18px] text-adm-muted mt-0.5">{f.action}</p>
                     </div>
-                    <span className="text-al-meta text-muted-foreground whitespace-nowrap">{relativeTime(f.lastAt)}</span>
+                    <span className="text-[12px] leading-[18px] text-adm-muted whitespace-nowrap">{relativeTime(f.lastAt)}</span>
                   </li>
                 ))}
               </ul>
@@ -233,23 +230,23 @@ const CustomerRecord = () => {
 
             {customer.engagement.modules.length > 0 && (
               <div>
-                <h3 className="text-al-card text-foreground">Where the attention went</h3>
+                <h3 className="text-[14px] leading-[20px] font-semibold text-adm-ink">Where the attention went</h3>
                 <ul className="mt-2 space-y-1.5">
                   {customer.engagement.modules.map((m) => (
-                    <li key={m.module} className="flex items-center justify-between gap-3 text-al-body">
-                      <span className="text-foreground">{m.label}</span>
-                      <span className="text-muted-foreground tabular-nums">{mmss(m.seconds)}</span>
+                    <li key={m.module} className="flex items-center justify-between gap-3 text-[14px] leading-[20px]">
+                      <span className="text-adm-ink">{m.label}</span>
+                      <span className="text-adm-muted tabular-nums">{mmss(m.seconds)}</span>
                     </li>
                   ))}
                 </ul>
-                <p className="text-al-meta text-muted-foreground mt-2">
+                <p className="text-[12px] leading-[18px] text-adm-muted mt-2">
                   Lead with the section they spent the most time in - it is the objection they are still working through.
                 </p>
               </div>
             )}
           </div>
         )}
-        <p className="text-al-meta text-muted-foreground mt-5 border-t border-border pt-4">
+        <p className="text-[12px] leading-[18px] text-adm-muted mt-5 border-t border-adm-border pt-4">
           Not captured by this platform: walkaround video request, send, open, completion and replay. No code emits those events, so they
           are not shown as zeros here.
         </p>
@@ -261,11 +258,11 @@ const CustomerRecord = () => {
         ) : (
           <ul className="space-y-4">
             {customer.deals.map((deal) => (
-              <li key={deal.id} className="rounded-xl border border-border p-4 space-y-3">
+              <li key={deal.id} className="rounded-xl border border-adm-border p-4 space-y-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-al-card text-foreground">{deal.vehicleLabel}</p>
-                    <p className="text-al-meta text-muted-foreground mt-0.5">
+                    <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{deal.vehicleLabel}</p>
+                    <p className="text-[12px] leading-[18px] text-adm-muted mt-0.5">
                       {deal.stock ? `Stock ${deal.stock} · ` : ""}
                       {money(deal.amount)}
                       {deal.employeeName ? ` · Sold by ${deal.employeeName}` : ""}
@@ -277,7 +274,7 @@ const CustomerRecord = () => {
                   </div>
                 </div>
                 {deal.returnInfo && (
-                  <p className="text-al-body text-foreground">
+                  <p className="text-[14px] leading-[20px] text-adm-ink">
                     {deal.returnInfo.label}
                     {deal.returnInfo.reason ? ` - "${deal.returnInfo.reason}"` : ""}
                   </p>
@@ -298,29 +295,31 @@ const CustomerRecord = () => {
             {customer.activity.map((a, i) => (
               <li key={`${a.at}-${i}`} className="py-3 flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-al-body font-semibold text-foreground">{a.label}</p>
-                  <p className="text-al-meta text-muted-foreground mt-0.5">{a.detail}</p>
+                  <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{a.label}</p>
+                  <p className="text-[12px] leading-[18px] text-adm-muted mt-0.5">{a.detail}</p>
                 </div>
-                <span className="text-al-meta text-muted-foreground whitespace-nowrap">{relativeTime(a.at)}</span>
+                <span className="text-[12px] leading-[18px] text-adm-muted whitespace-nowrap">{relativeTime(a.at)}</span>
               </li>
             ))}
           </ol>
         )}
       </SectionCard>
-    </div>
+    </PageBody>
   );
 };
 
+// Back returns to the exact list state (stage, search) when there is history;
+// a direct load falls back to the Customers list.
 const BackLink = () => (
-  <Link to="/leads" className="inline-flex items-center gap-1.5 text-al-body font-semibold text-muted-foreground hover:text-foreground transition-colors">
+  <Link to="/customers" onClick={(e) => { if (window.history.length > 1) { e.preventDefault(); window.history.back(); } }} className="inline-flex items-center gap-1.5 text-[14px] leading-[20px] font-semibold text-adm-muted hover:text-adm-ink transition-colors">
     <ArrowLeft className="w-4 h-4" /> Customers
   </Link>
 );
 
 const Field = ({ label, value }: { label: string; value: string }) => (
   <div className="min-w-0">
-    <dt className="text-al-meta uppercase tracking-wider text-muted-foreground">{label}</dt>
-    <dd className="text-al-body text-foreground mt-0.5 break-words">{value}</dd>
+    <dt className="text-[12px] leading-[18px] uppercase tracking-wider text-adm-muted">{label}</dt>
+    <dd className="text-[14px] leading-[20px] text-adm-ink mt-0.5 break-words">{value}</dd>
   </div>
 );
 

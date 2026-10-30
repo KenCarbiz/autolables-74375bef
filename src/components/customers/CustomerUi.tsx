@@ -6,14 +6,14 @@ import { dwellLabel, money, relativeTime } from "./customerBook";
 export type Tone = "neutral" | "good" | "waiting" | "attention";
 
 const TONE_CLASS: Record<Tone, string> = {
-  neutral: "bg-muted text-muted-foreground",
+  neutral: "bg-adm-workspace text-adm-muted",
   good: "bg-teal/10 text-teal",
   waiting: "bg-gold/15 text-gold",
-  attention: "bg-destructive/10 text-destructive",
+  attention: "bg-adm-danger-bg text-adm-danger",
 };
 
 export const Chip = ({ tone = "neutral", children }: { tone?: Tone; children: ReactNode }) => (
-  <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-al-meta font-semibold ${TONE_CLASS[tone]}`}>
+  <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[2px] text-[12px] leading-[18px] font-semibold ${TONE_CLASS[tone]}`}>
     {children}
   </span>
 );
@@ -28,7 +28,7 @@ export const TabStrip = <T extends string>({
   onSelect: (key: T) => void;
 }) => (
   <div className="overflow-x-auto no-print">
-    <div className="inline-flex items-center gap-1 rounded-xl border border-border bg-muted/60 p-1">
+    <div className="inline-flex items-center gap-1 rounded-xl border border-adm-border bg-adm-workspace p-1">
       {tabs.map((t) => {
         const on = t.key === active;
         return (
@@ -37,12 +37,12 @@ export const TabStrip = <T extends string>({
             type="button"
             onClick={() => onSelect(t.key)}
             aria-pressed={on}
-            className={`h-8 px-3.5 rounded-lg text-al-meta font-semibold whitespace-nowrap inline-flex items-center gap-1.5 transition-colors ${
-              on ? "bg-card text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:text-foreground"
+            className={`h-8 px-3.5 rounded-lg text-[12px] leading-[18px] font-semibold whitespace-nowrap inline-flex items-center gap-1.5 transition-colors ${
+              on ? "bg-adm-surface text-adm-ink shadow-sm ring-1 ring-border" : "text-adm-muted hover:text-adm-ink"
             }`}
           >
             {t.label}
-            <span className={`text-al-meta font-bold tabular-nums px-1.5 rounded-full ${on ? "bg-primary/10 text-primary" : "bg-muted-foreground/15"}`}>
+            <span className={`text-[12px] leading-[18px] font-bold tabular-nums px-1.5 rounded-[2px] ${on ? "bg-primary/10 text-primary" : "bg-adm-workspace-foreground/15"}`}>
               {t.count}
             </span>
           </button>
@@ -53,11 +53,11 @@ export const TabStrip = <T extends string>({
 );
 
 export const SectionCard = ({ title, subtitle, action, children }: { title: string; subtitle?: string; action?: ReactNode; children: ReactNode }) => (
-  <section className="bg-card rounded-2xl border border-border shadow-premium">
-    <header className="flex items-start justify-between gap-3 px-5 py-3.5 border-b border-border">
+  <section className="bg-adm-surface rounded-2xl border border-adm-border shadow-premium">
+    <header className="flex items-start justify-between gap-3 px-5 py-3.5 border-b border-adm-border">
       <div className="min-w-0">
-        <h2 className="text-al-card font-display text-foreground">{title}</h2>
-        {subtitle && <p className="text-al-meta text-muted-foreground mt-0.5">{subtitle}</p>}
+        <h2 className="text-[14px] leading-[20px] font-semibold font-display text-adm-ink">{title}</h2>
+        {subtitle && <p className="text-[12px] leading-[18px] text-adm-muted mt-0.5">{subtitle}</p>}
       </div>
       {action}
     </header>
@@ -66,9 +66,9 @@ export const SectionCard = ({ title, subtitle, action, children }: { title: stri
 );
 
 export const EmptyBlock = ({ title, body }: { title: string; body: string }) => (
-  <div className="rounded-xl border border-dashed border-border px-5 py-10 text-center">
-    <p className="text-al-card text-foreground">{title}</p>
-    <p className="text-al-body text-muted-foreground mt-1.5 max-w-xl mx-auto">{body}</p>
+  <div className="rounded-xl border border-dashed border-adm-border px-5 py-10 text-center">
+    <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{title}</p>
+    <p className="text-[14px] leading-[20px] text-adm-muted mt-1.5 max-w-xl mx-auto">{body}</p>
   </div>
 );
 
@@ -87,8 +87,8 @@ export const dealStateTone = (state: DealEntry["state"]): Tone =>
 
 export const NextActionCell = ({ action }: { action: NextAction }) => (
   <div className="min-w-0">
-    <p className="text-al-body font-semibold text-foreground">{action.headline}</p>
-    <p className="text-al-meta text-muted-foreground mt-0.5">{action.detail}</p>
+    <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{action.headline}</p>
+    <p className="text-[12px] leading-[18px] text-adm-muted mt-0.5">{action.detail}</p>
   </div>
 );
 
@@ -97,12 +97,12 @@ export const NextActionCell = ({ action }: { action: NextAction }) => (
 // activity.
 export const EngagementCell = ({ engagement }: { engagement: EngagementRollup }) => {
   if (!engagement.linked || (!engagement.facts.length && !engagement.sessions)) {
-    return <p className="text-al-meta text-muted-foreground">No passport activity linked to this customer.</p>;
+    return <p className="text-[12px] leading-[18px] text-adm-muted">No passport activity linked to this customer.</p>;
   }
   const shown = engagement.facts.slice(0, 3);
   return (
     <div className="min-w-0 space-y-1">
-      <p className="text-al-meta text-muted-foreground tabular-nums">
+      <p className="text-[12px] leading-[18px] text-adm-muted tabular-nums">
         {engagement.sessions} {engagement.sessions === 1 ? "visit" : "visits"} · {engagement.visitDays} {engagement.visitDays === 1 ? "day" : "days"}
         {engagement.dwellSeconds > 0 ? ` · ${dwellLabel(engagement.dwellSeconds)}` : ""}
       </p>
@@ -114,7 +114,7 @@ export const EngagementCell = ({ engagement }: { engagement: EngagementRollup })
           </Chip>
         ))}
         {engagement.facts.length > shown.length && (
-          <span className="text-al-meta text-muted-foreground self-center">+{engagement.facts.length - shown.length} more</span>
+          <span className="text-[12px] leading-[18px] text-adm-muted self-center">+{engagement.facts.length - shown.length} more</span>
         )}
       </div>
     </div>
@@ -123,13 +123,13 @@ export const EngagementCell = ({ engagement }: { engagement: EngagementRollup })
 
 export const VehicleCell = ({ label, stock, vin, slug }: { label: string; stock: string | null; vin: string | null; slug: string | null }) => (
   <div className="min-w-0">
-    <p className="text-al-body font-semibold text-foreground truncate">{label}</p>
-    <p className="text-al-meta text-muted-foreground truncate">
+    <p className="text-[14px] leading-[20px] font-semibold text-adm-ink truncate">{label}</p>
+    <p className="text-[12px] leading-[18px] text-adm-muted truncate">
       {stock ? `Stock ${stock}` : vin ? `VIN ${vin.slice(-8)}` : "No stock number"}
       {slug ? (
         <>
           {" · "}
-          <Link to={`/v/${slug}`} className="underline underline-offset-2 hover:text-foreground">
+          <Link to={`/v/${slug}`} className="underline underline-offset-2 hover:text-adm-ink">
             Passport
           </Link>
         </>
@@ -139,5 +139,5 @@ export const VehicleCell = ({ label, stock, vin, slug }: { label: string; stock:
 );
 
 export const TimeCell = ({ at }: { at: string | null }) => (
-  <span className="text-al-meta text-muted-foreground tabular-nums whitespace-nowrap">{relativeTime(at)}</span>
+  <span className="text-[12px] leading-[18px] text-adm-muted tabular-nums whitespace-nowrap">{relativeTime(at)}</span>
 );

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Download, Mail, Phone, RefreshCw, Search, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,13 +11,13 @@ import {
   type CustomerBucket,
   type CustomerEntry,
 } from "@/components/customers/customerBook";
+import { Button, InlineNote, LocalTabs, PageBody, PageHeader, type LocalTab } from "@/components/product";
 import { useCustomerBook } from "@/components/customers/useCustomerBook";
 import {
   Chip,
   EmptyBlock,
   EngagementCell,
   NextActionCell,
-  TabStrip,
   TimeCell,
   VehicleCell,
 } from "@/components/customers/CustomerUi";
@@ -52,8 +52,16 @@ const matches = (c: CustomerEntry, needle: string) => {
 const Customers = () => {
   const navigate = useNavigate();
   const { book, loading, error, refetch } = useCustomerBook();
-  const [tab, setTab] = useState<CustomerBucket>("hot");
-  const [q, setQ] = useState("");
+  // Stage and search live in the URL so opening a record and going back keeps them.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const stage = searchParams.get("stage");
+  const tab: CustomerBucket = TAB_ORDER.includes(stage as CustomerBucket) ? (stage as CustomerBucket) : "hot";
+  const q = searchParams.get("q") ?? "";
+  const setQ = (v: string) => {
+    const n = new URLSearchParams(searchParams);
+    if (v) n.set("q", v); else n.delete("q");
+    setSearchParams(n, { replace: true });
+  };
   const [busyLead, setBusyLead] = useState<string | null>(null);
 
   const needle = q.trim().toLowerCase();
@@ -111,72 +119,60 @@ const Customers = () => {
   };
 
   return (
-    <div className="max-w-[1520px] mx-auto p-4 lg:p-6 space-y-5">
+    <PageBody width="wide">
       <Seo title="Customers" description="Every shopper working a vehicle, ordered by what they actually did." path="/customers" />
 
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-al-page font-display text-foreground">Customers</h1>
-          <p className="text-al-body text-muted-foreground mt-1 max-w-3xl">
-            Everyone working a vehicle right now - people who gave you their details, and shoppers who have not yet.
-            {" "}
-            {identified} identified · {anonymous} anonymous with a real intent action · {book.passiveVisitors} view-only sessions not listed.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={refetch}
-            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-al-body font-semibold hover:bg-muted transition-colors"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </button>
-          <button
-            type="button"
-            onClick={exportCsv}
-            disabled={!rows.length}
-            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-al-body font-semibold hover:bg-muted transition-colors disabled:opacity-40"
-          >
-            <Download className="w-3.5 h-3.5" />
-            Export
-          </button>
-        </div>
-      </header>
+      <PageHeader
+        title="Customers"
+        description={loading && !book.customers.length
+          ? "Everyone working a vehicle right now: people who gave you their details, and shoppers who have not yet."
+          : `Everyone working a vehicle right now: people who gave you their details, and shoppers who have not yet. ${identified} identified · ${anonymous} anonymous with a real intent action · ${book.passiveVisitors} view-only sessions not listed.`}
+        actions={
+          <>
+            <Button onClick={refetch}>
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" /> Refresh
+            </Button>
+            <Button onClick={exportCsv} disabled={!rows.length}>
+              <Download className="h-4 w-4" aria-hidden="true" /> Export
+            </Button>
+          </>
+        }
+      />
 
       {error && (
-        <p className="text-al-body text-destructive bg-destructive/10 rounded-lg px-4 py-2.5">
-          Some customer data failed to load: {error}
-        </p>
+        <InlineNote tone="danger" title="Some customer data failed to load" action={<Button size="sm" onClick={refetch}>Retry</Button>}>
+          {error}
+        </InlineNote>
       )}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <TabStrip tabs={tabs} active={tab} onSelect={setTab} />
-        <label className="relative flex-1 min-w-[220px] max-w-sm">
-          <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search name, email, phone, VIN, stock"
-            aria-label="Search customers"
-            className="w-full h-9 pl-9 pr-3 rounded-md border border-border bg-card text-al-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-        </label>
-      </div>
+      <LocalTabs
+        label="Customer stages"
+        tabs={tabs.map((t): LocalTab => ({ key: t.key, label: t.label, to: `/customers?stage=${t.key}${q ? `&q=${encodeURIComponent(q)}` : ""}`, count: loading && !book.customers.length ? null : t.count, active: t.key === tab }))}
+      />
+      <label className="relative block max-w-sm">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-adm-muted" aria-hidden="true" />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search name, email, phone, VIN, stock"
+          aria-label="Search customers"
+          className="h-10 w-full rounded-md border border-adm-border bg-adm-surface pl-9 pr-3 text-[14px] text-adm-ink placeholder:text-adm-muted focus:outline-none focus:ring-2 focus:ring-adm-primary"
+        />
+      </label>
 
       {loading && !book.customers.length ? (
-        <div className="bg-card rounded-2xl border border-border shadow-premium px-5 py-12 text-center">
-          <p className="text-al-body text-muted-foreground">Loading customers...</p>
+        <div role="status" aria-label="Loading" className="rounded-[6px] border border-adm-border bg-adm-surface px-5 py-12 text-center">
+          <p className="text-[14px] text-adm-muted">Loading customers...</p>
         </div>
-      ) : rows.length === 0 ? (
+      ) : rows.length === 0 && error && !book.customers.length ? null : rows.length === 0 ? (
         <EmptyBlock title={`No customers in ${BUCKET_LABEL[tab]}`} body={needle ? "No customer matches that search in this tab." : BUCKET_EMPTY_COPY[tab]} />
       ) : (
         <>
-          <div className="hidden lg:block bg-card rounded-2xl border border-border shadow-premium overflow-hidden">
+          <div className="hidden lg:block bg-adm-surface rounded-2xl border border-adm-border shadow-premium overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1180px] text-left">
-                <thead className="bg-muted/40">
-                  <tr className="text-al-meta uppercase tracking-wider text-muted-foreground">
+                <thead className="bg-adm-workspace">
+                  <tr className="text-[12px] leading-[18px] uppercase tracking-wider text-adm-muted">
                     <th className="font-semibold px-5 py-2.5">Customer</th>
                     <th className="font-semibold py-2.5">Vehicle</th>
                     <th className="font-semibold py-2.5">Engagement</th>
@@ -191,7 +187,7 @@ const Customers = () => {
                     <tr
                       key={c.id}
                       onClick={() => navigate(`/customers/${encodeURIComponent(c.id)}`)}
-                      className="border-t border-border align-top cursor-pointer hover:bg-muted/30 transition-colors"
+                      className="border-t border-adm-border align-top cursor-pointer hover:bg-adm-workspace transition-colors"
                     >
                       <td className="px-5 py-3.5 w-[15%]">
                         <CustomerIdentity customer={c} />
@@ -200,27 +196,27 @@ const Customers = () => {
                         {c.vehicles[0] ? (
                           <VehicleCell label={c.vehicles[0].label} stock={c.vehicles[0].stock} vin={c.vehicles[0].vin} slug={c.vehicles[0].slug} />
                         ) : (
-                          <span className="text-al-meta text-muted-foreground">No vehicle attached</span>
+                          <span className="text-[12px] leading-[18px] text-adm-muted">No vehicle attached</span>
                         )}
                         {c.vehicles.length > 1 && (
-                          <p className="text-al-meta text-muted-foreground mt-1">+{c.vehicles.length - 1} more</p>
+                          <p className="text-[12px] leading-[18px] text-adm-muted mt-1">+{c.vehicles.length - 1} more</p>
                         )}
                       </td>
                       <td className="py-3.5 w-[20%] pr-4">
                         <EngagementCell engagement={c.engagement} />
                       </td>
                       <td className="py-3.5 w-[12%] pr-4">
-                        <p className="text-al-body text-foreground">{c.returnStatus.label}</p>
-                        <p className="text-al-meta text-muted-foreground mt-0.5">{c.returnStatus.detail}</p>
+                        <p className="text-[14px] leading-[20px] text-adm-ink">{c.returnStatus.label}</p>
+                        <p className="text-[12px] leading-[18px] text-adm-muted mt-0.5">{c.returnStatus.detail}</p>
                       </td>
                       <td className="py-3.5 w-[10%] pr-4">
                         {c.assignedEmployee ? (
                           <>
-                            <p className="text-al-body text-foreground">{c.assignedEmployee.name}</p>
-                            <p className="text-al-meta text-muted-foreground">{c.assignedEmployee.source}</p>
+                            <p className="text-[14px] leading-[20px] text-adm-ink">{c.assignedEmployee.name}</p>
+                            <p className="text-[12px] leading-[18px] text-adm-muted">{c.assignedEmployee.source}</p>
                           </>
                         ) : (
-                          <span className="text-al-meta text-muted-foreground">Unassigned</span>
+                          <span className="text-[12px] leading-[18px] text-adm-muted">Unassigned</span>
                         )}
                       </td>
                       <td className="py-3.5 w-[8%] pr-4">
@@ -239,25 +235,25 @@ const Customers = () => {
 
           <div className="lg:hidden space-y-3">
             {rows.map((c) => (
-              <article key={c.id} className="bg-card rounded-2xl border border-border shadow-premium p-4 space-y-3">
+              <article key={c.id} className="bg-adm-surface rounded-2xl border border-adm-border shadow-premium p-4 space-y-3">
                 <CustomerIdentity customer={c} />
                 {c.vehicles[0] && <VehicleCell label={c.vehicles[0].label} stock={c.vehicles[0].stock} vin={c.vehicles[0].vin} slug={c.vehicles[0].slug} />}
                 <EngagementCell engagement={c.engagement} />
                 <dl className="grid grid-cols-2 gap-2">
                   <div>
-                    <dt className="text-al-meta text-muted-foreground">Return status</dt>
-                    <dd className="text-al-body text-foreground">{c.returnStatus.label}</dd>
+                    <dt className="text-[12px] leading-[18px] text-adm-muted">Return status</dt>
+                    <dd className="text-[14px] leading-[20px] text-adm-ink">{c.returnStatus.label}</dd>
                   </div>
                   <div>
-                    <dt className="text-al-meta text-muted-foreground">Assigned</dt>
-                    <dd className="text-al-body text-foreground">{c.assignedEmployee?.name || "Unassigned"}</dd>
+                    <dt className="text-[12px] leading-[18px] text-adm-muted">Assigned</dt>
+                    <dd className="text-[14px] leading-[20px] text-adm-ink">{c.assignedEmployee?.name || "Unassigned"}</dd>
                   </div>
                   <div>
-                    <dt className="text-al-meta text-muted-foreground">Last activity</dt>
-                    <dd className="text-al-body text-foreground">{relativeTime(c.lastActivityAt)}</dd>
+                    <dt className="text-[12px] leading-[18px] text-adm-muted">Last activity</dt>
+                    <dd className="text-[14px] leading-[20px] text-adm-ink">{relativeTime(c.lastActivityAt)}</dd>
                   </div>
                 </dl>
-                <div className="border-t border-border pt-3">
+                <div className="border-t border-adm-border pt-3">
                   <NextActionCell action={c.nextAction} />
                   <RowActions customer={c} busyLead={busyLead} onMarkContacted={markContacted} />
                 </div>
@@ -266,23 +262,23 @@ const Customers = () => {
           </div>
         </>
       )}
-    </div>
+    </PageBody>
   );
 };
 
 const CustomerIdentity = ({ customer }: { customer: CustomerEntry }) => (
   <div className="min-w-0">
     <div className="flex items-center gap-2 min-w-0">
-      <UserRound className={`w-4 h-4 shrink-0 ${customer.identified ? "text-foreground" : "text-muted-foreground"}`} />
+      <UserRound className={`w-4 h-4 shrink-0 ${customer.identified ? "text-adm-ink" : "text-adm-muted"}`} />
       <Link
         to={`/customers/${encodeURIComponent(customer.id)}`}
         onClick={(e) => e.stopPropagation()}
-        className="text-al-body font-semibold text-foreground truncate hover:underline underline-offset-2"
+        className="text-[14px] leading-[20px] font-semibold text-adm-ink truncate hover:underline underline-offset-2"
       >
         {customer.identified ? customer.name || customer.email || "Unnamed customer" : "Unidentified shopper"}
       </Link>
     </div>
-    <p className="text-al-meta text-muted-foreground mt-0.5 truncate">
+    <p className="text-[12px] leading-[18px] text-adm-muted mt-0.5 truncate">
       {customer.identified
         ? [customer.phone, customer.email].filter(Boolean).join(" · ") || "No phone or email captured"
         : "No contact captured"}
@@ -309,7 +305,7 @@ const RowActions = ({
   const showMark = !!lead && lead.status !== "contacted" && lead.status !== "converted";
   const vehicle = customer.vehicles[0];
   const stop = (e: React.MouseEvent) => e.stopPropagation();
-  const base = "inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-border text-al-meta font-semibold hover:bg-muted transition-colors";
+  const base = "inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-adm-border text-[12px] leading-[18px] font-semibold hover:bg-adm-workspace transition-colors";
   return (
     <div className="flex flex-wrap items-center gap-2 mt-2.5">
       {tel && (

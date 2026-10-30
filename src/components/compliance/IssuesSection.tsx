@@ -58,14 +58,14 @@ export const IssuesSection = ({ rows, loading }: { rows: IssueRow[]; loading: bo
             key={f.id}
             type="button"
             onClick={() => setFilter(f.id)}
-            className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-al-meta font-bold transition-colors ${
+            className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-[12px] leading-[18px] font-semibold transition-colors ${
               filter === f.id
-                ? "border-foreground bg-foreground text-background"
-                : "border-border bg-card text-foreground hover:bg-muted"
+                ? "border-adm-primary bg-adm-selected text-adm-primary"
+                : "border-adm-border bg-adm-surface text-adm-ink hover:bg-adm-workspace"
             }`}
           >
             {f.label}
-            <span className="tabular-nums opacity-70">{counts[f.id] ?? 0}</span>
+            <span className="tabular-nums opacity-70">{loading ? "–" : counts[f.id] ?? 0}</span>
           </button>
         ))}
       </div>
@@ -75,18 +75,18 @@ export const IssuesSection = ({ rows, loading }: { rows: IssueRow[]; loading: bo
         meta="Counts are vehicles, not findings."
         action={
           <div className="relative w-full max-w-xs">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-adm-muted" />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search vehicle, stock, VIN"
-              className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-al-body text-foreground outline-none focus:ring-2 focus:ring-ring"
+              className="h-9 w-full rounded-lg border border-adm-border bg-adm-surface pl-9 pr-3 text-[14px] leading-[20px] text-adm-ink outline-none focus:ring-2 focus:ring-adm-primary"
             />
           </div>
         }
       >
         {loading ? (
-          <p className="px-4 py-10 text-center text-al-body text-muted-foreground">Loading issues…</p>
+          <p className="px-4 py-10 text-center text-[14px] leading-[20px] text-adm-muted">Loading issues…</p>
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={CheckCircle2}
@@ -101,17 +101,17 @@ export const IssuesSection = ({ rows, loading }: { rows: IssueRow[]; loading: bo
         ) : (
           <TableShell headers={["Vehicle", "Stock / VIN", "Open issues", "Certification", "Last checked", "Action"]}>
             {filtered.map((r) => (
-              <tr key={r.vehicleId} className="align-top hover:bg-muted/30">
+              <tr key={r.vehicleId} className="align-top hover:bg-adm-workspace">
                 <td className="px-4 py-3">
-                  <p className="text-al-card text-foreground">{r.title}</p>
-                  <p className="mt-0.5 text-al-meta text-muted-foreground">
+                  <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{r.title}</p>
+                  <p className="mt-0.5 text-[12px] leading-[18px] text-adm-muted">
                     {r.issues.length} open finding{r.issues.length === 1 ? "" : "s"}
                     {r.critical > 0 ? ` · ${r.critical} critical` : ""}
                   </p>
                 </td>
                 <td className="px-4 py-3">
-                  <p className="font-mono text-al-meta text-foreground">{r.stockNumber || "—"}</p>
-                  <p className="font-mono text-al-meta text-muted-foreground">{r.vin}</p>
+                  <p className="font-mono text-[12px] leading-[18px] text-adm-ink">{r.stockNumber || "—"}</p>
+                  <p className="font-mono text-[12px] leading-[18px] text-adm-muted">{r.vin}</p>
                 </td>
                 <td className="px-4 py-3">
                   <ul className="max-w-[460px] space-y-1.5">
@@ -121,9 +121,9 @@ export const IssuesSection = ({ rows, loading }: { rows: IssueRow[]; loading: bo
                           <StateBadge tone={i.severity === "critical" ? "critical" : "attention"}>
                             {ISSUE_CATEGORY_LABEL[i.category]}
                           </StateBadge>
-                          <span className="text-al-body text-foreground">{i.label}</span>
+                          <span className="text-[14px] leading-[20px] text-adm-ink">{i.label}</span>
                         </div>
-                        <p className="mt-0.5 text-al-meta text-muted-foreground">{i.detail}</p>
+                        <p className="mt-0.5 text-[12px] leading-[18px] text-adm-muted">{i.detail}</p>
                       </li>
                     ))}
                   </ul>
@@ -136,16 +136,16 @@ export const IssuesSection = ({ rows, loading }: { rows: IssueRow[]; loading: bo
                   ) : (
                     <StateBadge tone="attention">Not ready</StateBadge>
                   )}
-                  <p className="mt-1 text-al-meta text-muted-foreground">{formatDateTime(r.certifiedAt)}</p>
+                  <p className="mt-1 text-[12px] leading-[18px] text-adm-muted">{formatDateTime(r.certifiedAt)}</p>
                 </td>
-                <td className="px-4 py-3 text-al-meta text-muted-foreground">{formatDateTime(r.lastCheckedAt)}</td>
+                <td className="px-4 py-3 text-[12px] leading-[18px] text-adm-muted">{formatDateTime(r.lastCheckedAt)}</td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap justify-end gap-2">
                     <UsedVehicleDocsButton vehicleId={r.vehicleId} vin={r.vin} condition={r.condition} />
                     <button
                       type="button"
                       onClick={() => navigate(`/vehicle-file/${r.vehicleId}`)}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-2.5 text-al-meta font-bold text-foreground hover:bg-muted"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-adm-border px-2.5 text-[12px] leading-[18px] font-semibold text-adm-ink hover:bg-adm-workspace"
                     >
                       <ExternalLink className="h-3.5 w-3.5" /> Open
                     </button>

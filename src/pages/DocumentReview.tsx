@@ -5,13 +5,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { logStickerAudit } from "@/lib/stickerStudio/api";
 import { useTenant } from "@/contexts/TenantContext";
 import { supabase } from "@/integrations/supabase/client";
-import { AlertTriangle, ArrowLeft, FileWarning, ExternalLink, Check, EyeOff, RefreshCw, Printer } from "lucide-react";
+import { ExternalLink, Check, EyeOff, RefreshCw, Printer } from "lucide-react";
+import { Button, PageBody, PageHeader, Panel, QueryState, StatusText, WorkTable, Th, Td, type Tone } from "@/components/product";
 import { toast } from "sonner";
 
-const sevMeta: Record<StaleFlag["severity"], { tone: string; label: string }> = {
-  compliance_block: { tone: "border-rose-200 bg-rose-50 text-rose-700", label: "Compliance block" },
-  warning: { tone: "border-amber-200 bg-amber-50 text-amber-700", label: "Warning" },
-  info: { tone: "border-border bg-muted text-muted-foreground", label: "Info" },
+const sevMeta: Record<StaleFlag["severity"], { tone: Tone; label: string }> = {
+  compliance_block: { tone: "danger", label: "Compliance block" },
+  warning: { tone: "warning", label: "Warning" },
+  info: { tone: "neutral", label: "Info" },
 };
 const fmtVal = (v: unknown) => (typeof v === "number" ? v.toLocaleString() : String(v ?? "—"));
 
@@ -60,58 +61,68 @@ const DocumentReview = () => {
     }
   };
 
-  if (loading) return <p className="p-6 text-sm text-muted-foreground">Loading review queue…</p>;
+  // Loading and an unavailable table are their own states; an empty queue is
+  // reported only after the read succeeded.
+  const status = loading ? "loading" : !available ? "error" : flags.length === 0 ? "empty" : "ready";
 
   return (
-    <div className="p-4 lg:p-6 max-w-[1000px] mx-auto space-y-4">
-      <div>
-        <button onClick={() => navigate("/dashboard")} className="text-[11px] font-semibold text-blue-600 hover:underline inline-flex items-center gap-1"><ArrowLeft className="w-3 h-3" /> Dashboard</button>
-        <h1 className="text-al-page font-display text-foreground inline-flex items-center gap-2"><FileWarning className="w-5 h-5 text-primary" /> Document review queue</h1>
-        <p className="text-xs text-muted-foreground mt-1">Stickers and addendums that may be stale because the vehicle's price, MSRP, or details changed after they were generated.</p>
-      </div>
-
-      {!available ? (
-        <div className="rounded-2xl border border-dashed border-border p-8 text-center">
-          <FileWarning className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
-          <p className="text-sm font-semibold text-foreground">Review queue not available yet</p>
-          <p className="text-xs text-muted-foreground mt-1">Apply migration <span className="font-mono">20260620140000_stale_document_flags.sql</span> to enable stale-document review.</p>
-        </div>
-      ) : flags.length === 0 ? (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-8 text-center">
-          <Check className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
-          <p className="text-sm font-semibold text-emerald-800">All clear</p>
-          <p className="text-xs text-emerald-700 mt-1">No documents need review right now.</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          <div className="flex justify-end"><button onClick={reload} className="text-[11px] font-semibold text-muted-foreground hover:text-foreground inline-flex items-center gap-1"><RefreshCw className="w-3 h-3" /> Refresh</button></div>
-          {flags.map((f) => {
-            const m = sevMeta[f.severity];
-            return (
-              <div key={f.id} className={`rounded-xl border p-3 ${m.tone}`}>
-                <div className="flex items-start justify-between gap-3 flex-wrap">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span className="text-al-meta font-bold uppercase tracking-wide">{m.label}</span>
-                      {f.changed_field && <span className="text-[10px] font-mono opacity-70">{f.changed_field}</span>}
-                    </div>
-                    <p className="text-sm font-semibold mt-1">{f.reason}</p>
-                    <p className="text-[11px] opacity-80">Sticker: {fmtVal(f.old_value)} · Now: {fmtVal(f.new_value)}</p>
-                  </div>
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <button onClick={() => navigate(`/vehicle-file/${f.vehicle_id}?tab=labels`)} className="h-7 px-2.5 rounded-md bg-card/70 border border-current/20 text-[11px] font-semibold inline-flex items-center gap-1"><ExternalLink className="w-3 h-3" /> Open vehicle</button>
-                    <button onClick={() => queueReprint(f)} disabled={queueing === f.id} className="h-7 px-2.5 rounded-md bg-card/70 border border-current/20 text-[11px] font-semibold inline-flex items-center gap-1 disabled:opacity-50"><Printer className="w-3 h-3" /> Queue reprint</button>
-                    <button onClick={() => act(f, "resolved")} className="h-7 px-2.5 rounded-md bg-card/70 border border-current/20 text-[11px] font-semibold inline-flex items-center gap-1"><Check className="w-3 h-3" /> Resolve</button>
-                    <button onClick={() => act(f, "ignored")} className="h-7 px-2.5 rounded-md bg-card/70 border border-current/20 text-[11px] font-semibold inline-flex items-center gap-1"><EyeOff className="w-3 h-3" /> Ignore</button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+    <PageBody width="wide">
+      <PageHeader
+        title="Document review queue"
+        description="Stickers and addendums that may be stale because the vehicle's price, MSRP, or details changed after they were generated."
+        actions={
+          <Button onClick={reload} disabled={loading}>
+            <RefreshCw className="h-4 w-4" aria-hidden="true" /> Refresh
+          </Button>
+        }
+      />
+      <Panel flush title={status === "ready" ? `${flags.length} open ${flags.length === 1 ? "review" : "reviews"}` : undefined}>
+        <QueryState
+          status={status}
+          onRetry={reload}
+          errorTitle="The review queue is not available."
+          errorDetail="The stale-document flag table could not be read, so the queue is unknown rather than empty."
+          emptyTitle="No documents are waiting for review."
+          emptyDetail="Nothing is flagged as stale for this rooftop right now."
+        >
+          <WorkTable caption="Documents needing review" minWidth={820}>
+            <thead>
+              <tr>
+                <Th>Severity</Th>
+                <Th>Reason</Th>
+                <Th>Sticker value</Th>
+                <Th>Current value</Th>
+                <Th>Actions</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {flags.map((f) => {
+                const m = sevMeta[f.severity];
+                return (
+                  <tr key={f.id}>
+                    <Td>
+                      <StatusText tone={m.tone} icon>{m.label}</StatusText>
+                      {f.changed_field && <p className="mt-1 font-mono text-[12px] text-adm-muted">{f.changed_field}</p>}
+                    </Td>
+                    <Td>{f.reason}</Td>
+                    <Td align="right">{fmtVal(f.old_value)}</Td>
+                    <Td align="right">{fmtVal(f.new_value)}</Td>
+                    <Td>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button size="sm" onClick={() => navigate(`/vehicle-file/${f.vehicle_id}?tab=labels`)}><ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /> Open vehicle</Button>
+                        <Button size="sm" onClick={() => queueReprint(f)} disabled={queueing === f.id}><Printer className="h-3.5 w-3.5" aria-hidden="true" /> Queue reprint</Button>
+                        <Button size="sm" onClick={() => act(f, "resolved")}><Check className="h-3.5 w-3.5" aria-hidden="true" /> Resolve</Button>
+                        <Button size="sm" onClick={() => act(f, "ignored")}><EyeOff className="h-3.5 w-3.5" aria-hidden="true" /> Ignore</Button>
+                      </div>
+                    </Td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </WorkTable>
+        </QueryState>
+      </Panel>
+    </PageBody>
   );
 };
 

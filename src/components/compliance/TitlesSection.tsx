@@ -38,19 +38,19 @@ export const TitlesSection = ({
       />
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <CountTile
+        <CountTile loading={loading}
           label="Outstanding"
           value={outstanding.length}
           tone={outstanding.length > 0 ? "attention" : "clear"}
           means="In-stock vehicles missing one or both sides of the required document."
         />
-        <CountTile
+        <CountTile loading={loading}
           label="Over 30 days"
           value={aged}
           tone={aged > 0 ? "critical" : "neutral"}
           means="Outstanding vehicles that have been in stock 30 days or more without their document on file."
         />
-        <CountTile
+        <CountTile loading={loading}
           label="Owner"
           value={owner ? "Assigned" : "Unassigned"}
           means={
@@ -65,7 +65,7 @@ export const TitlesSection = ({
         title={`${filtered.length.toLocaleString()} vehicle${filtered.length === 1 ? "" : "s"}`}
         action={
           <div className="flex flex-wrap items-center gap-3">
-            <label className="inline-flex items-center gap-2 text-al-meta font-bold text-foreground">
+            <label className="inline-flex items-center gap-2 text-[12px] leading-[18px] font-bold text-adm-ink">
               <input
                 type="checkbox"
                 checked={showComplete}
@@ -75,19 +75,19 @@ export const TitlesSection = ({
               Include vehicles with documents on file
             </label>
             <div className="relative w-full max-w-xs">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-adm-muted" />
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Search vehicle, stock, VIN"
-                className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-al-body text-foreground outline-none focus:ring-2 focus:ring-ring"
+                className="h-9 w-full rounded-lg border border-adm-border bg-adm-surface pl-9 pr-3 text-[14px] leading-[20px] text-adm-ink outline-none focus:ring-2 focus:ring-adm-primary"
               />
             </div>
           </div>
         }
       >
         {loading ? (
-          <p className="px-4 py-10 text-center text-al-body text-muted-foreground">Loading vehicles…</p>
+          <p className="px-4 py-10 text-center text-[14px] leading-[20px] text-adm-muted">Loading vehicles…</p>
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={CheckCircle2}
@@ -102,25 +102,25 @@ export const TitlesSection = ({
         ) : (
           <TableShell headers={["Vehicle", "Requirement", "Current state", "Age", "Owner", "Action"]}>
             {filtered.map((r) => (
-              <tr key={r.vehicleId} className="hover:bg-muted/30">
+              <tr key={r.vehicleId} className="hover:bg-adm-workspace">
                 <td className="px-4 py-3">
-                  <p className="text-al-card text-foreground">{r.title}</p>
-                  <p className="font-mono text-al-meta text-muted-foreground">{r.stockNumber || r.vin}</p>
+                  <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{r.title}</p>
+                  <p className="font-mono text-[12px] leading-[18px] text-adm-muted">{r.stockNumber || r.vin}</p>
                 </td>
-                <td className="px-4 py-3 text-al-body text-foreground">{r.requirement.label}</td>
+                <td className="px-4 py-3 text-[14px] leading-[20px] text-adm-ink">{r.requirement.label}</td>
                 <td className="px-4 py-3">
                   <StateBadge tone={r.state === "on_file" ? "clear" : r.state === "not_received" ? "attention" : "neutral"}>
                     {TITLE_STATE_LABEL[r.state]}
                   </StateBadge>
                   {r.receivedAt && (
-                    <p className="mt-1 text-al-meta text-muted-foreground">Last upload {formatDate(r.receivedAt)}</p>
+                    <p className="mt-1 text-[12px] leading-[18px] text-adm-muted">Last upload {formatDate(r.receivedAt)}</p>
                   )}
                 </td>
-                <td className="px-4 py-3 text-al-body tabular-nums text-foreground">
+                <td className="px-4 py-3 text-[14px] leading-[20px] tabular-nums text-adm-ink">
                   {r.ageDays == null ? "—" : `${r.ageDays}d`}
-                  <span className="ml-1 text-al-meta text-muted-foreground">in stock</span>
+                  <span className="ml-1 text-[12px] leading-[18px] text-adm-muted">in stock</span>
                 </td>
-                <td className="px-4 py-3 text-al-meta text-muted-foreground">
+                <td className="px-4 py-3 text-[12px] leading-[18px] text-adm-muted">
                   {r.owner || "No title clerk configured"}
                 </td>
                 <td className="px-4 py-3 text-right">

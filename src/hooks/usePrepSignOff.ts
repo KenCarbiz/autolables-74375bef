@@ -51,10 +51,11 @@ export interface PrepSignOff {
 
 export const usePrepSignOff = (storeId: string) => {
   const [signOffs, setSignOffs] = useState<PrepSignOff[]>([]);
-  const [loading, setLoading] = useState(false);
+  // True until the first read settles, so counts never render as a zero.
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    if (!storeId) return;
+    if (!storeId) { setLoading(false); return; }
     setLoading(true);
     const { data } = await (supabase as any)
       .from("prep_sign_offs")

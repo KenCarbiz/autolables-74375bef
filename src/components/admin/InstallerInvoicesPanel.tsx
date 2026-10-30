@@ -1,3 +1,4 @@
+import { MetricStrip, StatusText } from "@/components/product";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
@@ -149,28 +150,31 @@ export default function InstallerInvoicesPanel() {
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h3 className="text-sm font-semibold text-foreground inline-flex items-center gap-1.5">
-            <Receipt className="w-4 h-4 text-blue-600" /> Installer Invoices
+          <h3 className="text-sm font-semibold text-adm-ink inline-flex items-center gap-1.5">
+            <Receipt className="w-4 h-4 text-adm-primary" /> Installer Invoices
           </h3>
-          <p className="text-xs text-muted-foreground mt-0.5 max-w-xl">
+          <p className="text-xs text-adm-muted mt-0.5 max-w-xl">
             Billable work derived from completed Get-Ready records — accessory installs priced from your
             product catalog plus internal services performed. Mark each vehicle invoiced, then paid.
           </p>
         </div>
-        <button onClick={exportCsv} className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg border border-border text-xs font-semibold hover:bg-muted">
+        <button onClick={exportCsv} className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg border border-adm-border text-xs font-semibold hover:bg-adm-workspace">
           <Download className="w-3.5 h-3.5" /> Export CSV
         </button>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatMini icon={FileText} label="Ready to invoice" value={String(stats.invoiceable)} color="text-amber-600" />
-        <StatMini icon={Receipt} label="Invoiced" value={String(stats.invoiced)} color="text-blue-600" />
-        <StatMini icon={CheckCircle2} label="Paid" value={String(stats.paid)} color="text-emerald-600" />
-        <StatMini icon={FileText} label="Outstanding" value={money(stats.outstanding)} color="text-foreground" />
-      </div>
+      <MetricStrip
+        label="Installer invoice totals"
+        metrics={[
+          { label: "Ready to invoice", value: loading ? null : stats.invoiceable, loading, tone: "warning", hint: "completed work not yet invoiced" },
+          { label: "Invoiced", value: loading ? null : stats.invoiced, loading, tone: "info" },
+          { label: "Paid", value: loading ? null : stats.paid, loading, tone: "success", hint: "marked paid by staff" },
+          { label: "Outstanding", value: loading ? null : money(stats.outstanding), loading, tone: "neutral", hint: "invoiced, not yet marked paid" },
+        ]}
+      />
 
       {!available && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+        <div className="rounded-xl border border-adm-warning-bg bg-adm-warning-bg px-4 py-3 text-xs text-adm-warning">
           Invoice status can't be saved yet — apply migration{" "}
           <span className="font-mono">20260704000000_get_ready_invoices.sql</span> to enable
           mark-as-invoiced and paid tracking. Line items below are still derived live.
@@ -178,12 +182,12 @@ export default function InstallerInvoicesPanel() {
       )}
 
       {loading ? (
-        <div className="py-10 text-center"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground mx-auto" /></div>
+        <div className="py-10 text-center"><Loader2 className="w-5 h-5 animate-spin text-adm-muted mx-auto" /></div>
       ) : derived.length === 0 ? (
-        <div className="bg-card rounded-xl border border-border shadow-premium px-5 py-10 text-center">
-          <Receipt className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
-          <p className="text-sm font-semibold text-foreground">No billable get-ready work yet</p>
-          <p className="text-xs text-muted-foreground mt-1">Vehicles appear here as soon as an accessory install or internal service is completed in Get-Ready.</p>
+        <div className="bg-adm-surface rounded-xl border border-adm-border shadow-premium px-5 py-10 text-center">
+          <Receipt className="w-8 h-8 text-adm-muted/40 mx-auto mb-2" />
+          <p className="text-sm font-semibold text-adm-ink">No billable get-ready work yet</p>
+          <p className="text-xs text-adm-muted mt-1">Vehicles appear here as soon as an accessory install or internal service is completed in Get-Ready.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -197,30 +201,26 @@ export default function InstallerInvoicesPanel() {
               invoiceNumber: inv?.invoice_number || "Draft", status, lines, total,
             };
             return (
-              <div key={d.recordId} className="bg-card rounded-xl border border-border shadow-premium overflow-hidden">
-                <div className="px-5 py-3 flex items-center justify-between gap-3 flex-wrap border-b border-border">
+              <div key={d.recordId} className="bg-adm-surface rounded-xl border border-adm-border shadow-premium overflow-hidden">
+                <div className="px-5 py-3 flex items-center justify-between gap-3 flex-wrap border-b border-adm-border">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-foreground truncate">{d.ymm || "Vehicle"}</p>
-                    <p className="text-[11px] text-muted-foreground font-mono">
+                    <p className="text-sm font-semibold text-adm-ink truncate">{d.ymm || "Vehicle"}</p>
+                    <p className="text-[11px] text-adm-muted font-mono">
                       {d.vin}{d.stockNumber ? ` · Stock ${d.stockNumber}` : ""}{d.roNumber ? ` · RO ${d.roNumber}` : ""}{inv ? ` · ${inv.invoice_number}` : ""}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                      status === "paid" ? "bg-emerald-50 text-emerald-700"
-                      : status === "invoiced" ? "bg-blue-50 text-blue-700"
-                      : "bg-amber-50 text-amber-700"
-                    }`}>{status}</span>
-                    <button onClick={() => printInvoice(printable, settings.dealer_name)} title="Print invoice" className="h-8 px-2.5 rounded-lg border border-border text-[11px] font-semibold inline-flex items-center gap-1 hover:bg-muted">
+                    <StatusText tone={status === "paid" ? "success" : status === "invoiced" ? "info" : "warning"} icon>{status.charAt(0).toUpperCase() + status.slice(1)}</StatusText>
+                    <button onClick={() => printInvoice(printable, settings.dealer_name)} title="Print invoice" className="h-8 px-2.5 rounded-lg border border-adm-border text-[11px] font-semibold inline-flex items-center gap-1 hover:bg-adm-workspace">
                       <Printer className="w-3.5 h-3.5" /> Print
                     </button>
                     {available && !inv && (
-                      <button disabled={busy === d.recordId} onClick={() => onMarkInvoiced(d)} className="h-8 px-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-semibold inline-flex items-center gap-1 disabled:opacity-50">
+                      <button disabled={busy === d.recordId} onClick={() => onMarkInvoiced(d)} className="h-8 px-2.5 rounded-lg bg-adm-primary hover:bg-adm-primary-hover text-white text-[11px] font-semibold inline-flex items-center gap-1 disabled:opacity-50">
                         {busy === d.recordId ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Receipt className="w-3.5 h-3.5" />} Mark invoiced
                       </button>
                     )}
                     {available && inv && inv.status === "invoiced" && (
-                      <button disabled={busy === inv.id} onClick={() => onMarkPaid(inv)} className="h-8 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold inline-flex items-center gap-1 disabled:opacity-50">
+                      <button disabled={busy === inv.id} onClick={() => onMarkPaid(inv)} className="h-8 px-2.5 rounded-lg bg-adm-success hover:opacity-90 text-white text-[11px] font-semibold inline-flex items-center gap-1 disabled:opacity-50">
                         {busy === inv.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />} Mark paid
                       </button>
                     )}
@@ -230,14 +230,14 @@ export default function InstallerInvoicesPanel() {
                   {lines.map((l, i) => (
                     <div key={i} className="px-5 py-2 flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-xs font-semibold text-foreground truncate">{l.label}</p>
-                        <p className="text-[10px] text-muted-foreground">{l.kind === "accessory" ? "Accessory install" : "Service"}{l.detail ? ` · ${l.detail}` : ""}</p>
+                        <p className="text-xs font-semibold text-adm-ink truncate">{l.label}</p>
+                        <p className="text-[10px] text-adm-muted">{l.kind === "accessory" ? "Accessory install" : "Service"}{l.detail ? ` · ${l.detail}` : ""}</p>
                       </div>
                       <p className="text-xs font-bold tabular-nums">{money(l.amount)}</p>
                     </div>
                   ))}
-                  <div className="px-5 py-2.5 flex items-center justify-between bg-muted/30">
-                    <p className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground">Total</p>
+                  <div className="px-5 py-2.5 flex items-center justify-between bg-adm-workspace">
+                    <p className="text-[12px] leading-[18px] font-bold uppercase tracking-wider text-adm-muted">Total</p>
                     <p className="text-sm font-extrabold tabular-nums">{money(total)}</p>
                   </div>
                 </div>
@@ -246,16 +246,6 @@ export default function InstallerInvoicesPanel() {
           })}
         </div>
       )}
-    </div>
-  );
-}
-
-function StatMini({ icon: Icon, label, value, color }: { icon: typeof FileText; label: string; value: string; color: string }) {
-  return (
-    <div className="bg-card rounded-xl border border-border p-3.5">
-      <Icon className={`w-4 h-4 ${color}`} />
-      <p className={`text-lg font-bold tabular-nums mt-1 ${color}`}>{value}</p>
-      <p className="text-al-meta font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
     </div>
   );
 }

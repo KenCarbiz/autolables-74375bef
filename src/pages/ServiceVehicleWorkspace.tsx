@@ -78,11 +78,11 @@ interface AuditRow { id: string; action: string; created_at: string; details: Re
 interface Clearance { state: string; reason_codes: string[]; computed_at?: string | null; }
 
 const TONE_BOX: Record<Tone, string> = {
-  slate: "border-border bg-muted",
-  amber: "border-amber-200 bg-amber-50",
-  red: "border-red-200 bg-red-50",
-  blue: "border-blue-200 bg-blue-50",
-  emerald: "border-emerald-200 bg-emerald-50",
+  slate: "border-adm-border bg-adm-workspace",
+  amber: "border-adm-warning-bg bg-adm-warning-bg",
+  red: "border-adm-border bg-adm-danger-bg",
+  blue: "border-adm-border bg-adm-selected",
+  emerald: "border-adm-border bg-adm-success-bg",
 };
 
 const REPAIR_STATE_LABELS: Record<RepairState, string> = {
@@ -336,7 +336,7 @@ export default function ServiceVehicleWorkspace() {
 
   return (
     <CommandCapabilityProvider role={role} isAdmin={isAdmin}>
-      <div className="max-w-[1400px] mx-auto p-4 md:p-6 space-y-4 pb-28 lg:pb-6">
+      <div className="mx-auto max-w-[1400px] space-y-4 px-4 py-4 pb-28 sm:px-6 sm:py-6 lg:pb-6">
         <div className={ACTION_GROUP}>
           <Link to="/service" className={BTN_SECONDARY}>
             <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Service Desk
@@ -442,7 +442,7 @@ export default function ServiceVehicleWorkspace() {
               >
                 <ServiceApprovalsPanel tenantId={tenantId} vin={vin} onDecided={() => void load()} />
                 {pendingRequests === 0 && (
-                  <p className="text-[11.5px] text-muted-foreground py-2">No additional-work request is pending for this vehicle.</p>
+                  <p className="text-[11.5px] text-adm-muted py-2">No additional-work request is pending for this vehicle.</p>
                 )}
               </CommandCard>
             </div>
@@ -513,14 +513,14 @@ function StatusBannerCard({ ws, onAction }: { ws: WorkspaceStatus; onAction: (k:
       className={cn("rounded-2xl border p-4 flex items-center justify-between gap-3 flex-wrap", TONE_BOX[ws.tone])}
     >
       <div className="flex items-center gap-3 min-w-0">
-        <span className={cn("w-11 h-11 rounded-xl bg-card/70 grid place-items-center shrink-0", TONE_TEXT[ws.tone])}>
+        <span className={cn("w-11 h-11 rounded-xl bg-adm-surface/70 grid place-items-center shrink-0", TONE_TEXT[ws.tone])}>
           <Icon className="w-5 h-5" aria-hidden="true" />
         </span>
         <div className="min-w-0">
           <p className={cn("text-[15px] font-bold leading-tight", TONE_TEXT[ws.tone])}>{ws.label}</p>
           {ws.blockerLabel
-            ? <p className="text-caption text-muted-foreground">{ws.blockerLabel}</p>
-            : <p className="text-caption text-muted-foreground">Next: {ws.action.label}</p>}
+            ? <p className="text-caption text-adm-muted">{ws.blockerLabel}</p>
+            : <p className="text-caption text-adm-muted">Next: {ws.action.label}</p>}
         </div>
       </div>
       <button
@@ -528,7 +528,7 @@ function StatusBannerCard({ ws, onAction }: { ws: WorkspaceStatus; onAction: (k:
         onClick={() => onAction(ws.action.key)}
         className={cn(
           "min-h-[44px] px-4 rounded-lg text-sm font-semibold inline-flex items-center gap-1.5 shrink-0",
-          ws.tone === "red" ? "bg-red-600 text-white" : ws.key === "cleared" ? "border border-border bg-card text-foreground" : "bg-primary text-primary-foreground",
+          ws.tone === "red" ? "bg-red-600 text-white" : ws.key === "cleared" ? "border border-adm-border bg-adm-surface text-adm-ink" : "bg-primary text-primary-foreground",
         )}
       >
         {ws.action.label} <ChevronRight className="w-4 h-4" aria-hidden="true" />
@@ -586,7 +586,7 @@ function AssignmentCard({ inspection, members, canAssign, onAssigned }: {
             value={inspection?.assigned_to || ""}
             onChange={(e) => void assign(e.target.value)}
             disabled={!!reason || busy}
-            className="w-full h-11 rounded-lg border border-border bg-background px-2 text-sm disabled:opacity-50"
+            className="w-full h-11 rounded-lg border border-adm-border bg-adm-surface px-2 text-sm disabled:opacity-50"
           >
             <option value="">Unassigned</option>
             {members.map((m) => (
@@ -595,7 +595,7 @@ function AssignmentCard({ inspection, members, canAssign, onAssigned }: {
           </select>
         </DisabledReason>
         {inspection?.started_at && (
-          <p className="text-[11.5px] text-muted-foreground">Started {formatCommandDateTime(inspection.started_at)}</p>
+          <p className="text-[11.5px] text-adm-muted">Started {formatCommandDateTime(inspection.started_at)}</p>
         )}
       </div>
     </CommandCard>
@@ -610,7 +610,7 @@ function ProgressCard({ items }: { items: GetReadyItem[] }) {
   return (
     <CommandCard title="Get-Ready progress" subtitle={total ? `${done} of ${total} items complete` : "No worklist items yet."}>
       {total > 0 && (
-        <div className="h-2 rounded-full bg-muted overflow-hidden" role="img" aria-label={`${done} of ${total} items complete`}>
+        <div className="h-2 rounded-full bg-adm-workspace overflow-hidden" role="img" aria-label={`${done} of ${total} items complete`}>
           <div className="h-full bg-primary" style={{ width: `${Math.round((done / total) * 100)}%` }} />
         </div>
       )}
@@ -641,7 +641,7 @@ function SummaryCard({ newestSigned, openFailures, clearance, items }: {
         />
       </dl>
       {clearance && clearance.reason_codes.length > 0 && (
-        <ul className="mt-2 space-y-1 text-[11.5px] text-muted-foreground list-disc pl-4">
+        <ul className="mt-2 space-y-1 text-[11.5px] text-adm-muted list-disc pl-4">
           {clearance.reason_codes.map((code) => <li key={code}>{clearanceReasonLabel(code)}</li>)}
         </ul>
       )}
@@ -652,8 +652,8 @@ function SummaryCard({ newestSigned, openFailures, clearance, items }: {
 function Row({ label, value, tone }: { label: string; value: string; tone?: "red" | "emerald" }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className={cn("font-semibold text-foreground", tone === "red" && "text-red-700", tone === "emerald" && "text-emerald-700")}>{value}</dd>
+      <dt className="text-adm-muted">{label}</dt>
+      <dd className={cn("font-semibold text-adm-ink", tone === "red" && "text-adm-danger", tone === "emerald" && "text-adm-success")}>{value}</dd>
     </div>
   );
 }
@@ -737,12 +737,12 @@ function ExecutedOrExecutePanel({ tenantId, veh, signedRow, canExecute, openFail
   if (certified) {
     return (
       <CommandCard title="CT K-208 safety inspection">
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 space-y-2">
+        <div className="rounded-xl border border-adm-border bg-adm-success-bg p-4 space-y-2">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600" aria-hidden="true" />
-            <p className="font-bold text-emerald-900">K-208 executed</p>
+            <CheckCircle2 className="w-5 h-5 text-adm-success" aria-hidden="true" />
+            <p className="font-bold text-adm-success">K-208 executed</p>
           </div>
-          <dl className="text-[12.5px] text-emerald-900 space-y-1">
+          <dl className="text-[12.5px] text-adm-success space-y-1">
             <div className="flex justify-between gap-2"><dt>Inspected by</dt><dd className="font-semibold">{signedRow.inspector_name || "Not recorded"}</dd></div>
             <div className="flex justify-between gap-2"><dt>Executed by</dt><dd className="font-semibold">{signedRow.licensee_name || "Authorized signer"}</dd></div>
             <div className="flex justify-between gap-2"><dt>Executed at</dt><dd className="font-semibold">{formatCommandDateTime(signedRow.licensee_certified_at)}</dd></div>
@@ -805,8 +805,8 @@ function ExecutedOrExecutePanel({ tenantId, veh, signedRow, canExecute, openFail
     >
       <div className="space-y-3">
         <dl className="grid grid-cols-2 gap-2 text-[12.5px]">
-          <div><dt className="text-muted-foreground">Items passed</dt><dd className="font-semibold text-foreground">{passed} of {checklist.length || K208_ITEMS.length}</dd></div>
-          <div><dt className="text-muted-foreground">Mileage</dt><dd className="font-semibold text-foreground">{veh.mileage != null ? Number(veh.mileage).toLocaleString("en-US") : "Not recorded"}</dd></div>
+          <div><dt className="text-adm-muted">Items passed</dt><dd className="font-semibold text-adm-ink">{passed} of {checklist.length || K208_ITEMS.length}</dd></div>
+          <div><dt className="text-adm-muted">Mileage</dt><dd className="font-semibold text-adm-ink">{veh.mileage != null ? Number(veh.mileage).toLocaleString("en-US") : "Not recorded"}</dd></div>
         </dl>
         {priorFailures.length > 0 && (
           <CommandCallout tone="amber" Icon={AlertTriangle} title="Prior failures on this inspection">
@@ -815,16 +815,16 @@ function ExecutedOrExecutePanel({ tenantId, veh, signedRow, canExecute, openFail
         )}
         <Link to={`/k208/${vin}`} className={BTN_SECONDARY}><FileText className="w-4 h-4" aria-hidden="true" /> Preview the K-208 document</Link>
         <fieldset className="space-y-1.5">
-          <legend className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground">Signer confirmations</legend>
+          <legend className="text-[12px] leading-[18px] font-bold uppercase tracking-wide text-adm-muted">Signer confirmations</legend>
           {CONFIRMS.map((c, i) => (
-            <label key={c} className="flex items-start gap-2 text-[12.5px] text-foreground min-h-[44px] items-center">
+            <label key={c} className="flex items-start gap-2 text-[12.5px] text-adm-ink min-h-[44px] items-center">
               <input type="checkbox" checked={confirms[i]} onChange={(e) => setConfirms((s) => s.map((v, j) => (j === i ? e.target.checked : v)))} />
               <span>{c}</span>
             </label>
           ))}
         </fieldset>
         <div>
-          <span className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground">Warranty result</span>
+          <span className="text-[12px] leading-[18px] font-bold uppercase tracking-wide text-adm-muted">Warranty result</span>
           <div className={cn(ACTION_GROUP, "mt-1")}>
             {(["A", "B", "C"] as const).map((code) => (
               <button
@@ -833,13 +833,13 @@ function ExecutedOrExecutePanel({ tenantId, veh, signedRow, canExecute, openFail
                 aria-pressed={resultInitial === code}
                 onClick={() => setResultInitial(code)}
                 className={cn("min-h-[44px] px-4 rounded-lg border text-sm font-bold",
-                  resultInitial === code ? "bg-primary text-primary-foreground border-primary" : "bg-background text-foreground border-border hover:bg-muted")}
+                  resultInitial === code ? "bg-primary text-primary-foreground border-primary" : "bg-adm-surface text-adm-ink border-adm-border hover:bg-adm-workspace")}
               >
                 {code}
               </button>
             ))}
           </div>
-          <p className="text-[10.5px] text-muted-foreground mt-1">
+          <p className="text-[10.5px] text-adm-muted mt-1">
             {K208_INSPECTION_RESULTS.map((r: { code: string; label: string }) => `${r.code}: ${r.label}`).join(" · ")}
           </p>
         </div>
@@ -848,12 +848,12 @@ function ExecutedOrExecutePanel({ tenantId, veh, signedRow, canExecute, openFail
           onChange={(e) => setSignerName(e.target.value)}
           placeholder="Signer full name"
           aria-label="Signer full name"
-          className="w-full h-11 rounded-lg border border-border bg-background px-3 text-sm"
+          className="w-full h-11 rounded-lg border border-adm-border bg-adm-surface px-3 text-sm"
         />
         <SignaturePad label="Signer signature" subtitle="Your own authenticated signature. Never sign as another person."
           value={sig.data} type={sig.type} onChange={(d, t) => setSig({ data: d, type: t })} />
-        <p className="text-[10.5px] text-muted-foreground">{K208_CERTIFICATION_TEXT}</p>
-        <p className="text-[10.5px] text-muted-foreground">This execution is recorded with your user identity, a timestamp, and the document version, and is fully audited.</p>
+        <p className="text-[10.5px] text-adm-muted">{K208_CERTIFICATION_TEXT}</p>
+        <p className="text-[10.5px] text-adm-muted">This execution is recorded with your user identity, a timestamp, and the document version, and is fully audited.</p>
         <DisabledReason reason={reason} busyLabel={busy ? "Executing" : ""}>
           <button
             type="button"
@@ -1074,7 +1074,7 @@ function InspectionChecklistPanel({ tenantId, veh, newestActive, canConduct, pas
         ? "Every required item must be reinspected by an authorized employee. This records a new signed inspection."
         : "Mark each item, explain any failure, review, then sign."}
       action={
-        <span className="text-[11px] text-muted-foreground" role="status" aria-live="polite">
+        <span className="text-[11px] text-adm-muted" role="status" aria-live="polite">
           {serverSave === "saving" ? "Saving…"
             : serverSave === "saved" ? `Saved ${formatCommandDateTime(serverSavedAt) ?? ""}`
             : serverSave === "offline"
@@ -1110,28 +1110,28 @@ function InspectionChecklistPanel({ tenantId, veh, newestActive, canConduct, pas
         />
 
         <div className="space-y-2">
-          <span className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground">Documents (inspection sheet, defect photos)</span>
+          <span className="text-[12px] leading-[18px] font-bold uppercase tracking-wide text-adm-muted">Documents (inspection sheet, defect photos)</span>
           <input type="file" accept="image/*,application/pdf" multiple onChange={(e) => onFiles(e.target.files)} className="hidden" id="k208-files" />
           <div className={ACTION_GROUP}>
             <label htmlFor="k208-files" className={cn(BTN_SECONDARY, "cursor-pointer")}>
               {uploading ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Upload className="w-4 h-4" aria-hidden="true" />} Add file
             </label>
-            {docs.length > 0 && <span className="text-xs text-muted-foreground">{docs.length} file(s) attached</span>}
+            {docs.length > 0 && <span className="text-xs text-adm-muted">{docs.length} file(s) attached</span>}
           </div>
         </div>
 
         {/* Review gate: the summary must be reviewed before signing enables. */}
-        <div className="rounded-xl border border-border p-3 space-y-2">
-          <p className="text-[12.5px] font-bold text-foreground">Review inspection</p>
-          <p className="text-[12.5px] text-muted-foreground">
+        <div className="rounded-xl border border-adm-border p-3 space-y-2">
+          <p className="text-[12.5px] font-bold text-adm-ink">Review inspection</p>
+          <p className="text-[12.5px] text-adm-muted">
             {answered} of {K208_ITEMS.length} marked · {K208_ITEMS.filter((i) => marks[i.id] === "pass").length} pass · {failIds.length} fail
           </p>
           {failIds.length > 0 && (
-            <ul className="text-[11.5px] text-red-700 list-disc pl-4 space-y-0.5">
+            <ul className="text-[11.5px] text-adm-danger list-disc pl-4 space-y-0.5">
               {failIds.map((id) => <li key={id}>{itemLabel(id)}: {(itemNotes[id] || "").trim() || "explanation required"}</li>)}
             </ul>
           )}
-          <label className="flex items-center gap-2 text-[12.5px] text-foreground min-h-[44px]">
+          <label className="flex items-center gap-2 text-[12.5px] text-adm-ink min-h-[44px]">
             <input type="checkbox" checked={reviewed} disabled={!allAnswered || !failsExplained}
               onChange={(e) => setReviewed(e.target.checked)} />
             <span>I reviewed every item mark and failure explanation above.</span>
@@ -1139,10 +1139,10 @@ function InspectionChecklistPanel({ tenantId, veh, newestActive, canConduct, pas
         </div>
 
         <input value={inspectorName} onChange={(e) => setInspectorName(e.target.value)} placeholder="Inspector full name"
-          aria-label="Inspector full name" className="w-full h-11 rounded-lg border border-border bg-background px-3 text-sm" />
+          aria-label="Inspector full name" className="w-full h-11 rounded-lg border border-adm-border bg-adm-surface px-3 text-sm" />
         <SignaturePad label="Inspector signature" subtitle="Sign to certify this inspection." value={sig.data} type={sig.type}
           onChange={(d, t) => setSig({ data: d, type: t })} />
-        <label className="flex items-start gap-2 text-xs text-muted-foreground">
+        <label className="flex items-start gap-2 text-xs text-adm-muted">
           <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5" />
           <span>{K208_CERTIFICATION_TEXT}</span>
         </label>
@@ -1158,7 +1158,7 @@ function InspectionChecklistPanel({ tenantId, veh, newestActive, canConduct, pas
             Sign inspection ({result.toUpperCase()})
           </button>
         </DisabledReason>
-        <p className="text-[10.5px] text-muted-foreground">
+        <p className="text-[10.5px] text-adm-muted">
           Signing records the technician inspection. K-208 execution is a separate authorized-signer step and is never triggered by Pass All.
         </p>
       </div>
@@ -1290,11 +1290,11 @@ function FailedItemsPanel({ tenantId, vin, newestSigned, failures, members, canR
           const assignee = members.find((m) => m.user_id === f.assignee);
           const resolved = isFailureResolved(f.repair_state);
           return (
-            <div key={f.id} className={cn("rounded-xl border p-3 space-y-2", resolved ? "border-emerald-200 bg-emerald-50/50" : "border-red-200 bg-red-50/40")}>
+            <div key={f.id} className={cn("rounded-xl border p-3 space-y-2", resolved ? "border-adm-border bg-adm-success-bg/50" : "border-adm-border bg-adm-danger-bg/40")}>
               <div className="flex items-start justify-between gap-2 flex-wrap">
                 <div className="min-w-0">
-                  <p className="text-[13px] font-bold text-foreground">{itemLabel(f.item_id)}</p>
-                  <p className="text-[12px] text-muted-foreground">{f.explanation}</p>
+                  <p className="text-[13px] font-bold text-adm-ink">{itemLabel(f.item_id)}</p>
+                  <p className="text-[12px] text-adm-muted">{f.explanation}</p>
                 </div>
                 <StatusPill tone={resolved ? "emerald" : f.repair_state === "ready_for_reinspection" ? "amber" : "red"}>
                   {REPAIR_STATE_LABELS[f.repair_state as RepairState] ?? f.repair_state}
@@ -1304,7 +1304,7 @@ function FailedItemsPanel({ tenantId, vin, newestSigned, failures, members, canR
                 <div className="flex gap-1.5 flex-wrap">
                   {f.photos.slice(0, 5).map((u) => (
                     <a key={u} href={u} target="_blank" rel="noreferrer">
-                      <img src={u} alt="Failure evidence" className="w-14 h-10 rounded-md object-cover border border-border" />
+                      <img src={u} alt="Failure evidence" className="w-14 h-10 rounded-md object-cover border border-adm-border" />
                     </a>
                   ))}
                 </div>
@@ -1312,12 +1312,12 @@ function FailedItemsPanel({ tenantId, vin, newestSigned, failures, members, canR
               {!resolved && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <label className="block">
-                    <span className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground">Repair state</span>
+                    <span className="text-[12px] leading-[18px] font-bold uppercase tracking-wide text-adm-muted">Repair state</span>
                     <select
                       value={f.repair_state}
                       disabled={busyId === f.id || !canConduct}
                       onChange={(e) => void updateFailure(f, { repair_state: e.target.value }, "failure_repair_state_changed")}
-                      className="mt-1 w-full h-11 rounded-lg border border-border bg-background px-2 text-sm disabled:opacity-50"
+                      className="mt-1 w-full h-11 rounded-lg border border-adm-border bg-adm-surface px-2 text-sm disabled:opacity-50"
                     >
                       {REPAIR_STATES.filter((s) => s !== "passed_on_reinspection").map((s) => (
                         <option key={s} value={s}>{REPAIR_STATE_LABELS[s]}</option>
@@ -1325,29 +1325,29 @@ function FailedItemsPanel({ tenantId, vin, newestSigned, failures, members, canR
                     </select>
                   </label>
                   <label className="block">
-                    <span className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground">Assignee</span>
+                    <span className="text-[12px] leading-[18px] font-bold uppercase tracking-wide text-adm-muted">Assignee</span>
                     <select
                       value={f.assignee || ""}
                       disabled={busyId === f.id || !canConduct}
                       onChange={(e) => void updateFailure(f, { assignee: e.target.value || null }, "failure_assignee_changed")}
-                      className="mt-1 w-full h-11 rounded-lg border border-border bg-background px-2 text-sm disabled:opacity-50"
+                      className="mt-1 w-full h-11 rounded-lg border border-adm-border bg-adm-surface px-2 text-sm disabled:opacity-50"
                     >
                       <option value="">Unassigned</option>
                       {members.map((m) => <option key={m.user_id ?? m.id} value={m.user_id ?? ""}>{memberName(m)}</option>)}
                     </select>
                   </label>
                   <label className="block">
-                    <span className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground">RO number</span>
+                    <span className="text-[12px] leading-[18px] font-bold uppercase tracking-wide text-adm-muted">RO number</span>
                     <input
                       defaultValue={f.ro_number || ""}
                       disabled={!canConduct}
                       onBlur={(e) => { if (e.target.value.trim() !== (f.ro_number || "")) void updateFailure(f, { ro_number: e.target.value.trim() || null }, "failure_ro_changed"); }}
                       placeholder="Repair order"
-                      className="mt-1 w-full h-11 rounded-lg border border-border bg-background px-3 text-sm disabled:opacity-50"
+                      className="mt-1 w-full h-11 rounded-lg border border-adm-border bg-adm-surface px-3 text-sm disabled:opacity-50"
                     />
                   </label>
                   <div className="block">
-                    <span className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground">Evidence</span>
+                    <span className="text-[12px] leading-[18px] font-bold uppercase tracking-wide text-adm-muted">Evidence</span>
                     <div className="mt-1">
                       <input type="file" accept="image/*" multiple className="hidden" id={`fail-photo-${f.id}`} onChange={(e) => void addFailurePhoto(f, e.target.files)} />
                       <label htmlFor={`fail-photo-${f.id}`} className={cn(BTN_SECONDARY, "cursor-pointer")}>
@@ -1379,7 +1379,7 @@ function FailedItemsPanel({ tenantId, vin, newestSigned, failures, members, canR
                 </DisabledReason>
               )}
               {resolved && (
-                <p className="text-[11.5px] text-emerald-800">
+                <p className="text-[11.5px] text-adm-success">
                   Reinspected by {memberName(members.find((m) => m.user_id === f.reinspected_by))} {formatCommandDateTime(f.reinspected_at) ?? ""}
                 </p>
               )}
@@ -1473,7 +1473,7 @@ function WorkSections({ tenantId, vin, gr, vehRecall, canCompleteWork, userLabel
   if (!gr || items.length === 0) {
     return (
       <CommandCard title="Get-Ready work" subtitle="No worklist has been created for this vehicle yet.">
-        <p className="text-[11.5px] text-muted-foreground py-2">
+        <p className="text-[11.5px] text-adm-muted py-2">
           The intake automation seeds the worklist for used and CPO vehicles; nothing to show for this one yet.
         </p>
       </CommandCard>
@@ -1496,8 +1496,8 @@ function WorkSections({ tenantId, vin, gr, vehRecall, canCompleteWork, userLabel
           subtitle={`${section.items.filter((i) => i.status === "complete").length} of ${section.items.length} complete`}
         >
           {section.key === "recall" && (
-            <p className="text-[11.5px] text-muted-foreground mb-2">
-              Recorded recall status: <span className="font-semibold text-foreground">{vehRecall || "not checked"}</span>
+            <p className="text-[11.5px] text-adm-muted mb-2">
+              Recorded recall status: <span className="font-semibold text-adm-ink">{vehRecall || "not checked"}</span>
             </p>
           )}
           <ul className="divide-y divide-border/60">
@@ -1507,15 +1507,15 @@ function WorkSections({ tenantId, vin, gr, vehRecall, canCompleteWork, userLabel
                 <li key={item.id} className="py-2.5 space-y-1.5">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="min-w-0">
-                      <p className="text-[13px] font-medium text-foreground">{item.label}</p>
-                      <p className="text-[11px] text-muted-foreground">
+                      <p className="text-[13px] font-medium text-adm-ink">{item.label}</p>
+                      <p className="text-[11px] text-adm-muted">
                         {done
                           ? `Complete${item.completedBy ? ` · ${item.completedBy}` : ""}${item.completedAt ? ` · ${formatCommandDateTime(item.completedAt) ?? ""}` : ""}`
                           : "Pending"}
                         {item.roNumber ? ` · RO ${item.roNumber}` : ""}
                         {item.photos?.length ? ` · ${item.photos.length} photo(s)` : ""}
                       </p>
-                      {item.notes ? <p className="text-[11px] text-muted-foreground italic">{item.notes}</p> : null}
+                      {item.notes ? <p className="text-[11px] text-adm-muted italic">{item.notes}</p> : null}
                     </div>
                     {done ? (
                       <StatusPill tone="emerald" Icon={CheckCircle2}>Complete</StatusPill>
@@ -1550,18 +1550,18 @@ function WorkSections({ tenantId, vin, gr, vehRecall, canCompleteWork, userLabel
                         onBlur={(e) => { if (e.target.value.trim() !== (item.notes || "")) void patchItem(item.id, { notes: e.target.value.trim() }, "Couldn't save the note."); }}
                         placeholder="Note"
                         aria-label={`Note for ${item.label}`}
-                        className="flex-1 min-w-[140px] h-10 rounded-lg border border-border bg-background px-2.5 text-xs"
+                        className="flex-1 min-w-[140px] h-10 rounded-lg border border-adm-border bg-adm-surface px-2.5 text-xs"
                       />
                       <input
                         defaultValue={item.roNumber || ""}
                         onBlur={(e) => { if (e.target.value.trim() !== (item.roNumber || "")) void patchItem(item.id, { roNumber: e.target.value.trim() }, "Couldn't save the RO."); }}
                         placeholder="RO #"
                         aria-label={`RO number for ${item.label}`}
-                        className="w-24 h-10 rounded-lg border border-border bg-background px-2.5 text-xs"
+                        className="w-24 h-10 rounded-lg border border-adm-border bg-adm-surface px-2.5 text-xs"
                       />
                       <input type="file" accept="image/*" multiple className="hidden" id={`item-photo-${item.id}`} onChange={(e) => void addItemPhoto(item, e.target.files)} />
                       <label htmlFor={`item-photo-${item.id}`} aria-label={`Add photo for ${item.label}`}
-                        className="min-h-[40px] min-w-[40px] grid place-items-center rounded-lg border border-border text-muted-foreground hover:text-foreground cursor-pointer">
+                        className="min-h-[40px] min-w-[40px] grid place-items-center rounded-lg border border-adm-border text-adm-muted hover:text-adm-ink cursor-pointer">
                         <Camera className="w-4 h-4" aria-hidden="true" />
                       </label>
                     </div>
@@ -1593,7 +1593,7 @@ function ServiceQrCard({ tenantId, vin }: { tenantId: string; vin: string }) {
 
   return (
     <CommandCard title="Get-Ready QR (windshield)" leading={<QrCode className="w-4 h-4 text-primary" aria-hidden="true" />}>
-      <p className="text-[11.5px] text-muted-foreground mb-3">
+      <p className="text-[11.5px] text-adm-muted mb-3">
         One permanent code for this car. Service, detail, installers, and outside vendors scan it, pick their
         station, and sign. Each station locks once signed.
       </p>
@@ -1603,7 +1603,7 @@ function ServiceQrCard({ tenantId, vin }: { tenantId: string; vin: string }) {
         </button>
       ) : (
         <div className="flex flex-col items-start gap-3">
-          <div className="bg-card p-3 rounded-xl border border-border"><QRCodeSVG value={url} size={140} /></div>
+          <div className="bg-adm-surface p-3 rounded-xl border border-adm-border"><QRCodeSVG value={url} size={140} /></div>
           <a href={url} target="_blank" rel="noreferrer" className="block text-xs text-primary break-all underline">{url}</a>
           <button onClick={() => void copyWithToast(url, "Link")} className={BTN_SECONDARY}>
             <Copy className="w-4 h-4" aria-hidden="true" /> Copy link
@@ -1664,21 +1664,21 @@ function VoidInspectionCard({ tenantId, vin, inspection, canVoid, onChanged }: {
             type="button"
             aria-disabled={!canVoid || undefined}
             onClick={() => { if (canVoid) setOpen(true); }}
-            className={cn(BTN_SECONDARY, "border-red-200 text-red-700", !canVoid && "opacity-50 cursor-not-allowed")}
+            className={cn(BTN_SECONDARY, "border-adm-border text-adm-danger", !canVoid && "opacity-50 cursor-not-allowed")}
           >
             <AlertTriangle className="w-4 h-4" aria-hidden="true" /> Void inspection
           </button>
         ) : (
           <form onSubmit={(e) => { e.preventDefault(); void submit(); }} className="space-y-2">
             <label className="block">
-              <span className="text-al-meta font-bold uppercase tracking-wide text-muted-foreground">Reason (required, recorded in the audit trail)</span>
+              <span className="text-[12px] leading-[18px] font-bold uppercase tracking-wide text-adm-muted">Reason (required, recorded in the audit trail)</span>
               <textarea
                 autoFocus
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 rows={2}
                 placeholder="Why this signed record is being retired"
-                className="mt-1 w-full rounded-lg border border-border bg-background p-2.5 text-sm"
+                className="mt-1 w-full rounded-lg border border-adm-border bg-adm-surface p-2.5 text-sm"
               />
             </label>
             <div className={ACTION_GROUP}>
@@ -1727,19 +1727,19 @@ function TitleMcoUpload({ tenantId, veh }: { tenantId: string; veh: { id: string
 
   return (
     <CommandCard title="Title / MCO (dealer-only)" leading={<FileText className="w-4 h-4 text-primary" aria-hidden="true" />}>
-      <p className="text-[11.5px] text-muted-foreground mb-3">Front and back of the title, or the new-car MCO. Never shown on the public Passport.</p>
+      <p className="text-[11.5px] text-adm-muted mb-3">Front and back of the title, or the new-car MCO. Never shown on the public Passport.</p>
       <div className="grid grid-cols-2 gap-3">
         {TITLE_SLOTS.map((slot) => (
-          <div key={slot.key} className="rounded-xl border border-dashed border-border p-3 text-center space-y-2">
-            <div className="text-xs font-semibold text-foreground">{slot.label}</div>
+          <div key={slot.key} className="rounded-xl border border-dashed border-adm-border p-3 text-center space-y-2">
+            <div className="text-xs font-semibold text-adm-ink">{slot.label}</div>
             {saved[slot.key] ? (
-              <a href={saved[slot.key]} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-emerald-600 font-semibold min-h-[44px]">
+              <a href={saved[slot.key]} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-adm-success font-semibold min-h-[44px]">
                 <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" /> Uploaded
               </a>
             ) : (
               <>
                 <input type="file" accept="image/*,application/pdf" id={`doc-${slot.key}`} className="hidden" onChange={(e) => upload(slot.key, e.target.files?.[0] ?? null)} />
-                <label htmlFor={`doc-${slot.key}`} className="min-h-[44px] px-3 rounded-md border border-border text-[11px] font-semibold inline-flex items-center gap-1.5 hover:bg-muted cursor-pointer">
+                <label htmlFor={`doc-${slot.key}`} className="min-h-[44px] px-3 rounded-md border border-adm-border text-[11px] font-semibold inline-flex items-center gap-1.5 hover:bg-adm-workspace cursor-pointer">
                   {busy === slot.key ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Upload className="w-3.5 h-3.5" aria-hidden="true" />} Upload
                 </label>
               </>

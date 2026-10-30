@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { MoreHorizontal, RefreshCw, Search } from "lucide-react";
 import { toast } from "sonner";
 import Seo from "@/components/Seo";
@@ -10,13 +10,13 @@ import {
   type CustomerEntry,
   type DealEntry,
 } from "@/components/customers/customerBook";
+import { Button, InlineNote, LocalTabs, PageBody, PageHeader, type LocalTab } from "@/components/product";
 import { useCustomerBook } from "@/components/customers/useCustomerBook";
 import {
   Chip,
   EmptyBlock,
   NextActionCell,
   PriceIntegrityChip,
-  TabStrip,
   VehicleCell,
   dealStateTone,
 } from "@/components/customers/CustomerUi";
@@ -64,8 +64,16 @@ const Deals = () => {
   const navigate = useNavigate();
   const { book, loading, error, refetch } = useCustomerBook();
   const { sendSigningLink } = useSmsDelivery();
-  const [tab, setTab] = useState<DealTab>("out_for_signature");
-  const [q, setQ] = useState("");
+  // Lifecycle view and search live in the URL so opening a deal and returning keeps them.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const stateParam = searchParams.get("state");
+  const tab: DealTab = stateParam && stateParam in TAB_LABEL ? (stateParam as DealTab) : "out_for_signature";
+  const q = searchParams.get("q") ?? "";
+  const setQ = (v: string) => {
+    const n = new URLSearchParams(searchParams);
+    if (v) n.set("q", v); else n.delete("q");
+    setSearchParams(n, { replace: true });
+  };
 
   const customerById = useMemo(() => {
     const m = new Map<string, CustomerEntry>();
@@ -135,58 +143,53 @@ const Deals = () => {
   };
 
   return (
-    <div className="max-w-[1520px] mx-auto p-4 lg:p-6 space-y-5">
+    <PageBody width="wide">
       <Seo title="Deals" description="Every deal, its signature state, its price integrity, and what it needs next." path="/deals" />
 
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-al-page font-display text-foreground">Deals</h1>
-          <p className="text-al-body text-muted-foreground mt-1 max-w-3xl">
-            Every addendum in the state the database says it is in. Price integrity is the server-side check that gates signing - a
-            mismatch cannot be signed around.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={refetch}
-          className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-al-body font-semibold hover:bg-muted transition-colors"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </button>
-      </header>
+      <PageHeader
+        title="Deals"
+        description="Every addendum in the state the database says it is in. Price integrity is the server-side check that gates signing: a mismatch cannot be signed around."
+        actions={
+          <Button onClick={refetch}>
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" /> Refresh
+          </Button>
+        }
+      />
 
       {error && (
-        <p className="text-al-body text-destructive bg-destructive/10 rounded-lg px-4 py-2.5">Some deal data failed to load: {error}</p>
+        <InlineNote tone="danger" title="Some deal data failed to load" action={<Button size="sm" onClick={refetch}>Retry</Button>}>
+          {error}
+        </InlineNote>
       )}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <TabStrip tabs={tabs} active={tab} onSelect={setTab} />
-        <label className="relative flex-1 min-w-[220px] max-w-sm">
-          <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search vehicle, stock, VIN, customer"
-            aria-label="Search deals"
-            className="w-full h-9 pl-9 pr-3 rounded-md border border-border bg-card text-al-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-        </label>
-      </div>
+      <LocalTabs
+        label="Deal lifecycle views"
+        tabs={tabs.map((t): LocalTab => ({ key: t.key, label: t.label, to: `/deals?state=${t.key}${q ? `&q=${encodeURIComponent(q)}` : ""}`, count: loading && !book.deals.length ? null : t.count, active: t.key === tab }))}
+      />
+      <label className="relative block max-w-sm">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-adm-muted" aria-hidden="true" />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search vehicle, stock, VIN, customer"
+          aria-label="Search deals"
+          className="h-10 w-full rounded-md border border-adm-border bg-adm-surface pl-9 pr-3 text-[14px] text-adm-ink placeholder:text-adm-muted focus:outline-none focus:ring-2 focus:ring-adm-primary"
+        />
+      </label>
 
       {loading && !book.deals.length ? (
-        <div className="bg-card rounded-2xl border border-border shadow-premium px-5 py-12 text-center">
-          <p className="text-al-body text-muted-foreground">Loading deals...</p>
+        <div role="status" aria-label="Loading" className="rounded-[6px] border border-adm-border bg-adm-surface px-5 py-12 text-center">
+          <p className="text-[14px] text-adm-muted">Loading deals...</p>
         </div>
-      ) : rows.length === 0 ? (
+      ) : rows.length === 0 && error && !book.deals.length ? null : rows.length === 0 ? (
         <EmptyBlock title={`No deals in ${TAB_LABEL[tab]}`} body={needle ? "No deal matches that search in this tab." : TAB_EMPTY[tab]} />
       ) : (
         <>
-          <div className="hidden lg:block bg-card rounded-2xl border border-border shadow-premium overflow-hidden">
+          <div className="hidden lg:block bg-adm-surface rounded-2xl border border-adm-border shadow-premium overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1180px] text-left">
-                <thead className="bg-muted/40">
-                  <tr className="text-al-meta uppercase tracking-wider text-muted-foreground">
+                <thead className="bg-adm-workspace">
+                  <tr className="text-[12px] leading-[18px] uppercase tracking-wider text-adm-muted">
                     <th className="font-semibold px-5 py-2.5">Date</th>
                     <th className="font-semibold py-2.5">Vehicle</th>
                     <th className="font-semibold py-2.5">Stock</th>
@@ -202,20 +205,20 @@ const Deals = () => {
                   {rows.map((deal) => {
                     const customer = deal.customerId ? customerById.get(deal.customerId) || null : null;
                     return (
-                      <tr key={deal.id} className="border-t border-border align-top hover:bg-muted/30 transition-colors">
-                        <td className="px-5 py-3.5 text-al-meta text-muted-foreground tabular-nums whitespace-nowrap">{dateLabel(deal.createdAt)}</td>
+                      <tr key={deal.id} className="border-t border-adm-border align-top hover:bg-adm-workspace transition-colors">
+                        <td className="px-5 py-3.5 text-[12px] leading-[18px] text-adm-muted tabular-nums whitespace-nowrap">{dateLabel(deal.createdAt)}</td>
                         <td className="py-3.5 pr-4 w-[16%]">
                           <VehicleCell label={deal.vehicleLabel} stock={null} vin={deal.vin} slug={deal.slug} />
                         </td>
-                        <td className="py-3.5 pr-4 text-al-body text-foreground whitespace-nowrap">{deal.stock || "--"}</td>
+                        <td className="py-3.5 pr-4 text-[14px] leading-[20px] text-adm-ink whitespace-nowrap">{deal.stock || "--"}</td>
                         <td className="py-3.5 pr-4 w-[13%]">
-                          <p className="text-al-body text-foreground truncate">{deal.customerName || "No customer on the deal"}</p>
-                          {deal.employeeName && <p className="text-al-meta text-muted-foreground truncate">Sold by {deal.employeeName}</p>}
+                          <p className="text-[14px] leading-[20px] text-adm-ink truncate">{deal.customerName || "No customer on the deal"}</p>
+                          {deal.employeeName && <p className="text-[12px] leading-[18px] text-adm-muted truncate">Sold by {deal.employeeName}</p>}
                         </td>
-                        <td className="py-3.5 pr-4 text-al-body text-foreground text-right tabular-nums whitespace-nowrap">{money(deal.amount)}</td>
+                        <td className="py-3.5 pr-4 text-[14px] leading-[20px] text-adm-ink text-right tabular-nums whitespace-nowrap">{money(deal.amount)}</td>
                         <td className="py-3.5 pr-4">
                           <Chip tone={dealStateTone(deal.state)}>{deal.stateLabel}</Chip>
-                          <p className="text-al-meta text-muted-foreground mt-1">{deal.returnInfo ? deal.returnInfo.label : deal.stateDetail}</p>
+                          <p className="text-[12px] leading-[18px] text-adm-muted mt-1">{deal.returnInfo ? deal.returnInfo.label : deal.stateDetail}</p>
                         </td>
                         <td className="py-3.5 pr-4">
                           <PriceIntegrityChip integrity={deal.priceIntegrity} />
@@ -228,7 +231,7 @@ const Deals = () => {
                             <button
                               type="button"
                               onClick={() => view(deal)}
-                              className="inline-flex items-center h-8 px-3 rounded-md bg-primary text-primary-foreground text-al-meta font-semibold hover:brightness-110 transition-all"
+                              className="inline-flex items-center h-8 px-3 rounded-md bg-primary text-primary-foreground text-[12px] leading-[18px] font-semibold hover:brightness-110 transition-all"
                             >
                               View
                             </button>
@@ -247,29 +250,29 @@ const Deals = () => {
             {rows.map((deal) => {
               const customer = deal.customerId ? customerById.get(deal.customerId) || null : null;
               return (
-                <article key={deal.id} className="bg-card rounded-2xl border border-border shadow-premium p-4 space-y-3">
+                <article key={deal.id} className="bg-adm-surface rounded-2xl border border-adm-border shadow-premium p-4 space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <VehicleCell label={deal.vehicleLabel} stock={deal.stock} vin={deal.vin} slug={deal.slug} />
-                    <span className="text-al-meta text-muted-foreground whitespace-nowrap">{dateLabel(deal.createdAt)}</span>
+                    <span className="text-[12px] leading-[18px] text-adm-muted whitespace-nowrap">{dateLabel(deal.createdAt)}</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <Chip tone={dealStateTone(deal.state)}>{deal.stateLabel}</Chip>
                     <PriceIntegrityChip integrity={deal.priceIntegrity} />
-                    <span className="text-al-body text-foreground tabular-nums">{money(deal.amount)}</span>
+                    <span className="text-[14px] leading-[20px] text-adm-ink tabular-nums">{money(deal.amount)}</span>
                   </div>
-                  <p className="text-al-meta text-muted-foreground">
+                  <p className="text-[12px] leading-[18px] text-adm-muted">
                     {deal.customerName || "No customer on the deal"}
                     {deal.employeeName ? ` · Sold by ${deal.employeeName}` : ""}
                     {deal.signedAt ? ` · Signed ${relativeTime(deal.signedAt)}` : ""}
                   </p>
-                  <div className="border-t border-border pt-3">
+                  <div className="border-t border-adm-border pt-3">
                     <NextActionCell action={deal.nextAction} />
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => view(deal)}
-                      className="inline-flex items-center h-9 px-4 rounded-md bg-primary text-primary-foreground text-al-body font-semibold"
+                      className="inline-flex items-center h-9 px-4 rounded-md bg-primary text-primary-foreground text-[14px] leading-[20px] font-semibold"
                     >
                       View
                     </button>
@@ -281,7 +284,7 @@ const Deals = () => {
           </div>
         </>
       )}
-    </div>
+    </PageBody>
   );
 };
 
@@ -304,7 +307,7 @@ const DealMenu = ({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className="inline-flex items-center justify-center h-8 w-8 rounded-md border border-border text-muted-foreground hover:bg-muted transition-colors"
+        className="inline-flex items-center justify-center h-8 w-8 rounded-md border border-adm-border text-adm-muted hover:bg-adm-workspace transition-colors"
         aria-label={`More actions for ${deal.vehicleLabel}`}
       >
         <MoreHorizontal className="w-4 h-4" />
