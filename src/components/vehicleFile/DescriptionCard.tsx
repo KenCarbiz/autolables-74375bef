@@ -56,10 +56,9 @@ export const DescriptionCard = ({ vehicleId }: { vehicleId: string }) => {
   return (
     <Card title="Latest description">
       {!c ? (
-        <EmptyNote
-          title="No description case for this vehicle yet"
-          detail="Vehicles ingested from the inventory feed initialize automatically; others are picked up by reconciliation. Nothing is drafted here until a case exists."
-        />
+        <p className="text-[14px] leading-[20px] text-adm-muted">
+          No description case for this vehicle yet. Nothing is drafted until the feed or reconciliation creates one.
+        </p>
       ) : (
         <>
           <div className="flex items-center gap-2 flex-wrap">

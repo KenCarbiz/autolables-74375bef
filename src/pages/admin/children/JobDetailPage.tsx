@@ -58,6 +58,7 @@ export default function JobDetailPage() {
   const meta = HEALTH_META[row.verdict.state];
   const scheduler: { label: string; tone: HealthTone } = cron === "unavailable" ? { label: "Unknown", tone: "neutral" } : !cronRow ? { label: "Not scheduled", tone: "warning" } : cronRow.active === false ? { label: "Paused", tone: "warning" } : cronRow.active ? { label: "Enabled", tone: "success" } : { label: "Unknown", tone: "neutral" };
   const succeeded = row.lastOutcome?.toLowerCase() === "ok" || row.lastOutcome?.toLowerCase() === "succeeded" || row.lastOutcome?.toLowerCase() === "success";
+  const outcomeText = row.lastOutcome ? row.lastOutcome.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()) : "";
   const outcomeTone: HealthTone = !row.lastOutcome ? "neutral" : succeeded ? "success" : "danger";
 
   const banner = scheduler.label === "Paused" || needsAttention(row.verdict.state);
@@ -65,7 +66,7 @@ export default function JobDetailPage() {
     <ChildPageFrame
       section="integrations"
       crumbs={crumbs}
-      title={row.verdict.headline}
+      title={row.lastOutcome ? (succeeded ? "Invocation completed" : "Invocation failed") : row.verdict.headline}
       subtitle={`${spec.label}, scheduled job detail${row.lastAttemptAt ? `. Last invocation ${formatAt(row.lastAttemptAt)}` : ""}`}
       backHref={jobsHref}
       backLabel="Back to jobs"
@@ -95,10 +96,10 @@ export default function JobDetailPage() {
               {row.lastAttemptAt ? `${formatAt(row.lastAttemptAt)} (${describeAge(row.lastAttemptAt, now)})` : "No invocation recorded"}
             </Step>
             <Step n={3} tone={outcomeTone} title="Provider or job result">
-              {row.lastOutcome ? row.lastOutcome.replace(/_/g, " ") : "No result recorded"}
+              {row.lastOutcome ? outcomeText : "No result recorded"}
             </Step>
             <Step n={4} tone={row.lastSuccessAt ? "success" : "neutral"} title="Last usable output" last>
-              {row.lastSuccessAt ? `${formatAt(row.lastSuccessAt)}${row.evidence === "scheduler" ? ", scheduler record for all rooftops" : ""}` : "No successful output recorded"}
+              {row.lastSuccessAt ? `${formatAt(row.lastSuccessAt)}${row.evidence === "scheduler" ? ", scheduler record for all rooftops" : ""}` : succeeded ? "Run completed; no output confirmed for this rooftop" : "No successful output recorded"}
             </Step>
           </ol>
         </Panel>
@@ -106,8 +107,8 @@ export default function JobDetailPage() {
           <KeyValueList
             rows={[
               { label: "Health", value: <StatusText tone={meta.tone}>{meta.label}</StatusText> },
-              { label: "Last outcome", value: row.lastOutcome ? row.lastOutcome.replace(/_/g, " ") : <span className="text-adm-muted">None recorded</span> },
-              { label: "Last success", value: row.lastSuccessAt ? formatAt(row.lastSuccessAt) : <span className="text-adm-muted">None recorded</span> },
+              { label: "Last outcome", value: row.lastOutcome ? <>{outcomeText}{row.lastOutcome && !row.lastSuccessAt && succeeded ? " (scheduler run)" : ""}</> : <span className="text-adm-muted">None recorded</span> },
+              { label: "Last success", value: row.lastSuccessAt ? formatAt(row.lastSuccessAt) : <span className="text-adm-muted">{succeeded ? "No output confirmed for this rooftop" : "None recorded"}</span> },
               { label: "Evidence", value: row.evidence === "rooftop_ledger" ? "This rooftop's ledger" : row.evidence === "scheduler" ? "Scheduler record" : "None" },
               { label: "Retained data", value: row.verdict.inventoryPreserved === "unknown" ? "Unknown" : row.verdict.inventoryPreserved ? "Last good data kept" : "Not kept" },
             ]}

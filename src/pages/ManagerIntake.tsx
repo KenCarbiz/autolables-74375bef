@@ -1,3 +1,4 @@
+import { STATE_OWNER } from "@/lib/lifecycle/states";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -234,14 +235,16 @@ export default function ManagerIntake() {
           emptyTitle={q ? "No vehicles match that search." : `Nothing is waiting in ${tabLabel}.`}
           emptyDetail="New vehicles from tonight's ingest arrive in this queue automatically. This is the selected filter only. Existing inventory was grandfathered as authorized at rollout."
         >
-          <WorkTable caption="Intake authorization queue" minWidth={760}>
+          <WorkTable caption="Intake authorization queue" minWidth={900}>
             <thead>
               <tr>
                 <Th>Vehicle</Th>
                 <Th align="right">Age (days)</Th>
                 <Th>Condition</Th>
-                <Th>Recall</Th>
+                <Th>Recall (evidence)</Th>
                 <Th align="right">Asking price</Th>
+                <Th>Owner</Th>
+                <Th>Status</Th>
                 <Th align="right"><span className="sr-only">Action</span></Th>
               </tr>
             </thead>
@@ -265,12 +268,17 @@ export default function ManagerIntake() {
                     <Td>{/^cpo$/i.test(r.condition) ? "CPO" : r.condition ? r.condition.charAt(0).toUpperCase() + r.condition.slice(1).toLowerCase() : "Unknown"}</Td>
                     <Td>
                       {dnd ? <StatusText tone="danger">Do-not-drive</StatusText>
-                        : r.recall ? <span className="text-adm-muted capitalize">{r.recall.replace(/_/g, " ")}</span>
-                        : <span className="text-adm-muted">Unknown</span>}
+                        : r.recall ? <span className="capitalize text-adm-ink">{r.recall.replace(/_/g, " ")}</span>
+                        : <span className="text-adm-ink">Unknown</span>}
+                      <p className="text-[12px] leading-[16px] text-adm-muted">{r.recall ? "Stored recall check" : "No report on file"}</p>
                     </Td>
                     <Td align="right">{r.price != null ? `$${r.price.toLocaleString("en-US")}` : <span className="text-adm-muted">Unknown</span>}</Td>
+                    <Td className="whitespace-nowrap text-adm-muted">{STATE_OWNER[r.state as keyof typeof STATE_OWNER] ?? "Unknown"}</Td>
+                    <Td className="whitespace-nowrap">
+                      <StatusText tone={(STATE_PILL[r.state] ?? { tone: "neutral" as Tone }).tone}>{(STATE_PILL[r.state] ?? { label: r.state }).label}</StatusText>
+                    </Td>
                     <Td align="right">
-                      <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setDrawer(r); setReason(""); }} aria-label={`Review ${r.ymm}`}>Review</Button>
+                      <button type="button" className="text-[14px] font-semibold text-adm-primary hover:underline" onClick={(e) => { e.stopPropagation(); setDrawer(r); setReason(""); }} aria-label={`Review ${r.ymm}`}>Review</button>
                     </Td>
                   </tr>
                 );

@@ -479,12 +479,12 @@ export default function DescriptionOperations() {
       )}
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[180px] max-w-[220px]">
+        <div className="relative flex-1 min-w-[220px] max-w-[280px]">
           <Search className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             value={query}
             onChange={(e) => { setQuery(e.target.value); setPage(0); }}
-            placeholder="Search by make, model, stock # or VIN"
+            placeholder="Search stock #, VIN, vehicle"
             aria-label="Search vehicles"
             className="w-full h-10 pl-10 pr-3 rounded-md border border-adm-border bg-adm-surface text-[14px] focus:outline-none focus:ring-2 focus:ring-primary"
           />
@@ -568,7 +568,9 @@ export default function DescriptionOperations() {
           <>
             <table className="w-full table-fixed text-left border-collapse">
               <colgroup>
-                <col className="w-[26%]" /><col className="w-[11%]" /><col className="w-[19%]" /><col className="w-[22%]" /><col className="w-[9%]" /><col className="w-[13%]" />
+                {drawer
+                  ? <><col className="w-[34%]" /><col className="w-[14%]" /><col className="w-[24%]" /><col className="w-[28%]" /></>
+                  : <><col className="w-[26%]" /><col className="w-[11%]" /><col className="w-[19%]" /><col className="w-[22%]" /><col className="w-[9%]" /><col className="w-[13%]" /></>}
               </colgroup>
               <thead>
                 <tr className="text-[12px] leading-[18px] font-semibold text-adm-muted bg-adm-workspace border-b border-adm-border">
@@ -576,8 +578,8 @@ export default function DescriptionOperations() {
                   <th className="px-3 py-2.5">Stock #</th>
                   <SortHead k="state">Description state</SortHead>
                   <th className="px-3 py-2.5">Primary issue</th>
-                  <th className="px-3 py-2.5">Channels</th>
-                  <SortHead k="updated">Updated</SortHead>
+                  {!drawer && <th className="px-3 py-2.5">Channels</th>}
+                  {!drawer && <SortHead k="updated">Updated</SortHead>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-adm-border">
@@ -600,12 +602,16 @@ export default function DescriptionOperations() {
                       <td className="px-3 text-[14px] text-adm-muted truncate">{stock || "Unknown"}</td>
                       <td className="px-3"><StatusText tone={state.tone}>{state.label}</StatusText></td>
                       <td className="px-3 text-[14px] text-adm-ink truncate">{r.issue || "None"}</td>
-                      <td className="px-3 text-[14px] tabular-nums text-adm-ink truncate">
-                        {configuredChannels.length === 0 ? "None" : `${r.channelsPresent.length}/${configuredChannels.length}`}
-                      </td>
-                      <td className="px-3 text-[13px] text-adm-muted whitespace-nowrap">
-                        {r.updatedAt ? new Date(r.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "Unknown"}
-                      </td>
+                      {!drawer && (
+                        <td className="px-3 text-[14px] tabular-nums text-adm-ink truncate">
+                          {configuredChannels.length === 0 ? "None" : `${r.channelsPresent.length}/${configuredChannels.length}`}
+                        </td>
+                      )}
+                      {!drawer && (
+                        <td className="px-3 text-[13px] text-adm-muted whitespace-nowrap">
+                          {r.updatedAt ? new Date(r.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "Unknown"}
+                        </td>
+                      )}
                     </tr>
                   );
                 })}

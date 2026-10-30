@@ -41,6 +41,13 @@ interface VehicleHit {
   stock_number?: string | null;
   mileage?: number | null;
   hero_image_url?: string | null;
+  key_specs?: Record<string, unknown> | null;
+  mc_attributes?: Record<string, unknown> | null;
+}
+
+interface FactoryRecordSummary {
+  generation_status: string;
+  normalized_data_json: Record<string, unknown> | null;
 }
 
 interface HistoryRow {
@@ -73,6 +80,42 @@ const humanize = (s: string) => s.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) =>
 const fmtWhen = (d?: string | null) =>
   d ? new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—";
 
+const specText = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : "Unknown");
+
+function FactoryRecordStrip({ vehicle, record, onOpen }: { vehicle: VehicleHit; record: FactoryRecordSummary | null; onOpen: () => void }) {
+  const ks = vehicle.key_specs || {};
+  const mc = vehicle.mc_attributes || {};
+  const mech = (record?.normalized_data_json?.mechanical || {}) as Record<string, unknown>;
+  const colors = (record?.normalized_data_json?.colors || {}) as { exterior?: { name?: string | null }; interior?: { name?: string | null } };
+  const verified = record?.generation_status === "APPROVED" || record?.generation_status === "PUBLISHED";
+  const cells: Array<[string, string]> = [
+    ["Engine", specText(mech.engine ?? ks.engine ?? mc.engine)],
+    ["Drivetrain", specText(mech.drivetrain ?? ks.drivetrain ?? mc.drivetrain)],
+    ["Exterior", specText(colors.exterior?.name ?? ks.exterior_color ?? mc.exterior_color)],
+    ["Interior", specText(colors.interior?.name ?? ks.interior_color ?? mc.interior_color)],
+  ];
+  return (
+    <div className={`border-t border-adm-border border-l-4 ${verified ? "border-l-adm-success" : "border-l-adm-warning"} px-5 py-3`}>
+      <p className="text-[14px] leading-[22px] font-semibold text-adm-ink">
+        {verified ? "Verified factory record" : record ? "Factory record not yet verified" : "No factory record yet"}
+      </p>
+      <div className="mt-1 flex items-start gap-6">
+        <dl className="grid flex-1 min-w-0 grid-cols-2 gap-x-6 gap-y-2 md:grid-cols-4">
+          {cells.map(([k, v]) => (
+            <div key={k} className="min-w-0 md:border-l md:border-adm-border md:pl-4 first:md:border-l-0 first:md:pl-0">
+              <dt className="text-[12px] leading-[18px] text-adm-muted">{k}</dt>
+              <dd className="text-[14px] leading-[20px] text-adm-ink truncate">{v}</dd>
+            </div>
+          ))}
+        </dl>
+        <button type="button" onClick={onOpen} className="shrink-0 self-center inline-flex items-center gap-1 text-[14px] font-semibold text-adm-primary hover:underline">
+          View full OEM data <ArrowRight className="w-5 h-5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function StepRail({ active }: { active: number }) {
   return (
     <ol className="flex items-center" aria-label="Window sticker steps">
@@ -80,7 +123,7 @@ function StepRail({ active }: { active: number }) {
         const state = s.n < active ? "done" : s.n === active ? "current" : "todo";
         return (
           <li key={s.n} aria-current={state === "current" ? "step" : undefined} className={`flex items-center gap-2 ${i < STEPS.length - 1 ? "flex-1" : ""}`}>
-            <span aria-hidden className={`w-8 h-8 rounded-full grid place-items-center text-[14px] font-bold shrink-0 border ${
+            <span aria-hidden className={`w-10 h-10 rounded-full grid place-items-center text-[15px] font-bold shrink-0 border ${
               state === "done" ? "bg-adm-selected border-adm-primary text-adm-primary" : state === "current" ? "bg-adm-primary border-adm-primary text-white" : "bg-adm-surface border-adm-border text-adm-muted"
             }`}>
               {state === "done" ? <Check className="w-5 h-5" /> : s.n}
@@ -105,6 +148,7 @@ export default function WindowStickerStudio() {
 
   const [params, setParams] = useSearchParams();
   const selectedId = params.get("vehicle");
+  const presetVin = params.get("vin");
   const tab = params.get("tab") === "history" ? "history" : "create";
 
   const [query, setQuery] = useState("");
@@ -116,6 +160,42 @@ export default function WindowStickerStudio() {
   const [history, setHistory] = useState<HistoryRow[] | null>(null);
   const [picked, setPicked] = useState<VehicleHit | null>(null);
   const [mode, setMode] = useState<"inventory" | "vin">("inventory");
+  const [record, setRecord] = useState<FactoryRecordSummary | null>(null);
+
+  useEffect(() => {
+    if (!tenantId || !presetVin || selectedId) return;
+    let cancelled = false;
+    (async () => {
+      // deno-lint-ignore no-explicit-any
+      const { data } = await (supabase as any)
+        .from("vehicle_listings")
+        .select("id, vin, ymm, condition, status, slug, mileage, hero_image_url, key_specs, mc_attributes")
+        .eq("tenant_id", tenantId).eq("vin", presetVin.toUpperCase()).maybeSingle();
+      if (!cancelled && data) setPicked(data as VehicleHit);
+    })();
+    return () => { cancelled = true; };
+  }, [tenantId, presetVin, selectedId]);
+
+  useEffect(() => {
+    if (!tenantId || !picked) { setRecord(null); return; }
+    let cancelled = false;
+    (async () => {
+      // deno-lint-ignore no-explicit-any
+      const { data } = await (supabase as any)
+        .from("factory_sticker_records")
+        .select("generation_status, normalized_data_json")
+        .eq("tenant_id", tenantId).eq("vehicle_id", picked.id)
+        .order("updated_at", { ascending: false }).limit(1);
+      // deno-lint-ignore no-explicit-any
+      const { data: file } = picked.vin ? await (supabase as any)
+        .from("vehicle_files").select("stock_number").eq("tenant_id", tenantId).eq("vin", picked.vin).maybeSingle() : { data: null };
+      if (cancelled) return;
+      setRecord(((data || [])[0] as FactoryRecordSummary) || null);
+      const stock = (file as { stock_number?: string | null } | null)?.stock_number;
+      if (stock && !picked.stock_number) setPicked((p) => (p ? { ...p, stock_number: stock } : p));
+    })();
+    return () => { cancelled = true; };
+  }, [tenantId, picked]);
 
   const select = useCallback((vehicleId: string) => {
     const next = new URLSearchParams(params);
@@ -160,7 +240,7 @@ export default function WindowStickerStudio() {
       // deno-lint-ignore no-explicit-any
       let q = (supabase as any)
         .from("vehicle_listings")
-        .select("id, vin, ymm, condition, status, slug, mileage, hero_image_url")
+        .select("id, vin, ymm, condition, status, slug, mileage, hero_image_url, key_specs, mc_attributes")
         .eq("tenant_id", tenantId)
         .order("updated_at", { ascending: false })
         .limit(25);
@@ -257,7 +337,6 @@ export default function WindowStickerStudio() {
   const modeTabs: LocalTab[] = [
     { key: "inventory", label: "Search inventory", to: "#", active: mode === "inventory" },
     { key: "vin", label: "Create by VIN", to: "#", active: mode === "vin" },
-    { key: "history", label: "History", to: "#", active: false },
   ];
 
   return (
@@ -292,7 +371,7 @@ export default function WindowStickerStudio() {
               <h2 className="text-[17px] leading-[24px] font-semibold text-adm-ink">Select vehicle</h2>
               <nav aria-label="Vehicle source" className="flex gap-6 border-b border-adm-border">
                 {modeTabs.map((t) => (
-                  <button key={t.key} type="button" onClick={() => (t.key === "history" ? setTab("history") : setMode(t.key as "inventory" | "vin"))} aria-current={t.active ? "page" : undefined}
+                  <button key={t.key} type="button" onClick={() => setMode(t.key as "inventory" | "vin")} aria-current={t.active ? "page" : undefined}
                     className={`-mb-px h-10 border-b-2 text-[14px] font-semibold ${t.active ? "border-adm-primary text-adm-primary" : "border-transparent text-adm-muted hover:text-adm-ink"}`}>
                     {t.label}
                   </button>
@@ -330,18 +409,26 @@ export default function WindowStickerStudio() {
                   </div>
 
                   {picked ? (
-                    <div className="flex items-center justify-between gap-4 rounded-[6px] border border-adm-border bg-adm-surface px-4 py-3">
-                      {picked.hero_image_url
-                        ? <img src={picked.hero_image_url} alt="" className="h-[64px] w-[96px] shrink-0 rounded-[4px] border border-adm-border object-cover" />
-                        : <span className="h-[64px] w-[96px] shrink-0 rounded-[4px] bg-adm-workspace" aria-hidden="true" />}
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[12px] leading-[18px] text-adm-muted">{picked.stock_number ? `Stock ${picked.stock_number}` : "No stock number"}</p>
-                        <p className="text-[17px] leading-[24px] font-semibold text-adm-ink truncate">{picked.ymm || "Vehicle"}</p>
-                        <p className="text-[13px] leading-[18px] text-adm-muted truncate">
-                          VIN {picked.vin || "Unknown"}{picked.condition ? ` | ${humanize(picked.condition)}` : ""}{picked.mileage != null ? ` | ${picked.mileage.toLocaleString("en-US")} mi` : ""}
-                        </p>
+                    <div className="rounded-[6px] border border-adm-border bg-adm-surface overflow-hidden">
+                      <div className="flex items-center gap-5 px-5 py-4">
+                        {picked.hero_image_url
+                          ? <img src={picked.hero_image_url} alt="" className="h-[84px] w-[132px] shrink-0 rounded-[4px] object-cover" />
+                          : <span className="h-[84px] w-[132px] shrink-0 rounded-[4px] bg-adm-workspace" aria-hidden="true" />}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[16px] leading-[22px] font-semibold text-adm-ink">{picked.stock_number || "No stock number"}</p>
+                          <p className="text-[15px] leading-[22px] font-semibold text-adm-ink truncate">{picked.ymm || "Vehicle"}</p>
+                          <p className="text-[13px] leading-[20px] text-adm-muted truncate">VIN: {picked.vin || "Unknown"}</p>
+                        </div>
+                        <div className="hidden md:block w-[140px] shrink-0">
+                          <p className="text-[14px] leading-[22px] text-adm-ink">{picked.mileage != null ? `${picked.mileage.toLocaleString("en-US")} mi` : "Mileage unknown"}</p>
+                          <p className="text-[14px] leading-[22px] text-adm-muted">{picked.condition ? (picked.condition === "cpo" ? "CPO" : humanize(picked.condition)) : "Unknown"}</p>
+                        </div>
+                        <div className="hidden lg:block w-[180px] shrink-0 border-l border-adm-border pl-5">
+                          <p className="text-[14px] leading-[22px] text-adm-ink truncate">{tenant?.name || "Dealership"}</p>
+                        </div>
+                        <Button onClick={() => setPicked(null)}>Change</Button>
                       </div>
-                      <Button onClick={() => setPicked(null)}>Change</Button>
+                      <FactoryRecordStrip vehicle={picked} record={record} onOpen={() => select(picked.id)} />
                     </div>
                   ) : (
                     <div className="divide-y divide-adm-border rounded-[6px] border border-adm-border bg-adm-surface overflow-hidden">

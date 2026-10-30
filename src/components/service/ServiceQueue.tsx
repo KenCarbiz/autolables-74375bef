@@ -68,6 +68,7 @@ interface Row {
   ageHours: number;
   openFailures: number;
   readySince: string | null;
+  roNumber: string | null;
 }
 
 const isToday = (iso?: string | null) => {
@@ -164,7 +165,7 @@ export default function ServiceQueue({ mode = "desk", onCounts }: { mode?: "my_w
       const vins = vs.map((v) => v.vin).filter(Boolean);
       const empty = Promise.resolve({ data: [] });
       const [grRes, siRes, srRes, failRes, clrRes, memRes, vfRes] = await Promise.all([
-        vins.length ? sb().from("get_ready_records").select("vin, status, items, get_ready_complete_date, delivery_target").eq("tenant_id", tenant.id).in("vin", vins) : empty,
+        vins.length ? sb().from("get_ready_records").select("vin, status, items, get_ready_complete_date, delivery_target, ro_number").eq("tenant_id", tenant.id).in("vin", vins) : empty,
         // `id` is load-bearing: failure counts are scoped by inspection_id
         // against the newest signed row — without it every failure is skipped.
         vins.length ? sb().from("safety_inspections").select("id, vin, status, result, inspection_state, assigned_to, licensee_certified_at, signed_at, created_at").eq("tenant_id", tenant.id).in("vin", vins).order("created_at", { ascending: false }) : empty,
@@ -310,6 +311,7 @@ export default function ServiceQueue({ mode = "desk", onCounts }: { mode?: "my_w
           grState: s.grState, k208State: s.k208State, inspectionState,
           delivery: s.blocked ? "Delivery blocked" : s.cleared ? "Cleared" : v.status === "published" ? "In stock" : "Draft",
           deliveryTarget: (gr?.delivery_target as string) || null,
+          roNumber: (gr?.ro_number as string) || null,
           clearanceState: clr?.state ?? null,
           clearanceReasons: clr?.reason_codes ?? [],
           next: { label: s.nextLabel, tone: s.nextTone },
@@ -525,11 +527,12 @@ export default function ServiceQueue({ mode = "desk", onCounts }: { mode?: "my_w
       {toolbar}
       {mobileCards(tableRows)}
       <div className="hidden lg:block overflow-hidden rounded-[6px] border border-adm-border bg-adm-surface">
-        <WorkTable className="[&_th]:px-2 [&_td]:px-2" caption={mode === "my_work" ? "My service work" : "Vehicles requiring service action"}>
+        <WorkTable className="[&_th]:px-1.5 [&_td]:px-1.5" caption={mode === "my_work" ? "My service work" : "Vehicles requiring service action"}>
           <thead>
             <tr>
               {mode === "my_work" ? <Th>Due</Th> : <Th>Priority</Th>}
               <Th>Status</Th>
+              {mode === "my_work" && <Th className="whitespace-nowrap">RO #</Th>}
               <Th>Vehicle</Th>
               <Th>{mode === "my_work" ? "Task" : "Age"}</Th>
               {mode === "desk" && <Th>Assigned to</Th>}
@@ -559,7 +562,8 @@ export default function ServiceQueue({ mode = "desk", onCounts }: { mode?: "my_w
                       ? <StatusText tone="warning">Awaiting approval</StatusText>
                       : <StatusText tone={G.tone}>{G.label}{r.openFailures > 0 ? ` (${r.openFailures})` : ""}</StatusText>}
                   </Td>
-                  <Td className="max-w-[200px]">
+                  {mode === "my_work" && <Td className="whitespace-nowrap tabular-nums text-adm-muted">{r.roNumber || "Unknown"}</Td>}
+                  <Td className="max-w-[170px]">
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); setDrawer(r); }}
@@ -570,7 +574,7 @@ export default function ServiceQueue({ mode = "desk", onCounts }: { mode?: "my_w
                     </button>
                     <p className="truncate text-[12px] leading-[16px] text-adm-muted">{r.stock ? `Stock ${r.stock}` : "No stock number"} · {r.vin.slice(-6)}</p>
                   </Td>
-                  <Td className={cn("whitespace-nowrap", mode === "my_work" && "max-w-[170px] truncate")}>
+                  <Td className={cn("whitespace-nowrap", mode === "my_work" && "max-w-[150px] truncate")}>
                     {mode === "my_work"
                       ? <span className="block truncate">{r.nextTask}</span>
                       : <span className={cn("tabular-nums", r.overdue ? "font-semibold text-adm-danger" : "text-adm-ink")}>{ageDisplay(r)}</span>}
@@ -592,7 +596,7 @@ export default function ServiceQueue({ mode = "desk", onCounts }: { mode?: "my_w
               );
             })}
             {tableRows.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-6">
+              <tr><td colSpan={8} className="px-4 py-6">
                 <EmptyState Icon={CheckCircle2} title={mode === "my_work" && myTotal === 0 ? "No work in your queues" : "All caught up"} detail={emptyDetail} />
               </td></tr>
             )}

@@ -50,8 +50,10 @@ export const VehicleSubHeader = ({
   description,
   actions,
   strip,
+  crumbs = true,
 }: {
   vehicle: VehicleRow;
+  crumbs?: boolean;
   section: string;
   title: string;
   description?: ReactNode;
@@ -59,13 +61,15 @@ export const VehicleSubHeader = ({
   strip?: ReactNode;
 }) => (
   <div className="flex flex-col gap-4">
-    <Crumbs
-      items={[
-        { label: "Vehicles", to: "/inventory" },
-        { label: vehicle.ymm || vehicle.vin, to: `/vehicle-file/${vehicle.id}` },
-        { label: section },
-      ]}
-    />
+    {crumbs && (
+      <Crumbs
+        items={[
+          { label: "Vehicles", to: "/inventory" },
+          { label: vehicle.ymm || vehicle.vin, to: `/vehicle-file/${vehicle.id}` },
+          { label: section },
+        ]}
+      />
+    )}
     <PageHeader title={title} description={description} actions={actions} />
     {strip}
   </div>

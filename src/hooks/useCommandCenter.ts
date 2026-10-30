@@ -1883,7 +1883,7 @@ async function loadPrintCenter(r: SourceReader, tenantId: string, vehicleId: str
 }
 
 export function usePrintCenter(vehicleId?: string): Result<PrintCenterData> & {
-  printCompletePacket(): Promise<MutationResult>;
+  printCompletePacket(only?: string[]): Promise<MutationResult>;
   printByStock(): Promise<MutationResult>;
   /** Put an already-released document back on paper as copy N — no status transition. */
   reprintDocument(docId: string): Promise<MutationResult>;
@@ -1912,7 +1912,7 @@ export function usePrintCenter(vehicleId?: string): Result<PrintCenterData> & {
   // poll interval and the message listener alive for the rest of the session.
   const activeSheet = useRef<PacketPrintHandle | null>(null);
   useEffect(() => () => { activeSheet.current?.cancel(); }, []);
-  const printCompletePacket = useCallback(async (): Promise<MutationResult> => {
+  const printCompletePacket = useCallback(async (only?: string[]): Promise<MutationResult> => {
     if (!tenantId || !vehicleId) return { ok: false, error: "No dealership or vehicle in context." };
     if (printing.current) return { ok: false, error: "A packet release is already in progress." };
     // Opened before the first await so the browser still counts the click as
@@ -1933,7 +1933,7 @@ export function usePrintCenter(vehicleId?: string): Result<PrintCenterData> & {
         return abandon({ ok: false, error: "Could not read this vehicle's documents, so nothing was printed. Retry in a moment.", errorDetail: detail });
       }
       const docs = liveDocuments((docRows as Row[]) || []);
-      const onSheet = docs.filter(printSheetIncludes);
+      const onSheet = docs.filter(printSheetIncludes).filter((d) => !only || only.includes(String(d.id)));
       if (onSheet.length === 0) return abandon({ ok: false, error: printBlockedReason(docs) });
 
       const current = dataRef.current;

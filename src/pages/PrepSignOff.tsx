@@ -19,6 +19,14 @@ import EmptyState from "@/components/ui/empty-state";
 import { LocalTabs, MetricStrip, PageBody, PageHeader, Button as ProductButton, Panel as ProductPanel, WorkTable, Th, Td, StatusText, type LocalTab } from "@/components/product";
 import { uploadPhoto } from "@/lib/storage";
 
+const taskLabel = (accs: Array<{ product_name: string }>) =>
+  accs.length === 0 ? "No work listed" : accs.length === 1 ? accs[0].product_name : `${accs[0].product_name} +${accs.length - 1}`;
+
+const vendorLabel = (accs: Array<{ installed_by?: string }>) => {
+  const names = Array.from(new Set(accs.map((a) => (a.installed_by || "").trim()).filter(Boolean)));
+  return names.length === 0 ? "Unknown" : names.length === 1 ? names[0] : `${names[0]} +${names.length - 1}`;
+};
+
 const PrepSignOff = () => {
   const { user } = useAuth();
   const { currentStore, tenant } = useTenant();
@@ -175,16 +183,17 @@ const PrepSignOff = () => {
               : `This filter shows ${filter} sign-offs only; ${signOffs.length} ${signOffs.length === 1 ? "request exists" : "requests exist"} in total.`}
           />
         ) : (
-          <div className={selected ? "grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start" : ""}>
+          <div className={selected ? "grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start" : ""}>
             <div className="min-w-0">
-            <WorkTable caption="Prep sign-offs" minWidth={selected ? 480 : 760}>
+            <WorkTable caption="Prep sign-offs" minWidth={selected ? 520 : 860}>
               <thead>
                 <tr>
                   <Th>Vehicle</Th>
+                  <Th>Task</Th>
+                  <Th>Vendor</Th>
+                  <Th className="whitespace-nowrap">Proof needed</Th>
                   <Th>Status</Th>
-                  <Th>Accessories</Th>
-                  <Th>Foreman</Th>
-                  <Th>Updated</Th>
+                  {!selected && <Th>Updated</Th>}
                   {!selected && <Th align="right"><span className="sr-only">Next action</span></Th>}
                 </tr>
               </thead>
@@ -195,14 +204,17 @@ const PrepSignOff = () => {
                       <p className="truncate font-semibold text-adm-ink">{s.ymm || s.vin}</p>
                       <p className="truncate text-[12px] leading-[16px] text-adm-muted">{s.stock_number ? `Stock ${s.stock_number}` : s.vin}</p>
                     </Td>
+                    <Td className="max-w-[240px]">
+                      <p className="truncate">{taskLabel(s.accessories_installed)}</p>
+                    </Td>
+                    <Td className="whitespace-nowrap"><p>{vendorLabel(s.accessories_installed)}</p></Td>
+                    <Td className="whitespace-nowrap text-adm-muted">{s.install_photos?.length ? `${s.install_photos.length} ${s.install_photos.length === 1 ? "photo" : "photos"}` : "Install photo"}</Td>
                     <Td>
                       <StatusText tone={s.status === "pending" ? "warning" : s.status === "signed" ? "success" : s.status === "rejected" ? "danger" : "neutral"}>
                         {s.status.charAt(0).toUpperCase() + s.status.slice(1)}
                       </StatusText>
                     </Td>
-                    <Td className="whitespace-nowrap">{s.accessories_installed.filter(a => a.installed_date).length} of {s.accessories_installed.length}</Td>
-                    <Td className="whitespace-nowrap">{s.foreman_name}</Td>
-                    <Td className="whitespace-nowrap text-adm-muted">{format(new Date(s.updated_at), selected ? "MMM d" : "MMM d, h:mm a")}</Td>
+                    {!selected && <Td className="whitespace-nowrap text-adm-muted">{format(new Date(s.updated_at), "MMM d, h:mm a")}</Td>}
                     {!selected && <Td align="right">
                       <button type="button" className="text-[14px] font-semibold text-adm-primary hover:underline whitespace-nowrap" onClick={(e) => { e.stopPropagation(); select(s.id); }}>
                         {s.status === "pending" ? "Review" : "View"}
@@ -230,6 +242,7 @@ const PrepSignOff = () => {
                   )}
                   <dl className="space-y-1.5">
                     {[
+                      ["Vendor", vendorLabel(selected.accessories_installed)],
                       ["Foreman", selected.foreman_name || "Unknown"],
                       ["Status", selected.status.charAt(0).toUpperCase() + selected.status.slice(1)],
                       ["Updated", format(new Date(selected.updated_at), "MMM d, yyyy")],
@@ -255,11 +268,11 @@ const PrepSignOff = () => {
                   </div>
                   {selected.notes && <p className="text-adm-muted">{selected.notes}</p>}
                 </div>
-                <div className="flex flex-col gap-2 border-t border-adm-border px-4 py-3">
+                <div className="flex items-center justify-between gap-3 border-t border-adm-border px-4 py-3">
+                  <button type="button" className="text-[14px] font-semibold text-adm-primary hover:underline" onClick={() => navigate(`/prep/${selected.vin}`)}>Open mobile flow</button>
                   <ProductButton variant="primary" onClick={() => setSearchParams({ view: "detail", id: selected.id })}>
                     {selected.status === "pending" ? "Review and sign" : "Open sign-off"}
                   </ProductButton>
-                  <ProductButton onClick={() => navigate(`/prep/${selected.vin}`)}>Open mobile flow</ProductButton>
                 </div>
               </aside>
             )}

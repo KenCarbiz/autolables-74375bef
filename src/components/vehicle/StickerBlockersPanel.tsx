@@ -101,9 +101,9 @@ export default function StickerBlockersPanel({
                   type="button"
                   onClick={onRetrieveSourceData}
                   disabled={busy}
-                  className="inline-flex items-center gap-1.5 h-10 px-4 rounded-[6px] bg-adm-primary hover:bg-adm-primary-hover text-white text-[14px] font-semibold disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 h-10 px-4 rounded-[6px] border border-adm-border bg-adm-surface text-[14px] font-semibold hover:bg-adm-workspace disabled:opacity-50"
                 >
-                  Retrieve vehicle data <ArrowRight className="w-3.5 h-3.5" />
+                  Retrieve vehicle data <ArrowRight className="w-5 h-5" />
                 </button>
               )}
               {permitted && !isRetrieval && onRegenerate && (

@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { resolveOperatingState } from "@/lib/dealerState";
-import { Button, EmptyState, Panel, StatusText, Td, Th, WorkTable, type Tone } from "@/components/product";
-import { ALL, filterLibrary, libraryRows, type LibraryType } from "./libraryData";
+import { Button, EmptyState, LocalTabs, Panel, StatusText, Td, Th, WorkTable, type LocalTab, type Tone } from "@/components/product";
+import { ALL, FEDERAL_AND_PRODUCT_ROWS, filterLibrary, libraryRows, type LibraryRow, type LibraryType } from "./libraryData";
 
 const TYPE_TONE: Record<LibraryType, Tone> = {
   Law: "info",
@@ -25,7 +26,24 @@ export const LibrarySection = () => {
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const rows = useMemo(() => filterLibrary(all, { jurisdiction, type, query }), [all, jurisdiction, type, query]);
+  const [params] = useSearchParams();
+  const dealerStateName = useMemo(() => all.find((r) => !FEDERAL_AND_PRODUCT_ROWS.includes(r))?.jurisdiction ?? null, [all]);
+  const scopes = useMemo(() => {
+    const isOther = (r: LibraryRow) => r.type === "Law" && r.jurisdiction !== "Federal" && r.jurisdiction !== dealerStateName;
+    const defs: { key: string; label: string; test: (r: LibraryRow) => boolean }[] = [
+      { key: "all", label: "All", test: () => true },
+      { key: "federal", label: "Federal", test: (r) => r.jurisdiction === "Federal" },
+      ...(dealerStateName ? [{ key: "state", label: dealerStateName, test: (r: LibraryRow) => r.jurisdiction === dealerStateName }] : []),
+      { key: "other", label: "Other states", test: isOther },
+      { key: "dealer", label: "Dealer policy", test: (r) => r.type === "Dealer policy" },
+      { key: "product", label: "Product checks", test: (r) => r.type === "Product check" },
+    ];
+    return defs.filter((d) => d.key === "all" || all.some(d.test));
+  }, [all, dealerStateName]);
+  const scopeKey = scopes.find((d) => d.key === params.get("scope"))?.key ?? "all";
+  const scopeTest = scopes.find((d) => d.key === scopeKey)?.test ?? (() => true);
+  const scopeTabs: LocalTab[] = scopes.map((d) => ({ key: d.key, label: d.label, to: `/compliance?tab=library${d.key === "all" ? "" : `&scope=${d.key}`}`, active: d.key === scopeKey }));
+  const rows = useMemo(() => filterLibrary(all, { jurisdiction, type, query }).filter(scopeTest), [all, jurisdiction, type, query, scopeTest]);
   const selected = rows.find((r) => r.id === selectedId) || rows[0] || null;
   const filtered = jurisdiction !== ALL || type !== ALL || query.trim() !== "";
   const clear = () => {
@@ -36,6 +54,7 @@ export const LibrarySection = () => {
 
   return (
     <div className="space-y-4">
+      <LocalTabs label="Jurisdiction" tabs={scopeTabs} />
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-[14px] text-adm-muted">
           Jurisdiction
@@ -64,21 +83,22 @@ export const LibrarySection = () => {
           />
         </label>
         <span className="text-[14px] text-adm-muted tabular-nums">{rows.length} of {all.length} items</span>
-        <Button variant="primary" onClick={clear} disabled={!filtered}>Clear filters</Button>
+        <Button variant="primary" onClick={clear}>Clear filters</Button>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
         <Panel flush>
           {rows.length === 0 ? (
             <EmptyState title="No requirement matches these filters" detail="Clear a filter or change the search." compact />
           ) : (
-            <WorkTable caption="Compliance requirements" minWidth={720}>
+            <WorkTable caption="Compliance requirements" minWidth={660}>
               <thead>
                 <tr>
                   <Th className="px-2.5">Jurisdiction</Th>
                   <Th className="px-2.5">Requirement</Th>
                   <Th className="px-2.5">Type</Th>
                   <Th className="px-2.5">Source</Th>
+                  <Th className="px-2.5">Reviewed</Th>
                   <Th className="px-2.5">Workflow</Th>
                 </tr>
               </thead>
@@ -93,11 +113,12 @@ export const LibrarySection = () => {
                       aria-selected={on}
                     >
                       <Td className="whitespace-nowrap px-2.5 text-adm-muted">{r.jurisdiction}</Td>
-                      <Td className="max-w-[210px] truncate px-2.5 font-semibold">
+                      <Td className="max-w-[190px] truncate px-2.5 font-semibold">
                         <button type="button" onClick={() => setSelectedId(r.id)} className="max-w-full truncate text-left hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary">{r.requirement}</button>
                       </Td>
                       <Td className="whitespace-nowrap px-2.5"><StatusText tone={TYPE_TONE[r.type]}>{r.type}</StatusText></Td>
-                      <Td className="max-w-[150px] truncate px-2.5 text-adm-muted">{r.source}</Td>
+                      <Td className="max-w-[140px] truncate px-2.5 text-adm-muted">{r.source}</Td>
+                      <Td className="whitespace-nowrap px-2.5 text-adm-muted">{r.reviewed ?? "Unknown"}</Td>
                       <Td className="max-w-[110px] truncate px-2.5 text-adm-muted">{r.workflow}</Td>
                     </tr>
                   );

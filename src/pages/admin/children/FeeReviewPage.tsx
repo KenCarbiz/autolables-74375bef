@@ -336,7 +336,7 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
           </AdminShell>
         )}
       </div>
-      <div className="absolute max-md:fixed inset-0 z-40 bg-[#626A75]/[0.64]" onClick={close} aria-hidden="true" />
+      <div className="fixed inset-0 z-[55] bg-[#626A75]/[0.64]" onClick={close} aria-hidden="true" />
       {/* The reference draws the review 18px left of the content column centre on desktop; narrow widths centre it. */}
       <div aria-hidden="true" data-landmark="fee-review-top" className="absolute inset-x-0 top-0 h-[123px] pointer-events-none" />
       <div
@@ -346,7 +346,7 @@ function FeeReviewDialog({ fixture }: { fixture: FeeReviewFixture | null }) {
         aria-labelledby="fee-review-title"
         tabIndex={-1}
         onKeyDown={onKeyDown}
-        className="z-50 rounded-[8px] border border-adm-border bg-adm-surface shadow-2xl outline-none text-adm-ink md:absolute md:top-[123px] md:left-1/2 md:-translate-x-1/2 lg:left-[calc(50%-18px)] md:w-[min(907px,calc(100%-32px))] md:px-[26px] md:pt-[22px] md:pb-6 max-md:fixed max-md:inset-x-3 max-md:top-3 max-md:max-h-[calc(100dvh-24px)] max-md:flex max-md:flex-col max-md:overflow-hidden"
+        className="z-[60] rounded-[8px] border border-adm-border bg-adm-surface shadow-2xl outline-none text-adm-ink md:absolute md:top-[123px] md:left-1/2 md:-translate-x-1/2 lg:left-[calc(50%-18px)] md:w-[min(907px,calc(100%-32px))] md:px-[26px] md:pt-[22px] md:pb-6 max-md:fixed max-md:inset-x-3 max-md:top-3 max-md:max-h-[calc(100dvh-24px)] max-md:flex max-md:flex-col max-md:overflow-hidden"
       >
         <header className="flex items-start justify-between gap-4 max-md:flex-shrink-0 max-md:px-4 max-md:pt-4 max-md:pb-3 max-md:border-b max-md:border-adm-border">
           <div className="min-w-0">

@@ -19,7 +19,8 @@ export default function ProviderDetailPage() {
   const { data, cards, formatAt } = useProvidersData();
   const card = cards.find((c) => c.spec.id === providerId) ?? null;
   const spec = PROVIDER_CARDS.find((p) => p.id === providerId) ?? null;
-  const tab = params.get("tab") === "attempts" ? "attempts" : "overview";
+  const requested = params.get("tab");
+  const tab = (["configuration", "attempts", "data", "quota"] as const).find((t) => t === requested) ?? "overview";
   const base = ADMIN_CHILD_ROUTES.providerDetail(providerId ?? "");
   const providersHref = adminTabHref("providers");
 
@@ -55,6 +56,13 @@ export default function ProviderDetailPage() {
   const meta = HEALTH_META[card.verdict.state];
   const freshness = card.ttlHours === null ? null : card.ttlHours >= 24 ? `${Math.round(card.ttlHours / 24)} ${Math.round(card.ttlHours / 24) === 1 ? "day" : "days"}` : `${card.ttlHours} hours`;
   const agg = data.events && spec.billingProducts.length ? aggregateEvents(data.events, spec.billingProducts) : null;
+  const state = card.verdict.state;
+  const configuration = state === "unknown" ? "Unknown" : state === "not_configured" ? "Not configured" : state === "disabled" ? "Disabled" : "Configured";
+  const enabled = state === "unknown" ? "Unknown" : state === "disabled" || state === "not_applicable" ? "No" : "Yes";
+  const ageH = card.lastSuccessAt ? (Date.now() - new Date(card.lastSuccessAt).getTime()) / 36e5 : null;
+  const cacheState = ageH === null || card.ttlHours === null ? "Unknown" : ageH > card.ttlHours ? "Stale" : "Fresh";
+  const cacheTone = cacheState === "Stale" ? "warning" : cacheState === "Fresh" ? "success" : "neutral";
+  const lastOutcomeLabel = agg?.lastOutcome ? agg.lastOutcome.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()) : "None";
 
   return (
     <ChildPageFrame
@@ -70,7 +78,10 @@ export default function ProviderDetailPage() {
           label="Provider sections"
           tabs={[
             { key: "overview", label: "Overview", to: base, active: tab === "overview" },
+            { key: "configuration", label: "Configuration", to: `${base}?tab=configuration`, active: tab === "configuration" },
             { key: "attempts", label: "Attempts", to: `${base}?tab=attempts`, active: tab === "attempts" },
+            { key: "data", label: "Data & Cache", to: `${base}?tab=data`, active: tab === "data" },
+            { key: "quota", label: "Quota", to: `${base}?tab=quota`, active: tab === "quota" },
           ]}
         />
       }
@@ -80,29 +91,30 @@ export default function ProviderDetailPage() {
           label="Provider status"
           metrics={[
             { label: "Entitlement", value: ENTITLEMENT_LABEL[card.entitlement], tone: card.entitlement === "entitled" ? "success" : card.entitlement === "unknown" || card.entitlement === "not_applicable" ? "neutral" : "danger" },
-            { label: "Health", value: meta.label, tone: meta.tone },
-            { label: "Last outcome", value: agg?.lastOutcome ? agg.lastOutcome.replace(/_/g, " ") : "None recorded" },
-            { label: "Last success", value: card.lastSuccessAt ? formatAt(card.lastSuccessAt) : "None recorded", hint: card.lastSuccessAt ? describeAge(card.lastSuccessAt, Date.now()) : undefined },
-            { label: "Freshness window", value: freshness ?? "Not set" },
-            { label: "30-day calls", value: card.attempts === null ? "Unknown" : String(card.attempts) },
+            { label: "Configuration", value: configuration, tone: configuration === "Configured" ? "success" : "neutral" },
+            { label: "Enabled", value: enabled, tone: enabled === "Yes" ? "success" : "neutral" },
+            { label: "Last outcome", value: lastOutcomeLabel, tone: agg?.lastOutcome && agg.lastOutcome !== "ok" ? "danger" : "neutral" },
+            { label: "Cache status", value: cacheState, tone: cacheTone, hint: card.lastSuccessAt ? `Last good ${formatAt(card.lastSuccessAt)}` : "No successful call" },
+            { label: "Data freshness", value: card.lastSuccessAt ? describeAge(card.lastSuccessAt, Date.now()) : "No data", hint: freshness ? `Window ${freshness}` : "Window not set" },
           ]}
         />
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_320px] items-start">
-          {tab === "overview" ? (
-              <Panel title="Capability details" titleSize="md" inset="sm">
-                <KeyValueList
-                  rows={[
-                    { label: "Affects", value: spec.affectedOutput },
-                    { label: "Last attempt", value: card.lastAttemptAt ? formatAt(card.lastAttemptAt) : <span className="text-adm-muted">None recorded</span> },
-                    { label: "Last success", value: card.lastSuccessAt ? formatAt(card.lastSuccessAt) : <span className="text-adm-muted">None recorded</span> },
-                    ...(card.attempts !== null ? [{ label: "30-day calls", value: `${card.attempts}${card.refusals ? `, ${card.refusals} refused` : ""}` }] : []),
-                    ...(agg?.lastOutcome ? [{ label: "Last outcome", value: agg.lastOutcome.replace(/_/g, " ") }] : []),
-                    ...(spec.registryKeys.length ? [{ label: "Registry keys", value: <span className="font-mono text-[13px]">{spec.registryKeys.join(", ")}</span> }] : []),
-                    ...(spec.manual ? [{ label: "Mode", value: "Manual, on request" }] : []),
-                  ]}
-                />
-              </Panel>
-          ) : <div className="hidden xl:block" />}
+          {(tab === "overview" || tab === "configuration" || tab === "data") && (
+            <Panel title={tab === "data" ? "Data and cache" : tab === "configuration" ? "Configuration" : "Capability details"} titleSize="md" inset="sm">
+              <KeyValueList
+                rows={[
+                  { label: "Affects", value: spec.affectedOutput },
+                  ...(tab !== "data" && spec.registryKeys.length ? [{ label: "Registry keys", value: <span className="font-mono text-[13px]">{spec.registryKeys.join(", ")}</span> }] : []),
+                  ...(tab !== "data" ? [{ label: "Mode", value: spec.manual ? "Manual, on request" : "Automatic" }] : []),
+                  { label: "Last attempt", value: card.lastAttemptAt ? formatAt(card.lastAttemptAt) : <span className="text-adm-muted">None recorded</span> },
+                  { label: "Last success", value: card.lastSuccessAt ? formatAt(card.lastSuccessAt) : <span className="text-adm-muted">None recorded</span> },
+                  ...(tab !== "configuration" ? [{ label: "Freshness window", value: freshness ?? "Not set" }, { label: "Cache status", value: cacheState }] : []),
+                  ...(tab === "overview" && agg?.lastOutcome ? [{ label: "Last outcome", value: lastOutcomeLabel }] : []),
+                ]}
+              />
+            </Panel>
+          )}
+          {(tab === "overview" || tab === "attempts") && (
             <Panel title="Recent attempts" titleSize="md" inset="sm" flush>
               {attempts.length === 0 ? (
                 <EmptyState title={data.events === null ? "Calls could not be read" : "No calls recorded"} detail={data.events === null ? "The call ledger did not answer. Nothing here is current." : "No call to this provider is recorded in the last 30 days."} compact />
@@ -124,16 +136,20 @@ export default function ProviderDetailPage() {
                 </WorkTable>
               )}
             </Panel>
-          <aside aria-label="Guidance">
-            <Panel title="Quota and guidance" titleSize="md" inset="sm">
-              <div className="space-y-3">
-                <StatusText tone={meta.tone}>{meta.label}</StatusText>
-                <p className="text-[14px] font-semibold text-adm-ink">{card.verdict.headline}</p>
-                <p className="text-[13px] leading-[18px] text-adm-muted">{card.verdict.detail}</p>
-                <LinkButton to={providerDrillIn(spec, data.latestRunId)}>{spec.drillInLabel}</LinkButton>
-              </div>
-            </Panel>
-          </aside>
+          )}
+          {(tab === "overview" || tab === "quota") && (
+            <aside aria-label="Guidance" className={tab === "quota" ? "xl:col-span-3" : undefined}>
+              <Panel title="Quota and guidance" titleSize="md" inset="sm">
+                <div className="space-y-3">
+                  <StatusText tone={meta.tone}>{meta.label}</StatusText>
+                  <p className="text-[14px] font-semibold text-adm-ink">{card.verdict.headline}</p>
+                  <p className="text-[13px] leading-[18px] text-adm-muted">{card.verdict.detail}</p>
+                  {card.attempts !== null && <p className="text-[13px] leading-[18px] text-adm-muted">{`${card.attempts} calls in the last 30 days${card.refusals ? `, ${card.refusals} refused` : ""}.`}</p>}
+                  <LinkButton to={providerDrillIn(spec, data.latestRunId)}>{spec.drillInLabel}</LinkButton>
+                </div>
+              </Panel>
+            </aside>
+          )}
         </div>
       </div>
     </ChildPageFrame>

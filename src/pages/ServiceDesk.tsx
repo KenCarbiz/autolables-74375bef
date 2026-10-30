@@ -5,7 +5,7 @@ import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
-import { LocalTabs, PageBody, PageHeader, LinkButton } from "@/components/product";
+import { LocalTabs, PageBody, PageHeader } from "@/components/product";
 import ServiceQueue from "@/components/service/ServiceQueue";
 import { ManagerMessagesRail } from "@/components/service/ServiceMessages";
 import { CommandCapabilityProvider } from "@/components/command/CommandPrimitives";
@@ -27,7 +27,6 @@ export default function ServiceDesk() {
   const { isAdmin, user } = useAuth();
   const { member } = useEntitlements();
   const tenantId = tenant?.id && tenant.id !== "house" ? tenant.id : null;
-  const canManageSettings = isAdmin || hasDealerCapability(member?.role, "can_manage_service_settings", isAdmin);
   // Writers/managers (anyone who can assign work) default to the full desk;
   // technicians default to My Work.
   const canAssign = isAdmin || hasDealerCapability(member?.role, "can_assign_service_work", isAdmin);
@@ -76,7 +75,6 @@ export default function ServiceDesk() {
           actions={
             <>
               <span className="text-[13px] leading-[18px] text-adm-muted">{today}</span>
-              {canManageSettings && <LinkButton to="/service/settings" aria-label="Service Desk settings, K-208 Policy">Settings</LinkButton>}
             </>
           }
         />
@@ -91,7 +89,7 @@ export default function ServiceDesk() {
           />
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_240px] gap-5 items-start">
           <ServiceQueue key={view} mode={view} onCounts={setCounts} />
           <div className="xl:sticky xl:top-4">
             <ManagerMessagesRail tenantId={tenantId} vehicles={railVehicles} />

@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { ExternalLink, Mail, Phone } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import Seo from "@/components/Seo";
 import { LinkButton, PageBody, PageHeader, Panel, QueryState } from "@/components/product";
@@ -85,7 +86,7 @@ const CustomerRecord = () => {
         description={`${customer.identified ? "Contact captured" : "No contact captured"} · Last activity ${relativeTime(customer.lastActivityAt)}`}
         actions={
           <>
-            {customer.email && <LinkButton variant="secondary" to={`mailto:${customer.email}`}>Email</LinkButton>}
+            {customer.email && <LinkButton variant="secondary" className="whitespace-nowrap px-2" to={`mailto:${customer.email}`}>Email</LinkButton>}
             {callHref && <LinkButton variant="primary" to={callHref}>Call {customer.phone}</LinkButton>}
           </>
         }
@@ -148,6 +149,33 @@ const CustomerRecord = () => {
                       {v.slug && <a href={`/v/${v.slug}`} target="_blank" rel="noopener noreferrer" className="text-adm-primary hover:underline">Passport</a>}
                       {v.listingId && <button type="button" onClick={() => navigate(`/vehicle-file/${v.listingId}`)} className="text-adm-primary hover:underline">Vehicle file</button>}
                     </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+
+          <Panel title={`Deals (${customer.deals.length})`}>
+            {customer.deals.length === 0 ? (
+              <p className="text-[14px] leading-[20px] text-adm-muted">No addendum on this store carries this customer's name or email.</p>
+            ) : (
+              <ul className="divide-y divide-adm-border">
+                {customer.deals.map((deal) => (
+                  <li key={deal.id} className="space-y-1 py-3 first:pt-0 last:pb-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="min-w-0 truncate text-[14px] leading-[20px] font-semibold text-adm-ink">{deal.vehicleLabel}</p>
+                      <span className="shrink-0 whitespace-nowrap"><Chip tone={dealStateTone(deal.state)}>{deal.stateLabel}</Chip></span>
+                    </div>
+                    <p className="text-[13px] leading-[18px] text-adm-muted">
+                      {money(deal.amount)}{deal.employeeName ? ` · Sold by ${deal.employeeName}` : ""}
+                    </p>
+                    {deal.returnInfo && <p className="text-[13px] leading-[18px] text-adm-ink">{deal.returnInfo.label}</p>}
+                    {deal.state === "out_for_signature" && (
+                      <details>
+                        <summary className="cursor-pointer text-[13px] font-semibold text-adm-primary">Signing status</summary>
+                        <div className="mt-2"><AddendumStatusTimeline addendumId={deal.id} /></div>
+                      </details>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -223,39 +251,13 @@ const CustomerRecord = () => {
           </Panel>
           <Panel title="Contact actions">
             <div className="grid grid-cols-2 gap-2">
-              {callHref ? <LinkButton variant="secondary" to={callHref}>Call</LinkButton> : null}
-              {customer.email ? <LinkButton variant="secondary" to={`mailto:${customer.email}`}>Send email</LinkButton> : null}
-              {primaryVehicle?.slug ? <LinkButton variant="secondary" to={`/v/${primaryVehicle.slug}`}>Open Passport</LinkButton> : null}
+              {callHref ? <LinkButton variant="secondary" className="whitespace-nowrap px-2" to={callHref}><Phone className="h-5 w-5 text-adm-primary" aria-hidden="true" /> Call</LinkButton> : null}
+              {customer.email ? <LinkButton variant="secondary" className="whitespace-nowrap px-2" to={`mailto:${customer.email}`}><Mail className="h-5 w-5 text-adm-primary" aria-hidden="true" /> Send email</LinkButton> : null}
+              {primaryVehicle?.slug ? <LinkButton variant="secondary" className="whitespace-nowrap px-2" to={`/v/${primaryVehicle.slug}`}><ExternalLink className="h-5 w-5 text-adm-primary" aria-hidden="true" /> Open Passport</LinkButton> : null}
               {!callHref && !customer.email && !primaryVehicle?.slug ? (
                 <p className="text-[14px] leading-[20px] text-adm-muted">No contact method captured.</p>
               ) : null}
             </div>
-          </Panel>
-          <Panel title={`Deals (${customer.deals.length})`}>
-            {customer.deals.length === 0 ? (
-              <p className="text-[14px] leading-[20px] text-adm-muted">No addendum on this store carries this customer's name or email.</p>
-            ) : (
-              <ul className="divide-y divide-adm-border">
-                {customer.deals.map((deal) => (
-                  <li key={deal.id} className="space-y-1 py-3 first:pt-0 last:pb-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="min-w-0 truncate text-[14px] leading-[20px] font-semibold text-adm-ink">{deal.vehicleLabel}</p>
-                      <span className="shrink-0 whitespace-nowrap"><Chip tone={dealStateTone(deal.state)}>{deal.stateLabel}</Chip></span>
-                    </div>
-                    <p className="text-[13px] leading-[18px] text-adm-muted">
-                      {money(deal.amount)}{deal.employeeName ? ` · Sold by ${deal.employeeName}` : ""}
-                    </p>
-                    {deal.returnInfo && <p className="text-[13px] leading-[18px] text-adm-ink">{deal.returnInfo.label}</p>}
-                    {deal.state === "out_for_signature" && (
-                      <details>
-                        <summary className="cursor-pointer text-[13px] font-semibold text-adm-primary">Signing status</summary>
-                        <div className="mt-2"><AddendumStatusTimeline addendumId={deal.id} /></div>
-                      </details>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
           </Panel>
         </div>
       </div>

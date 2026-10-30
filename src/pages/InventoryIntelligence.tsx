@@ -32,13 +32,12 @@ const Stage = ({ stage }: { stage: PipelineStage }) =>
     ? <span className="text-adm-muted" aria-label="Not applicable">-</span>
     : <StatusText tone={STAGE_TONE_MAP[STAGE_TONE[stage]] ?? "neutral"} className="whitespace-nowrap">{stage === "Enrichment Pending" ? "Pending" : stage}</StatusText>;
 
-const FAMILY_SHORT: Record<string, string> = {
-  "OEM Window Sticker": "OEM sticker",
-  "New Vehicle Addendum": "New addendum",
-  "Used Vehicle Addendum": "Used addendum",
-  "FTC Buyers Guide": "Buyers Guide",
-  "Used Car Window Sticker": "Used sticker",
-};
+const COLUMNS: Array<{ key: string; label: string; ids: Array<(typeof DOCUMENT_FAMILY_IDS)[number]> }> = [
+  { key: "oem", label: "OEM sticker", ids: ["oem_window_sticker_reproduction"] },
+  { key: "addendum", label: "Addendum", ids: ["new_vehicle_addendum", "used_vehicle_addendum"] },
+  { key: "bg", label: "Buyers Guide", ids: ["ftc_buyers_guide"] },
+  { key: "used", label: "Used sticker", ids: ["used_vehicle_window_sticker"] },
+];
 
 interface Vehicle {
   id: string;
@@ -83,6 +82,7 @@ export default function InventoryIntelligence() {
   const [query, setQuery] = useState("");
   const [onlyBlocked, setOnlyBlocked] = useState(false);
   const [condition, setCondition] = useState("all");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     if (!tenantId) return;
@@ -158,10 +158,12 @@ export default function InventoryIntelligence() {
     });
   }, [rows, query, onlyBlocked, condition]);
 
+  const exportRows = filtered ? (selected.size ? filtered.filter((r) => selected.has(r.vehicle.id)) : filtered) : null;
+
   const exportCsv = () => {
-    if (!filtered) return;
+    if (!exportRows) return;
     const head = ["Stock #", "Vehicle", "VIN", "Source data", ...DOCUMENT_FAMILY_IDS.map((id) => DOCUMENT_FAMILIES[id].adminTitle), "Blocker"];
-    const body = filtered.map(({ vehicle, intel }) => [
+    const body = exportRows.map(({ vehicle, intel }) => [
       vehicleStockNumber(vehicle) ?? "",
       vehicle.ymm ?? "",
       vehicle.vin ?? "",
@@ -189,10 +191,9 @@ export default function InventoryIntelligence() {
         title="Inventory Intelligence"
         description="Document status and source data for each vehicle."
         actions={
-          <>
-            <Button onClick={load}>Refresh</Button>
-            <Button variant="primary" onClick={exportCsv} disabled={!filtered || filtered.length === 0}>Export</Button>
-          </>
+          <Button variant="primary" onClick={exportCsv} disabled={!exportRows || exportRows.length === 0}>
+            {selected.size ? `Export ${selected.size} selected` : "Export"}
+          </Button>
         }
       />
 
@@ -241,15 +242,22 @@ export default function InventoryIntelligence() {
           emptyTitle="No vehicles match"
           emptyDetail="Clear the search or the attention filter to widen the list."
         >
-          <WorkTable className="[&_th]:px-2 [&_td]:px-2 [&_td]:py-2.5" caption="Document pipeline by vehicle and family" minWidth={960}>
+          <WorkTable className="[&_th]:px-2 [&_td]:px-2 [&_td]:py-2.5" caption="Document pipeline by vehicle and family" minWidth={900}>
             <thead>
               <tr>
+                <Th className="w-8">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all vehicles"
+                    checked={!!filtered && filtered.length > 0 && filtered.every((r) => selected.has(r.vehicle.id))}
+                    onChange={(e) => setSelected(e.target.checked && filtered ? new Set(filtered.map((r) => r.vehicle.id)) : new Set())}
+                    className="h-4 w-4 accent-[#2457D6]"
+                  />
+                </Th>
                 <Th className="whitespace-nowrap">Stock #</Th>
                 <Th>Vehicle</Th>
                 <Th>Source data</Th>
-                {DOCUMENT_FAMILY_IDS.map((id) => (
-                  <Th key={id} className="whitespace-nowrap">{FAMILY_SHORT[DOCUMENT_FAMILIES[id].adminTitle] ?? DOCUMENT_FAMILIES[id].adminTitle}</Th>
-                ))}
+                {COLUMNS.map((c) => <Th key={c.key} className="whitespace-nowrap">{c.label}</Th>)}
                 <Th>Blocker</Th>
                 <Th align="right">Review</Th>
               </tr>
@@ -257,17 +265,26 @@ export default function InventoryIntelligence() {
             <tbody>
               {filtered?.map(({ vehicle, intel }) => (
                 <tr key={vehicle.id} className="hover:bg-adm-workspace">
+                  <Td className="w-8">
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${vehicle.ymm || vehicle.vin || "vehicle"}`}
+                      checked={selected.has(vehicle.id)}
+                      onChange={(e) => setSelected((prev) => { const n = new Set(prev); if (e.target.checked) n.add(vehicle.id); else n.delete(vehicle.id); return n; })}
+                      className="h-4 w-4 accent-[#2457D6]"
+                    />
+                  </Td>
                   <Td className="whitespace-nowrap font-mono text-[12px]">{vehicleStockNumber(vehicle) ?? "Unknown"}</Td>
-                  <Td className="max-w-[190px]">
+                  <Td className="max-w-[260px]">
                     <span className="block truncate font-semibold text-adm-ink">{vehicle.ymm || "Vehicle"}</span>
                     <span className="block truncate font-mono text-[12px] leading-[16px] text-adm-muted">{vehicle.vin || "no VIN"}</span>
                   </Td>
                   <Td><Stage stage={intel.sourceStage} /></Td>
-                  {DOCUMENT_FAMILY_IDS.map((id) => {
-                    const f = intel.families.find((x) => x.family === id);
-                    return <Td key={id}>{f ? <Stage stage={f.stage} /> : null}</Td>;
+                  {COLUMNS.map((c) => {
+                    const f = c.ids.map((id) => intel.families.find((x) => x.family === id)).find((x) => x && x.stage !== "Not Applicable") ?? intel.families.find((x) => x.family === c.ids[0]);
+                    return <Td key={c.key}>{f ? <Stage stage={f.stage} /> : null}</Td>;
                   })}
-                  <Td className="max-w-[130px]">
+                  <Td className="max-w-[160px]">
                     {intel.blocker
                       ? <span className="block truncate text-[13px] text-adm-warning" title={intel.blocker}>{intel.blocker}</span>
                       : <span className="text-[12px] text-adm-muted">None</span>}

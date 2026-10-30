@@ -182,7 +182,7 @@ export const MetricStrip = ({ metrics, label, className, action }: { metrics: Me
             const body = (
               <>
                 <dt className="text-[12px] leading-[18px] font-medium text-adm-muted">{m.label}</dt>
-                <dd className={cn("mt-0.5 font-bold tabular-nums", shown.length >= 6 ? "truncate text-[20px] leading-[28px]" : "text-[24px] leading-[32px]", m.tone === "danger" ? "text-adm-danger" : "text-adm-ink")}>
+                <dd className={cn("mt-0.5 font-bold tabular-nums", shown.length >= 6 ? "truncate text-[20px] leading-[28px]" : "text-[24px] leading-[32px]", m.tone === "danger" ? "text-adm-danger" : m.tone === "success" ? "text-adm-success" : m.tone === "warning" ? "text-[#B45309]" : "text-adm-ink")}>
                   {m.loading ? <SkeletonBlock className="h-7 w-16" /> : <ValueOrUnknown value={m.value} />}
                 </dd>
                 {m.hint && <dd className="truncate text-[12px] leading-[18px] text-adm-muted">{m.hint}</dd>}

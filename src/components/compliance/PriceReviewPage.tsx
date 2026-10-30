@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { Crumbs, DetailLayout, FactStrip, SummaryList, fmtDateTime } from "@/components/detail/parts";
+import { Crumbs, DetailLayout, FactStrip, fmtDateTime } from "@/components/detail/parts";
 import { LinkButton, LocalTabs, PageBody, PageHeader, Panel, QueryState, StatusText, Td, Th, WorkTable, type Tone } from "@/components/product";
 import { PRICE_STATE_LABEL, money, type PriceRow, type PriceState } from "./complianceData";
 import { useComplianceCenterData } from "./useComplianceCenterData";
@@ -140,7 +140,7 @@ export default function PriceReviewPage() {
       <PageHeader
         title={row ? `Price review — ${row.title}` : "Price review"}
         description={<span className="font-mono">VIN {vin}</span>}
-        actions={row ? <LinkButton to={`/vehicle-file/${row.vehicleId}`} variant="primary">Open vehicle file</LinkButton> : undefined}
+        
       />
       <QueryState
         status={status}
@@ -176,20 +176,26 @@ export default function PriceReviewPage() {
               <DetailLayout
                 main={<Evidence row={row} />}
                 aside={
-                  <Panel title="Comparison summary" inset="sm">
-                    <SummaryList
-                      rows={[
-                        { label: "Reference price", value: money(row.referencePrice) },
-                        { label: "Reference source", value: row.referenceLabel ?? "Unknown" },
-                        { label: "Website price", value: money(row.websitePrice) },
-                        { label: "Difference", value: row.difference == null ? "Unknown" : `${row.difference > 0 ? "+" : row.difference < 0 ? "−" : ""}${money(Math.abs(row.difference))}` },
-                        { label: "Doc fee", value: money(row.docFee) },
-                        { label: "Total", value: money(sum(row.referencePrice, row.docFee)), strong: true },
-                      ]}
-                    />
-                    <p className="mt-3 text-[13px] leading-[18px] text-adm-muted">
-                      Resolve a difference by correcting the vehicle price in the vehicle file; the nightly crawl then re-checks the website.
-                    </p>
+                  <Panel title="Proposed change" titleSize="md" inset="sm" flush>
+                    <WorkTable caption="Current and proposed price" minWidth={300}>
+                      <thead>
+                        <tr><Th>Field</Th><Th align="right">Current</Th><Th align="right">Proposed</Th></tr>
+                      </thead>
+                      <tbody>
+                        <tr><Td>Selling price</Td><Td align="right" className="tabular-nums">{money(row.websitePrice)}</Td><Td align="right" className="tabular-nums">{money(row.referencePrice)}</Td></tr>
+                        <tr><Td>Doc fee</Td><Td align="right" className="tabular-nums">{money(row.docFee)}</Td><Td align="right" className="tabular-nums">{money(row.docFee)}</Td></tr>
+                        <tr className="font-semibold"><Td>Total</Td><Td align="right" className="tabular-nums">{money(sum(row.websitePrice, row.docFee))}</Td><Td align="right" className="tabular-nums">{money(sum(row.referencePrice, row.docFee))}</Td></tr>
+                      </tbody>
+                    </WorkTable>
+                    <div className="space-y-3 px-4 py-3">
+                      <p className="text-[13px] leading-[18px] text-adm-muted">
+                        {row.difference == null || row.difference === 0 ? "No change is proposed." : `Proposed is the ${row.referenceLabel === "Feed" ? "feed" : "confirmed"} price, ${money(Math.abs(row.difference))} ${row.difference > 0 ? "below" : "above"} the website. Correct it in the vehicle file; the nightly crawl then re-checks the website.`}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <LinkButton to={`/vehicle-file/${row.vehicleId}`} variant="primary">Open vehicle file</LinkButton>
+                        <LinkButton to="/compliance?tab=price">Cancel</LinkButton>
+                      </div>
+                    </div>
                   </Panel>
                 }
               />

@@ -169,6 +169,7 @@ interface VehicleRow {
   id: string;
   tenant_id: string | null;
   vin: string | null;
+  ymm?: string | null;
   slug: string | null;
   status: string | null;
   condition: string | null;
@@ -440,7 +441,7 @@ export default function FactoryStickerWorkspace({
     try {
       const { data: v, error: ve } = await supabase
         .from("vehicle_listings")
-        .select("id, tenant_id, vin, slug, status, condition, hero_image_url, photos, mc_attributes, sticker_snapshot, oem_sticker_url")
+        .select("id, tenant_id, vin, ymm, slug, status, condition, hero_image_url, photos, mc_attributes, sticker_snapshot, oem_sticker_url")
         .eq("id", vehicleId)
         .maybeSingle();
       if (ve) throw ve;
@@ -718,26 +719,20 @@ export default function FactoryStickerWorkspace({
           title={title}
           description={<>
             Generated factory build record (not the original Monroney).
-            {data ? ` ${data.identity.year} ${data.identity.make} ${data.identity.model}${data.identity.trim ? ` ${data.identity.trim}` : ""}` : ""}
-            {currentDoc ? `, v${currentDoc.version}` : ""}
+            {data
+              ? ` ${data.identity.year} ${data.identity.make} ${data.identity.model}${data.identity.trim ? ` ${data.identity.trim}` : ""}`
+              : vehicle?.ymm ? ` ${vehicle.ymm}` : ""}
+            {currentDoc ? ` | v${currentDoc.version}` : " | No version yet"}
           </>}
-          meta={genStatus ? (
+          meta={!fixture ? (
             <span className="inline-flex items-center gap-2">
-              <Badge tone={GEN_STATUS_TONE[genStatus] || "off"}>{humanize(genStatus)}</Badge>
+              <Badge tone={genStatus ? GEN_STATUS_TONE[genStatus] || "off" : "off"}>{genStatus ? humanize(genStatus) : "Not generated"}</Badge>
               {currentDoc ? <span>{`v${currentDoc.version}`}</span> : null}
             </span>
           ) : undefined}
           actions={
             !fixture ? (
               <>
-                {!embedded && vehicle && (
-                  <Link
-                    to={`/vehicle-file/${vehicle.id}`}
-                    className="inline-flex items-center min-h-[40px] px-4 rounded-[6px] border border-adm-border bg-adm-surface text-[14px] font-semibold hover:bg-adm-workspace"
-                  >
-                    Vehicle file
-                  </Link>
-                )}
                 {pdfUrl && (
                   <a
                     href={pdfUrl}
@@ -876,7 +871,7 @@ export default function FactoryStickerWorkspace({
                 />
               </div>
             ) : (
-              <div className="rounded-lg border border-dashed border-border bg-muted/20 aspect-[792/612] flex flex-col items-center justify-center gap-2 text-center p-6">
+              <div className="rounded-lg border border-dashed border-border bg-muted/20 min-h-[300px] flex flex-col items-center justify-center gap-2 text-center p-6">
                 <FileText className="w-8 h-8 text-muted-foreground/50" />
                 <p className="text-xs font-semibold text-foreground">
                   {needsSourceData
@@ -911,9 +906,9 @@ export default function FactoryStickerWorkspace({
           <div className="space-y-4">
             <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4 space-y-3">
               {hero ? (
-                <img src={hero} alt="Vehicle" className="w-full aspect-[4/3] object-cover rounded-xl border border-border" />
+                <img src={hero} alt="Vehicle" className="w-full h-[180px] object-cover rounded-[6px] border border-border" />
               ) : (
-                <div className="w-full aspect-[4/3] rounded-xl border border-dashed border-border bg-muted/30 flex items-center justify-center text-[11px] text-muted-foreground">
+                <div className="w-full h-[120px] rounded-[6px] border border-dashed border-border bg-muted/30 flex items-center justify-center text-[11px] text-muted-foreground">
                   {fixture ? "Fixture vehicle — no photo" : "No photo on file"}
                 </div>
               )}
@@ -929,6 +924,9 @@ export default function FactoryStickerWorkspace({
                 <StatusRow label="Condition" value={humanize(data?.condition || vehicle?.condition || "unknown")} />
                 {!fixture && vehicle?.status && <StatusRow label="Listing status" value={humanize(vehicle.status)} />}
               </div>
+              {!embedded && vehicle && (
+                <Link to={`/vehicle-file/${vehicle.id}`} className="inline-block text-[14px] font-semibold text-adm-primary hover:underline">Open vehicle file</Link>
+              )}
             </div>
 
             {(record?.review_reason || record?.last_error || data?.generic) && (

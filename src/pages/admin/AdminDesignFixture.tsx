@@ -90,8 +90,11 @@ export default function AdminDesignFixture() {
   // The mocks draw their rail between 217 and 264px wide; the harness passes each
   // mock's width so the content origin lines up. Default: the Overview mock.
   // With ?chrome=1 the same width is applied to the real rail, for evidence only.
-  const railWidth = Math.min(320, Math.max(160, Number(search.get("rail")) || 229));
-  const chrome = search.get("chrome") === "1";
+  const withDialogBackdrop = screen === "06";
+  const railWidth = Math.min(320, Math.max(160, Number(search.get("rail")) || (withDialogBackdrop ? 243 : 229)));
+  // The fee-review mock shows the rail and header dimmed behind its dialog, so
+  // that screen draws the real frame unless ?chrome=0 asks for the stand-ins.
+  const chrome = search.get("chrome") === "1" || (withDialogBackdrop && search.get("chrome") !== "0");
   const entry = screen ? ADMIN_FIXTURES[screen] : undefined;
   if (!entry) {
     return (

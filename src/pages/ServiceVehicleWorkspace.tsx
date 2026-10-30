@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { deriveRecallView, type RecallRowInput } from "@/lib/vehicleTruth/recallView";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { LocalTabs, PageHeader } from "@/components/product";
-import { Crumbs, DetailLayout } from "@/components/detail/parts";
+import { DetailLayout } from "@/components/detail/parts";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
@@ -341,22 +341,24 @@ export default function ServiceVehicleWorkspace() {
   const assignedMember = members.find((m) => m.user_id === newestActive?.assigned_to);
   const sold = !!veh.deal_processed_at || String(veh.status || "") === "sold";
   const singleActionSticky = ws.key !== "cleared";
+  const daysInStock = veh.created_at ? Math.max(0, Math.floor((Date.now() - new Date(veh.created_at).getTime()) / 86_400_000)) : null;
+  const reinspections = failures.filter((f) => f.repair_state === "ready_for_reinspection").length;
 
   return (
     <CommandCapabilityProvider role={role} isAdmin={isAdmin}>
       <div className="mx-auto max-w-[1400px] space-y-4 px-4 py-4 pb-28 sm:px-6 sm:py-6 lg:pb-6">
-        <Crumbs items={[{ label: "Service Desk", to: "/service" }, { label: ymm }]} />
         <PageHeader
           title={ymm}
-          description={`VIN ${vin}${stock ? ` · Stock ${stock}` : ""}`}
+          description={`VIN ${vin}${stock ? ` | Stock ${stock}` : ""}`}
           meta={[
+            daysInStock != null ? `${daysInStock} ${daysInStock === 1 ? "day" : "days"} in stock` : null,
             veh.mileage != null ? `${Number(veh.mileage).toLocaleString("en-US")} mi` : null,
-            sold ? "Sold" : "In stock",
+            sold ? "Sold" : null,
             assignedMember ? memberName(assignedMember) : gr?.assigned_technician || "Unassigned",
-          ].filter(Boolean).join(" · ")}
+          ].filter(Boolean).join(" | ")}
           actions={
             <>
-              <Link to={`/vehicle-file/${veh.id}`} className={BTN_SECONDARY}>Vehicle file</Link>
+              {veh.hero_image_url && <img src={veh.hero_image_url} alt="" className="hidden sm:block h-12 w-[72px] rounded-[4px] border border-adm-border object-cover" />}
               <button
                 type="button"
                 onClick={() => onPrimaryAction(ws.action.key)}
@@ -367,7 +369,7 @@ export default function ServiceVehicleWorkspace() {
             </>
           }
         />
-        <WorkspaceTabs findings={findings.length} repairs={failures.length} approvals={pendingRequests} />
+        <WorkspaceTabs findings={findings.length} repairs={failures.length} reinspections={reinspections} k208={newestActive || newestSigned ? 1 : 0} approvals={pendingRequests} />
 
         <DetailLayout
           main={
@@ -411,6 +413,7 @@ export default function ServiceVehicleWorkspace() {
                 />
               )}
 
+              <div id="reinspection" />
               {(failures.length > 0 || isFailedInspection(newestSigned)) && (
                 <div id="failures">
                   <FailedItemsPanel
@@ -461,7 +464,7 @@ export default function ServiceVehicleWorkspace() {
                 vehicleFileHref={`/vehicle-file/${veh.id}`}
               />
               <div id="summary">
-                <SummaryCard newestSigned={newestSigned} openFailures={openFailures.length} clearance={clearance} items={grItems} />
+                <SummaryCard findings={findings} newestSigned={newestSigned} openFailures={openFailures.length} clearance={clearance} items={grItems} />
               </div>
               <AssignmentCard
                 inspection={newestActive}
@@ -619,18 +622,17 @@ function ProgressCard({ items }: { items: GetReadyItem[] }) {
 
 /* ───────────────────────────── summary ──────────────────────────── */
 
-function SummaryCard({ newestSigned, openFailures, clearance, items }: {
-  newestSigned: InspRow | null; openFailures: number; clearance: Clearance | null; items: GetReadyItem[];
+function SummaryCard({ findings, newestSigned, openFailures, clearance, items }: {
+  findings: { result: string }[]; newestSigned: InspRow | null; openFailures: number; clearance: Clearance | null; items: GetReadyItem[];
 }) {
-  const checklist = newestSigned?.checklist || [];
-  const passed = checklist.filter((c) => c.result === "pass").length;
-  const failed = checklist.filter((c) => c.result === "fail").length;
+  const passed = findings.filter((c) => c.result === "passed").length;
+  const failed = findings.filter((c) => c.result === "failed").length;
   const workDone = items.filter((i) => i.status === "complete").length;
   return (
     <CommandCard title="Status summary" subtitle="Measured from this vehicle's records.">
       <dl className="space-y-1.5 text-[12.5px]">
-        <Row label="Inspection items passed" value={newestSigned ? String(passed) : "Not inspected"} />
-        <Row label="Inspection items failed" value={newestSigned ? String(failed) : "Not inspected"} />
+        <Row label="Inspection items passed" value={findings.length ? String(passed) : "Not inspected"} />
+        <Row label="Inspection items failed" value={findings.length ? String(failed) : "Not inspected"} />
         <Row label="Open failed items" value={String(openFailures)} tone={openFailures > 0 ? "red" : undefined} />
         <Row label="Work items complete" value={`${workDone} of ${items.length}`} />
         <Row
@@ -1752,12 +1754,14 @@ function TitleMcoUpload({ tenantId, veh }: { tenantId: string; veh: { id: string
 
 // Flat jump tabs over the sections this page already has. They scroll to an
 // existing section; they do not add or hide any work.
-function WorkspaceTabs({ findings, repairs, approvals }: { findings: number; repairs: number; approvals: number }) {
+function WorkspaceTabs({ findings, repairs, reinspections, k208, approvals }: { findings: number; repairs: number; reinspections: number; k208: number; approvals: number }) {
   const { hash } = useLocation();
   const current = hash || "#inspection";
   const tabs = [
     { key: "inspection", label: "Inspection findings", to: "#inspection", count: findings },
     { key: "failures", label: "Repairs", to: "#failures", count: repairs },
+    { key: "reinspection", label: "Reinspection", to: "#reinspection", count: reinspections },
+    { key: "k208", label: "K-208", to: "#k208", count: k208 },
     { key: "approvals", label: "Approvals", to: "#approvals", count: approvals },
     { key: "summary", label: "History", to: "#summary" },
   ];

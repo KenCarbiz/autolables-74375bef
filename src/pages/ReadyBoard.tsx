@@ -55,6 +55,8 @@ export default function ReadyBoard() {
   const [marking, setMarking] = useState<string | null>(null);
   const [staleVins, setStaleVins] = useState<Set<string>>(new Set());
   const [requireK208, setRequireK208] = useState(false);
+  const [owners, setOwners] = useState<Map<string, string>>(new Map());
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [todayOnly, setTodayOnly] = useState(false);
@@ -71,7 +73,7 @@ export default function ReadyBoard() {
     if (!tenantId) return;
     setLoading(true);
     setLoadError(false);
-    const [list, si, fails, ds, ps, rr, re, prof, lc] = await Promise.all([
+    const [list, si, fails, ds, ps, rr, re, prof, lc, gro] = await Promise.all([
       (supabase as any).from("vehicle_listings").select("id, vin, ymm, condition, status, recall_check, orchestrated_at, deal_processed_at, hero_image_url").eq("tenant_id", tenantId).neq("status", "archived").limit(500),
       // All signed rows, reduced through the ONE executed predicate — a signed
       // FAIL (or a stale pass behind a newer signed failure) must not read as
@@ -87,6 +89,7 @@ export default function ReadyBoard() {
       (supabase as any).from("recon_estimates").select("vin").eq("tenant_id", tenantId).eq("status", "submitted"),
       (supabase as any).from("dealer_profiles").select("settings").eq("tenant_id", tenantId).maybeSingle(),
       (supabase as any).from("vehicle_lifecycle").select("vin, state").eq("tenant_id", tenantId).limit(1000),
+      (supabase as any).from("get_ready_records").select("vin, assigned_technician").eq("tenant_id", tenantId).limit(1000),
     ]);
     // Vehicles are published together with the maps that classify them, at
     // the end, so a partial read never renders as zero counts.
@@ -102,6 +105,7 @@ export default function ReadyBoard() {
     setRecallReview(new Set(((rr.data as { vin: string }[]) || []).map((r) => r.vin)));
     setReconNeeds(new Set(((re.data as { vin: string }[]) || []).map((r) => r.vin)));
     setRequireK208(!!(prof.data?.settings as { require_safety_inspection?: boolean } | null)?.require_safety_inspection);
+    setOwners(new Map(((gro.data as { vin: string; assigned_technician: string | null }[]) || []).filter((r) => r.assigned_technician).map((r) => [r.vin, String(r.assigned_technician)])));
     setLifecycle(new Map(((lc.data as { vin: string; state: string }[]) || []).map((r) => [r.vin, r.state])));
 
     // Active draft addendum per VIN (newest non-signed). Resilient to the
@@ -264,8 +268,10 @@ export default function ReadyBoard() {
     if (!rows) return [];
     let out = todayOnly ? rows.filter(isToday) : rows;
     if (bucket !== "all") out = out.filter((r) => bucketOf(r) === bucket);
+    const term = search.trim().toLowerCase();
+    if (term) out = out.filter((r) => `${r.ymm || ""} ${r.vin}`.toLowerCase().includes(term));
     return out;
-  }, [rows, todayOnly, isToday, bucket, bucketOf]);
+  }, [rows, todayOnly, isToday, bucket, bucketOf, search]);
 
   const showQr = async (vin: string) => {
     if (!tenantId) return;
@@ -306,13 +312,6 @@ export default function ReadyBoard() {
       <PageHeader
         title="Ready Board"
         description="Vehicle lifecycle workboard across service, detail, prep, recon and recall."
-        actions={
-          <>
-            <Button onClick={() => setTodayOnly((v) => !v)} aria-pressed={todayOnly}>
-              {todayOnly ? "Showing today's intake" : "Today's intake only"}
-            </Button>
-          </>
-        }
       />
 
       <LocalTabs label="Ready Board views" tabs={tabs} />
@@ -326,7 +325,19 @@ export default function ReadyBoard() {
           { label: "Recall review", value: stats ? stats.recallBlocked : null, loading, tone: stats && stats.recallBlocked > 0 ? "danger" : "neutral" },
         ]}
       />
-      <div>
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search vehicle or VIN"
+            aria-label="Search the board"
+            className="h-10 w-full max-w-[320px] rounded-[6px] border border-adm-border bg-adm-surface px-3 text-[14px]"
+          />
+          <Button onClick={() => setTodayOnly((v) => !v)} aria-pressed={todayOnly}>
+            {todayOnly ? "Showing today's intake" : "Today's intake only"}
+          </Button>
+        </div>
         <QueryState
           status={status}
           onRetry={load}
@@ -335,15 +346,15 @@ export default function ReadyBoard() {
           emptyTitle={`${current.empty}${scopeNote ? scopeNote : " in this view"}.`}
           emptyDetail={bucket === "all" && !todayOnly ? "No vehicles in inventory yet." : `This is the ${current.label} view only; it does not say the rest of the pipeline is clear.${otherViews}`}
         >
-          <WorkTable caption="Vehicles and their get-ready stations" minWidth={900}>
+          <WorkTable caption="Vehicles and their get-ready stations" minWidth={960}>
             <thead>
               <tr>
                 <Th>Vehicle</Th>
                 <Th>Current stage</Th>
-                <Th>Stations done</Th>
-                <Th>Recall</Th>
-                <Th>Ready</Th>
+                <Th>Days in stage</Th>
                 <Th>Next action</Th>
+                <Th>Owner</Th>
+                <Th>Recall</Th>
                 <Th align="right"><span className="sr-only">More</span></Th>
               </tr>
             </thead>
@@ -359,7 +370,8 @@ export default function ReadyBoard() {
                 ];
                 const open = stations.find(([, done]) => !done);
                 const stage = open ? open[0] : recallReview.has(r.vin) ? "Recall review" : "All stations clear";
-                const done = stations.filter(([, d]) => d).length;
+                const since = addMap.get(r.vin)?.updated_at || r.orchestrated_at;
+                const days = since ? Math.max(0, Math.floor((Date.now() - new Date(since).getTime()) / 864e5)) : null;
                 const primary: { label: string; run: () => void; busy: boolean } | null =
                   canDecideRetailReady && lifecycleOf(r) === "FINAL_READY_VERIFICATION"
                     ? { label: "Mark retail ready", run: () => markRetailReady(r), busy: marking === r.vin }
@@ -370,7 +382,7 @@ export default function ReadyBoard() {
                         : null;
                 return (
                   <tr key={r.vin} className="h-14 hover:bg-adm-workspace">
-                    <Td className="max-w-[300px]">
+                    <Td className="max-w-[340px]">
                       <div className="flex items-center gap-3">
                         {r.hero_image_url
                           ? <img src={r.hero_image_url} alt="" className="h-10 w-14 shrink-0 rounded-[4px] border border-adm-border object-cover" />
@@ -386,28 +398,24 @@ export default function ReadyBoard() {
                       </div>
                     </Td>
                     <Td className="whitespace-nowrap">{stage}</Td>
-                    <Td className="whitespace-nowrap tabular-nums text-adm-muted">{done} of {stations.length}</Td>
+                    <Td className="whitespace-nowrap tabular-nums text-adm-muted">{days == null ? "Unknown" : days}</Td>
+                    <Td className="whitespace-nowrap">
+                      {primary ? (
+                        <button type="button" className="text-[14px] font-semibold text-adm-primary hover:underline disabled:opacity-50" onClick={primary.run} disabled={primary.busy}>
+                          {primary.busy ? "Working..." : primary.label}
+                        </button>
+                      ) : bucketOf(r) === "ready" && r.deal_processed_at ? (
+                        <StatusText tone="success">Filed</StatusText>
+                      ) : (
+                        <button type="button" className="text-[14px] font-semibold text-adm-primary hover:underline" onClick={() => navigate(`/vehicle-file/${r.id}?tab=getready`)}>Open get-ready</button>
+                      )}
+                    </Td>
+                    <Td className="whitespace-nowrap text-adm-muted">{owners.get(r.vin) || "Unassigned"}</Td>
                     <Td className="whitespace-nowrap">
                       {recallReview.has(r.vin) ? <StatusText tone="danger">Review</StatusText>
                         : rc === "ok" ? <span className="text-adm-muted">Current</span>
                         : rc === "dnd" ? <StatusText tone="danger">Do not drive</StatusText>
                         : <span className="text-adm-muted">Unknown</span>}
-                    </Td>
-                    <Td className="whitespace-nowrap">
-                      {lifecycleOf(r) === "RETAIL_READY" ? <StatusText tone="success">Retail ready</StatusText>
-                        : isReady(r) ? <StatusText tone="success">Ready</StatusText>
-                        : <span className="text-adm-muted">Not ready</span>}
-                    </Td>
-                    <Td className="whitespace-nowrap">
-                      {primary ? (
-                        <Button size="sm" variant="outline" onClick={primary.run} disabled={primary.busy}>
-                          {primary.busy ? "Working…" : primary.label}
-                        </Button>
-                      ) : bucketOf(r) === "ready" && r.deal_processed_at ? (
-                        <StatusText tone="success">Filed</StatusText>
-                      ) : (
-                        <Button size="sm" onClick={() => navigate(`/vehicle-file/${r.id}?tab=getready`)}>View</Button>
-                      )}
                     </Td>
                     <Td align="right">
                       <DropdownMenu>

@@ -4,9 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import {
-  ArrowLeft, Car, ChevronRight, Copy, ExternalLink, Globe,
+  ArrowLeft, Car, ChevronRight, Copy, ExternalLink, Globe, MoreHorizontal,
 } from "lucide-react";
 import { PageBody, LocalTabs, Button, LinkButton, StatusText, EmptyState, SkeletonBlock, type LocalTab } from "@/components/product";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { FactStrip } from "@/components/detail/parts";
 import { IdentityStrip, lifecycleFacts } from "@/components/vehicleFile/SubPageHeader";
 import { useRecallTask } from "@/hooks/useRecallTask";
@@ -294,9 +295,7 @@ const VehicleFile = () => {
                   </button>
                 </span>
                 {vehicle.trim ? <span className="text-adm-muted">{vehicle.trim}</span> : null}
-                <span className="text-adm-muted capitalize">{vehicle.condition || "unknown"}</span>
                 <span className="text-adm-muted">{vehicle.mileage != null ? `${vehicle.mileage.toLocaleString()} mi` : "Mileage not recorded"}</span>
-                <span className="font-semibold tabular-nums">{vehicle.price != null ? `$${vehicle.price.toLocaleString()}` : "Not priced"}</span>
               </div>
 
               <ul aria-label="Vehicle status" className="flex flex-wrap items-center gap-x-2 gap-y-1.5 pt-1">
@@ -312,9 +311,6 @@ const VehicleFile = () => {
             </div>
 
             <div className="flex flex-wrap gap-2 lg:shrink-0 lg:justify-end">
-              <Button onClick={copyLink} aria-label="Copy shopper link">
-                <Copy className="w-5 h-5" /> Copy link
-              </Button>
               {published ? (
                 <LinkButton to={viewUrl} variant={tab === "overview" ? "primary" : undefined} target="_blank" rel="noreferrer">
                   <ExternalLink className="w-5 h-5" /> View shopper page
@@ -324,6 +320,15 @@ const VehicleFile = () => {
                   <Globe className="w-5 h-5" /> {publishing ? "Publishing…" : "Publish to shopper portal"}
                 </Button>
               )}
+              <DropdownMenu>
+                <DropdownMenuTrigger aria-label="More actions" className="h-10 w-10 grid place-items-center rounded-[6px] border border-adm-border bg-adm-surface text-adm-ink hover:bg-adm-workspace">
+                  <MoreHorizontal className="w-5 h-5" aria-hidden="true" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={copyLink}>Copy shopper link</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={copyVin}>Copy VIN</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>

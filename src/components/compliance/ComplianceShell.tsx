@@ -98,9 +98,9 @@ export const ComplianceShell = ({ defaultSection }: { defaultSection: Compliance
   return (
     <PageBody width="wide">
       <PageHeader
-        scope={own ? <Link to="/compliance" className="text-adm-primary hover:underline">Compliance</Link> : undefined}
+        scope={section === "titles" ? <Link to="/compliance" className="text-adm-primary hover:underline">Compliance</Link> : undefined}
         title={own ? header.title : "Compliance"}
-        description={own ? header.description : "Monitor deal readiness, identify blockers, and manage regulatory requirements."}
+        description={section === "titles" ? header.description : own ? undefined : "Monitor deal readiness, identify blockers, and manage regulatory requirements."}
         actions={
           section === "titles" ? (
             <div role="note" className="flex max-w-[420px] items-start gap-3 rounded-[6px] border border-[#F3B4AE] bg-adm-danger-bg px-4 py-2.5 text-[13px] leading-[18px] text-adm-danger">

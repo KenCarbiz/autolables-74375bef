@@ -55,7 +55,8 @@ const PlatformMemberDetail = () => {
   if (loading) return null;
   if (!isAdmin) return null;
 
-  const tab = searchParams.get("tab") === "tenants" ? "tenants" : "entitlements";
+  const tabParam = searchParams.get("tab");
+  const tab = tabParam === "tenants" ? "tenants" : tabParam === "overview" ? "overview" : "entitlements";
   const base = `/platform-admin/members/${memberId}`;
   const crumbs = [{ label: "Platform Console", href: "/platform-admin?tab=members" }, { label: "Members", href: "/platform-admin?tab=members" }, { label: member ? memberLabel(member) ?? "Pending seat" : "Member" }];
 
@@ -133,6 +134,7 @@ const PlatformMemberDetail = () => {
         <LocalTabs
           label="Member sections"
           tabs={[
+            { key: "overview", label: "Overview", to: `${base}?tab=overview`, active: tab === "overview" },
             { key: "entitlements", label: "Entitlements", to: base, active: tab === "entitlements" },
             { key: "tenants", label: "Tenants", to: `${base}?tab=tenants`, active: tab === "tenants" },
             { key: "audit", label: "Audit", to: "/platform-admin?tab=audit", active: false },
@@ -140,7 +142,21 @@ const PlatformMemberDetail = () => {
         />
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px] items-start">
           <div className="min-w-0">
-            {tab === "entitlements" ? (
+            {tab === "overview" ? (
+              <Panel title="Member" titleSize="md" inset="sm">
+                <KeyValueList
+                  rows={[
+                    { label: "Email", value: <ValueOrUnknown value={memberLabel(member)} /> },
+                    { label: "Role", value: roleDisplayName(member.role) },
+                    { label: "Primary tenant", value: tenantName(member.tenant_id) },
+                    { label: "Seats", value: seats.length },
+                    { label: "Status", value: <StatusText tone={status.tone}>{status.label}</StatusText> },
+                    { label: "Invited", value: <ValueOrUnknown value={formatDate(member.invited_at)} /> },
+                    { label: "Accepted", value: <ValueOrUnknown value={member.accepted_at ? formatDate(member.accepted_at) : null} unknownLabel="Not accepted" /> },
+                  ]}
+                />
+              </Panel>
+            ) : tab === "entitlements" ? (
               <Panel title="Effective access" titleSize="md" inset="sm" description="Derived from the seat's role and each tenant's AutoLabels entitlement. Read only." flush>
                 <WorkTable caption="Effective access by tenant">
                   <thead>
@@ -185,7 +201,17 @@ const PlatformMemberDetail = () => {
           <aside className="flex flex-col gap-4" aria-label="Access change">
             <Panel title="Access change (draft)" titleSize="md" inset="sm">
               {!drafting ? (
-                <p className="text-[14px] leading-[20px] text-adm-muted">No change drafted. Review access change opens a role change for this seat; nothing is written until you apply it.</p>
+                <div className="space-y-3">
+                  <KeyValueList
+                    className="grid-cols-[1fr_auto]"
+                    rows={[
+                      { label: "Current", value: roleDisplayName(member.role) },
+                      { label: "Proposed", value: <span className="text-adm-muted">None drafted</span> },
+                      { label: "Affected tenant", value: tenantName(member.tenant_id) },
+                    ]}
+                  />
+                  <p className="text-[13px] leading-[18px] text-adm-muted">Review access change opens a role change for this seat. Nothing is written until you apply it.</p>
+                </div>
               ) : (
                 <div className="space-y-3 text-[14px] leading-[20px]">
                   <KeyValueList
@@ -218,6 +244,7 @@ const PlatformMemberDetail = () => {
                 </div>
               )}
             </Panel>
+            {tab !== "overview" && (
             <Panel title="Member" titleSize="md" inset="sm">
               <KeyValueList
                 className="grid-cols-[1fr_auto]"
@@ -229,6 +256,7 @@ const PlatformMemberDetail = () => {
                 ]}
               />
             </Panel>
+            )}
           </aside>
         </div>
       </PageBody>

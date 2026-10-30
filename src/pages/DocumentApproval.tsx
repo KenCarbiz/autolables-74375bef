@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { toast } from "sonner";
+import { Check, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import Seo from "@/components/Seo";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,7 +19,7 @@ import {
 import { fetchFiledDocumentAssets } from "@/hooks/useWindowSticker";
 import { freshFiledDocumentUrl, isSignedStorageUrl } from "@/lib/filedDocumentUrl";
 import { vehicleStockNumber } from "@/lib/vehicleStockNumber";
-import { Button, EmptyState, LinkButton, PageBody, PageHeader, Panel, SkeletonBlock, StatusText, Td, Th, WorkTable, type Tone } from "@/components/product";
+import { Button, EmptyState, LinkButton, LocalTabs, PageBody, PageHeader, Panel, SkeletonBlock, StatusText, type Tone } from "@/components/product";
 import { Crumbs, SummaryList, fmtDateTime } from "@/components/detail/parts";
 
 // /vehicle-file/:id/documents/:docId — one stored document version. Only the
@@ -57,6 +58,8 @@ interface VehicleBits {
 
 const DocumentApproval = () => {
   const { id = "", docId = "" } = useParams<{ id: string; docId: string }>();
+  const { hash } = useLocation();
+  const sectionHash = hash || "#preview";
   const { user, isAdmin } = useAuth();
   const { tenant } = useTenant();
   const { member } = useEntitlements();
@@ -184,17 +187,22 @@ const DocumentApproval = () => {
 
       <PageHeader
         title={tags}
-        description={`${vehicleLabel}${stock ? ` (Stock ${stock})` : ""}. Version ${doc.version}, generated ${fmtDateTime(doc.created_at)}.`}
-        actions={
-          <>
-            <LinkButton to={back}>Back to documents</LinkButton>
-            <Button onClick={() => void open(doc)} disabled={!storedUrl}>Open file</Button>
-          </>
-        }
+        description={`${vehicleLabel}${stock ? ` (Stock ${stock})` : ""} | Version ${doc.version} | ${fmtDateTime(doc.created_at)}`}
+        actions={<Button onClick={() => void open(doc)} disabled={!storedUrl}>Open file</Button>}
+      />
+
+      <LocalTabs
+        label="Document sections"
+        tabs={[
+          { key: "preview", label: "Preview", to: "#preview" },
+          { key: "details", label: "Details", to: "#details" },
+          { key: "requirements", label: "Approval requirements", to: "#requirements" },
+          { key: "history", label: "History", to: "#history" },
+        ].map((t) => ({ ...t, active: t.to === sectionHash }))}
       />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)_300px] lg:items-start">
-        <Panel title="Document preview" titleSize="sm" inset="sm">
+        <Panel title="Document preview" titleSize="sm" inset="sm" id="preview">
           {doc.png_url && !isSignedStorageUrl(doc.png_url) ? (
             <img src={doc.png_url} alt={`${label} version ${doc.version}`} className="w-full rounded-[4px] border border-adm-border" />
           ) : (
@@ -208,15 +216,13 @@ const DocumentApproval = () => {
         </Panel>
 
         <div className="flex flex-col gap-6 min-w-0">
-          <Panel title="Approval details" titleSize="sm" inset="sm">
+          <Panel title="Approval details" titleSize="sm" inset="sm" id="details">
             <SummaryList
               rows={[
                 { label: "Status", value: <StatusText tone={STATUS_TONE[doc.document_status] || "neutral"}>{meta.label}</StatusText> },
                 { label: "Version", value: doc.version },
                 { label: "Created", value: fmtDateTime(doc.created_at) },
                 { label: "Approved", value: doc.approved_at ? fmtDateTime(doc.approved_at) : "Not approved" },
-                { label: "Printed", value: doc.printed_at ? `${fmtDateTime(doc.printed_at)}${doc.print_count ? ` (${doc.print_count})` : ""}` : "Not printed" },
-                { label: "Published", value: doc.published_at ? fmtDateTime(doc.published_at) : "Not published" },
                 { label: "Vehicle", value: vehicleLabel },
                 { label: "VIN", value: <span className="font-mono">{vehicle?.vin || "Unknown"}</span> },
               ]}
@@ -224,15 +230,17 @@ const DocumentApproval = () => {
             {doc.rejection_reason && <p className="mt-2 text-[13px] leading-[18px] text-adm-danger">Rejected: {doc.rejection_reason}</p>}
           </Panel>
 
-          <Panel title="Approval requirements" titleSize="sm" inset="sm">
+          <Panel title="Approval requirements" titleSize="sm" inset="sm" id="requirements">
             <ul className="divide-y divide-adm-border">
               {requirements.map((r) => (
-                <li key={r.label} className="flex items-start justify-between gap-3 py-2 text-[14px] leading-[20px]">
+                <li key={r.label} className="flex items-start gap-3 py-2 text-[14px] leading-[20px]">
+                  {r.ok
+                    ? <Check className="mt-0.5 h-5 w-5 shrink-0 text-adm-success" aria-label="Met" />
+                    : <X className="mt-0.5 h-5 w-5 shrink-0 text-adm-warning" aria-label="Not met" />}
                   <span className="min-w-0">
                     <span className="block text-adm-ink">{r.label}</span>
                     <span className="block text-[13px] leading-[18px] text-adm-muted">{r.note}</span>
                   </span>
-                  <StatusText tone={r.ok ? "success" : "warning"}>{r.ok ? "Met" : "Not met"}</StatusText>
                 </li>
               ))}
             </ul>
@@ -265,25 +273,20 @@ const DocumentApproval = () => {
             </p>
           </Panel>
 
-          <Panel title="Approval history" titleSize="sm" inset="sm" flush>
-            <div className="px-4 pb-4">
-              <WorkTable caption="Versions of this document" minWidth={300}>
-                <thead>
-                  <tr><Th>Version</Th><Th>Status</Th><Th>Created</Th></tr>
-                </thead>
-                <tbody>
-                  {versions.map((v) => (
-                    <tr key={v.id}>
-                      <Td className="whitespace-nowrap font-semibold">
-                        {v.id === doc.id ? `v${v.version}` : <Link to={`/vehicle-file/${id}/documents/${v.id}`} className="text-adm-primary hover:underline">v{v.version}</Link>}
-                      </Td>
-                      <Td><StatusText tone={STATUS_TONE[v.document_status] || "neutral"}>{STATUS_META[v.document_status]?.label || v.document_status}</StatusText></Td>
-                      <Td className="whitespace-nowrap text-adm-muted">{v.created_at ? new Date(v.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "Unknown"}</Td>
-                    </tr>
-                  ))}
-                </tbody>
-              </WorkTable>
-            </div>
+          <Panel title="Approval history" titleSize="sm" inset="sm" id="history">
+            <ol className="divide-y divide-adm-border">
+              {versions.map((v) => (
+                <li key={v.id} className="py-2.5 text-[14px] leading-[20px]">
+                  <div className="flex items-center justify-between gap-3">
+                    {v.id === doc.id
+                      ? <span className="font-semibold text-adm-ink">Version {v.version}</span>
+                      : <Link to={`/vehicle-file/${id}/documents/${v.id}`} className="font-semibold text-adm-primary hover:underline">Version {v.version}</Link>}
+                    <StatusText tone={STATUS_TONE[v.document_status] || "neutral"}>{STATUS_META[v.document_status]?.label || v.document_status}</StatusText>
+                  </div>
+                  <p className="text-[13px] leading-[18px] text-adm-muted">{v.created_at ? fmtDateTime(v.created_at) : "Unknown"}</p>
+                </li>
+              ))}
+            </ol>
           </Panel>
         </div>
       </div>

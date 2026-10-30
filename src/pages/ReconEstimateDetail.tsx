@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { Car } from "lucide-react";
+import { Car, MoreHorizontal } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Seo from "@/components/Seo";
 import { supabase } from "@/integrations/supabase/client";
 import { useReconEstimates, type ReconLine, type ReconMessage } from "@/hooks/useReconEstimates";
@@ -163,7 +164,7 @@ const ReconEstimateDetail = () => {
 
   const linesTable = (
     <Panel flush>
-      <WorkTable caption="Itemized labor, parts and sublet" minWidth={720}>
+      <WorkTable caption="Itemized labor, parts and sublet" minWidth={600}>
         <thead>
           <tr>
             <Th className="w-10">#</Th>
@@ -174,6 +175,7 @@ const ReconEstimateDetail = () => {
             <Th align="right">Sublet</Th>
             <Th align="right">Total</Th>
             <Th>Status</Th>
+            <Th className="w-10"><span className="sr-only">Decide</span></Th>
           </tr>
         </thead>
         <tbody>
@@ -186,11 +188,11 @@ const ReconEstimateDetail = () => {
             return (
               <tr key={l.id}>
                 <Td className="text-adm-muted tabular-nums">{i + 1}</Td>
-                <Td className="min-w-[220px]">
+                <Td className="min-w-[200px]">
                   <p className="font-semibold text-adm-ink">{l.description}</p>
                   {l.vendor && <p className="text-[12px] leading-[18px] text-adm-muted">{l.vendor}</p>}
                   {l.approval_status === "declined" && l.decline_reason && <p className="text-[12px] leading-[18px] text-adm-danger">Declined: {l.decline_reason}</p>}
-                  {canAct && (declineFor === l.id ? (
+                  {canAct && declineFor === l.id && (
                     <div className="mt-2 flex min-w-[220px] flex-col gap-2">
                       <input autoFocus value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason for declining (required)" aria-label="Reason for declining" className="h-9 w-full rounded-md border border-adm-border bg-adm-surface px-3 text-[14px]" />
                       <div className="flex gap-2">
@@ -198,12 +200,7 @@ const ReconEstimateDetail = () => {
                         <Button size="sm" onClick={() => { setDeclineFor(null); setReason(""); }}>Cancel</Button>
                       </div>
                     </div>
-                  ) : (
-                    <div className="mt-1.5 flex gap-2">
-                      <Button size="sm" className="whitespace-nowrap" disabled={busy === l.id} onClick={() => decideLine(l.id, "approve")}>Approve</Button>
-                      <Button size="sm" variant="danger" className="whitespace-nowrap" onClick={() => setDeclineFor(l.id)}>Decline</Button>
-                    </div>
-                  ))}
+                  )}
                 </Td>
                 <Td className="capitalize whitespace-nowrap">{l.category || "Unknown"}</Td>
                 <Td align="right">{money(l.labor_cost)}</Td>
@@ -211,6 +208,19 @@ const ReconEstimateDetail = () => {
                 <Td align="right">{money(l.sublet_cost)}</Td>
                 <Td align="right" className="font-semibold">{money(l.line_total)}</Td>
                 <Td><StatusText tone={st.tone}>{st.label}</StatusText></Td>
+                <Td align="right">
+                  {canAct && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger aria-label={`Decide on ${l.description}`} className="rounded-[6px] p-1 text-adm-muted hover:bg-adm-workspace">
+                        <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem disabled={busy === l.id} onSelect={() => decideLine(l.id, "approve")}>Approve this item</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setDeclineFor(l.id)}>Decline this item</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </Td>
               </tr>
             );
           })}
@@ -279,7 +289,7 @@ const ReconEstimateDetail = () => {
   );
 
   const reviewPanel = (
-    <Panel title="Review estimate" titleSize="sm" inset="sm">
+    <Panel title="Review estimate" titleSize="sm" inset="sm" id="review-estimate">
       {staged && isManager ? (
         <div className="flex flex-col gap-2">
           <p className="text-[13px] leading-[18px] text-adm-muted">This estimate came from intake and has not been released to service.</p>
@@ -322,8 +332,6 @@ const ReconEstimateDetail = () => {
   return (
     <PageBody width="wide">
       <Seo title={`Recon estimate ${recId}`} description="One recon estimate: line items, evidence, history and the review decision." path={`/recon/estimates/${sel.id}`} />
-      <Crumbs items={[{ label: "Recon Approvals", to: "/recon" }, { label: recId }]} />
-
       <PageHeader
         title={
           <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -335,6 +343,7 @@ const ReconEstimateDetail = () => {
           <>
             {listing && <LinkButton to={`/vehicle-file/${listing.id}`}>View vehicle</LinkButton>}
             <Button onClick={() => printWorkOrder(sel, lines)} disabled={!detail}>Print work order</Button>
+            {canDecide && <Button variant="primary" onClick={() => document.getElementById("review-estimate")?.scrollIntoView({ behavior: "smooth", block: "start" })}>Review</Button>}
           </>
         }
       />
@@ -358,8 +367,9 @@ const ReconEstimateDetail = () => {
           dense
           rows={[
             { label: "Owner", value: ownerOf(sel.submitted_by) },
-                        { label: "Created", value: fmtDateTime(sel.created_at) },
+            { label: "Created", value: fmtDateTime(sel.created_at) },
             { label: "Age", value: ageOf(sel.created_at) },
+            ...(sel.notes ? [{ label: "Note", value: <span className="block max-w-[200px] truncate" title={sel.notes}>{sel.notes}</span> }] : []),
           ]}
         />
         <div className="border-t border-adm-border pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
@@ -370,8 +380,6 @@ const ReconEstimateDetail = () => {
           <p className="mt-1 text-[12px] leading-[18px] text-adm-muted">{ESTIMATE_STATE[sel.status]?.label || sel.status}{sel.sent_to_service_at ? ", sent to service" : ""}</p>
         </div>
       </section>
-
-      {sel.notes && <p className="text-[14px] leading-[20px] text-adm-muted">Submitter note: {sel.notes}</p>}
 
       <DetailLayout
         main={

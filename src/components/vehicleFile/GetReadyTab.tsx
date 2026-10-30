@@ -157,6 +157,7 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready, strip }: { vehicle: Veh
     <VehicleSubHeader
       vehicle={vehicle}
       section="Get ready"
+      crumbs={false}
       title="Vehicle get ready"
       description="Move this vehicle through each stage to become retail ready."
       strip={strip}
@@ -238,9 +239,7 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready, strip }: { vehicle: Veh
             {ready.checks.map((c) => (
               <li key={c.label} className="flex items-center justify-between gap-3 py-2 text-[14px] leading-[20px]">
                 <span className="inline-flex items-center gap-2 min-w-0">
-                  {c.ok
-                    ? <CheckCircle2 className="w-4 h-4 shrink-0 text-adm-success" aria-hidden="true" />
-                    : <AlertTriangle className={`w-4 h-4 shrink-0 ${c.blocks ? "text-adm-danger" : "text-adm-warning"}`} aria-hidden="true" />}
+                  <input type="checkbox" checked={c.ok} readOnly disabled aria-label={c.ok ? "Complete" : c.blocks ? "Open, blocks publish" : "Open"} className="h-4 w-4 shrink-0 accent-[#2457D6]" />
                   <span className="truncate">{c.label}</span>
                 </span>
                 <span className="text-[12px] leading-[18px] text-adm-muted shrink-0">

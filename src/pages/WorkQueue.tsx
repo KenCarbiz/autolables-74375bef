@@ -390,13 +390,12 @@ const WorkQueue = () => {
                 : undefined
             }
           >
-            <WorkTable caption="Work items" minWidth={880}>
+            <WorkTable caption="Work items" minWidth={820}>
               <thead>
                 <tr>
                   <Th>Age</Th>
                   <Th>Task</Th>
                   <Th>Vehicle</Th>
-                  <Th>Department</Th>
                   <Th>Owner</Th>
                   <Th>Due</Th>
                   <Th>Status</Th>
@@ -434,7 +433,7 @@ const ageLabel = (iso?: string | null): string => {
 function RowMenu({ children, label }: { children: ReactNode; label: string }) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger aria-label={label} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-adm-border text-adm-muted hover:bg-adm-workspace">
+      <DropdownMenuTrigger aria-label={label} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-adm-muted hover:bg-adm-workspace">
         <MoreHorizontal className="h-5 w-5" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">{children}</DropdownMenuContent>
@@ -460,12 +459,14 @@ function HumanTaskRow({ item, currentUserId, previews, onOpen, onUpdate }: {
   return (
     <tr className="h-14 hover:bg-adm-workspace">
       <Td className="whitespace-nowrap text-adm-muted">{ageLabel(item.created_at)}</Td>
-      <Td className="max-w-[250px] truncate font-semibold text-adm-ink">
-        {item.title}
-        {urgent && <StatusText tone="danger" className="ml-2">{item.priority}</StatusText>}
+      <Td className="max-w-[300px]">
+        <p className="truncate font-semibold text-adm-ink" title={item.title}>
+          {item.title}
+          {urgent && <StatusText tone="danger" className="ml-2">{item.priority}</StatusText>}
+        </p>
+        <p className="truncate text-[12px] leading-[16px] capitalize text-adm-muted">{(item.department || "inventory").replace(/_/g, " ")}</p>
       </Td>
-      <Td className="max-w-[180px] truncate">{vehicleLabel(item)}</Td>
-      <Td className="text-adm-muted capitalize truncate">{item.department || "inventory"}</Td>
+      <Td className="max-w-[260px] truncate"><span title={vehicleLabel(item)}>{vehicleLabel(item)}</span></Td>
       <Td className="text-adm-muted">{owner}</Td>
       <Td className="whitespace-nowrap">
         <span className={due.overdue ? "text-adm-danger" : "text-adm-muted"}>{due.text}</span>
@@ -501,9 +502,11 @@ function ExceptionRow({ item, onOpen, onDismiss }: {
   return (
     <tr className="h-14 hover:bg-adm-workspace" title={[copy.why, showDetail ? detail : ""].filter(Boolean).join(" ")}>
       <Td className="whitespace-nowrap text-adm-muted">{ageLabel(item.created_at)}</Td>
-      <Td className="max-w-[250px] truncate font-semibold text-adm-ink">{copy.label}</Td>
-      <Td className="max-w-[180px] truncate">{vehicleLabel(item)}{departed ? " (left the lot)" : ""}</Td>
-      <Td className="text-adm-muted">System</Td>
+      <Td className="max-w-[300px]">
+        <p className="truncate font-semibold text-adm-ink" title={copy.label}>{copy.label}</p>
+        <p className="text-[12px] leading-[16px] text-adm-muted">System</p>
+      </Td>
+      <Td className="max-w-[260px] truncate">{vehicleLabel(item)}{departed ? " (left the lot)" : ""}</Td>
       <Td className="text-adm-muted">System</Td>
       <Td className="whitespace-nowrap text-adm-muted">
         {item.created_at ? format(new Date(item.created_at), "MMM d, yyyy") : "Unknown"}

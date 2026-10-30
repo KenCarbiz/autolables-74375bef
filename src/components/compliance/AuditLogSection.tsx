@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { Button, Panel, QueryState, Td, Th, WorkTable } from "@/components/product";
+import { Button, Panel, QueryState, StatusText, Td, Th, WorkTable } from "@/components/product";
 import { activityLabel, entityKindLabel } from "@/lib/admin/integrations/activity";
 import { formatDateTime } from "./primitives";
 
@@ -35,6 +35,18 @@ const detailText = (r: AuditRow): string => {
   return (r.content_hash || r.row_hash || "").slice(0, 16) || "No details recorded";
 };
 
+const outcomeOf = (r: AuditRow): "Success" | "Failed" => {
+  const d = r.details;
+  const status = typeof d?.status === "string" ? d.status.toLowerCase() : "";
+  return d?.error || status === "failed" || status === "error" || /(^|[._])(fail|failed|error|denied|rejected)/.test(r.action) ? "Failed" : "Success";
+};
+
+const entityRef = (r: AuditRow): string => {
+  const vin = typeof r.details?.vin === "string" ? r.details.vin : "";
+  if (vin) return `#${vin.slice(-6)}`;
+  return r.entity_id ? `#${r.entity_id.replace(/-/g, "").slice(0, 8)}` : "";
+};
+
 const FilterField = ({ label, children }: { label: string; children: React.ReactNode }) => (
   <label className="flex min-w-[140px] flex-1 flex-col gap-1 text-[13px] leading-[18px] text-adm-ink">
     {label}
@@ -47,8 +59,8 @@ export const AuditLogSection = ({ tenantId }: { tenantId: string | null }) => {
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [days, setDays] = useState(30);
-  const [draft, setDraft] = useState({ days: 30, actor: "all", action: "all", entity: "all" });
-  const [applied, setApplied] = useState({ actor: "all", action: "all", entity: "all" });
+  const [draft, setDraft] = useState({ days: 30, actor: "all", action: "all", entity: "all", outcome: "all" });
+  const [applied, setApplied] = useState({ actor: "all", action: "all", entity: "all", outcome: "all" });
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState<string | null>(null);
@@ -93,7 +105,8 @@ export const AuditLogSection = ({ tenantId }: { tenantId: string | null }) => {
         (r) =>
           (applied.actor === "all" || (r.user_email || "System") === applied.actor) &&
           (applied.action === "all" || r.action === applied.action) &&
-          (applied.entity === "all" || r.entity_type === applied.entity),
+          (applied.entity === "all" || r.entity_type === applied.entity) &&
+          (applied.outcome === "all" || outcomeOf(r) === applied.outcome),
       ),
     [rows, applied],
   );
@@ -105,7 +118,7 @@ export const AuditLogSection = ({ tenantId }: { tenantId: string | null }) => {
 
   const apply = () => {
     setDays(draft.days);
-    setApplied({ actor: draft.actor, action: draft.action, entity: draft.entity });
+    setApplied({ actor: draft.actor, action: draft.action, entity: draft.entity, outcome: draft.outcome });
     setPage(1);
   };
 
@@ -136,6 +149,13 @@ export const AuditLogSection = ({ tenantId }: { tenantId: string | null }) => {
               {options.entities.map((a) => <option key={a} value={a}>{entityKindLabel(a)}</option>)}
             </select>
           </FilterField>
+          <FilterField label="Outcome">
+            <select className={selectCls} value={draft.outcome} onChange={(e) => setDraft({ ...draft, outcome: e.target.value })}>
+              <option value="all">All</option>
+              <option value="Success">Success</option>
+              <option value="Failed">Failed</option>
+            </select>
+          </FilterField>
           <div className="flex items-center gap-4">
             <span className="whitespace-nowrap text-[13px] leading-[18px] text-adm-muted">{loading ? "Loading events" : `${rows.length.toLocaleString()} events (${filtered.length.toLocaleString()} after filters)`}</span>
             <Button variant="primary" onClick={apply}>Apply filters</Button>
@@ -158,6 +178,7 @@ export const AuditLogSection = ({ tenantId }: { tenantId: string | null }) => {
                 <Th>Actor</Th>
                 <Th>Action</Th>
                 <Th>Entity</Th>
+                <Th>Outcome</Th>
                 <Th>Details</Th>
                 <Th><span className="sr-only">Expand</span></Th>
               </tr>
@@ -167,10 +188,11 @@ export const AuditLogSection = ({ tenantId }: { tenantId: string | null }) => {
                 <Fragment key={r.id}>
                   <tr>
                     <Td className="whitespace-nowrap text-adm-muted">{formatDateTime(r.created_at)}</Td>
-                    <Td className="max-w-[200px] truncate">{r.user_email || "System"}</Td>
+                    <Td className="max-w-[170px] truncate">{r.user_email || "System"}</Td>
                     <Td className="whitespace-nowrap">{activityLabel(r.action)}</Td>
-                    <Td className="max-w-[200px] truncate">{entityKindLabel(r.entity_type)}</Td>
-                    <Td className="max-w-[280px] truncate text-adm-muted">{detailText(r)}</Td>
+                    <Td className="max-w-[200px] truncate">{entityKindLabel(r.entity_type)} <span className="font-mono text-[13px] text-adm-muted">{entityRef(r)}</span></Td>
+                    <Td className="whitespace-nowrap"><StatusText tone={outcomeOf(r) === "Failed" ? "danger" : "success"}>{outcomeOf(r)}</StatusText></Td>
+                    <Td className="max-w-[220px] truncate text-adm-muted">{detailText(r)}</Td>
                     <Td align="right">
                       <button type="button" aria-expanded={open === r.id} aria-label="Show event detail" onClick={() => setOpen(open === r.id ? null : r.id)} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-adm-primary hover:bg-adm-selected">
                         <ChevronDown className={`h-5 w-5 transition-transform ${open === r.id ? "rotate-180" : ""}`} aria-hidden="true" />
@@ -179,7 +201,7 @@ export const AuditLogSection = ({ tenantId }: { tenantId: string | null }) => {
                   </tr>
                   {open === r.id && (
                     <tr>
-                      <td colSpan={6} className="border-b border-adm-border bg-adm-workspace px-3 py-3 text-[13px] leading-[18px] text-adm-muted">
+                      <td colSpan={7} className="border-b border-adm-border bg-adm-workspace px-3 py-3 text-[13px] leading-[18px] text-adm-muted">
                         <p>Record reference <span className="font-mono text-adm-ink">{r.entity_id || "Unknown"}</span></p>
                         <p>Hash <span className="font-mono text-adm-ink">{r.content_hash || r.row_hash || "Unknown"}</span></p>
                       </td>

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { MoreHorizontal, RefreshCw, Search } from "lucide-react";
+import { MoreHorizontal, Search } from "lucide-react";
 import { toast } from "sonner";
 import Seo from "@/components/Seo";
 import { useSmsDelivery } from "@/hooks/useSmsDelivery";
@@ -32,9 +32,10 @@ import {
 // the SB 766 return window, and price integrity is the server-side
 // price_verification_status that gates signing.
 
-type DealTab = "drafts" | "out_for_signature" | "signed" | "delivered" | "returns";
+type DealTab = "all" | "drafts" | "out_for_signature" | "signed" | "delivered" | "returns";
 
 const TAB_LABEL: Record<DealTab, string> = {
+  all: "All",
   drafts: "Drafts",
   out_for_signature: "Out for signature",
   signed: "Signed",
@@ -43,6 +44,7 @@ const TAB_LABEL: Record<DealTab, string> = {
 };
 
 const TAB_EMPTY: Record<DealTab, string> = {
+  all: "No deals yet. A deal starts when an addendum is created for a vehicle.",
   drafts: "No draft deals. A deal starts here when an addendum is created and stays until the price verifies and it is sent for signature.",
   out_for_signature: "No deals are waiting on a signature.",
   signed: "No signed deals are waiting on delivery.",
@@ -51,6 +53,7 @@ const TAB_EMPTY: Record<DealTab, string> = {
 };
 
 const inTab = (deal: DealEntry, tab: DealTab): boolean => {
+  if (tab === "all") return true;
   if (tab === "returns") return !!deal.returnInfo;
   if (tab === "drafts") return deal.state === "draft";
   if (tab === "out_for_signature") return deal.state === "out_for_signature";
@@ -69,7 +72,7 @@ const Deals = () => {
   // Lifecycle view and search live in the URL so opening a deal and returning keeps them.
   const [searchParams, setSearchParams] = useSearchParams();
   const stateParam = searchParams.get("state");
-  const tab: DealTab = stateParam && stateParam in TAB_LABEL ? (stateParam as DealTab) : "out_for_signature";
+  const tab: DealTab = stateParam && stateParam in TAB_LABEL ? (stateParam as DealTab) : "all";
   const q = searchParams.get("q") ?? "";
   const setQ = (v: string) => {
     const n = new URLSearchParams(searchParams);
@@ -151,11 +154,6 @@ const Deals = () => {
       <PageHeader
         title="Deals"
         description="Every deal, its signature state and what it needs next."
-        actions={
-          <Button onClick={refetch}>
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" /> Refresh
-          </Button>
-        }
       />
 
       {error && (
@@ -200,15 +198,15 @@ const Deals = () => {
             <table className="w-full table-fixed text-left">
               <thead className="bg-adm-workspace">
                 <tr className="text-[12px] leading-[18px] text-adm-muted">
-                  <th className="font-semibold px-4 py-2.5 w-[9%]">Stock #</th>
-                  <th className="font-semibold py-2.5 w-[19%]">Vehicle</th>
+                  <th className="font-semibold px-4 py-2.5 w-[7%]">Stock #</th>
+                  <th className="font-semibold py-2.5 w-[24%]">Vehicle</th>
                   <th className="font-semibold py-2.5 w-[12%]">Customer</th>
-                  <th className="font-semibold py-2.5 w-[9%] text-right pr-4">Amount</th>
+                  <th className="font-semibold py-2.5 w-[8%] text-right pr-4">Amount</th>
                   <th className="font-semibold py-2.5 w-[13%]">Document state</th>
-                  <th className="font-semibold py-2.5 w-[13%]">Price integrity</th>
-                  <th className="font-semibold py-2.5 pl-3 w-[6%]">Age</th>
-                  <th className="font-semibold py-2.5 w-[14%]">Next action</th>
-                  <th className="font-semibold py-2.5 pr-3 w-[5%]"><span className="sr-only">Actions</span></th>
+                  <th className="font-semibold py-2.5 w-[12%]">Price integrity</th>
+                  <th className="font-semibold py-2.5 pl-3 w-[5%]">Age</th>
+                  <th className="font-semibold py-2.5 w-[15%]">Next action</th>
+                  <th className="font-semibold py-2.5 pr-3 w-[4%]"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody>

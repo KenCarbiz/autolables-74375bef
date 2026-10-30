@@ -10,7 +10,7 @@ const TIER_LABEL: Record<PlanTier, string> = {
 };
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ArrowDown, ArrowUp, Building2, Search, Plus, X, Database } from "lucide-react";
 import { AdminButton, AdminCard, AdminTable, KeyValueList, StatusChip as StatusText, Td, Th } from "@/components/admin/v2/primitives";
 import { TablePagination, useSortAndPaginate, toCsv, downloadCsv } from "./tablePrimitives";
@@ -27,7 +27,8 @@ export const PlatformTenants = () => {
   const { tenants, createTenant, marketcheck, setTenantTier, saveMarketcheckConfig, clearSyncedInventory, runMarketcheckNow, entitlements } = useAdminPlatform();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
-  const [creating, setCreating] = useState(false);
+  const [searchParams] = useSearchParams();
+  const [creating, setCreating] = useState(searchParams.get("new") === "1");
   const [editing, setEditing] = useState<TenantSummary | null>(null);
   const [savingTier, setSavingTier] = useState<string | null>(null);
 
@@ -145,13 +146,6 @@ export const PlatformTenants = () => {
             <option value="inactive">Suspended only</option>
           </select>
         </div>
-        <div className="flex items-center gap-2">
-          <AdminButton onClick={() => setCreating(true)} title="Search Autocurb and import a dealer">Import from Autocurb</AdminButton>
-          <AdminButton variant="primary" onClick={() => setCreating(true)}>
-            <Plus className="w-5 h-5" aria-hidden="true" />
-            Add tenant
-          </AdminButton>
-        </div>
       </div>
 
       {creating && (
@@ -233,17 +227,7 @@ export const PlatformTenants = () => {
                     </Td>
                     <Td>
                       <div className="flex items-center gap-2">
-                        <select
-                          value={current}
-                          disabled={savingTier === t.id}
-                          onChange={(e) => changeTier(t, e.target.value as PlanTier)}
-                          aria-label={`Plan for ${t.name}`}
-                          className="h-8 w-[124px] rounded-md border border-adm-border bg-adm-surface px-1.5 text-[13px] text-adm-ink disabled:opacity-50"
-                        >
-                          <option value="essential">Essential</option>
-                          <option value="unlimited">Unlimited</option>
-                          <option value="compliance_pro">Compliance Pro</option>
-                        </select>
+                        <span className="whitespace-nowrap">{TIER_LABEL[current] ?? current}</span>
                         {mc?.allowed && (
                           <span title={`MarketCheck scrape ${mc.enabled ? "on" : "granted, dealer not enabled yet"}${mc.last_run_at ? ` · last run ${formatDate(mc.last_run_at)}` : ""}`} className={mc.enabled ? "text-adm-success" : "text-adm-warning"}>
                             <Database className="w-5 h-5" aria-hidden="true" />

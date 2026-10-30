@@ -133,14 +133,17 @@ const AppShell = ({ children }: AppShellProps) => {
   // sentinel is not a real dealer.
   const realTenant = tenant && tenant.id !== "house" ? tenant : null;
   const settingsDealerName = settings.dealer_name && settings.dealer_name !== "Your Dealership" ? settings.dealer_name : "";
-  const rooftopGroup = realTenant
+  const onPlatformScreen = isAdmin && location.pathname.startsWith("/platform-admin");
+  const rooftopGroup = onPlatformScreen
+    ? PLATFORM_LABEL
+    : realTenant
     ? (realTenant.name || "").trim() || settingsDealerName || currentStore?.name || ""
     : isAdmin ? PLATFORM_LABEL : "";
-  const rooftopStore = realTenant && currentStore?.name && currentStore.name !== rooftopGroup ? currentStore.name : "";
+  const rooftopStore = !onPlatformScreen && realTenant && currentStore?.name && currentStore.name !== rooftopGroup ? currentStore.name : "";
   // A rooftop's city is its own. The dealership's address stands in only for
   // the one store synthesized from the tenant (TenantContext), or no store.
   const usesDealershipAddress = !currentStore || (!!realTenant && currentStore.id === realTenant.id);
-  const rooftopLocation = realTenant
+  const rooftopLocation = realTenant && !onPlatformScreen
     ? (usesDealershipAddress ? [settings.dealer_city, settings.dealer_state] : [currentStore?.city, currentStore?.state])
         .map((part) => (part || "").trim())
         .filter(Boolean)
@@ -635,7 +638,7 @@ const AppShell = ({ children }: AppShellProps) => {
             groupName={rooftopGroup}
             storeLocation={rooftopLocation}
             storeName={rooftopStore}
-            renderRooftopMenu={stores.length > 1 ? renderRooftopMenu : undefined}
+            renderRooftopMenu={stores.length > 1 && !onPlatformScreen ? renderRooftopMenu : undefined}
             onOpenSearch={() => setPaletteOpen(true)}
             searchLabel={searchLabel}
             notificationCount={unreadNotifs}

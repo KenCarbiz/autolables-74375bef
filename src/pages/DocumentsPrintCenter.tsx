@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   AlertTriangle, ArrowRight, Building2, Car, FileCheck, FileLock, FileSearch,
@@ -54,11 +54,19 @@ export default function DocumentsPrintCenter() {
   const [busyRow, setBusyRow] = useState<{ id: string; kind: "reprint" | "generate" } | null>(null);
   const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ id: string; row: DocRow; trigger: HTMLElement } | null>(null);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const seeded = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!data || seeded.current === data.vehicle.id) return;
+    seeded.current = data.vehicle.id;
+    setPicked(new Set(data.documents.filter((d) => d.kind === "doc" && d.printStatus.label !== "Blocked").map((d) => d.id)));
+  }, [data]);
 
   const runPrint = async (which: "packet" | "stock") => {
     setBusy(which);
     try {
-      const res = which === "packet" ? await printCompletePacket() : await printByStock();
+      const res = which === "packet" ? await printCompletePacket(Array.from(picked)) : await printByStock();
       // Never claim a print job that the hook did not confirm.
       if (!res.ok) { toast.error(res.error || "Print job could not be created"); return; }
       // The packet opens a print sheet and only files the print record once the
@@ -219,7 +227,9 @@ export default function DocumentsPrintCenter() {
     ? "Waiting for the print confirmation in the packet tab."
     : busy
       ? "A print job is already running."
-      : packetBlockedReason;
+      : picked.size === 0
+        ? "Select at least one document to print."
+        : packetBlockedReason;
   // The two conditions printByStock itself refuses on, quoted from the same
   // guards, so the button is dead here instead of returning a red toast.
   const stockReason = busy
@@ -287,6 +297,7 @@ export default function DocumentsPrintCenter() {
               <WorkTable className="[&_th]:px-2 [&_td]:px-2" caption="Documents for this vehicle" minWidth={700}>
                 <thead>
                   <tr>
+                    <Th className="w-10"><span className="sr-only">Select</span></Th>
                     <Th>Document</Th>
                     <Th>Version</Th>
                     <Th className="whitespace-nowrap">Internal status</Th>
@@ -302,6 +313,17 @@ export default function DocumentsPrintCenter() {
                     const generating = busyRow?.id === d.id && busyRow.kind === "generate";
                     return (
                       <tr key={d.id} className={`h-14 cursor-pointer ${previewDoc?.id === d.id ? "bg-adm-selected" : "hover:bg-adm-workspace"}`} onClick={() => setSelectedDoc(d.id)}>
+                        <Td className="w-10" >
+                          <input
+                            type="checkbox"
+                            aria-label={`Select ${d.label} for the print bundle`}
+                            checked={picked.has(d.id)}
+                            disabled={d.kind !== "doc"}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => setPicked((prev) => { const n = new Set(prev); if (e.target.checked) n.add(d.id); else n.delete(d.id); return n; })}
+                            className="h-4 w-4 accent-[#2457D6]"
+                          />
+                        </Td>
                         <Td className="max-w-[190px]">
                           <span className="inline-flex max-w-full items-center gap-2">
                             <span className="truncate text-[14px] font-semibold text-adm-ink">{d.label}</span>
@@ -360,7 +382,7 @@ export default function DocumentsPrintCenter() {
                 </tbody>
               </WorkTable>
               <p className="border-t border-adm-border px-4 py-3 text-[13px] leading-[18px] text-adm-muted">
-                {docCount} documents · {counts.ready} ready · {counts.blocked} blocked · {counts.customerVisible} shown in the Passport
+                {picked.size} of {docCount} documents selected · {counts.ready} ready · {counts.blocked} blocked · {counts.customerVisible} shown in the Passport
               </p>
             </Panel>
           )
@@ -388,15 +410,15 @@ export default function DocumentsPrintCenter() {
               ) : (
                 <p className="text-[14px] leading-[20px] text-adm-muted">Select a document to preview it.</p>
               )}
-              <div className="mt-3 border-t border-adm-border pt-3">
+              <div className="mt-3 flex flex-col gap-3 border-t border-adm-border pt-3">
                 <CommandAction
                   newTab
+                  variant="link"
                   href={passportHref ?? undefined}
-                  disabledReason={passportHref ? null : "This vehicle has no published Passport yet."}
-                  className="w-full"
-                  wrapperClassName="flex w-full">
+                  disabledReason={passportHref ? null : "This vehicle has no published Passport yet."}>
                   Open Passport View
                 </CommandAction>
+                {printAction}
               </div>
             </Panel>
 
@@ -449,6 +471,5 @@ export default function DocumentsPrintCenter() {
         />
       )}
     </>,
-    printAction,
   );
 }
