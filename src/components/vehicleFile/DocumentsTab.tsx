@@ -33,6 +33,16 @@ const SAFETY_FORM: Record<string, string> = {
   MO: "Missouri safety inspection",
 };
 
+// Group names for the register, from the real document type. Private
+// documents are only grouped here; their contents are never rendered.
+const GROUP_ORDER = ["Sales & Disclosure", "Title & Registration", "Stickers & Build Record", "Other"] as const;
+const groupForType = (type: string | undefined, name: string | undefined): (typeof GROUP_ORDER)[number] => {
+  const t = `${type || ""} ${name || ""}`.toLowerCase();
+  if (/title|registration|mco|odometer|lien|plate/.test(t)) return "Title & Registration";
+  if (/buyer|guide|k-?208|inspection|addendum|disclosure|warranty|contract|window|sticker|monroney/.test(t)) return "Sales & Disclosure";
+  return "Other";
+};
+
 interface RegisterRow {
   key: string;
   group: string;
@@ -55,18 +65,20 @@ const DocumentRegister = ({ vehicle }: { vehicle: VehicleRow }) => {
   const oem = (vehicle as unknown as { oem_sticker_url?: string | null }).oem_sticker_url ?? null;
 
   const rows: RegisterRow[] = [
-    { key: "oem", group: "Stickers and build record", name: "OEM window sticker", status: oem ? "On file" : "Not on file", tone: oem ? "success" : "neutral", packet: packetFor("oem_sticker"), href: oem ?? undefined },
+    { key: "oem", group: "Stickers & Build Record", name: "OEM window sticker", status: oem ? "On file" : "Not on file", tone: oem ? "success" : "neutral", packet: packetFor("oem_sticker"), href: oem ?? undefined },
   ];
   if (isUsed) {
     const docs = record ? dealDocStatus(record) : null;
     rows.push(
-      { key: "bg", group: "Forms", name: "FTC Buyers Guide", status: loading ? "Reading" : docs?.buyersGuide ? `Filed${record?.buyersGuide?.version != null ? ` (v${record.buyersGuide.version})` : ""}` : "Not filed", tone: docs?.buyersGuide ? "success" : "warning", packet: "Internal record" },
-      { key: "k208", group: "Forms", name: "Safety inspection", status: loading ? "Reading" : docs?.k208 ? "Executed" : "Not executed", tone: docs?.k208 ? "success" : "warning", packet: "Internal record" },
+      { key: "bg", group: "Sales & Disclosure", name: "FTC Buyers Guide", status: loading ? "Reading" : docs?.buyersGuide ? `Filed${record?.buyersGuide?.version != null ? ` (v${record.buyersGuide.version})` : ""}` : "Not filed", tone: docs?.buyersGuide ? "success" : "warning", packet: "Internal record" },
+      { key: "k208", group: "Sales & Disclosure", name: "Safety inspection", status: loading ? "Reading" : docs?.k208 ? "Executed" : "Not executed", tone: docs?.k208 ? "success" : "warning", packet: "Internal record" },
     );
   }
   (vehicle.documents || []).forEach((d, i) => {
-    rows.push({ key: `up-${i}`, group: "Uploaded files", name: d.name || d.type || "Document", status: "On file", tone: "success", packet: packetFor(d.type), href: d.url });
+    rows.push({ key: `up-${i}`, group: groupForType(d.type, d.name), name: d.name || d.type || "Document", status: "On file", tone: "success", packet: packetFor(d.type), href: d.url });
   });
+
+  const grouped = GROUP_ORDER.map((g) => ({ g, items: rows.filter((r) => r.group === g) })).filter((x) => x.items.length > 0);
 
   return (
     <Card title="Document register">
@@ -75,7 +87,9 @@ const DocumentRegister = ({ vehicle }: { vehicle: VehicleRow }) => {
           <tr><Th>Document</Th><Th>Group</Th><Th>Status</Th><Th>Customer packet</Th><Th align="right">Action</Th></tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
+          {grouped.flatMap(({ g, items }) => [
+            <tr key={`g-${g}`}><td colSpan={5} className="bg-adm-workspace px-3 py-2 text-[12px] leading-[18px] font-semibold text-adm-muted border-b border-adm-border">{g} ({items.length})</td></tr>,
+            ...items.map((r) => (
             <tr key={r.key}>
               <Td className="font-semibold">{r.name}</Td>
               <Td className="text-adm-muted">{r.group}</Td>
@@ -85,7 +99,8 @@ const DocumentRegister = ({ vehicle }: { vehicle: VehicleRow }) => {
                 {r.href ? <a className="text-adm-primary underline" href={r.href} target="_blank" rel="noreferrer">Open</a> : <span className="text-adm-muted">-</span>}
               </Td>
             </tr>
-          ))}
+            )),
+          ])}
         </tbody>
       </WorkTable>
       <p className="text-[12px] leading-[18px] text-adm-muted">

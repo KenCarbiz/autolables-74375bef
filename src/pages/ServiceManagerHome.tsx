@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SERVICE_FLOOR_STATES, stateLabel, type ServiceFloorState } from "@/lib/lifecycle/states";
+import { PageHeader } from "@/components/product";
 
 // /service-manager — the service manager's home. Physical work only: what is
 // unassigned, what is open on the floor, what is waiting on someone else, and
@@ -378,17 +379,8 @@ export default function ServiceManagerHome() {
   ];
 
   return (
-    <div className="max-w-[1500px] mx-auto p-4 md:p-6 space-y-6">
-      <header>
-        <div className="flex items-center gap-2">
-          <Wrench className="w-5 h-5 text-primary" aria-hidden="true" />
-          <h1 className="text-al-page font-display text-foreground">Service Manager</h1>
-        </div>
-        <p className="text-al-body text-muted-foreground mt-0.5">
-          Physical work in the shop right now. {metrics.inGetReady} used {metrics.inGetReady === 1 ? "vehicle is" : "vehicles are"} inside
-          get ready &middot; {metrics.getReadyService} at the service stage &middot; {metrics.retailReady} retail ready.
-        </p>
-      </header>
+    <div className="px-4 py-4 sm:px-6 sm:py-6 flex flex-col gap-6 text-adm-ink max-w-[1600px]">
+      <PageHeader title="Service Manager" description={<>Physical work in the shop right now. {metrics.inGetReady} used {metrics.inGetReady === 1 ? "vehicle is" : "vehicles are"} inside get ready | {metrics.getReadyService} at the service stage | {metrics.retailReady} retail ready.</>} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {tiles.map((t) => (

@@ -12,6 +12,7 @@ import { deriveManagerAlerts, filterAcknowledged, type ManagerAlert } from "@/li
 import { hasDealerCapability, type DealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import EmptyState from "@/components/ui/empty-state";
 import { ArrowRight, Car, FileSignature, Phone, PhoneOff, Scale, Users } from "lucide-react";
+import { PageHeader } from "@/components/product";
 
 const WINDOW_DAYS = 21;
 
@@ -259,17 +260,8 @@ const SalesManagerHome = () => {
     slug ? `/v/${slug}` : listingId ? `/vin-command/${listingId}` : "/inventory";
 
   return (
-    <div className="p-4 lg:p-6 max-w-[1400px] mx-auto space-y-6">
-      <header>
-        <p className="text-al-meta font-bold uppercase tracking-[0.18em] text-muted-foreground">
-          {currentStore?.name || tenant?.name || "Your dealership"} · Sales desk
-        </p>
-        <h1 className="font-display text-al-page text-foreground mt-1">Customer opportunities</h1>
-        <p className="text-al-body text-muted-foreground mt-1.5">
-          Shoppers who acted on a vehicle in the last {WINDOW_DAYS} days, and leads nobody has worked yet.
-          Every line is something a customer did — no scores, no predictions.
-        </p>
-      </header>
+    <div className="px-4 py-4 sm:px-6 sm:py-6 flex flex-col gap-6 text-adm-ink max-w-[1600px]">
+      <PageHeader title="Customer opportunities" scope={`${currentStore?.name || tenant?.name || "Your dealership"} | Sales desk`} description={<>Shoppers who acted on a vehicle in the last {WINDOW_DAYS} days, and leads nobody has worked yet. Every line is something a customer did: no scores, no predictions.</>} />
 
       <section className="space-y-3">
         {isLoading || leadsLoading ? (

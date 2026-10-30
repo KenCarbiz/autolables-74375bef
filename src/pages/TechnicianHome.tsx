@@ -13,6 +13,7 @@ import {
 } from "@/components/command/CommandPrimitives";
 import { Car, ClipboardList, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/product";
 
 // The technician's own bench. Tablet-first: one card per vehicle with a single
 // primary action, because a phone or shop tablet cannot work a dense table.
@@ -352,20 +353,8 @@ export default function TechnicianHome() {
   }
 
   return (
-    <div className="max-w-[1100px] mx-auto p-4 md:p-6 space-y-5">
-      <header>
-        <div className="flex items-center gap-2">
-          <Wrench className="w-5 h-5 text-primary" aria-hidden="true" />
-          <h1 className="text-al-page font-display text-foreground">My service work</h1>
-        </div>
-        <p className="text-al-body text-muted-foreground mt-0.5">
-          {counts.assigned + counts.in_progress + counts.reinspect === 0
-            ? "Nothing is open on your bench right now."
-            : `${counts.assigned + counts.in_progress + counts.reinspect} ${counts.assigned + counts.in_progress + counts.reinspect === 1 ? "vehicle needs" : "vehicles need"} you.`}
-          {" "}
-          {metrics.getReadyService} at the service stage across the shop.
-        </p>
-      </header>
+    <div className="px-4 py-4 sm:px-6 sm:py-6 flex flex-col gap-6 text-adm-ink max-w-[1600px]">
+      <PageHeader title="My service work" description={<>{counts.assigned + counts.in_progress + counts.reinspect === 0 ? "Nothing is open on your bench right now." : `${counts.assigned + counts.in_progress + counts.reinspect} ${counts.assigned + counts.in_progress + counts.reinspect === 1 ? "vehicle needs" : "vehicles need"} you.`} {metrics.getReadyService} at the service stage across the shop.</>} />
 
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 md:mx-0 md:px-0">
         {TABS.map((t) => (
