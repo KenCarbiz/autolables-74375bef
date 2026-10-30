@@ -78,7 +78,7 @@ export default {
         // Scoped to the Admin area by usage; never applied to customer pages.
         adm: {
           sidebar: "#142338",
-          workspace: "#F4F7FB",
+          workspace: "#F5F6F8",
           surface: "#FFFFFF",
           primary: "#2457D6",
           "primary-hover": "#1D46AE",
@@ -105,12 +105,17 @@ export default {
         },
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        // Each step reads an --al-r-* override first. Only the dealer and
+        // platform surfaces set those (src/styles/national-product.css), so
+        // customer, public and printed pages keep the ladder below.
+        lg: "var(--al-r-lg, var(--radius))",
+        md: "var(--al-r-md, calc(var(--radius) - 2px))",
+        sm: "var(--al-r-sm, calc(var(--radius) - 4px))",
         // Wave 2 scale — Apple/Tesla radius ladder
-        "xl": "24px",
-        "hero": "28px",
+        "xl": "var(--al-r-xl, 24px)",
+        "2xl": "var(--al-r-2xl, 1rem)",
+        "3xl": "var(--al-r-3xl, 1.5rem)",
+        "hero": "var(--al-r-hero, 28px)",
       },
       transitionDuration: {
         press: "var(--al-motion-press)",

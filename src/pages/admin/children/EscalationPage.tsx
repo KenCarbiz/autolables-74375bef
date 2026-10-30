@@ -458,7 +458,7 @@ export default function EscalationPage() {
 
           <div className="space-y-[9px]">
             <AdminCard inset="sm" title={cardTitle("Delivery states")} description="Possible states when sending an escalation notification." headerClassName="pt-3" bodyClassName="pt-[11px] pb-[15px]">
-              <ul data-landmark="delivery-states" className="rounded-[10px] border border-adm-border divide-y divide-adm-border">
+              <ul data-landmark="delivery-states" className="rounded-[6px] border border-adm-border divide-y divide-adm-border">
                 {DELIVERY_STATES.map((s, i) => (
                   <li key={s.title} className={cn("flex items-center gap-[22px] px-[14px]", STATE_ROW_PAD[i])}>
                     <span className="flex-shrink-0" aria-hidden="true">{s.mark}</span>

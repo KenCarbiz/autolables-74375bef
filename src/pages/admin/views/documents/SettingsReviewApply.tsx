@@ -306,11 +306,11 @@ export function SettingsReviewDialog<T extends object>({ review, title, descript
           </AdminTable>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="rounded-[10px] border border-adm-border px-4 py-3">
+            <div className="rounded-[6px] border border-adm-border px-4 py-3">
               <p className="text-[12px] leading-[18px] text-adm-muted">Active vehicles that follow the policy going forward</p>
               <p className="text-[20px] leading-[28px] font-bold text-adm-ink tabular-nums">{activeLabel}</p>
             </div>
-            <div className="rounded-[10px] border border-adm-border px-4 py-3">
+            <div className="rounded-[6px] border border-adm-border px-4 py-3">
               <p className="text-[12px] leading-[18px] text-adm-muted">Policy version at review</p>
               <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{versionLabel(versionCheck, impact?.version, computing)}</p>
             </div>

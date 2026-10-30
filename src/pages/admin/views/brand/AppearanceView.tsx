@@ -25,10 +25,10 @@ export default function AppearanceView() {
 
           <AdminCard title="Logo on dark and light surfaces" description="Your logo is never stretched; it is fitted inside the space the surface allows.">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="rounded-[10px] bg-adm-sidebar h-[96px] flex items-center justify-center px-6">
+              <div className="rounded-[6px] bg-adm-sidebar h-[96px] flex items-center justify-center px-6">
                 {logo ? <img src={logo} alt="Dealership logo on a dark surface" className="max-h-10 max-w-full object-contain" /> : <img src={wordmarkReverse} alt="AutoLabels wordmark placeholder on a dark surface" className="h-6" />}
               </div>
-              <div className="rounded-[10px] border border-adm-border bg-adm-surface h-[96px] flex items-center justify-center px-6">
+              <div className="rounded-[6px] border border-adm-border bg-adm-surface h-[96px] flex items-center justify-center px-6">
                 {logo ? <img src={logo} alt="Dealership logo on a light surface" className="max-h-10 max-w-full object-contain" /> : <img src={wordmarkPrimary} alt="AutoLabels wordmark placeholder on a light surface" className="h-6" />}
               </div>
             </div>

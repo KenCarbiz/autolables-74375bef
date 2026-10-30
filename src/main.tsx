@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import { HelmetProvider } from "react-helmet-async";
 import App from "./App.tsx";
 import "./index.css";
+import "./styles/national-product.css";
 
 // Restore dark mode preference before React renders (prevents flash)
 if (localStorage.getItem("dark_mode") === "true") {

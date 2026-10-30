@@ -100,7 +100,7 @@ export function ProductEditorModal({
               <Field label="Price ($)"><AdminInput type="number" step="0.01" value={editing.price || 0} onChange={(e) => set({ price: parseFloat(e.target.value) || 0 })} /></Field>
               <Field label="Sort order"><AdminInput type="number" value={editing.sort_order || 0} onChange={(e) => set({ sort_order: parseInt(e.target.value) || 0 })} /></Field>
             </div>
-            <div className="rounded-[10px] border border-adm-border p-3 space-y-2">
+            <div className="rounded-[6px] border border-adm-border p-3 space-y-2">
               <p className="text-[13px] font-semibold text-adm-ink">Vehicle-category pricing <span className="font-normal text-adm-muted">(optional)</span></p>
               <p className="text-[12px] leading-[18px] text-adm-muted">Set a price per vehicle size. Blank uses the base price. The addendum picks the bucket from the vehicle body class.</p>
               <div className="grid grid-cols-2 gap-2">
@@ -148,7 +148,7 @@ export function ProductEditorModal({
 
             <div className="space-y-3">
               <p className="text-[12px] leading-[18px] font-semibold text-adm-muted">Descriptions by how it is sold</p>
-              <label className="flex items-start gap-2 cursor-pointer rounded-[10px] border border-adm-border p-2.5">
+              <label className="flex items-start gap-2 cursor-pointer rounded-[6px] border border-adm-border p-2.5">
                 <input type="checkbox" className="mt-0.5 accent-adm-primary" checked={!(editing.available_preinstalled ?? true)} onChange={(e) => set({ available_preinstalled: !e.target.checked, ...(e.target.checked ? { badge_type: "optional", price_label: "If Accepted" } : {}) })} />
                 <span>
                   <span className="block text-[13px] font-semibold text-adm-ink">Not available for pre-install</span>
@@ -157,7 +157,7 @@ export function ProductEditorModal({
               </label>
 
               {(editing.available_preinstalled ?? true) && (
-                <div className={cn("rounded-[10px] border p-3 space-y-2.5", installed ? "border-adm-primary/50 bg-adm-selected" : "border-adm-border")}>
+                <div className={cn("rounded-[6px] border p-3 space-y-2.5", installed ? "border-adm-primary/50 bg-adm-selected" : "border-adm-border")}>
                   <div className="flex items-center justify-between">
                     <span className="text-[13px] font-semibold text-adm-ink">Pre-installed <span className="font-normal text-adm-muted">already on the car, in the price</span></span>
                     {installed && <StatusChip tone="info">Default</StatusChip>}
@@ -176,7 +176,7 @@ export function ProductEditorModal({
                 </div>
               )}
 
-              <div className={cn("rounded-[10px] border p-3 space-y-2.5", !installed ? "border-adm-primary/50 bg-adm-selected" : "border-adm-border")}>
+              <div className={cn("rounded-[6px] border p-3 space-y-2.5", !installed ? "border-adm-primary/50 bg-adm-selected" : "border-adm-border")}>
                 <div className="flex items-center justify-between">
                   <span className="text-[13px] font-semibold text-adm-ink">Optional <span className="font-normal text-adm-muted">customer adds at time of sale</span></span>
                   {!installed && <StatusChip tone="info">Default</StatusChip>}
@@ -189,7 +189,7 @@ export function ProductEditorModal({
 
               <p className="text-[12px] leading-[18px] text-adm-muted">Both sets are stored. The addendum shows the set matching how the line is sold on each deal; optional falls back to the pre-installed text when blank. The required benefit answers FTC Section 5 and CA SB 766 Section 11713.21.</p>
 
-              <label className="flex items-start gap-2 cursor-pointer rounded-[10px] border border-adm-border p-2.5">
+              <label className="flex items-start gap-2 cursor-pointer rounded-[6px] border border-adm-border p-2.5">
                 <input type="checkbox" className="mt-0.5 accent-adm-primary" checked={!!editing.upgrade} onChange={(e) => set({ upgrade: e.target.checked ? (editing.upgrade ?? EMPTY_UPGRADE) : null })} />
                 <span>
                   <span className="block text-[13px] font-semibold text-adm-ink">This product has an upgrade tier</span>
@@ -198,13 +198,13 @@ export function ProductEditorModal({
               </label>
 
               {editing.upgrade && (
-                <div className="rounded-[10px] border border-adm-warning/40 bg-adm-warning-bg/40 p-3 space-y-2.5">
+                <div className="rounded-[6px] border border-adm-warning/40 bg-adm-warning-bg/40 p-3 space-y-2.5">
                   <span className="text-[13px] font-semibold text-adm-ink">Upgrade tier</span>
                   <div className="grid grid-cols-2 gap-2">
                     <Field label="Upgrade name"><AdminInput value={upgrade.name} onChange={(e) => setUpgrade({ name: e.target.value })} placeholder="Platinum Protection" /></Field>
                     <Field label="Package price ($)"><AdminInput type="number" step="0.01" value={upgrade.price} onChange={(e) => setUpgrade({ price: parseFloat(e.target.value) || 0 })} /></Field>
                   </div>
-                  <label className="flex items-start gap-2 cursor-pointer rounded-[10px] border border-adm-border bg-adm-surface p-2.5">
+                  <label className="flex items-start gap-2 cursor-pointer rounded-[6px] border border-adm-border bg-adm-surface p-2.5">
                     <input type="checkbox" className="mt-0.5 accent-adm-primary" checked={!(upgrade.available_preinstalled ?? true)} onChange={(e) => setUpgrade({ available_preinstalled: !e.target.checked })} />
                     <span>
                       <span className="block text-[13px] font-semibold text-adm-ink">Not available for pre-install</span>
@@ -212,13 +212,13 @@ export function ProductEditorModal({
                     </span>
                   </label>
                   {(editing.available_preinstalled ?? true) && (upgrade.available_preinstalled ?? true) && (
-                    <div className="rounded-[10px] border border-adm-border bg-adm-surface p-3 space-y-2.5">
+                    <div className="rounded-[6px] border border-adm-border bg-adm-surface p-3 space-y-2.5">
                       <span className="text-[13px] font-semibold text-adm-ink">Pre-installed <span className="font-normal text-adm-muted">(upgrade)</span></span>
                       <Field label="Disclosure"><textarea value={upgrade.disclosure} onChange={(e) => setUpgrade({ disclosure: e.target.value })} className={textareaClass} rows={2} /></Field>
                       <Field label="Benefit justification"><textarea value={upgrade.benefit_justification} onChange={(e) => setUpgrade({ benefit_justification: e.target.value })} className={textareaClass} rows={2} /></Field>
                     </div>
                   )}
-                  <div className="rounded-[10px] border border-adm-border bg-adm-surface p-3 space-y-2.5">
+                  <div className="rounded-[6px] border border-adm-border bg-adm-surface p-3 space-y-2.5">
                     <span className="text-[13px] font-semibold text-adm-ink">Optional <span className="font-normal text-adm-muted">(upgrade)</span></span>
                     <Field label="Disclosure"><textarea value={upgrade.disclosure_optional} onChange={(e) => setUpgrade({ disclosure_optional: e.target.value })} className={textareaClass} rows={2} /></Field>
                     <Field label="Benefit justification"><textarea value={upgrade.benefit_justification_optional} onChange={(e) => setUpgrade({ benefit_justification_optional: e.target.value })} className={textareaClass} rows={2} /></Field>
@@ -227,7 +227,7 @@ export function ProductEditorModal({
               )}
             </div>
 
-            <div className="rounded-[10px] border border-adm-warning/40 bg-adm-warning-bg/40 p-3 space-y-2">
+            <div className="rounded-[6px] border border-adm-warning/40 bg-adm-warning-bg/40 p-3 space-y-2">
               <span className="text-[13px] font-semibold text-adm-ink inline-flex items-center gap-1.5">Product document <StatusChip tone="warning">Required</StatusChip></span>
               <p className="text-[12px] leading-[18px] text-adm-muted">Attach the product contract, or the warranty card when there is no contract. It substantiates the benefit claims and rides with the signed packet.</p>
               <div className="flex items-center gap-4">
@@ -290,7 +290,7 @@ export const ProductEditPreview = ({ editing }: { editing: EditingProduct }) => 
           <p className="text-[12px] leading-[18px] font-semibold text-adm-muted">Customer view</p>
           <p className="text-[12px] leading-[18px] text-adm-muted">How this item appears on the addendum.</p>
         </div>
-        <div className="rounded-[10px] border border-adm-border bg-adm-surface p-4">
+        <div className="rounded-[6px] border border-adm-border bg-adm-surface p-4">
           <div className="flex items-center justify-between gap-2">
             <StatusChip tone={installed ? "info" : "warning"}>{installed ? "Pre-installed" : "Optional"}</StatusChip>
             <span className="text-[14px] font-bold tabular-nums text-adm-ink">{fmtMoney(price)}</span>
@@ -307,7 +307,7 @@ export const ProductEditPreview = ({ editing }: { editing: EditingProduct }) => 
             </div>
           )}
         </div>
-        <div className={cn("rounded-[10px] border-2 p-4", tone === "success" ? "border-adm-success bg-adm-success-bg" : tone === "warning" ? "border-adm-warning/60 bg-adm-warning-bg" : "border-adm-danger/40 bg-adm-danger-bg")}>
+        <div className={cn("rounded-[6px] border-2 p-4", tone === "success" ? "border-adm-success bg-adm-success-bg" : tone === "warning" ? "border-adm-warning/60 bg-adm-warning-bg" : "border-adm-danger/40 bg-adm-danger-bg")}>
           <div className="flex items-center justify-between">
             <p className="text-[12px] font-semibold text-adm-ink">{score === 100 ? "Readiness complete" : "Readiness"}</p>
             <span className={cn("text-[22px] font-bold tabular-nums", tone === "success" ? "text-adm-success" : tone === "warning" ? "text-adm-warning" : "text-adm-danger")}>{score}%</span>

@@ -150,7 +150,7 @@ export default function EffectivePolicyView() {
                 const Icon = CARD_ICON[c.key];
                 const tone = CARD_TONE[c.tone];
                 return (
-                  <article key={c.key} data-landmark="class-card" className="rounded-[10px] border border-adm-border pt-[11px] px-[14px] pb-[14px] flex flex-col">
+                  <article key={c.key} data-landmark="class-card" className="rounded-[6px] border border-adm-border pt-[11px] px-[14px] pb-[14px] flex flex-col">
                     <div className="flex items-start gap-[14px]">
                       <span className={cn(ICON_BOX.avatarLg, "flex items-center justify-center flex-shrink-0", tone.icon)} aria-hidden="true"><Icon className={ICON.inCircle} /></span>
                       <div className="min-w-0 pt-1.5">
@@ -174,7 +174,7 @@ export default function EffectivePolicyView() {
         </section>
 
         <div className="mt-3 flex flex-col lg:flex-row lg:items-center gap-5 lg:gap-[19px]">
-          <div data-parity="recall-note" className="flex-1 rounded-[10px] border border-[#FDE1BB] bg-adm-warning-bg pl-[13px] pr-4 pt-[9px] pb-[10px] text-[13px] leading-[18px] font-semibold text-[#5F3F00] inline-flex items-center gap-2">
+          <div data-parity="recall-note" className="flex-1 rounded-[6px] border border-[#FDE1BB] bg-adm-warning-bg pl-[13px] pr-4 pt-[9px] pb-[10px] text-[13px] leading-[18px] font-semibold text-[#5F3F00] inline-flex items-center gap-2">
             <AlertTriangle className={cn(ICON.panel, "text-adm-warning fill-current stroke-white flex-shrink-0")} aria-hidden="true" />
             Do-not-drive recall follows a separate blocking policy.
           </div>

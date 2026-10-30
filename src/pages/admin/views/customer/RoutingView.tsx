@@ -80,7 +80,7 @@ const Pill = ({ tone, children }: { tone: PillTone; children: string }) => {
 const OrderRow = ({ row }: { row: RoutingOrderRow }) => {
   const Icon = ORDER_ICON[row.key];
   return (
-    <li data-landmark="order-row" className="min-h-[67.5px] rounded-[10px] border border-adm-border bg-adm-surface flex items-stretch">
+    <li data-landmark="order-row" className="min-h-[67.5px] rounded-[6px] border border-adm-border bg-adm-surface flex items-stretch">
       <div className="min-w-0 flex-1 flex items-center py-[13px]">
         <GripVertical className={cn(ICON.inline, "-ml-[3px] text-adm-muted flex-shrink-0")} aria-hidden="true" />
         <span className="ml-[14px] w-[34px] h-[34px] rounded-full bg-adm-workspace text-adm-ink text-[14px] font-semibold flex items-center justify-center flex-shrink-0">{row.step}</span>
@@ -249,7 +249,7 @@ export default function RoutingView() {
 
         <div className="space-y-[14px]">
           <AdminCard inset="sm" title="Configuration readiness" headerClassName="pt-[13px] px-[14px]" bodyClassName="px-3 pt-[15px] pb-[14px]">
-            <ul data-landmark="readiness-list" className="rounded-[10px] border border-adm-border divide-y divide-adm-border">
+            <ul data-landmark="readiness-list" className="rounded-[6px] border border-adm-border divide-y divide-adm-border">
               {railChecks.map((c) => <ReadinessRow key={c.key} check={c} chip={chipFor(c)} />)}
             </ul>
             <Link to={ADMIN_CHILD_ROUTES.escalation} data-parity="review-escalation" className="mt-[11px] inline-flex items-center gap-[15px] min-h-[36px] w-[232px] max-w-full pl-[25px] pr-2 rounded-md border border-adm-primary/40 text-[14px] font-semibold text-adm-primary whitespace-nowrap hover:bg-adm-selected focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary">
@@ -362,7 +362,7 @@ export default function RoutingView() {
             {agents.length === 0 && <p className="text-[13px] text-adm-muted">No salespeople yet. Smart routing will use the BDC and store fallbacks.</p>}
             <div className="space-y-3">
               {agents.map((a, i) => (
-                <div key={a.id} className="rounded-[10px] border border-adm-border p-3 grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
+                <div key={a.id} className="rounded-[6px] border border-adm-border p-3 grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
                   <Field label="Name" className="col-span-2"><input value={a.name} disabled={ro} onChange={(e) => patchAgent(i, { name: e.target.value })} placeholder="Full name" className={inputCls} /></Field>
                   <Field label="Title" className="col-span-2"><input value={a.title || ""} disabled={ro} onChange={(e) => patchAgent(i, { title: e.target.value })} className={inputCls} /></Field>
                   <Field label="Phone"><input value={a.phone || ""} disabled={ro} onChange={(e) => patchAgent(i, { phone: e.target.value })} className={inputCls} /></Field>

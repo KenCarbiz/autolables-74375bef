@@ -186,7 +186,7 @@ export default function PublishingReviewDialog(props: PublishingReviewDialogProp
         <div className="px-6 py-5 space-y-4">
           {step === "edit" && (
             <>
-              <ul className="divide-y divide-adm-border rounded-[10px] border border-adm-border">
+              <ul className="divide-y divide-adm-border rounded-[6px] border border-adm-border">
                 {PUBLISHING_DRAFT_KEYS.map((k) => (
                   <li key={k} className="flex items-center justify-between gap-4 px-4 py-3">
                     <label htmlFor={`pub-${k}`} className="text-[14px] text-adm-ink">{PUBLISHING_DRAFT_LABELS[k]}</label>
@@ -223,12 +223,12 @@ export default function PublishingReviewDialog(props: PublishingReviewDialogProp
                 </div>
                 <div className="space-y-3">
                   <p className="text-[14px] font-semibold text-adm-ink">Expected impact</p>
-                  <div className="rounded-[10px] border border-adm-border bg-adm-workspace px-4 py-3">
+                  <div className="rounded-[6px] border border-adm-border bg-adm-workspace px-4 py-3">
                     <p className="text-[28px] leading-[34px] font-bold text-adm-ink tabular-nums">{activeCount}</p>
                     <p className="text-[13px] text-adm-ink">active listings governed from now on</p>
                     <p className="text-[12px] text-adm-muted">{publishedCount} currently published. No listing is rewritten.</p>
                   </div>
-                  <div className="rounded-[10px] border border-adm-border bg-adm-workspace px-4 py-3 text-[12px] text-adm-muted">
+                  <div className="rounded-[6px] border border-adm-border bg-adm-workspace px-4 py-3 text-[12px] text-adm-muted">
                     Excluded: {impact.exclusions.join("; ")}.
                   </div>
                 </div>

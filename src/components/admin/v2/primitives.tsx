@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { ScrollRegion } from "./ScrollRegion";
 
 // The Administration V2 surface vocabulary: cards, chips, tiles, tables and
-// notes drawn to the reference tokens (10px card radius, 1px #D6DFEA lines,
+// notes drawn to the reference tokens (6px panel radius, 1px #D6DFEA lines,
 // 24px card padding, 12px table cells). Status is always text; colour is
 // supplemental. No component here fetches anything.
 
@@ -30,7 +30,7 @@ export const ICON = {
 
 export const ICON_BOX = {
   square: "w-10 h-10 rounded-md",
-  squareLg: "w-11 h-11 rounded-[10px]",
+  squareLg: "w-11 h-11 rounded-[6px]",
   circle: "w-14 h-14 rounded-full",
   avatar: "w-12 h-12 rounded-full",
   avatarLg: "w-[52px] h-[52px] rounded-full",
@@ -55,7 +55,7 @@ const TONE_ICON: Record<Tone, typeof Info> = {
 export const StatusChip = ({ tone = "neutral", children, className, icon = false }: { tone?: Tone; children: ReactNode; className?: string; icon?: boolean }) => {
   const Icon = TONE_ICON[tone];
   return (
-    <span className={cn("inline-flex items-center gap-1.5 rounded-md px-2 py-[3px] text-[12px] leading-[18px] font-semibold whitespace-nowrap", TONE_CHIP[tone], className)}>
+    <span className={cn("inline-flex items-center gap-1.5 rounded-[2px] px-2 py-[3px] text-[12px] leading-[18px] font-semibold whitespace-nowrap", TONE_CHIP[tone], className)}>
       {icon && <Icon className="w-4 h-4" aria-hidden="true" />}
       {children}
     </span>
@@ -106,7 +106,7 @@ export const AdminCard = ({
   const sm = inset === "sm";
   const padX = sm ? "px-4" : "px-6";
   return (
-    <section id={id} className={cn("rounded-[10px] border border-adm-border bg-adm-surface", className)}>
+    <section id={id} className={cn("rounded-[6px] border border-adm-border bg-adm-surface", className)}>
       {(title || action) && (
         <header className={cn("flex items-start justify-between gap-4", padX, sm ? "pt-3.5" : "pt-5", flush ? (sm ? "pb-3" : "pb-4") : "pb-0", headerClassName)}>
           <div className="min-w-0">
@@ -170,7 +170,7 @@ export const StatTile = ({
       {href && <ChevronRight className={cn(ICON.chevron, "text-adm-muted flex-shrink-0")} aria-hidden="true" />}
     </>
   );
-  const cls = "flex items-center gap-4 rounded-[10px] border border-adm-border bg-adm-surface px-4 py-[11px] min-h-[79px]";
+  const cls = "flex items-center gap-4 rounded-[6px] border border-adm-border bg-adm-surface px-4 py-[11px] min-h-[79px]";
   return href ? (
     <Link to={href} className={cn(cls, "hover:border-adm-primary/60 focus-visible:outline-2 focus-visible:outline-adm-primary")} aria-label={ariaLabel ?? `${label}: ${typeof value === "string" || typeof value === "number" ? value : ""}`}>
       {body}
@@ -198,7 +198,7 @@ export const HealthBanner = ({ verdict, action, title }: { verdict: HealthVerdic
 export const InlineNote = ({ tone = "info", title, children, action, className }: { tone?: Tone; title?: ReactNode; children?: ReactNode; action?: ReactNode; className?: string }) => {
   const Icon = TONE_ICON[tone];
   return (
-    <div role={tone === "danger" ? "alert" : "status"} className={cn("flex items-center gap-4 rounded-[10px] border px-4 py-3", BANNER[tone], className)}>
+    <div role={tone === "danger" ? "alert" : "status"} className={cn("flex items-center gap-4 rounded-[6px] border px-4 py-3", BANNER[tone], className)}>
       <Icon className="w-6 h-6 flex-shrink-0" aria-hidden="true" />
       <div className="min-w-0 flex-1 flex items-baseline gap-x-6 gap-y-0 flex-wrap">
         {title && <span className="text-[15px] leading-[22px] font-semibold">{title}</span>}

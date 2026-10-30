@@ -22,7 +22,7 @@ export const CARD_HEADER = "pt-4";
 export const HeaderPreviewCard = ({ preview, draftDiffers }: { preview: HeaderPreview; draftDiffers: boolean }) => (
   <AdminCard title={<CardTitle>Dealer header preview</CardTitle>} description={<CardDescription>How this dealership appears in AutoLabels.</CardDescription>} headerClassName={`${CARD_HEADER} px-[22px]`} bodyClassName="px-[22px]">
     {/* Narrow cards stack the wordmark over the name so the name keeps whole words on a line. */}
-    <div className="mt-[10px] rounded-[10px] bg-adm-sidebar px-5 py-4 sm:px-[36px] sm:py-0 min-h-[98px] flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-[22px]" aria-label="Application header preview">
+    <div className="mt-[10px] rounded-[6px] bg-adm-sidebar px-5 py-4 sm:px-[36px] sm:py-0 min-h-[98px] flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-[22px]" aria-label="Application header preview">
       <img src={wordmarkReverse} alt="AutoLabels" className="h-[21px] w-auto flex-shrink-0" />
       <span className="h-px w-10 sm:h-10 sm:w-px bg-white/25 flex-shrink-0" aria-hidden="true" />
       <div className="min-w-0 text-white">

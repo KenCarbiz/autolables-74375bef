@@ -99,7 +99,7 @@ const StateMark = ({ icon: Icon, tone, children }: { icon: MarkIcon; tone: Tone;
 
 // Card with the reference's 20px title; AdminCard fixes its title at 16px.
 const Panel = ({ title, description, children, bodyClassName }: { title: string; description?: ReactNode; children: ReactNode; bodyClassName?: string }) => (
-  <section className="rounded-[10px] border border-adm-border bg-adm-surface pt-4 pb-3">
+  <section className="rounded-[6px] border border-adm-border bg-adm-surface pt-4 pb-3">
     <header className="px-6">
       <h3 className="text-[20px] leading-[26px] font-bold text-adm-ink">{title}</h3>
       {description && <p className="mt-1 text-[13px] leading-[18px] text-adm-muted">{description}</p>}
@@ -476,7 +476,7 @@ export default function ProductApplicabilityPage() {
 
         {reviewing && (
           <AdminCard title="Review changes" description="These changes apply to every addendum built after they are saved.">
-            <div className="rounded-[10px] border border-adm-border overflow-hidden">
+            <div className="rounded-[6px] border border-adm-border overflow-hidden">
               <AdminTable caption="Changes to apply" minWidth={420}>
                 <thead>
                   <tr>

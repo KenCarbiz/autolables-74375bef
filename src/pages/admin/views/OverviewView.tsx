@@ -312,8 +312,8 @@ export default function OverviewView() {
             {SHORTCUTS.map((s) => {
               const section = ADMIN_SECTIONS.find((x) => x.id === s.section)!;
               return (
-                <Link key={s.section} to={adminTabHref(section.tabs[0].id)} className="relative flex items-start rounded-[10px] border border-adm-border pl-2 pr-0.5 pt-1.5 pb-[5px] hover:border-adm-primary/60">
-                  <span className="w-10 h-10 rounded-[10px] bg-adm-workspace flex items-center justify-center flex-shrink-0" aria-hidden="true"><s.icon className={`w-[22px] h-[22px] ${s.glyph}`} /></span>
+                <Link key={s.section} to={adminTabHref(section.tabs[0].id)} className="relative flex items-start rounded-[6px] border border-adm-border pl-2 pr-0.5 pt-1.5 pb-[5px] hover:border-adm-primary/60">
+                  <span className="w-10 h-10 rounded-[6px] bg-adm-workspace flex items-center justify-center flex-shrink-0" aria-hidden="true"><s.icon className={`w-[22px] h-[22px] ${s.glyph}`} /></span>
                   <span className="ml-2.5 min-w-0 flex-1 pt-[1.5px] pr-[22px] min-[1440px]:pr-0">
                     {/* From 1440px the chevron floats one title line down, so a one-line title runs above it as the
                         reference draws; narrower tiles keep it in its own lane so a wrapped word never drops under it. */}

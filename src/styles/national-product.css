@@ -1,0 +1,63 @@
+/* National product tokens for the authenticated dealer and platform surfaces
+   (Ken's V2 visual build, 2026-10-29). Opt-in by attribute: nothing here
+   touches the customer Passport, public pages or printed documents. */
+[data-product-surface="dealer"],
+[data-product-surface="platform"] {
+  --al-nav: #142338;
+  --al-workspace: #F5F6F8;
+  --al-surface: #FFFFFF;
+  --al-ink: #17263C;
+  --al-muted: #596A80;
+  --al-border: #D6DFEA;
+  --al-primary: #2457D6;
+  --al-primary-hover: #1D46AE;
+  --al-selected: #EAF0FF;
+  --al-success: #167347;
+  --al-warning: #946000;
+  --al-danger: #B42318;
+  --al-radius-control: 4px;
+  --al-radius-status: 2px;
+  --al-radius-panel: 6px;
+  --al-radius-table: 4px;
+  --al-radius-dialog: 8px;
+  --al-floating-shadow: 0 8px 24px rgb(20 35 56 / 14%);
+  --al-rail-width: 224px;
+  --al-header-height: 64px;
+  --al-row-height: 52px;
+  --al-row-compact: 40px;
+  --al-mobile-action-min: 44px;
+
+  /* Flat geometry: controls 4px, status 2px, panels 6px, dialogs 8px. */
+  --al-r-sm: 2px;
+  --al-r-md: 4px;
+  --al-r-lg: 6px;
+  --al-r-xl: 6px;
+  --al-r-2xl: 6px;
+  --al-r-3xl: 8px;
+  --al-r-hero: 8px;
+}
+
+/* No static shadows on working surfaces; floating layers keep theirs. */
+[data-product-surface="dealer"] :is(.shadow-premium, .shadow-premium-md, .shadow-premium-lg):not(:is([data-product-surface="customer"], [data-product-surface="document"]) *),
+[data-product-surface="platform"] :is(.shadow-premium, .shadow-premium-md, .shadow-premium-lg):not(:is([data-product-surface="customer"], [data-product-surface="document"]) *) {
+  box-shadow: none;
+}
+
+/* A customer component or an official document rendered inside the dealer
+   frame (customer previews, print previews) keeps its own approved geometry. */
+[data-product-surface="customer"],
+[data-product-surface="document"] {
+  --al-r-sm: calc(var(--radius) - 4px);
+  --al-r-md: calc(var(--radius) - 2px);
+  --al-r-lg: var(--radius);
+  --al-r-xl: 24px;
+  --al-r-2xl: 1rem;
+  --al-r-3xl: 1.5rem;
+  --al-r-hero: 28px;
+}
+
+/* One stroke weight across the working surfaces' icon family. */
+[data-product-surface="dealer"] svg.lucide:not(:is([data-product-surface="customer"], [data-product-surface="document"]) *),
+[data-product-surface="platform"] svg.lucide:not(:is([data-product-surface="customer"], [data-product-surface="document"]) *) {
+  stroke-width: 1.8;
+}

@@ -235,7 +235,7 @@ export default function ProductsView() {
                 const defaultTier = entry.priceTiers.find((t) => t.vehicleCategory === "default");
                 const basePrice = defaultTier ? defaultTier.price : entry.defaultPrice;
                 return (
-                  <div key={entry.id} className="rounded-[10px] border border-adm-border bg-adm-surface p-3 flex flex-col justify-between">
+                  <div key={entry.id} className="rounded-[6px] border border-adm-border bg-adm-surface p-3 flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-[14px] font-semibold text-adm-ink truncate">{entry.name}</p>

@@ -613,11 +613,18 @@ const AppShell = ({ children }: AppShellProps) => {
   // Lit by the same matchers as the rail, so a nested page lights its slot.
   const bottomActive = (path: string) => (activeLeaf ? activeLeaf.path === path : location.pathname === path);
 
+  // Menus and dialogs portal to <body>, outside the frame, so the national
+  // product geometry is scoped there too for as long as the frame is mounted.
+  useEffect(() => {
+    document.body.dataset.productSurface = "dealer";
+    return () => { delete document.body.dataset.productSurface; };
+  }, []);
+
   return (
     <VinScanContext.Provider value={vinScanApi}>
       {/* al-admin scopes the admin palette. Public routes and the locked
           customer passport render outside this shell and keep :root. */}
-      <div className="al-admin min-h-screen bg-background flex w-full overflow-hidden">
+      <div data-product-surface="dealer" className="al-admin min-h-screen bg-background flex w-full overflow-hidden">
         <a
           href="#app-scroll"
           onClick={(event) => { event.preventDefault(); mainRef.current?.focus(); }}

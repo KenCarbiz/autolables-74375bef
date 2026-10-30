@@ -249,7 +249,7 @@ const FeedBanner = ({ verdict, action }: { verdict: HealthVerdict; action?: Reac
   const tone = HEALTH_META[verdict.state].tone;
   const Icon = BANNER_ICON[tone];
   return (
-    <div role={tone === "danger" ? "alert" : "status"} className={cn("flex flex-wrap items-start gap-x-[18px] gap-y-3 rounded-[10px] border-2 pl-4 pr-[18px] pt-3 pb-[15px]", BANNER_TONE[tone])}>
+    <div role={tone === "danger" ? "alert" : "status"} className={cn("flex flex-wrap items-start gap-x-[18px] gap-y-3 rounded-[6px] border-2 pl-4 pr-[18px] pt-3 pb-[15px]", BANNER_TONE[tone])}>
       <Icon className={cn("mt-px w-8 h-8 flex-shrink-0", BANNER_ICON_COLOR[tone])} aria-hidden="true" />
       <div className="min-w-0 flex-1 basis-[200px]">
         <p className="text-[18px] leading-[24px] font-semibold">{verdict.headline}</p>
@@ -275,7 +275,7 @@ const FeedTile = ({ icon: Icon, iconClassName, label, value, tone, href, ariaLab
       </span>
     </>
   );
-  const cls = "flex items-start gap-[23px] rounded-[10px] border border-adm-border bg-adm-surface px-5 pt-[21px] pb-3 min-h-[91px]";
+  const cls = "flex items-start gap-[23px] rounded-[6px] border border-adm-border bg-adm-surface px-5 pt-[21px] pb-3 min-h-[91px]";
   return href ? (
     <Link to={href} data-parity="tile" className={cn(cls, "hover:border-adm-primary/60 focus-visible:outline-2 focus-visible:outline-adm-primary")} aria-label={ariaLabel ?? `${label}: ${value}`}>
       {body}
@@ -379,7 +379,7 @@ const SourceCard = ({
       </AdminButton>
       <p id="review-source-hint" className="mt-1.5 text-[12px] leading-[18px] text-adm-muted">{source.review.reason}</p>
       {open && source.review.enabled && (
-        <div className="mt-4 rounded-[10px] border border-adm-border bg-adm-workspace p-4 space-y-3" aria-label="Source identity review">
+        <div className="mt-4 rounded-[6px] border border-adm-border bg-adm-workspace p-4 space-y-3" aria-label="Source identity review">
           <KeyValueList rows={[
             { label: "Rooftop", value: source.rooftop.name ?? <span className="text-adm-muted">Not recorded</span> },
             { label: "Street", value: source.rooftop.street ?? <span className="text-adm-muted">Not recorded</span> },
