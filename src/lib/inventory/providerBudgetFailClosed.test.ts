@@ -95,8 +95,7 @@ describe("callers have no fail-open path", () => {
   it("every function that calls a paid provider goes through the gate", () => {
     const PAID = /api\.marketcheck\.com|mc-api\.marketcheck\.com|api\.firecrawl\.dev|places\.googleapis\.com|blackbookcloud\.com|vinaudit\.com|monroneylabels\.com/;
     const GATED = /admitProviderCall|gatedSearchFetch/;
-    // Its own reservation RPC: the call is made only on a granted slot.
-    const SEPARATELY_GUARDED = new Set(["market-valuation-write"]);
+    const SEPARATELY_GUARDED = new Set<string>();
     const ungated = readdirSync("supabase/functions", { withFileTypes: true })
       .filter((d) => d.isDirectory() && !d.name.startsWith("_") && existsSync(`supabase/functions/${d.name}/index.ts`))
       .map((d) => d.name)
@@ -116,6 +115,7 @@ describe("callers have no fail-open path", () => {
     order("marketcheck-recalls", "admitProviderCall(budgetCtx?.admin", "httpGet(url)");
     order("marketcheck-incentives", "admitProviderCall(budgetCtx?.admin", "fetch(url)");
     order("marketcheck-title-report", "admitProviderCall(admin", "fetch(endpoint(kind, vin)");
+    order("market-valuation-write", "admitProviderCall(admin", "await callProvider(url)");
     const reviews = readFileSync("supabase/functions/google-reviews/index.ts", "utf8");
     expect(reviews.match(/\bfetch\(/g)).toHaveLength(1);
   });
@@ -144,5 +144,22 @@ describe("the proposed SQL states the same policy", () => {
   it("stores no URL or key (code, not comments)", () => {
     const code = sql.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
     expect(code).not.toMatch(/api_key|\burl\b|token/i);
+  });
+});
+
+describe("a public Passport load never buys comparables", () => {
+  const src = readFileSync("supabase/functions/marketcheck-comps/index.ts", "utf8");
+  it("an anonymous caller is served the cache or the pending state before any paid call", () => {
+    const refuse = src.indexOf("if (!(await callerMayRefresh(");
+    expect(refuse).toBeGreaterThan(-1);
+    expect(refuse).toBeLessThan(src.indexOf("admitProviderCall(admin"));
+    expect(src).toMatch(/reason: "not_cached"/);
+  });
+  it("only a tenant member, a platform admin or the service role may refresh", () => {
+    const fn = src.slice(src.indexOf("async function callerMayRefresh"), src.indexOf("Deno.serve"));
+    expect(fn).toMatch(/if \(!auth\) return false;/);
+    expect(fn).toMatch(/tenant_members/);
+    expect(fn).toMatch(/user_roles/);
+    expect(fn).toMatch(/SERVICE_KEY/);
   });
 });

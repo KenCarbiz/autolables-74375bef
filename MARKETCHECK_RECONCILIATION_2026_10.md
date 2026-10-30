@@ -335,3 +335,49 @@ word); the contract additions the read models asked for (remaining warranty
 coverage, recall attempt time, fee-basis reasons) and a server route that
 serves the read models; the canary report (gate item 28); the Passport 2.0
 UI, which waits on the gate.
+
+## 13. Verification pass against the 2026-10-30 package (2026-10-30)
+
+The latest handoff zip (00_READ_ME_FIRST_LATEST, change order, add-on prompt,
+guardrails) was checked item by item against `main` at `5cb412f`. Suite:
+461 files, 7,520 tests passing before this pass; typecheck clean.
+
+Confirmed in code: the change-order price table (`mcCost.ts`, every value
+matches); the six identity match levels and the generic-fallback guards; the
+provider envelope; the cohort ladder with recorded tier, geography, sample,
+period and regeneration cadence; dealership-group identity isolated from
+Vehicle Score; the five equipment categories (available never installed);
+inferred-sold vocabulary and its Passport guard; the capability registry with
+all seven status states and per-capability influence; the Vehicle Score
+weights 35 / 30 / 20 / 15; the `mc_raw` boundary classifier; 429 kept as a
+rate-limit outcome; separate new and used policies; the call budget and
+reserve in front of every MarketCheck caller; the read models and the
+AutoCurb contract; every §42 deliverable document present.
+
+Gaps found and closed in this pass:
+
+- `marketcheck-comps` could still buy an Inventory Search call from an
+  anonymous Passport load on a 12-hour cache miss (CURRENT_STATE_AUDIT.md
+  listed it as "a §21 violation to close"). An anonymous caller is now served
+  the cached set (up to 7 days old, marked `stale`) or the pending state
+  (`not_cached`); only a signed-in tenant member, a platform admin or the
+  service role may buy a refresh.
+- `market-valuation-write` reserved against its own per-tenant budget but not
+  the account-wide monthly cap and feed reserve. The Price call now also
+  passes `provider_call_admit` and records its answer in
+  `provider_call_events`; the fail-closed test no longer exempts it.
+- Sold Vehicles Summary had a registry entry but no normalizer for the answer
+  side. `soldSummary.ts` keeps requested and applied filters, warnings,
+  notices, `result_count`, `truncated`, the month window, scope, per-row
+  statistics and percentiles, with `saleBasis: inferred_listing_exit` and
+  `priceBasis: last_advertised_price` as fixed fields. A refused or 429 call
+  yields no rows.
+- The Premium `alwaysSend` rule was declared but not executable.
+  `premiumRequest.ts` builds Premium and Premium Plus requests and refuses
+  one that lacks `vin`, `miles`, `zip`, `dealer_type` or `is_certified`.
+
+Still open, unchanged by this pass: the two edge functions above need a
+deploy to take effect (owner approval); the cost ledger has no cache-hit or
+cost-source column yet (cache hits are not ledgered, the cost source lives on
+the envelope); the entitlement-blocked items in §5; the canary report (gate
+item 28).
