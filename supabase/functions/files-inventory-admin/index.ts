@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
   FILESCOM_ORIGIN, INBOUND_FOLDER, MAX_CSV_BYTES, assertConnectorWrite, authorizePlatformAdmin, canonicalInboundPath,
-  encodeApiPath, intakeStatus, isSafeDownloadUrl, remoteMeta, sameVersion, sha256Hex, type BindingStatus, type RemoteMeta,
+  encodeApiPath, intakeStatus, remoteMeta, sameVersion, sha256Hex, type BindingStatus, type RemoteMeta,
 } from "../_shared/filescom/policy.ts";
 import { parseCsv } from "../_shared/filescom/csv.ts";
 import { compareIdentity, runDryRun, type TenantProfile } from "../_shared/filescom/dryRun.ts";
