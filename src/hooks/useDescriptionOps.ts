@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
+import { realTenantId } from "@/lib/tenant/realTenantId";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
@@ -15,6 +16,18 @@ import {
 
 // deno-lint-ignore-file no-explicit-any
 type Row = Record<string, any>;
+
+/**
+ * The active tenant, or null while only the anonymous "house" sentinel is
+ * present. The sentinel is not a uuid, so every tenant-scoped query built from
+ * it fails with a raw Postgres "invalid input syntax for type uuid" error.
+ * Returning null at this boundary keeps tenant scoping (no query runs without
+ * a real tenant) and stops the sentinel reaching a uuid column.
+ */
+export function useScopedTenant() {
+  const { tenant } = useTenant();
+  return { tenant: realTenantId(tenant) ? tenant : null };
+}
 
 // supabase-js collapses every non-2xx into "Edge Function returned a non-2xx
 // status code", which tells an operator nothing. The real reason is in the
@@ -74,7 +87,7 @@ export function useDescriptionPermissions() {
 }
 
 export function useDescriptionOperations() {
-  const { tenant } = useTenant();
+  const { tenant } = useScopedTenant();
   const [cases, setCases] = useState<DescriptionCaseRow[] | null>(null);
   const [vehicles, setVehicles] = useState<Record<string, Row>>({});
   const [summary, setSummary] = useState<OpsSummary | null>(null);
@@ -202,7 +215,7 @@ export function useDescriptionOperations() {
 }
 
 export function useDescriptionCase(vehicleId: string | undefined) {
-  const { tenant } = useTenant();
+  const { tenant } = useScopedTenant();
   const [record, setRecord] = useState<{
     caseRow: DescriptionCaseRow | null; vehicle: Row | null;
     versions: Row[]; channels: Row[]; findings: Row[];
