@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { stateLabel } from "@/lib/lifecycle/states";
+import { PageHeader } from "@/components/product";
 
 // /used-car-manager — the used-car manager's home: the PHYSICAL path of used
 // inventory, in the order this role has to act on it. Counts that exist in
@@ -408,25 +409,19 @@ export default function UsedCarManagerHome() {
     : 0;
 
   return (
-    <div className="max-w-[1500px] mx-auto p-4 md:p-6 space-y-6">
-      <header>
-        <div className="flex items-center gap-2">
-          <ClipboardCheck className="w-5 h-5 text-primary" aria-hidden="true" />
-          <h1 className="text-al-page font-display text-foreground">Used Car Manager</h1>
-        </div>
-        <p className="text-al-body text-muted-foreground mt-0.5">
-          The physical path of used inventory, in the order you have to act on it.
-          {" "}{metrics.usedInventory} used {metrics.usedInventory === 1 ? "vehicle" : "vehicles"} active
-          {" "}&middot; {metrics.inGetReady} in get ready &middot; {metrics.retailReady} retail ready.
-        </p>
-        {metrics.usedMissingLifecycle > 0 && (
+    <div className="px-4 py-4 sm:px-6 sm:py-6 flex flex-col gap-6 text-adm-ink max-w-[1600px]">
+      <PageHeader
+        title="Used Car Manager"
+        description={<>The physical path of used inventory, in the order you have to act on it. {metrics.usedInventory} used {metrics.usedInventory === 1 ? "vehicle" : "vehicles"} active | {metrics.inGetReady} in get ready | {metrics.retailReady} retail ready.</>}
+      />
+      {metrics.usedMissingLifecycle > 0 && (
           <p className="text-al-meta text-red-700 mt-1.5 inline-flex items-center gap-1.5">
             <AlertTriangle className="w-4 h-4" aria-hidden="true" />
             {metrics.usedMissingLifecycle} used {metrics.usedMissingLifecycle === 1 ? "vehicle is" : "vehicles are"} missing a lifecycle
             record and cannot be tracked on this page.
           </p>
         )}
-      </header>
+      
 
       {/* 1 — Awaiting intake authorization. Over half the used lot can sit
           here, and nothing downstream moves until this role decides. */}

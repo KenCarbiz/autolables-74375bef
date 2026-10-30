@@ -12,6 +12,7 @@ import { useGetReady } from "@/hooks/useGetReady";
 import { useAdvertisedPrices, assessDrift } from "@/hooks/useAdvertisedPrices";
 import { hasDealerCapability, type DealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import SetupChecklistWidget from "@/components/dashboard/SetupChecklistWidget";
+import { PageHeader, Button } from "@/components/product";
 import {
   ScanLine, Wrench, Tag, Send, CheckCircle2,
   RotateCcw, ShieldCheck,
@@ -235,45 +236,20 @@ const ProcessDashboard = () => {
   const sortedPriorities = [...priorities].sort((a, b) => (b.count > 0 ? 1 : 0) - (a.count > 0 ? 1 : 0));
 
   return (
-    <div className="p-4 lg:p-6 max-w-[1600px] mx-auto space-y-5">
+    <div className="px-4 py-4 sm:px-6 sm:py-6 flex flex-col gap-6 text-adm-ink max-w-[1600px]">
       {/* Hero — outcome-centric greeting; the dealer's status line. */}
-      <section className="rounded-2xl bg-card border border-border px-5 lg:px-6 py-5 lg:py-6 shadow-sm">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="min-w-0">
-            <p className="text-al-meta font-bold uppercase tracking-[0.18em] text-muted-foreground">
-              {currentStore?.name || tenant?.name || "Your dealership"}
-            </p>
-            <h1 className="font-display text-al-page text-foreground mt-1">
-              {greeting}, {capitalized}.
-            </h1>
-            <div className="mt-3 inline-flex items-center gap-2">
-              <span className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-[11px] font-semibold ${
-                health.tone === "ok"
-                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                  : "bg-amber-50 text-amber-800 border border-amber-200"
-              }`}>
-                <Activity className="w-3 h-3" strokeWidth={2.5} />
-                {health.headline}
-              </span>
-            </div>
-            <p className="text-sm text-muted-foreground mt-2">{health.sub}</p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={openScan}
-              className="h-10 px-4 rounded-xl bg-blue-600 text-white inline-flex items-center gap-1.5 shadow-sm shadow-blue-600/30 ring-1 ring-inset ring-white/15 hover:bg-blue-700 transition-colors"
-            >
-              <ScanLine className="w-4 h-4 stroke-[2.5]" />
-              <span className="font-display font-semibold tracking-tight text-sm">Scan a VIN</span>
-            </button>
-            <button
-              onClick={() => navigate("/inventory?add=1")}
-              className="h-10 px-4 rounded-xl bg-card border border-border text-foreground inline-flex items-center gap-1.5 hover:bg-muted transition-colors"
-            >
-              <span className="font-display font-semibold tracking-tight text-sm">Add vehicle</span>
-            </button>
-          </div>
-        </div>
+      <section className="rounded-[6px] border border-adm-border bg-adm-surface p-4 sm:p-5 flex flex-col gap-4">
+        <PageHeader
+          title="Today"
+          scope={currentStore?.name || tenant?.name || "Your dealership"}
+          description={<>{greeting}, {capitalized}. <span className={health.tone === "ok" ? "text-adm-success font-semibold" : "text-adm-warning font-semibold"}>{health.headline}.</span> {health.sub}</>}
+          actions={
+            <>
+              <Button onClick={() => navigate("/inventory?add=1")}>Add vehicle</Button>
+              <Button variant="primary" onClick={openScan}><ScanLine className="w-4 h-4" /> Scan a VIN</Button>
+            </>
+          }
+        />
 
         <SetupChecklistWidget />
       </section>

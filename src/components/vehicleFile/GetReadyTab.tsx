@@ -300,6 +300,29 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready }: { vehicle: VehicleRow
         </div>
       </Card>
 
+      <Card title="Notes">
+        {historyLoading ? (
+          <p className="text-[14px] text-adm-muted">Loading notes...</p>
+        ) : (() => {
+          const notes = [
+            ...(row?.gate_reason ? [{ key: "gate", when: row.state_changed_at, who: "Manager gate", text: row.gate_reason }] : []),
+            ...prep.filter((r) => r.notes && r.notes.trim()).map((r) => ({ key: r.id, when: r.updated_at, who: r.foreman_name || "Prep sign-off", text: r.notes as string })),
+          ];
+          return notes.length === 0 ? (
+            <p className="text-[14px] leading-[20px] text-adm-muted">No notes are recorded for this vehicle. Notes entered on prep sign-offs and manager gates appear here.</p>
+          ) : (
+            <ul className="divide-y divide-adm-border">
+              {notes.map((n) => (
+                <li key={n.key} className="py-2">
+                  <p className="text-[14px] leading-[20px] text-adm-ink whitespace-pre-wrap">{n.text}</p>
+                  <p className="text-[12px] leading-[18px] text-adm-muted">{n.who} | {fmtWhen(n.when) ?? "time unknown"}</p>
+                </li>
+              ))}
+            </ul>
+          );
+        })()}
+      </Card>
+
       <Card title="Prep & install records">
         {historyLoading ? (
           <p className="text-al-body text-muted-foreground">Loading records…</p>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { PageHeader } from "@/components/product";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
@@ -714,32 +715,28 @@ export default function FactoryStickerWorkspace({
           </div>
         )}
 
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3 min-w-0">
-            {!fixture && !embedded && vehicle && (
-              <Link
-                to={`/vehicle-file/${vehicle.id}`}
-                className="inline-flex items-center gap-1 h-8 px-2.5 rounded-md border border-border bg-card text-xs font-semibold hover:bg-muted/40 shrink-0"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" /> Vehicle File
-              </Link>
-            )}
-            <div className="min-w-0">
-              {embedded ? (
-                <h2 className="text-[17px] leading-[24px] font-semibold text-adm-ink truncate">{title}</h2>
-              ) : (
-                <h1 className="text-[24px] leading-[32px] sm:text-[28px] sm:leading-[36px] font-bold text-adm-ink truncate">{title}</h1>
+        <PageHeader
+          as={embedded ? "h2" : "h1"}
+          title={title}
+          description={<>
+            {data ? `${data.identity.year} ${data.identity.make} ${data.identity.model}${data.identity.trim ? ` ${data.identity.trim}` : ""}` : "Factory sticker workspace"}
+            {currentDoc ? ` | v${currentDoc.version}` : ""}
+            {" | "}Generated build record, not the original OEM Monroney.
+          </>}
+          actions={
+            <>
+              {genStatus && <Badge tone={GEN_STATUS_TONE[genStatus] || "off"}>{humanize(genStatus)}</Badge>}
+              {!fixture && !embedded && vehicle && (
+                <Link
+                  to={`/vehicle-file/${vehicle.id}`}
+                  className="inline-flex items-center gap-1 min-h-[36px] px-3 rounded-md border border-adm-border bg-adm-surface text-[14px] font-semibold hover:bg-adm-workspace"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" /> Vehicle File
+                </Link>
               )}
-              <p className="text-[13px] leading-[18px] text-adm-muted">
-                {data ? `${data.identity.year} ${data.identity.make} ${data.identity.model}${data.identity.trim ? ` ${data.identity.trim}` : ""}` : "Factory sticker workspace"}
-                {currentDoc ? ` · v${currentDoc.version}` : ""}
-              </p>
-            </div>
-          </div>
-          {genStatus && (
-            <Badge tone={GEN_STATUS_TONE[genStatus] || "off"}>{humanize(genStatus)}</Badge>
-          )}
-        </div>
+            </>
+          }
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)_340px] gap-4 items-start">
           {/* LEFT — vehicle and data status */}

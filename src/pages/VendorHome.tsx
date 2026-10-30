@@ -13,6 +13,7 @@ import {
 } from "@/components/command/CommandPrimitives";
 import { Camera, ClipboardList, PackageCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/product";
 
 // The third-party vendor's task list, and nothing else. A vendor sees only the
 // get-ready lines addressed to their own email: no pricing, no customer, no
@@ -201,16 +202,8 @@ export default function VendorHome() {
   }
 
   return (
-    <div className="max-w-[900px] mx-auto p-4 md:p-6 space-y-5">
-      <header>
-        <div className="flex items-center gap-2">
-          <PackageCheck className="w-5 h-5 text-primary" aria-hidden="true" />
-          <h1 className="text-al-page font-display text-foreground">My work orders</h1>
-        </div>
-        <p className="text-al-body text-muted-foreground mt-0.5">
-          Only the vehicle lines assigned to {vendorEmail || "your company"}.
-        </p>
-      </header>
+    <div className="px-4 py-4 sm:px-6 sm:py-6 flex flex-col gap-6 text-adm-ink max-w-[1600px]">
+      <PageHeader title="My work orders" description={<>Only the vehicle lines assigned to {vendorEmail || "your company"}.</>} />
 
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 md:mx-0 md:px-0">
         {TABS.map((t) => (
