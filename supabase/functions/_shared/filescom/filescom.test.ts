@@ -97,7 +97,7 @@ describe("authorization and quarantine", () => {
   it("the admin function writes vehicle_listings nowhere and calls no provider other than Files.com", () => {
     const src = readFileSync(resolve(__dirname, "../../files-inventory-admin/index.ts"), "utf8");
     expect(src).not.toMatch(/from\("vehicle_listings"\)\.(insert|update|upsert|delete)/);
-    expect(src).not.toMatch(/marketcheck\.com|MARKETCHECK/i);
+    expect(src).not.toMatch(/marketcheck\.com|MARKETCHECK_API|marketcheck-|functions\.invoke/i);
     expect(src).not.toMatch(/x-dms-tenant/i);
     expect([...src.matchAll(/fetch\(/g)].length).toBe(2);
   });
