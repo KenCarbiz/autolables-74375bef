@@ -12,8 +12,8 @@ const TONE_CLASS: Record<Tone, string> = {
   attention: "bg-adm-danger-bg text-adm-danger",
 };
 
-export const Chip = ({ tone = "neutral", children }: { tone?: Tone; children: ReactNode }) => (
-  <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[2px] text-[12px] leading-[18px] font-semibold ${TONE_CLASS[tone]}`}>
+export const Chip = ({ tone = "neutral", children, size = "sm" }: { tone?: Tone; children: ReactNode; size?: "sm" | "lg" }) => (
+  <span className={`inline-flex items-center gap-1.5 rounded-[2px] font-semibold ${size === "lg" ? "px-3 py-1.5 text-[14px] leading-[20px]" : "px-2 py-0.5 text-[12px] leading-[18px]"} ${TONE_CLASS[tone]}`}>
     {children}
   </span>
 );

@@ -62,16 +62,18 @@ export const OverviewTab = ({ vehicle, ready, lifecycle, stockNumber, onTab, onR
   const gallery = listingGallery(vehicle);
   const videos = vehicle.videos || [];
 
+  const yearMatch = vehicle.ymm?.match(/^(\d{4})\s+(.+)$/) ?? null;
   const infoPairs: { label: string; value: React.ReactNode }[] = [
     { label: "VIN", value: <span className="font-mono">{vehicle.vin}</span> },
-    { label: "Model", value: vehicle.ymm || "Needs VIN decode" },
+    ...(yearMatch ? [{ label: "Year", value: yearMatch[1] }] : []),
+    { label: "Model", value: yearMatch ? yearMatch[2] : vehicle.ymm || "Needs VIN decode" },
     { label: "Trim", value: vehicle.trim || "Not decoded" },
     { label: "Stock #", value: stockNumber || "Not on the feed" },
     { label: "Condition", value: <span className="capitalize">{vehicle.condition || "unknown"}</span> },
     { label: "Mileage", value: vehicle.mileage != null ? `${vehicle.mileage.toLocaleString()} mi` : "Not recorded" },
     { label: "Advertised price", value: vehicle.price != null ? `$${vehicle.price.toLocaleString()}` : "Not priced" },
     { label: "Created", value: new Date(vehicle.created_at).toLocaleDateString() },
-    { label: "Last inventory sync", value: vehicle.enriched_at ? (fmtWhen(vehicle.enriched_at) ?? "Unknown") : "Never synced" },
+    { label: "Last sync", value: vehicle.enriched_at ? (fmtWhen(vehicle.enriched_at) ?? "Unknown") : "Never synced" },
   ];
 
   // Re-pull this VIN's MarketCheck enrichment (value, comps, days-supply,
@@ -107,9 +109,9 @@ export const OverviewTab = ({ vehicle, ready, lifecycle, stockNumber, onTab, onR
         }>
           <dl className="text-[14px] leading-[20px] border-t border-adm-border">
             {infoPairs.map((p) => (
-              <div key={p.label} className="grid grid-cols-[130px_minmax(0,1fr)] gap-3 border-b border-adm-border py-1">
+              <div key={p.label} className="grid grid-cols-[104px_minmax(0,1fr)] gap-3 border-b border-adm-border py-[3px]">
                 <dt className="text-adm-muted">{p.label}</dt>
-                <dd className="min-w-0 break-words text-adm-ink">{p.value}</dd>
+                <dd className="min-w-0 truncate text-adm-ink" title={typeof p.value === "string" ? p.value : undefined}>{p.value}</dd>
               </div>
             ))}
           </dl>
@@ -130,7 +132,7 @@ export const OverviewTab = ({ vehicle, ready, lifecycle, stockNumber, onTab, onR
               <p className="text-[14px] text-adm-muted">{gallery.length} photo{gallery.length === 1 ? "" : "s"} · {videos.length} video{videos.length === 1 ? "" : "s"}</p>
               {gallery.length > 0 && (
                 <div className="grid grid-cols-3 gap-2">
-                  <img src={gallery[0]} alt="" className="col-span-3 aspect-[16/10] w-full rounded-[4px] border border-adm-border object-cover" />
+                  <img src={gallery[0]} alt="" className="col-span-3 aspect-[16/9] w-full rounded-[4px] border border-adm-border object-cover" />
                   {gallery.slice(1, gallery.length > 7 ? 5 : 7).map((src, i) => (
                     <img key={`${src}-${i}`} src={src} alt="" className="aspect-[4/3] w-full rounded-[4px] border border-adm-border object-cover" />
                   ))}

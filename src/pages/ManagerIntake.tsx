@@ -227,10 +227,22 @@ export default function ManagerIntake() {
         }
       />
 
-      <LocalTabs label="Intake queue filters" tabs={tabs} />
+      <LocalTabs
+        label="Intake queue filters"
+        tabs={tabs}
+        trailing={
+          <div className="relative w-[240px]">
+            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-adm-muted" aria-hidden="true" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search vehicle or VIN"
+              aria-label="Search intake queue"
+              className="h-8 w-full rounded-md border border-adm-border bg-adm-surface pl-8 pr-3 text-[13px]" />
+          </div>
+        }
+      />
 
       <MetricStrip
         numberFirst
+        boxed
         label="Intake queue summary"
         metrics={[
           { label: "Awaiting authorization", value: ready ? counts.awaiting : null, hint: "In queue for review", loading, href: "/get-ready-command?gate=awaiting" },
@@ -239,13 +251,6 @@ export default function ManagerIntake() {
           { label: "Authorized today", value: ready ? authorizedToday : null, hint: "Cleared for get-ready", loading },
         ]}
       />
-
-      <div className="relative w-full min-w-[220px] max-w-sm">
-        <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-adm-muted" aria-hidden="true" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by year, make, model, or VIN"
-          aria-label="Search intake queue"
-          className="h-10 w-full rounded-md border border-adm-border bg-adm-surface pl-10 pr-3 text-[14px]" />
-      </div>
 
       <div>
         <QueryState
@@ -256,6 +261,7 @@ export default function ManagerIntake() {
           emptyTitle={q ? "No vehicles match that search." : `Nothing is waiting in ${tabLabel}.`}
           emptyDetail="New vehicles from tonight's ingest arrive in this queue automatically. This is the selected filter only. Existing inventory was grandfathered as authorized at rollout."
         >
+          <div className="overflow-hidden rounded-md border border-adm-border bg-white">
           <WorkTable className="[&_th]:px-2 [&_td]:px-2" caption="Intake authorization queue" minWidth={900}>
             <thead>
               <tr>
@@ -271,7 +277,7 @@ export default function ManagerIntake() {
                 <Th align="right" className="whitespace-nowrap">Asking price</Th>
                 <Th>Owner</Th>
                 <Th>Status</Th>
-                <Th align="right"><span className="sr-only">Action</span></Th>
+                <Th align="right">Action</Th>
               </tr>
             </thead>
             <tbody>
@@ -295,11 +301,11 @@ export default function ManagerIntake() {
                       </div>
                     </Td>
                     <Td align="right" className="whitespace-nowrap">{r.ageDays}</Td>
-                    <Td>{/^cpo$/i.test(r.condition) ? "CPO" : r.condition ? r.condition.charAt(0).toUpperCase() + r.condition.slice(1).toLowerCase() : "Unknown"}</Td>
+                    <Td><StatusText tone="neutral">{/^cpo$/i.test(r.condition) ? "CPO" : r.condition ? r.condition.charAt(0).toUpperCase() + r.condition.slice(1).toLowerCase() : "Unknown"}</StatusText></Td>
                     <Td>
                       {dnd ? <StatusText tone="danger">Do-not-drive</StatusText>
-                        : r.recall ? <span className="capitalize text-adm-ink">{r.recall.replace(/_/g, " ")}</span>
-                        : <span className="text-adm-ink">Unknown</span>}
+                        : r.recall ? <StatusText tone={/clear|none|ok|current/i.test(r.recall) ? "success" : "warning"}>{r.recall.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase())}</StatusText>
+                        : <StatusText tone="neutral">Unknown</StatusText>}
                       <p className="whitespace-nowrap text-[12px] leading-[16px] text-adm-muted">{r.recall ? "Stored recall check" : "No report on file"}</p>
                     </Td>
                     <Td align="right">{r.price != null ? `$${r.price.toLocaleString("en-US")}` : <span className="text-adm-muted">Unknown</span>}</Td>
@@ -315,6 +321,7 @@ export default function ManagerIntake() {
               })}
             </tbody>
           </WorkTable>
+          </div>
         </QueryState>
       </div>
 

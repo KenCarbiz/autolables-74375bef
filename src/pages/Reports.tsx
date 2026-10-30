@@ -74,7 +74,7 @@ const Strip = ({ children }: { children: ReactNode }) => {
   return (
     <div className="flex flex-col gap-3">
       {rows.map((row, i) => (
-        <MetricStrip
+        <MetricStrip boxed
           key={i}
           label="Report metrics"
           metrics={row.map((e) => ({

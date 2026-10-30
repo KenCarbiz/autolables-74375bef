@@ -15,7 +15,7 @@ import {
   WORK_LANES,
   type WorkLane,
 } from "@/lib/work/workClassification";
-import { MoreHorizontal, AlertTriangle, Car, CheckCircle2, ClipboardList, Filter, Inbox, PlayCircle, Printer, RefreshCw, RotateCcw, ScanLine, ShieldCheck, Sparkles, Trash2, Wrench } from "lucide-react";
+import { MoreHorizontal, AlertTriangle, Car, CheckCircle2, ClipboardList, Inbox, PlayCircle, Printer, RefreshCw, RotateCcw, ScanLine, Search, ShieldCheck, Sparkles, Trash2, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useSearchParams } from "react-router-dom";
@@ -338,8 +338,8 @@ const WorkQueue = () => {
       {tabKey !== "print" && (
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-[220px] flex-1 max-w-md">
-            <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-adm-muted" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search work" placeholder="Search VIN, stock, task, department" className="h-9 w-full rounded-[6px] border border-adm-border bg-adm-surface pl-9 pr-3 text-[14px] text-adm-ink" />
+            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-adm-muted" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search work" placeholder="Search stock #, VIN, or task" className="h-9 w-full rounded-[6px] border border-adm-border bg-adm-surface pl-9 pr-3 text-[14px] text-adm-ink" />
           </div>
           <FilterSelect label="Filter by type" value={department} onChange={(v) => setDepartment(v as Department)}
             options={[{ value: "all", label: "All types" }, ...(["inventory", "print", "service", "detail", "third_party", "compliance", "manager", "passport", "finance"] as const).map((d) => ({ value: d, label: d === "third_party" ? "Third party" : d.charAt(0).toUpperCase() + d.slice(1) }))]} />
@@ -479,8 +479,8 @@ function HumanTaskRow({ item, currentUserId, previews, onOpen, onUpdate, selecte
         <input type="checkbox" aria-label={`Select ${item.title}`} checked={selected} disabled={external || item.status === "completed"} onChange={(e) => onSelect(e.target.checked)} className="h-4 w-4 accent-[#2457D6]" />
       </Td>
       <Td className="whitespace-nowrap text-adm-muted">{ageLabel(item.created_at)}</Td>
-      <Td className="max-w-[220px] truncate"><span title={vehicleLabel(item)}>{vehicleLabel(item)}</span></Td>
-      <Td className="max-w-[270px]">
+      <Td className="max-w-[260px] truncate"><span title={vehicleLabel(item)}>{vehicleLabel(item)}</span></Td>
+      <Td className="max-w-[250px]">
         <p className="truncate font-medium text-adm-ink" title={item.title}>
           {item.title}
           {urgent && item.priority && <StatusText tone="warning" className="ml-2">{item.priority.charAt(0).toUpperCase() + item.priority.slice(1)}</StatusText>}
@@ -524,7 +524,7 @@ function ExceptionRow({ item, onOpen, onDismiss }: {
       <Td className="w-8"><input type="checkbox" aria-label="Exception rows are resolved from the vehicle" disabled className="h-4 w-4 accent-[#2457D6]" /></Td>
       <Td className="whitespace-nowrap text-adm-muted">{ageLabel(item.created_at)}</Td>
       <Td className="max-w-[260px] truncate">{vehicleLabel(item)}{departed ? " (left the lot)" : ""}</Td>
-      <Td className="max-w-[300px]">
+      <Td className="max-w-[250px]">
         <p className="truncate font-medium text-adm-ink" title={copy.label}>{copy.label}</p>
       </Td>
       <Td className="text-adm-muted">System</Td>

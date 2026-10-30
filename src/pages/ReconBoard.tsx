@@ -68,7 +68,7 @@ export default function ReconBoard() {
 
       <LocalTabs label="Recon estimate states" tabs={tabs} />
 
-      <MetricStrip
+      <MetricStrip boxed
         numberFirst
         label="Recon estimate totals"
         metrics={[

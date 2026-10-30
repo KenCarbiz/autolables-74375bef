@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
-  AlertTriangle, ArrowRight, ChevronLeft, ChevronRight, Building2, Car, FileCheck, FileLock, FileSearch,
+  AlertTriangle, ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Building2, Car, FileCheck, FileLock, FileSearch,
   FileText, FileX, KeyRound, Layers, Lock, Package, Printer, QrCode,
-  Tag,
+  Search, Tag,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageBody, PageHeader, Panel, WorkTable, Th, Td, StatusText } from "@/components/product";
@@ -31,6 +31,27 @@ const BUNDLE_ICON = (label: string) => {
   if (l.includes("sticker") || l.includes("window")) return Tag;
   if (l.includes("paper") || l.includes("letter")) return FileText;
   return Package;
+};
+
+const DOC_PAGE_W = 816;
+const DOC_PAGE_H = 1056;
+const THUMB_W = 180;
+
+const DocThumb = ({ href, children }: { href?: string; children: React.ReactNode }) => {
+  const remote = href && /^https:\/\//i.test(href) ? href : null;
+  const isImage = remote ? /\.(png|jpe?g|webp|gif)(\?|$)/i.test(remote) : false;
+  const scale = THUMB_W / DOC_PAGE_W;
+  return (
+    <div className="relative mx-auto aspect-[8.5/11] w-full max-w-[180px] overflow-hidden rounded-[4px] border border-adm-border bg-white shadow-sm">
+      {remote && isImage ? (
+        <img src={remote} alt="" className="h-full w-full object-cover object-top" />
+      ) : remote ? (
+        <iframe title="Document preview" src={`${remote}#toolbar=0&navpanes=0&view=FitH`} tabIndex={-1} aria-hidden="true" loading="lazy"
+          className="pointer-events-none absolute left-0 top-0 border-0 bg-white"
+          style={{ width: DOC_PAGE_W, height: DOC_PAGE_H, transform: `scale(${scale})`, transformOrigin: "top left" }} />
+      ) : children}
+    </div>
+  );
 };
 
 export default function DocumentsPrintCenter() {
@@ -269,12 +290,15 @@ export default function DocumentsPrintCenter() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0">
           <p className="mb-1 text-[13px] leading-[18px] font-semibold text-adm-ink">Vehicle</p>
-          <div className="flex min-h-[44px] items-center justify-between gap-3 rounded-[6px] border border-adm-border bg-adm-surface px-3">
-            <span className="min-w-0 truncate text-[14px] leading-[20px] text-adm-ink">
+          <div className="flex min-h-[44px] items-center gap-2 rounded-[6px] border border-adm-border bg-adm-surface px-3">
+            <Search className="h-5 w-5 shrink-0 text-adm-muted" aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate text-[14px] leading-[20px] text-adm-ink">
               <span className="font-semibold">{vehicleLine}</span>
               {vehicleMeta ? <span className="text-adm-muted">{`  ·  ${vehicleMeta}`}</span> : null}
             </span>
-            <Link to="/inventory" className="shrink-0 text-[14px] font-semibold text-adm-primary hover:underline">Change vehicle</Link>
+            <Link to="/inventory" aria-label="Change vehicle" title="Change vehicle" className="grid h-8 w-8 shrink-0 place-items-center rounded-[6px] text-adm-muted hover:bg-adm-workspace hover:text-adm-ink">
+              <ChevronDown className="h-5 w-5" aria-hidden="true" />
+            </Link>
           </div>
         </div>
         <div className="min-w-0">
@@ -352,6 +376,7 @@ export default function DocumentsPrintCenter() {
                             {d.reprintCopy != null ? (
                               <CommandAction
                                 variant="link"
+                                className="!min-h-0"
                                 capability="can_print"
                                 busy={reprinting}
                                 disabledReason={
@@ -365,6 +390,7 @@ export default function DocumentsPrintCenter() {
                             ) : (d.generateKind || d.generateBlockedReason) ? (
                               <CommandAction
                                 variant="link"
+                                className="!min-h-0"
                                 capability="can_create_documents"
                                 busy={generating}
                                 disabledReason={
@@ -398,14 +424,16 @@ export default function DocumentsPrintCenter() {
             <Panel title="Preview">
               {previewDoc ? (
                 <div className="flex flex-col gap-3">
-                  <div className="mx-auto flex aspect-[8.5/11] w-full max-w-[180px] flex-col justify-between rounded-[4px] border border-adm-border bg-white p-4 text-left">
-                    <div>
-                      <p className="text-[11px] leading-[16px] text-adm-muted">{vehicleLine}</p>
-                      <p className="mt-1 text-[15px] leading-[20px] font-bold text-adm-ink">{previewDoc.label}</p>
-                      <p className="text-[12px] leading-[18px] text-adm-muted">{previewDoc.version}</p>
+                  <DocThumb href={previewDoc.href}>
+                    <div className="flex h-full flex-col justify-between p-4 text-left">
+                      <div>
+                        <p className="text-[11px] leading-[16px] text-adm-muted">{vehicleLine}</p>
+                        <p className="mt-1 text-[15px] leading-[20px] font-bold text-adm-ink">{previewDoc.label}</p>
+                        <p className="text-[12px] leading-[18px] text-adm-muted">{previewDoc.version}</p>
+                      </div>
+                      <p className="text-[11px] leading-[16px] text-adm-muted">{vehicle.vin}</p>
                     </div>
-                    <p className="text-[11px] leading-[16px] text-adm-muted">{vehicle.vin}</p>
-                  </div>
+                  </DocThumb>
                   {docCount > 1 && (
                     <div className="flex items-center justify-center gap-3 text-[13px] leading-[18px] text-adm-muted">
                       <button type="button" aria-label="Previous document" className="grid h-8 w-8 place-items-center rounded-[6px] border border-adm-border hover:bg-adm-workspace" onClick={() => setSelectedDoc(documents[(documents.indexOf(previewDoc) - 1 + docCount) % docCount].id)}>

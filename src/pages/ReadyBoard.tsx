@@ -314,7 +314,24 @@ export default function ReadyBoard() {
         title="Ready Board"
       />
 
-      <LocalTabs label="Ready Board views" tabs={tabs} />
+      <LocalTabs
+        label="Ready Board views"
+        tabs={tabs}
+        trailing={
+          <>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search vehicle or VIN"
+              aria-label="Search the board"
+              className="h-8 w-[220px] rounded-[6px] border border-adm-border bg-adm-surface px-3 text-[13px]"
+            />
+            <button type="button" onClick={() => setTodayOnly((v) => !v)} aria-pressed={todayOnly} className="whitespace-nowrap text-[13px] font-semibold text-adm-primary hover:underline">
+              {todayOnly ? "Showing today's intake" : "Today's intake only"}
+            </button>
+          </>
+        }
+      />
 
       <MetricStrip
         numberFirst
@@ -327,24 +344,14 @@ export default function ReadyBoard() {
         ]}
       />
       <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search vehicle or VIN"
-            aria-label="Search the board"
-            className="h-10 w-full max-w-[320px] rounded-[6px] border border-adm-border bg-adm-surface px-3 text-[14px]"
-          />
-          {canAccept && picked.size > 0 && (
+        {canAccept && picked.size > 0 && (
+          <div>
             <Button size="sm" variant="primary" onClick={async () => {
               for (const r of visibleRows.filter((x) => picked.has(x.vin) && bucketOf(x) === "acceptance")) await acceptAndDispatch(r);
               setPicked(new Set());
             }}>Authorize and dispatch {picked.size}</Button>
-          )}
-          <button type="button" onClick={() => setTodayOnly((v) => !v)} aria-pressed={todayOnly} className="text-[14px] font-semibold text-adm-primary hover:underline">
-            {todayOnly ? "Showing today's intake" : "Today's intake only"}
-          </button>
-        </div>
+          </div>
+        )}
         <QueryState
           status={status}
           onRetry={load}
@@ -353,6 +360,7 @@ export default function ReadyBoard() {
           emptyTitle={`${current.empty}${scopeNote ? scopeNote : " in this view"}.`}
           emptyDetail={bucket === "all" && !todayOnly ? "No vehicles in inventory yet." : `This is the ${current.label} view only; it does not say the rest of the pipeline is clear.${otherViews}`}
         >
+          <div className="overflow-hidden rounded-md border border-adm-border bg-white">
           <WorkTable className="[&_td]:py-1.5 [&_td]:px-2 [&_th]:px-2" caption="Vehicles and their get-ready stations" minWidth={960}>
             <thead>
               <tr>
@@ -367,7 +375,7 @@ export default function ReadyBoard() {
                 <Th>Next action</Th>
                 <Th>Owner</Th>
                 <Th>Recall</Th>
-                <Th align="right"><span className="sr-only">More</span></Th>
+                <Th align="right">Action</Th>
               </tr>
             </thead>
             <tbody>
@@ -417,13 +425,13 @@ export default function ReadyBoard() {
                     <Td className="whitespace-nowrap tabular-nums text-adm-muted">{days == null ? "Unknown" : days}</Td>
                     <Td className="whitespace-nowrap">
                       {primary ? (
-                        <button type="button" className="text-[14px] font-semibold text-adm-primary hover:underline disabled:opacity-50" onClick={primary.run} disabled={primary.busy}>
+                        <button type="button" className="text-[14px] font-medium text-adm-ink hover:underline disabled:opacity-50" onClick={primary.run} disabled={primary.busy}>
                           {primary.busy ? "Working..." : primary.label}
                         </button>
                       ) : bucketOf(r) === "ready" && r.deal_processed_at ? (
                         <StatusText tone="success">Filed</StatusText>
                       ) : (
-                        <button type="button" className="text-[14px] font-semibold text-adm-primary hover:underline" onClick={() => navigate(`/vehicle-file/${r.id}?tab=getready`)}>Open get-ready</button>
+                        <button type="button" className="text-[14px] font-medium text-adm-ink hover:underline" onClick={() => navigate(`/vehicle-file/${r.id}?tab=getready`)}>Open get-ready</button>
                       )}
                     </Td>
                     <Td className="whitespace-nowrap text-adm-muted">{owners.get(r.vin) || "Unassigned"}</Td>
@@ -457,6 +465,7 @@ export default function ReadyBoard() {
               })}
             </tbody>
           </WorkTable>
+          </div>
         </QueryState>
       </div>
 

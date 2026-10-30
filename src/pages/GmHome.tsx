@@ -410,6 +410,7 @@ const GmHome = () => {
       )}
 
       <MetricStrip
+        allBars
         label="Today at a glance"
         action={canViewInventory ? <LinkButton to="#today-work" variant="primary">Review work</LinkButton> : undefined}
         metrics={[
@@ -441,14 +442,14 @@ const GmHome = () => {
             </thead>
             <tbody>
               {shown.map((r, i) => (
-                <tr key={r.id} className="h-14 hover:bg-adm-workspace">
+                <tr key={r.id} className="h-12 hover:bg-adm-workspace">
                   <Td className="tabular-nums">
-                    <span className={`inline-flex min-w-[24px] justify-center rounded-[2px] px-1.5 text-[12px] font-bold ${r.urgent ? "bg-adm-danger-bg text-adm-danger" : "bg-adm-workspace text-adm-muted"}`}>{i + 1}</span>
+                    <span className={`inline-flex min-w-[24px] justify-center rounded-[2px] px-1.5 text-[12px] font-bold ${r.urgent ? (i === 0 ? "bg-adm-danger text-white" : "bg-[#D97706] text-white") : "bg-adm-workspace text-adm-muted"}`}>{i + 1}</span>
                   </Td>
                   <Td className="max-w-[160px] truncate text-adm-muted">{r.kind}</Td>
-                  <Td className="max-w-[260px] truncate font-semibold text-adm-ink">{r.vehicle}</Td>
+                  <Td className="max-w-[320px] truncate font-semibold text-adm-ink">{r.vehicle}</Td>
                   <Td className="max-w-[160px] truncate text-adm-muted">{r.owner}</Td>
-                  <Td className="max-w-[320px] truncate">
+                  <Td className="max-w-[380px] truncate">
                     <Link to={r.href} className="text-adm-primary hover:underline" title={r.issue}>{r.next}</Link>
                     <span className="text-adm-muted">{` - ${r.issue}`}</span>
                   </Td>

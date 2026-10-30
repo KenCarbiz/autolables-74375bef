@@ -156,7 +156,7 @@ const Customers = () => {
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch">
         <div className="min-w-0 flex-1">
-          <MetricStrip
+          <MetricStrip boxed
             label="Customer totals"
             metrics={[
               { label: BUCKET_LABEL[tab], value: loading && !book.customers.length ? null : rows.length, tone: "danger" },
@@ -228,10 +228,10 @@ const Customers = () => {
                       </Link>
                     </Td>
                     <Td className="whitespace-nowrap text-adm-muted">{c.identified ? maskContact(c.email || c.phone) : "Not captured"}</Td>
-                    <Td className="min-w-[150px]">{c.vehicles[0]?.label ?? "None attached"}</Td>
+                    <Td className="max-w-[215px]"><span className="block truncate" title={c.vehicles[0]?.label}>{c.vehicles[0]?.label ?? "None attached"}</span></Td>
                     <Td className="whitespace-nowrap">{c.assignedEmployee?.name ?? <span className="text-adm-muted">Unassigned</span>}</Td>
-                    <Td className="min-w-[110px]">{lastIntent(c) ?? <span className="text-adm-muted">None linked</span>}</Td>
-                    <Td className="min-w-[130px]"><span className="block text-[14px] font-semibold text-adm-primary">{c.nextAction.headline}</span></Td>
+                    <Td className="whitespace-nowrap">{lastIntent(c) ?? <span className="text-adm-muted">None linked</span>}</Td>
+                    <Td className="max-w-[130px]"><span className="block truncate text-[14px] font-semibold text-adm-primary" title={c.nextAction.headline}>{c.nextAction.headline}</span></Td>
                     <Td align="right" className="whitespace-nowrap text-adm-muted">{relativeTime(c.lastActivityAt)}</Td>
                     <Td align="right" className="w-10" >
                       <span onClick={(e) => e.stopPropagation()}>

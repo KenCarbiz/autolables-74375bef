@@ -103,6 +103,7 @@ export default function ProviderDetailPage() {
     >
       <div className="flex flex-col gap-4">
         <MetricStrip
+          allBars
           label="Provider status"
           metrics={[
             { label: "Entitlement", value: ENTITLEMENT_LABEL[card.entitlement], tone: card.entitlement === "entitled" ? "success" : card.entitlement === "unknown" || card.entitlement === "not_applicable" ? "neutral" : "danger" },

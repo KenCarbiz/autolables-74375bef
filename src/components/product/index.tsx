@@ -128,7 +128,7 @@ const tabMatches = (to: string, pathname: string, search: string) => {
  * so deep links, reload and back keep working. Scrolls sideways on a phone
  * instead of wrapping or clipping.
  */
-export const LocalTabs = ({ tabs, label, className, defaultKey }: { tabs: LocalTab[]; label: string; className?: string; defaultKey?: string }) => {
+export const LocalTabs = ({ tabs, label, className, defaultKey, trailing }: { tabs: LocalTab[]; label: string; className?: string; defaultKey?: string; trailing?: ReactNode }) => {
   const { pathname, search } = useLocation();
   const matched = tabs.map((t) => t.active ?? tabMatches(t.to, pathname, search));
   // With no query-string match, the tab named as the default (or the first
@@ -136,7 +136,7 @@ export const LocalTabs = ({ tabs, label, className, defaultKey }: { tabs: LocalT
   const anyActive = matched.some(Boolean);
   return (
     <nav aria-label={label} className={cn("overflow-x-auto border-b border-adm-border print:hidden", className)}>
-      <ul className="flex min-w-max items-stretch gap-6">
+      <ul className={cn("flex min-w-max items-stretch gap-6", trailing && "w-full")}>
         {tabs.map((t, i) => {
           const key = t.key ?? t.to;
           const active = anyActive ? matched[i] : defaultKey ? key === defaultKey : i === 0 && t.to.split("?")[0] === pathname;
@@ -157,7 +157,8 @@ export const LocalTabs = ({ tabs, label, className, defaultKey }: { tabs: LocalT
             </li>
           );
         })}
-      </ul>
+      {trailing && <li className="ml-auto flex items-center gap-3 py-1">{trailing}</li>}
+        </ul>
     </nav>
   );
 };
@@ -175,10 +176,10 @@ export interface Metric {
 }
 
 /** Four or fewer primary metrics in one strip, each with its own denominator. */
-export const MetricStrip = ({ metrics, label, className, action, numberFirst = false }: { metrics: Metric[]; label: string; className?: string; action?: ReactNode; numberFirst?: boolean }) => {
+export const MetricStrip = ({ metrics, label, className, action, numberFirst = false, boxed = false, allBars = false }: { metrics: Metric[]; label: string; className?: string; action?: ReactNode; numberFirst?: boolean; boxed?: boolean; allBars?: boolean }) => {
   const shown = metrics.slice(0, 6);
   return (
-    <section aria-label={label} className={cn("border-y border-adm-border", className)}>
+    <section aria-label={label} className={cn(boxed ? "overflow-hidden rounded-md border border-adm-border bg-white" : "border-y border-adm-border", className)}>
       <div className="flex flex-col lg:flex-row lg:items-stretch">
         <dl className={cn("grid flex-1 grid-cols-2", shown.length >= 6 ? "lg:grid-cols-6" : shown.length >= 4 ? "lg:grid-cols-4" : shown.length === 3 ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
           {shown.map((m, i) => {
@@ -199,7 +200,7 @@ export const MetricStrip = ({ metrics, label, className, action, numberFirst = f
                 {m.hint && <dd className="truncate text-[12px] leading-[18px] text-adm-muted">{m.hint}</dd>}
               </>
             );
-            const barred = numberFirst ? !m.loading : !m.loading && m.value !== 0 && m.value !== "0" && (m.tone === "danger" || m.tone === "success" || m.tone === "warning");
+            const barred = numberFirst || allBars ? !m.loading : !m.loading && m.value !== 0 && m.value !== "0" && (m.tone === "danger" || m.tone === "success" || m.tone === "warning");
             const barColor = m.tone === "danger" ? "before:bg-adm-danger" : m.tone === "success" ? "before:bg-adm-success" : m.tone === "warning" ? "before:bg-[#B45309]" : "before:bg-adm-border";
             const cell = cn(
               "relative block py-3 px-5 min-w-0",

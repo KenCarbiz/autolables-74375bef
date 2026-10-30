@@ -91,8 +91,8 @@ const CustomerRecord = () => {
         title={
           <span className="inline-flex flex-wrap items-center gap-3">
             {title}
-            <Chip tone={customer.identified ? "good" : "neutral"}>{customer.identified ? "Identified" : "Unidentified"}</Chip>
-            <Chip tone={customer.bucket === "hot" ? "attention" : customer.bucket === "won" ? "good" : "neutral"}>
+            <Chip size="lg" tone={customer.identified ? "good" : "neutral"}>{customer.identified ? "Identified" : "Unidentified"}</Chip>
+            <Chip size="lg" tone={customer.bucket === "hot" ? "attention" : customer.bucket === "won" ? "good" : "neutral"}>
               {BUCKET_LABEL[customer.bucket]}
             </Chip>
           </span>
@@ -291,7 +291,7 @@ const CustomerRecord = () => {
               {customer.phone ? <LinkButton variant="secondary" className="w-full whitespace-nowrap px-2" to={`sms:${customer.phone.replace(/[^\d+]/g, "")}`}><MessageSquare className="h-5 w-5 text-adm-primary" aria-hidden="true" /> Send SMS</LinkButton> : null}
               {customer.email ? <LinkButton variant="secondary" className="w-full whitespace-nowrap px-2" to={`mailto:${customer.email}`}><Mail className="h-5 w-5 text-adm-primary" aria-hidden="true" /> Send email</LinkButton> : null}
               <Button className="w-full whitespace-nowrap px-2" onClick={() => setContactOpen(true)}>Log contact</Button>
-              {primaryVehicle?.slug ? <LinkButton variant="secondary" className="w-full whitespace-nowrap px-2" to={`/v/${primaryVehicle.slug}`}><ExternalLink className="h-5 w-5 shrink-0 text-adm-primary" aria-hidden="true" /> Open Passport</LinkButton> : null}
+              {primaryVehicle?.slug ? <LinkButton variant="secondary" className="col-span-2 w-full whitespace-nowrap px-2" to={`/v/${primaryVehicle.slug}`}><ExternalLink className="h-5 w-5 shrink-0 text-adm-primary" aria-hidden="true" /> Open Passport</LinkButton> : null}
               {!callHref && !customer.email && !primaryVehicle?.slug ? (
                 <p className="text-[14px] leading-[20px] text-adm-muted">No contact method captured.</p>
               ) : null}

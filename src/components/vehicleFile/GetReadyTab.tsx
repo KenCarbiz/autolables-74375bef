@@ -51,28 +51,21 @@ const STAGE_DOT: Record<StageState, string> = {
 const RailStrip = ({ state }: { state: LifecycleState | null }) => {
   const states = stageStates(state);
   return (
-    <ol className="flex flex-col gap-2 sm:flex-row sm:items-stretch sm:gap-0">
+    <ol className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-0">
       {RAIL.map((stage, i) => {
         const s = states[stage.key];
         return (
-          <li key={stage.key} className="flex-1 min-w-0 flex sm:flex-col items-center sm:items-stretch gap-3 sm:gap-0">
-            <div className="flex items-center sm:justify-center gap-0 shrink-0">
-              {i > 0 && <span className={`hidden sm:block h-0.5 flex-1 ${s === "future" ? "bg-adm-border" : "bg-adm-primary"}`} />}
-              <span className={`w-7 h-7 rounded-full border inline-flex items-center justify-center shrink-0 ${STAGE_DOT[s]}`}>
-                <span className="text-[13px] font-bold tabular-nums">{i + 1}</span>
-              </span>
-              {i < RAIL.length - 1 && <span className={`hidden sm:block h-0.5 flex-1 ${states[RAIL[i + 1].key] === "future" ? "bg-adm-border" : "bg-adm-primary"}`} />}
-            </div>
-            <div className="min-w-0 sm:text-center sm:mt-2">
-              <p className={`text-al-body font-semibold truncate ${
-                s === "current" ? "text-adm-ink" : s === "done" ? "text-adm-ink" : "text-adm-muted"
-              }`}>
-                {stage.label}
-              </p>
-              <p className="text-[12px] leading-[18px] text-adm-muted truncate">
+          <li key={stage.key} className={`flex min-w-0 items-center gap-2 ${i < RAIL.length - 1 ? "sm:flex-1" : ""}`}>
+            <span className={`w-7 h-7 rounded-full border inline-flex items-center justify-center shrink-0 ${STAGE_DOT[s]}`}>
+              <span className="text-[13px] font-bold tabular-nums">{i + 1}</span>
+            </span>
+            <div className="min-w-0 shrink-0">
+              <p className={`text-[13px] leading-[16px] font-semibold ${s === "future" ? "text-adm-muted" : "text-adm-ink"}`}>{stage.label}</p>
+              <p className="text-[12px] leading-[16px] text-adm-muted">
                 {s === "done" ? "Confirmed" : s === "current" ? "In progress" : "Not started"}
               </p>
             </div>
+            {i < RAIL.length - 1 && <span aria-hidden="true" className={`hidden sm:block h-px min-w-[12px] flex-1 ${states[RAIL[i + 1].key] === "future" ? "bg-adm-border" : "bg-adm-primary"}`} />}
           </li>
         );
       })}
@@ -286,7 +279,7 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready, strip }: { vehicle: Veh
           <p className="-mt-2 text-[13px] leading-[18px] text-adm-muted">Complete all items to make this vehicle retail ready.</p>
           <ul className="divide-y divide-adm-border">
             {ready.checks.map((c) => (
-              <li key={c.label} className="flex items-center justify-between gap-3 py-2 text-[14px] leading-[20px]">
+              <li key={c.label} className="flex items-center justify-between gap-3 py-[6px] text-[14px] leading-[20px]">
                 <span className="inline-flex items-center gap-2 min-w-0">
                   <span role="img" aria-label={c.ok ? "Complete" : c.blocks ? "Open, blocks publish" : "Open"} className={`h-4 w-4 shrink-0 rounded-[3px] border inline-flex items-center justify-center ${c.ok ? "bg-adm-primary border-adm-primary text-white" : "bg-adm-surface border-adm-border"}`}>
                     {c.ok && <Check className="w-3 h-3" strokeWidth={3} aria-hidden="true" />}

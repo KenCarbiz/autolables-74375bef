@@ -33,7 +33,7 @@ export function FindingsTable({ findings, selectedId, onSelect }: { findings: Fi
                 onClick={() => setFilter(f.key)}
                 className={cn(
                   "min-h-[32px] rounded-[6px] border px-3 text-[13px] font-medium",
-                  filter === f.key ? "border-adm-primary text-adm-primary bg-adm-selected" : "border-adm-border text-adm-ink hover:bg-adm-workspace",
+                  f.key === "failed" && counts.failed > 0 && filter === f.key ? "border-adm-danger text-adm-danger bg-white" : filter === f.key ? "border-adm-primary text-adm-primary bg-adm-selected" : "border-adm-border text-adm-ink hover:bg-adm-workspace",
                 )}
               >
                 {f.label} ({counts[f.key]})

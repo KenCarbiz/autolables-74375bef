@@ -421,6 +421,7 @@ export default function ServiceWriterDesk() {
         <EmptyState Icon={ClipboardList} title={TAB_EMPTY[tab].title} detail={TAB_EMPTY[tab].detail} />
       ) : (
         <div>
+          <div className="overflow-hidden rounded-md border border-adm-border bg-white">
           <WorkTable caption="Vehicles in the service pipeline, highest priority first" minWidth={960}>
             <thead>
               <tr>
@@ -433,9 +434,9 @@ export default function ServiceWriterDesk() {
                 <Th>Stage</Th>
                 <Th>Technician</Th>
                 <Th align="right">Age</Th>
-                <Th>Delivery target</Th>
+                <Th className="whitespace-nowrap">Delivery target</Th>
                 <Th>Next action</Th>
-                <Th align="right"><span className="sr-only">Action</span></Th>
+                <Th align="right">Action</Th>
               </tr>
             </thead>
             <tbody>
@@ -470,6 +471,7 @@ export default function ServiceWriterDesk() {
               ))}
             </tbody>
           </WorkTable>
+          </div>
           {visible.length > 100 ? (
             <p className="text-[12px] leading-[18px] text-adm-muted pt-3">
               Showing the 100 highest-priority of {visible.length}.

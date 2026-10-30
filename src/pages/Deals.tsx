@@ -165,7 +165,7 @@ const Deals = () => {
         label="Deal lifecycle views"
         tabs={tabs.map((t): LocalTab => ({ key: t.key, label: t.label, to: `/deals?state=${t.key}${q ? `&q=${encodeURIComponent(q)}` : ""}`, count: loading && !book.deals.length ? null : t.count, active: t.key === tab }))}
       />
-      <MetricStrip
+      <MetricStrip boxed
         numberFirst
         label="Deal totals"
         action={
