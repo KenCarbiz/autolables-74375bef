@@ -78,35 +78,93 @@ export function parseNotifyBody(raw: Uint8Array): NotifyParse {
   return { ok: true, event: { action, path: p.path, destination, at, size } };
 }
 
-// The signed download URL Files.com returns is fetched with no credentials.
-// Only public https hosts on the default port are allowed.
-export function isSafeDownloadUrl(raw: unknown): boolean {
-  if (typeof raw !== "string") return false;
-  let u: URL;
-  try {
-    u = new URL(raw);
-  } catch {
-    return false;
-  }
-  if (u.protocol !== "https:" || u.username || u.password || (u.port && u.port !== "443")) return false;
-  const h = u.hostname.toLowerCase();
-  if (!h.includes(".") || h === "localhost" || h.endsWith(".localhost") || h.endsWith(".internal") || h.endsWith(".local")) return false;
-  if (/^\d+(\.\d+){3}$/.test(h) || h.startsWith("[") || h.includes(":")) return false;
-  return true;
-}
-
-export type RemoteMeta = { size: number | null; mtime: string | null; checksum: string | null };
+export type RemoteMeta = { size: number | null; mtime: string | null; checksum: string | null; sha256: string | null };
 
 export function remoteMeta(obj: unknown): RemoteMeta {
   const o = (obj ?? {}) as Record<string, unknown>;
   const size = typeof o.size === "number" ? o.size : null;
   const mtime = typeof o.mtime === "string" ? o.mtime : null;
-  const checksum = typeof o.md5 === "string" && o.md5 ? `md5:${o.md5}` : typeof o.crc32 === "string" && o.crc32 ? `crc32:${o.crc32}` : null;
-  return { size, mtime, checksum };
+  const sha256 = typeof o.sha256 === "string" && /^[0-9a-f]{64}$/i.test(o.sha256) ? o.sha256.toLowerCase() : null;
+  const checksum = sha256 ? `sha256:${sha256}` : typeof o.md5 === "string" && o.md5 ? `md5:${o.md5}` : typeof o.crc32 === "string" && o.crc32 ? `crc32:${o.crc32}` : null;
+  return { size, mtime, checksum, sha256 };
 }
 
+// Fails closed: a version without size and mtime cannot be pinned.
+export const hasVersion = (m: RemoteMeta): boolean => m.size !== null && m.mtime !== null;
 export const sameVersion = (a: RemoteMeta, b: RemoteMeta): boolean =>
-  a.size === b.size && a.mtime === b.mtime && a.checksum === b.checksum;
+  hasVersion(a) && hasVersion(b) && a.size === b.size && a.mtime === b.mtime && a.checksum === b.checksum;
+
+export type ContentCheck = { ok: true } | { ok: false; reason: string };
+export function checkDownloadedContent(before: RemoteMeta, after: RemoteMeta, byteLength: number, sha: string): ContentCheck {
+  if (!hasVersion(before) || !hasVersion(after)) return { ok: false, reason: "remote_version_unavailable" };
+  if (!sameVersion(before, after)) return { ok: false, reason: "file_changed_during_download" };
+  if (before.size !== byteLength) return { ok: false, reason: "size_mismatch" };
+  if (before.sha256 && before.sha256 !== sha) return { ok: false, reason: "sha256_mismatch" };
+  return { ok: true };
+}
+
+export const fileContentsUrl = (path: string): string => `${FILESCOM_ORIGIN}/api/rest/v1/file_contents/${encodeApiPath(path)}`;
+export const DOWNLOAD_TIMEOUT_MS = 60_000;
+
+type Fetch = (url: string, init: RequestInit) => Promise<Response>;
+// Single-stream download from the fixed origin only. Redirects are refused so
+// the API key is never presented to another host.
+export async function downloadFileContents(fetchFn: Fetch, key: string, path: string): Promise<Uint8Array> {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), DOWNLOAD_TIMEOUT_MS);
+  try { return await streamContents(fetchFn, key, path, ctl.signal); }
+  finally { clearTimeout(timer); }
+}
+
+async function streamContents(fetchFn: Fetch, key: string, path: string, signal: AbortSignal): Promise<Uint8Array> {
+  let res: Response;
+  try {
+    res = await fetchFn(fileContentsUrl(path), { headers: { "X-FilesAPI-Key": key }, redirect: "error", signal });
+  } catch {
+    throw new Error("download_refused_or_timeout");
+  }
+  if (res.status !== 200) {
+    await res.body?.cancel();
+    throw new Error(res.status === 401 || res.status === 403 ? "filescom_auth_failed" : "download_failed");
+  }
+  if (Number(res.headers.get("content-length") ?? "0") > MAX_CSV_BYTES) { await res.body?.cancel(); throw new Error("file_too_large"); }
+  if (!res.body) return new Uint8Array(0);
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_CSV_BYTES) { await reader.cancel(); throw new Error("file_too_large"); }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(total);
+  let o = 0;
+  for (const c of chunks) { out.set(c, o); o += c.byteLength; }
+  return out;
+}
+
+export type ApprovalBinding = { id: string; status: BindingStatus; tenant_id: string | null; proposed_at: string | null };
+export type ApprovalRun = { id: string; status: string; binding_id: string | null; tenant_id: string | null; content_sha256: string | null; remote_size: number | null; remote_mtime: string | null; report: unknown } | null;
+export type ApprovalFile = { last_run_id: string | null; last_content_sha256: string | null; remote_size: number | null; remote_mtime: string | null } | null;
+export type ApprovalDecision = { ok: true; review: unknown; acknowledged: boolean } | { ok: false; error: string };
+
+// Approval is allowed only on a passed dry run of the current file version,
+// against this exact proposal (id, tenant, proposed_at).
+export function approvalDecision(b: ApprovalBinding | null, run: ApprovalRun, file: ApprovalFile, acknowledge: unknown): ApprovalDecision {
+  if (!b || b.status !== "pending" || !b.tenant_id || !b.proposed_at) return { ok: false, error: "no_pending_binding" };
+  if (!run || run.binding_id !== b.id || run.tenant_id !== b.tenant_id) return { ok: false, error: "dry_run_against_proposed_dealer_required" };
+  const rep = (run.report ?? null) as { outcome?: unknown; identity?: unknown; identities?: unknown; bindingProposedAt?: unknown; identityReview?: { verdict?: unknown } | null } | null;
+  if (run.status !== "passed" || !rep || rep.outcome !== "passed") return { ok: false, error: "dry_run_not_passed" };
+  if (!rep.identity || rep.identities !== 1) return { ok: false, error: "dealer_identity_not_single" };
+  if (rep.bindingProposedAt !== b.proposed_at) return { ok: false, error: "proposal_changed_since_dry_run" };
+  if (!file || file.last_run_id !== run.id || !run.content_sha256 || file.last_content_sha256 !== run.content_sha256) return { ok: false, error: "file_changed_since_dry_run" };
+  if (run.remote_size === null || run.remote_mtime === null || file.remote_size !== run.remote_size || file.remote_mtime !== run.remote_mtime) return { ok: false, error: "file_changed_since_dry_run" };
+  const match = rep.identityReview?.verdict === "match";
+  if (!match && acknowledge !== true) return { ok: false, error: "identity_not_confirmed" };
+  return { ok: true, review: rep.identityReview ?? null, acknowledged: !match };
+}
 
 export type BindingStatus = "pending" | "approved" | "disabled" | null;
 

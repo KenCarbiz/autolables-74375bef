@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
   FILESCOM_ORIGIN, INBOUND_FOLDER, MAX_CSV_BYTES, assertConnectorWrite, authorizePlatformAdmin, canonicalInboundPath,
-  encodeApiPath, intakeStatus, remoteMeta, sameVersion, sha256Hex, type BindingStatus, type RemoteMeta,
+  approvalDecision, checkDownloadedContent, downloadFileContents, encodeApiPath, intakeStatus, remoteMeta, sha256Hex, type BindingStatus, type RemoteMeta,
 } from "../_shared/filescom/policy.ts";
 import { parseCsv } from "../_shared/filescom/csv.ts";
 import { compareIdentity, runDryRun, type TenantProfile } from "../_shared/filescom/dryRun.ts";
@@ -33,39 +33,17 @@ async function fcApi(key: string, path: string): Promise<unknown> {
 const fileMeta = async (key: string, path: string): Promise<RemoteMeta> => remoteMeta(await fcApi(key, `file_actions/metadata/${encodeApiPath(path)}`));
 
 async function download(key: string, path: string): Promise<Uint8Array> {
-  let res: Response;
-  try {
-    res = await fetch(`${FILESCOM_ORIGIN}/api/rest/v1/file_contents/${encodeApiPath(path)}`, { headers: { "X-FilesAPI-Key": key }, redirect: "error" });
-  } catch {
-    throw new FcError("download_redirect_refused");
-  }
-  if (res.status !== 200) {
-    await res.body?.cancel();
-    throw new FcError(res.status === 401 || res.status === 403 ? "filescom_auth_failed" : "download_failed", res.status);
-  }
-  const len = Number(res.headers.get("content-length") ?? "0");
-  if (len > MAX_CSV_BYTES) throw new FcError("file_too_large");
-  const reader = res.body!.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > MAX_CSV_BYTES) { await reader.cancel(); throw new FcError("file_too_large"); }
-    chunks.push(value);
-  }
-  const out = new Uint8Array(total);
-  let o = 0;
-  for (const c of chunks) { out.set(c, o); o += c.byteLength; }
-  return out;
+  try { return await downloadFileContents(fetch, key, path); }
+  catch (e) { throw new FcError(e instanceof Error ? e.message : "download_failed"); }
 }
+
+const must = (r: { error: unknown }) => { if (r.error) throw new FcError("ledger_write_failed"); };
 
 const write = (db: SupabaseClient, table: string) => { assertConnectorWrite(table); return db.from(table); };
 
 async function bindingFor(db: SupabaseClient, path: string) {
   const { data } = await db.from("inventory_feed_bindings").select("*").eq("provider", "filescom").eq("path", path).maybeSingle();
-  return data as { id: string; status: BindingStatus; tenant_id: string | null } | null;
+  return data as { id: string; status: BindingStatus; tenant_id: string | null; proposed_at: string | null } | null;
 }
 
 async function tenantProfile(db: SupabaseClient, tenantId: string): Promise<TenantProfile | null> {
@@ -78,7 +56,7 @@ async function tenantProfile(db: SupabaseClient, tenantId: string): Promise<Tena
 async function syncFileStatus(db: SupabaseClient, path: string) {
   const b = await bindingFor(db, path);
   const s = intakeStatus(b?.status ?? null);
-  await write(db, "inventory_feed_files").update({ status: s.status, quarantine_reason: s.reason, updated_at: new Date().toISOString() }).eq("provider", "filescom").eq("path", path).in("status", ["pending", "quarantined"]);
+  must(await write(db, "inventory_feed_files").update({ status: s.status, quarantine_reason: s.reason, updated_at: new Date().toISOString() }).eq("provider", "filescom").eq("path", path).in("status", ["pending", "quarantined"]));
 }
 
 async function overview(db: SupabaseClient) {
@@ -117,12 +95,13 @@ async function discover(db: SupabaseClient, key: string) {
     const m = remoteMeta(item);
     const b = await bindingFor(db, p.path);
     const s = intakeStatus(b?.status ?? null);
-    const { data: existing } = await db.from("inventory_feed_files").select("id,status").eq("provider", "filescom").eq("path", p.path).maybeSingle();
+    const { data: existing, error: rerr } = await db.from("inventory_feed_files").select("id,status").eq("provider", "filescom").eq("path", p.path).maybeSingle();
+    if (rerr) throw new FcError("read_failed");
     if (existing) {
       const keep = existing.status === "validating" || existing.status === "validated" || existing.status === "rejected" || existing.status === "failed";
-      await write(db, "inventory_feed_files").update({ remote_size: m.size, remote_mtime: m.mtime, remote_checksum: m.checksum, discovered_at: now, updated_at: now, ...(keep ? {} : { status: s.status, quarantine_reason: s.reason }) }).eq("id", existing.id);
+      must(await write(db, "inventory_feed_files").update({ remote_size: m.size, remote_mtime: m.mtime, remote_checksum: m.checksum, discovered_at: now, updated_at: now, ...(keep ? {} : { status: s.status, quarantine_reason: s.reason }) }).eq("id", existing.id));
     } else {
-      await write(db, "inventory_feed_files").insert({ path: p.path, remote_size: m.size, remote_mtime: m.mtime, remote_checksum: m.checksum, discovered_at: now, status: s.status, quarantine_reason: s.reason });
+      must(await write(db, "inventory_feed_files").insert({ path: p.path, remote_size: m.size, remote_mtime: m.mtime, remote_checksum: m.checksum, discovered_at: now, status: s.status, quarantine_reason: s.reason }));
     }
     found++;
   }
@@ -138,13 +117,14 @@ async function validate(db: SupabaseClient, key: string, path: string, uid: stri
     file_id: file.id, path, binding_id: binding?.id ?? null, binding_status: binding?.status ?? "unmapped", tenant_id: binding?.tenant_id ?? null, triggered_by: uid,
   }).select("id").single();
   if (error || !run) throw new FcError("run_create_failed");
-  await write(db, "inventory_feed_files").update({ status: "validating", updated_at: new Date().toISOString() }).eq("id", file.id);
+  must(await write(db, "inventory_feed_files").update({ status: "validating", updated_at: new Date().toISOString() }).eq("id", file.id));
 
   const finish = async (status: "passed" | "rejected" | "failed", patch: Record<string, unknown>) => {
     const now = new Date().toISOString();
-    await write(db, "inventory_feed_runs").update({ status, finished_at: now, ...patch }).eq("id", run.id);
+    must(await write(db, "inventory_feed_runs").update({ status, finished_at: now, ...patch }).eq("id", run.id));
     const fileStatus = status === "passed" ? "validated" : status === "rejected" ? "rejected" : "failed";
-    await write(db, "inventory_feed_files").update({ status: fileStatus, last_run_id: run.id, updated_at: now, ...(patch.content_sha256 ? { last_content_sha256: patch.content_sha256 } : {}) }).eq("id", file.id);
+    const version = patch.content_sha256 ? { last_content_sha256: patch.content_sha256, remote_size: patch.remote_size ?? null, remote_mtime: patch.remote_mtime ?? null } : {};
+    must(await write(db, "inventory_feed_files").update({ status: fileStatus, last_run_id: run.id, updated_at: now, ...version }).eq("id", file.id));
     return { runId: run.id, status };
   };
 
@@ -152,10 +132,9 @@ async function validate(db: SupabaseClient, key: string, path: string, uid: stri
     const before = await fileMeta(key, path);
     const bytes = await download(key, path);
     const after = await fileMeta(key, path);
-    if (!sameVersion(before, after) || (before.size !== null && before.size !== bytes.byteLength)) {
-      return await finish("failed", { failure_reason: "file_changed_during_download" });
-    }
     const sha = await sha256Hex(bytes);
+    const chk = checkDownloadedContent(before, after, bytes.byteLength, sha);
+    if (!chk.ok) return await finish("failed", { failure_reason: chk.reason });
     let text: string;
     try { text = new TextDecoder("utf-8", { fatal: true }).decode(bytes); }
     catch { return await finish("rejected", { failure_reason: "not_utf8", content_sha256: sha, remote_size: after.size, remote_mtime: after.mtime }); }
@@ -169,16 +148,18 @@ async function validate(db: SupabaseClient, key: string, path: string, uid: stri
       if (lerr) return await finish("failed", { failure_reason: "inventory_read_failed" });
       existing = (rows ?? []).filter((r) => r.vin).map((r) => ({ vin: r.vin as string, price: r.price === null ? null : Number(r.price) }));
       profile = await tenantProfile(db, binding.tenant_id);
+      if (!profile) return await finish("failed", { failure_reason: "tenant_profile_unavailable" });
     }
     const report = runDryRun(csv.headers, csv.rows, existing);
     const identityReview = profile ? compareIdentity(report.identity, profile) : null;
     return await finish(report.outcome, {
       content_sha256: sha, remote_size: after.size, remote_mtime: after.mtime,
       failure_reason: report.outcome === "rejected" ? report.rejectReasons.join(",") : null,
-      report: { ...report, identityReview, tenantProfile: profile, inventoryWrites: 0, providerCalls: 0 },
+      report: { ...report, identityReview, bindingProposedAt: binding?.proposed_at ?? null, tenantProfile: profile, inventoryWrites: 0, providerCalls: 0 },
     });
   } catch (e) {
     const code = e instanceof FcError ? e.code : "validation_error";
+    if (code === "ledger_write_failed") throw e;
     return await finish("failed", { failure_reason: code });
   }
 }
@@ -242,21 +223,23 @@ Deno.serve(async (req) => {
         if (existing?.status === "approved") return json(409, { error: "binding_already_approved_disable_first" });
         const now = new Date().toISOString();
         const { error } = await write(db, "inventory_feed_bindings").upsert({ provider: "filescom", path, tenant_id: body.tenant_id, status: "pending", proposed_by: userId, proposed_at: now, approved_by: null, approved_at: null, identity_acknowledged: null, updated_at: now }, { onConflict: "provider,path" });
-        if (error) throw new FcError("write_failed");
+        if (error) throw new FcError("ledger_write_failed");
         await syncFileStatus(db, path);
         return json(200, { ok: true });
       }
       case "approve_binding": {
         const path = needPath();
         const b = await bindingFor(db, path);
-        if (!b || b.status !== "pending" || !b.tenant_id) return json(409, { error: "no_pending_binding" });
-        const { data: last } = await db.from("inventory_feed_runs").select("id,status,report,binding_id,tenant_id").eq("path", path).order("started_at", { ascending: false }).limit(1).maybeSingle();
-        if (!last || last.binding_id !== b.id || last.tenant_id !== b.tenant_id || !last.report) return json(409, { error: "dry_run_against_proposed_dealer_required" });
-        const review = (last.report as { identityReview?: { verdict?: string; fields?: unknown } }).identityReview ?? null;
-        if (review?.verdict !== "match" && body.acknowledge_identity !== true) return json(409, { error: "identity_not_confirmed", review });
+        const { data: last, error: lerr } = await db.from("inventory_feed_runs").select("id,status,report,binding_id,tenant_id,content_sha256,remote_size,remote_mtime").eq("provider", "filescom").eq("path", path).order("started_at", { ascending: false }).limit(1).maybeSingle();
+        const { data: file, error: ferr } = await db.from("inventory_feed_files").select("last_run_id,last_content_sha256,remote_size,remote_mtime").eq("provider", "filescom").eq("path", path).maybeSingle();
+        if (lerr || ferr) throw new FcError("read_failed");
+        const d = approvalDecision(b, last, file, body.acknowledge_identity);
+        if (!d.ok) return json(409, { error: d.error });
         const now = new Date().toISOString();
-        const { error } = await write(db, "inventory_feed_bindings").update({ status: "approved", approved_by: userId, approved_at: now, identity_acknowledged: { run_id: last.id, review, acknowledged: review?.verdict !== "match" }, updated_at: now }).eq("id", b.id).eq("status", "pending");
-        if (error) throw new FcError("write_failed");
+        const { data: upd, error } = await write(db, "inventory_feed_bindings").update({ status: "approved", approved_by: userId, approved_at: now, identity_acknowledged: { run_id: last!.id, review: d.review, acknowledged: d.acknowledged }, updated_at: now })
+          .eq("id", b!.id).eq("status", "pending").eq("tenant_id", b!.tenant_id!).eq("proposed_at", b!.proposed_at!).select("id");
+        if (error) throw new FcError("ledger_write_failed");
+        if (!upd || upd.length !== 1) return json(409, { error: "proposal_changed_concurrently" });
         await syncFileStatus(db, path);
         return json(200, { ok: true });
       }
@@ -264,7 +247,7 @@ Deno.serve(async (req) => {
         const path = needPath();
         const now = new Date().toISOString();
         const { error } = await write(db, "inventory_feed_bindings").update({ status: "disabled", disabled_by: userId, disabled_at: now, updated_at: now }).eq("provider", "filescom").eq("path", path);
-        if (error) throw new FcError("write_failed");
+        if (error) throw new FcError("ledger_write_failed");
         await syncFileStatus(db, path);
         return json(200, { ok: true });
       }
