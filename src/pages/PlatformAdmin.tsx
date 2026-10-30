@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { LocalTabs, PageBody, PageHeader } from "@/components/product";
 import { useAuth } from "@/contexts/AuthContext";
 import PlatformTenants from "@/components/admin/PlatformTenants";
 import PlatformMembers from "@/components/admin/PlatformMembers";
@@ -31,7 +32,7 @@ const TABS: { id: PlatformTab; label: string; icon: typeof Store }[] = [
   { id: "tenants",      label: "Tenants",      icon: Store },
   { id: "members",      label: "Members",      icon: Users },
   { id: "entitlements", label: "Entitlements", icon: Award },
-  { id: "audit",        label: "Platform Audit", icon: ShieldCheck },
+  { id: "audit",        label: "Platform audit", icon: ShieldCheck },
   { id: "recalls",      label: "Recall refresh", icon: RefreshCw },
   { id: "billing",      label: "Billing handshake", icon: CreditCard },
   { id: "stripe",       label: "Stripe config", icon: KeyRound },
@@ -44,12 +45,10 @@ const TABS: { id: PlatformTab; label: string; icon: typeof Store }[] = [
 const PlatformAdmin = () => {
   const { user, isAdmin, loading } = useAuth();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
 
   const urlTab = searchParams.get("tab") as PlatformTab | null;
   const tab: PlatformTab = urlTab && VALID.includes(urlTab) ? urlTab : "tenants";
-
-  const setTab = (t: PlatformTab) => setSearchParams({ tab: t }, { replace: true });
 
   useEffect(() => {
     if (!loading && (!user || !isAdmin)) navigate("/login");
@@ -59,40 +58,33 @@ const PlatformAdmin = () => {
   if (!isAdmin) return null;
 
   return (
-    <div className="max-w-6xl mx-auto">
-      <div className="px-4 lg:px-6 pt-6">
-        <div className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-          Platform Admin
-        </div>
-        <h1 className="mt-1 text-2xl font-display font-semibold tracking-tight text-foreground">
-          Platform Control
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1 max-w-xl">
-          Cross-tenant surfaces: dealers, seat assignments, app entitlements, template libraries, Passport engagement, and the tamper-evident platform audit log.
-        </p>
-      </div>
+    <div data-product-surface="platform">
+      <PageBody>
+        <PageHeader
+          scope="Platform scope: every dealership"
+          title="Platform Console"
+          description="Dealers, seats, app entitlements, provider cost, template libraries and the platform audit log."
+        />
+        <LocalTabs
+          label="Platform sections"
+          defaultKey="tenants"
+          tabs={TABS.map((t) => ({ key: t.id, label: t.label, to: `/platform-admin?tab=${t.id}`, active: t.id === tab }))}
+        />
 
-      <div className="p-4 lg:p-6 space-y-4">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full bg-muted font-semibold text-foreground">
-            {TABS.find(t => t.id === tab)?.label || "Section"}
-          </span>
-          <span className="hidden sm:inline">— pick any platform section from the left sidebar to switch.</span>
-        </div>
-
-        {tab === "tenants"      && <PlatformTenants />}
-        {tab === "members"      && <PlatformMembers />}
-        {tab === "entitlements" && <PlatformEntitlements />}
-        {tab === "audit"        && <PlatformAudit />}
-        {tab === "recalls"      && <RecallRefreshTool />}
-        {tab === "billing"      && <BillingHandshakeDiagnostic />}
-        {tab === "stripe"       && <StripeConfigPanel />}
-        {tab === "templates"    && <StickerTemplatesAdminPanel />}
-        {tab === "passport-engagement" && <PassportEngagementDashboard />}
-        {tab === "api-usage"    && <MarketcheckApiUsagePanel />}
-        {tab === "budgets"      && <ProviderBudgetsPanel />}
-      </div>
+        <section aria-label={TABS.find((t) => t.id === tab)?.label} className="flex flex-col gap-4">
+          {tab === "tenants"      && <PlatformTenants />}
+          {tab === "members"      && <PlatformMembers />}
+          {tab === "entitlements" && <PlatformEntitlements />}
+          {tab === "audit"        && <PlatformAudit />}
+          {tab === "recalls"      && <RecallRefreshTool />}
+          {tab === "billing"      && <BillingHandshakeDiagnostic />}
+          {tab === "stripe"       && <StripeConfigPanel />}
+          {tab === "templates"    && <StickerTemplatesAdminPanel />}
+          {tab === "passport-engagement" && <PassportEngagementDashboard />}
+          {tab === "api-usage"    && <MarketcheckApiUsagePanel />}
+          {tab === "budgets"      && <ProviderBudgetsPanel />}
+        </section>
+      </PageBody>
     </div>
   );
 };
