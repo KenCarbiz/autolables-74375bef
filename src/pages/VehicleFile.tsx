@@ -2,42 +2,45 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Link } from "react-router-dom";
 import {
-  ArrowLeft, Car, ChevronRight, Copy, ExternalLink, FileText, FolderCheck,
-  Gauge, Globe, ShieldCheck, UserRound, Wrench,
+  ArrowLeft, Car, ChevronRight, Copy, ExternalLink, FolderCheck, Gauge, Globe,
 } from "lucide-react";
+import { PageBody, LocalTabs, Button, LinkButton, StatusText, EmptyState, SkeletonBlock, type LocalTab } from "@/components/product";
 import { useRecallTask } from "@/hooks/useRecallTask";
 import VehicleHistoryFacts from "@/components/vehicle/VehicleHistoryFacts";
 import { listingGallery } from "@/lib/photos";
 import { vehicleStockNumber } from "@/lib/vehicleStockNumber";
 import { useVehicleLifecycle } from "@/components/vehicleFile/lifecycle";
-import { STATE_LABEL } from "@/lib/lifecycle/states";
+import { deriveStatusFacts, recallFact, type StatusFact } from "@/components/vehicleFile/statusFacts";
+import HistoryTab from "@/components/vehicleFile/HistoryTab";
 import OverviewTab from "@/components/vehicleFile/OverviewTab";
 import DocumentsTab from "@/components/vehicleFile/DocumentsTab";
 import GetReadyTab from "@/components/vehicleFile/GetReadyTab";
 import CustomerTab from "@/components/vehicleFile/CustomerTab";
 import ComplianceTab from "@/components/vehicleFile/ComplianceTab";
 import {
-  readinessLabel, readinessSummary, resolveTab, type TabId, type VehicleRow,
+  readinessSummary, resolveTab, type TabId, type VehicleRow,
 } from "@/components/vehicleFile/types";
 
 // ──────────────────────────────────────────────────────────────
 // VehicleFile — /vehicle-file/:id
 //
-// The employee view of one vehicle, in five tabs:
-//   Overview · Documents · Get Ready · Customer · Compliance
+// The employee view of one vehicle, in six tabs:
+//   Overview · Documents · Get Ready · Customer · Compliance · History
 //
 // The vehicle_listings row is the record; every child artifact refers to it
 // by id. Lifecycle truth comes from the stored vehicle_lifecycle row, and
 // readiness from the one readiness model in components/vehicleFile/types.
 // ──────────────────────────────────────────────────────────────
 
-const TABS: { id: TabId; label: string; icon: typeof Car }[] = [
-  { id: "overview", label: "Overview", icon: Car },
-  { id: "documents", label: "Documents", icon: FileText },
-  { id: "getready", label: "Get Ready", icon: Wrench },
-  { id: "customer", label: "Customer", icon: UserRound },
-  { id: "compliance", label: "Compliance", icon: ShieldCheck },
+const TABS: { id: TabId; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "documents", label: "Documents" },
+  { id: "getready", label: "Get Ready" },
+  { id: "customer", label: "Customer" },
+  { id: "compliance", label: "Compliance" },
+  { id: "history", label: "History" },
 ];
 
 const VehicleFile = () => {
@@ -130,43 +133,35 @@ const VehicleFile = () => {
 
   if (loading) {
     return (
-      <div className="p-8 flex items-center justify-center">
-        <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-      </div>
+      <PageBody width="wide">
+        <div role="status" aria-label="Loading vehicle" className="flex flex-col gap-3">
+          <SkeletonBlock className="h-[150px] w-full" />
+          <SkeletonBlock className="h-10 w-2/3" />
+          <SkeletonBlock className="h-64 w-full" />
+        </div>
+      </PageBody>
     );
   }
 
   if (notFound || !vehicle) {
     return (
-      <div className="p-8 max-w-md mx-auto text-center space-y-3">
-        <Car className="w-10 h-10 text-muted-foreground mx-auto" />
-        <h2 className="text-al-section text-foreground">Vehicle not found</h2>
-        <p className="text-al-body text-muted-foreground">
-          This file may have been archived, or your tenant does not have access to it.
-        </p>
-        <button
-          onClick={() => navigate("/inventory")}
-          className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-al-body font-semibold inline-flex items-center gap-1.5"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" /> Back to inventory
-        </button>
-      </div>
+      <PageBody width="form">
+        <EmptyState
+          title="Vehicle not found"
+          detail="This file may have been archived, or your tenant does not have access to it."
+          action={<Button variant="primary" onClick={() => navigate("/inventory")}><ArrowLeft className="w-3.5 h-3.5" /> Back to inventory</Button>}
+        />
+      </PageBody>
     );
   }
 
   const ready = readinessSummary(vehicle, recall);
-  const readiness = readinessLabel(ready);
   const gallery = listingGallery(vehicle);
   const safeImg = gallery.length ? Math.min(imgIdx, gallery.length - 1) : 0;
   const stockNo = vehicleStockNumber(vehicle);
   const published = vehicle.status === "published";
-  const stageLabel = !lifecycle.tracked
-    ? "No get-ready lifecycle (new stock)"
-    : lifecycle.loading
-      ? "Reading lifecycle…"
-      : lifecycle.row
-        ? STATE_LABEL[lifecycle.row.state]
-        : "No lifecycle record yet";
+  const facts = deriveStatusFacts({ vehicle, ready, lifecycle });
+  const recallLine = recallFact(vehicle);
 
   const copyLink = async () => {
     if (!publicUrl) return;
@@ -217,205 +212,157 @@ const VehicleFile = () => {
     }
   };
 
-  const chip = (label: string, value: string, tone: "neutral" | "good" | "warn") => (
-    <div className={`rounded-xl border px-3 py-2 min-w-0 ${
-      tone === "good" ? "border-emerald-200 bg-emerald-50"
-        : tone === "warn" ? "border-amber-200 bg-amber-50"
-        : "border-border bg-muted/40"
-    }`}>
-      <p className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className={`text-al-body font-semibold truncate ${
-        tone === "good" ? "text-emerald-800" : tone === "warn" ? "text-amber-800" : "text-foreground"
-      }`}>{value}</p>
-    </div>
-  );
+  const summary: StatusFact[] = [facts.lifecycle, facts.publication, facts.retail, facts.signing, facts.delivery, recallLine];
+
+  const tabs: LocalTab[] = TABS.map((t) => ({
+    key: t.id,
+    label: t.label,
+    to: t.id === "overview" ? `/vehicle-file/${vehicle.id}` : `/vehicle-file/${vehicle.id}?tab=${t.id}`,
+    active: tab === t.id,
+  }));
 
   return (
-    <div className="p-4 lg:px-7 lg:py-6 max-w-[1500px] mx-auto space-y-5 pb-24 lg:pb-8">
-      <button
-        onClick={() => navigate("/inventory")}
-        className="text-al-meta font-semibold text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5"
-      >
+    <PageBody width="wide" className="pb-24 lg:pb-8">
+      <Link to="/inventory" className="text-[13px] font-semibold text-adm-muted hover:text-adm-ink inline-flex items-center gap-1.5 w-fit">
         <ArrowLeft className="w-3.5 h-3.5" /> Back to inventory
-      </button>
+      </Link>
 
-      <section className="rounded-2xl border border-border bg-card shadow-premium overflow-hidden">
-        <div className="flex flex-col lg:flex-row gap-0 p-5 lg:p-6">
-          <div className="lg:w-[320px] shrink-0">
-            <div className="h-56 lg:h-[230px] rounded-2xl overflow-hidden bg-muted flex items-center justify-center">
+      {/* Record header: compact media and identity */}
+      <section className="rounded-[6px] border border-adm-border bg-adm-surface p-4">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="sm:w-[176px] shrink-0">
+            <div className="h-[118px] rounded-[4px] overflow-hidden bg-adm-workspace flex items-center justify-center">
               {gallery.length ? (
                 <div className="relative w-full h-full">
-                  <img src={gallery[safeImg]} alt={vehicle.ymm || "vehicle"} className="w-full h-full object-cover" />
+                  <img src={gallery[safeImg]} alt={vehicle.ymm ? `${vehicle.ymm} photo ${safeImg + 1} of ${gallery.length}` : "Vehicle photo"} className="w-full h-full object-cover" />
                   {gallery.length > 1 && (
                     <>
                       <button
                         type="button"
                         onClick={() => setImgIdx((i) => (i - 1 + gallery.length) % gallery.length)}
                         aria-label="Previous photo"
-                        className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-foreground/50 text-background flex items-center justify-center"
+                        className="absolute left-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-foreground/50 text-background flex items-center justify-center"
                       ><ArrowLeft className="w-4 h-4" /></button>
                       <button
                         type="button"
                         onClick={() => setImgIdx((i) => (i + 1) % gallery.length)}
                         aria-label="Next photo"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-foreground/50 text-background flex items-center justify-center"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-foreground/50 text-background flex items-center justify-center"
                       ><ChevronRight className="w-4 h-4" /></button>
-                      <span className="absolute bottom-2 left-2 text-al-meta font-semibold px-1.5 py-0.5 rounded bg-foreground/60 text-background tabular-nums">
+                      <span className="absolute bottom-1 left-1 text-[12px] font-semibold px-1.5 rounded-[2px] bg-foreground/60 text-background tabular-nums">
                         {safeImg + 1} / {gallery.length}
                       </span>
                     </>
                   )}
                 </div>
               ) : (
-                <Car className="w-16 h-16 text-muted-foreground" strokeWidth={1.25} />
+                <Car className="w-12 h-12 text-adm-muted" strokeWidth={1.25} aria-label="No photo on file" />
               )}
             </div>
           </div>
 
-          <div className="flex-1 lg:pl-7 pt-5 lg:pt-0 min-w-0 space-y-4">
-            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
-              <div className="min-w-0 flex-1 space-y-2">
-                <span className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground">
-                  {vehicle.condition || "unknown"} · {vehicle.status}
-                </span>
-                <h1 className="text-al-page font-display text-foreground">
-                  {vehicle.ymm || "Vehicle needs a VIN decode"}
-                </h1>
-                {vehicle.trim ? <p className="text-al-section text-muted-foreground font-normal">{vehicle.trim}</p> : null}
+          <div className="flex-1 min-w-0 flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+            <div className="min-w-0 space-y-1.5">
+              <p className="text-[12px] leading-[18px] font-semibold text-adm-muted capitalize">
+                {vehicle.condition || "unknown"} | {vehicle.status}
+              </p>
+              <h1 className="text-[24px] leading-[32px] sm:text-[28px] sm:leading-[36px] font-bold text-adm-ink">
+                {vehicle.ymm || "Vehicle needs a VIN decode"}
+              </h1>
+              {vehicle.trim ? <p className="text-[14px] leading-[20px] text-adm-muted">{vehicle.trim}</p> : null}
 
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-al-body">
-                  {/* The stock number is how the lot, the DMS and the desk all
-                      refer to this car, so it is always stated — an absent one
-                      says so rather than leaving a gap that reads as "this
-                      screen has no stock number field". */}
-                  {stockNo ? (
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground">Stock</span>
-                      <span className="font-mono font-semibold text-foreground">{stockNo}</span>
-                    </span>
-                  ) : (
-                    <span className="text-al-meta font-semibold text-amber-700">Stock # not on the feed</span>
-                  )}
-                  <span className="inline-flex items-center gap-1.5 min-w-0">
-                    <span className="text-al-meta font-bold uppercase tracking-wider text-muted-foreground">VIN</span>
-                    <span className="font-mono text-foreground truncate">{vehicle.vin}</span>
-                    <button onClick={copyVin} title="Copy VIN" aria-label="Copy VIN" className="text-muted-foreground hover:text-foreground shrink-0">
-                      <Copy className="w-3.5 h-3.5" />
-                    </button>
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[14px] leading-[20px]">
+                {/* The stock number is how the lot, the DMS and the desk all
+                    refer to this car, so it is always stated. */}
+                {stockNo ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="text-adm-muted">Stock</span>
+                    <span className="font-mono font-semibold">{stockNo}</span>
                   </span>
-                  <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                    <Gauge className="w-4 h-4" />
-                    {vehicle.mileage != null ? `${vehicle.mileage.toLocaleString()} mi` : "Mileage not recorded"}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 font-semibold text-foreground">
-                    {vehicle.price != null ? `$${vehicle.price.toLocaleString()}` : "Not priced"}
-                  </span>
-                </div>
-
-                <VehicleHistoryFacts vehicle={vehicle} />
-              </div>
-
-              <div className="flex flex-col gap-2 w-full lg:w-[240px] shrink-0">
-                {published ? (
-                  <a
-                    href={viewUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="h-11 px-4 rounded-xl bg-primary hover:opacity-90 text-primary-foreground text-al-body font-semibold inline-flex items-center justify-center gap-2 transition-opacity"
-                  >
-                    <ExternalLink className="w-4 h-4" /> View shopper page
-                  </a>
                 ) : (
-                  <button
-                    onClick={publish}
-                    disabled={publishing}
-                    className="h-11 px-4 rounded-xl bg-primary hover:opacity-90 text-primary-foreground text-al-body font-semibold inline-flex items-center justify-center gap-2 transition-opacity disabled:opacity-50"
-                  >
-                    <Globe className="w-4 h-4" /> {publishing ? "Publishing…" : "Publish to shopper portal"}
-                  </button>
+                  <span className="text-[12px] font-semibold text-adm-warning">Stock # not on the feed</span>
                 )}
-                <button
-                  onClick={() => setTab("documents")}
-                  className="h-11 px-4 rounded-xl border border-border bg-card hover:bg-muted text-foreground text-al-body font-semibold inline-flex items-center justify-center gap-2 transition-colors"
-                >
-                  <FolderCheck className="w-4 h-4" /> Generate document
-                </button>
-                <button
-                  onClick={copyLink}
-                  className="h-9 px-4 rounded-xl border border-border bg-card hover:bg-muted text-foreground text-al-meta font-semibold inline-flex items-center justify-center gap-2 transition-colors"
-                >
-                  <Copy className="w-3.5 h-3.5" /> Copy shopper link
-                </button>
+                <span className="inline-flex items-center gap-1.5 min-w-0">
+                  <span className="text-adm-muted">VIN</span>
+                  <span className="font-mono truncate">{vehicle.vin}</span>
+                  <button onClick={copyVin} title="Copy VIN" aria-label="Copy VIN" className="text-adm-muted hover:text-adm-ink shrink-0 min-w-[24px] min-h-[24px] inline-flex items-center justify-center">
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+                </span>
+                <span className="inline-flex items-center gap-1.5 text-adm-muted">
+                  <Gauge className="w-4 h-4" />
+                  {vehicle.mileage != null ? `${vehicle.mileage.toLocaleString()} mi` : "Mileage not recorded"}
+                </span>
+                <span className="font-semibold tabular-nums">
+                  {vehicle.price != null ? `$${vehicle.price.toLocaleString()}` : "Not priced"}
+                </span>
               </div>
+
+              <VehicleHistoryFacts vehicle={vehicle} />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {chip("Lifecycle stage", stageLabel, "neutral")}
-              {chip("Retail readiness", readiness.label, readiness.ready ? "good" : "warn")}
-              {chip("Digital status", published ? "Live on the shopper portal" : vehicle.status === "archived" ? "Archived" : "Draft — not published", published ? "good" : "warn")}
+            <div className="flex flex-wrap lg:flex-col gap-2 lg:w-[220px] shrink-0">
+              {published ? (
+                <LinkButton to={viewUrl} variant="primary" target="_blank" rel="noreferrer" className="flex-1 lg:flex-none">
+                  <ExternalLink className="w-4 h-4" /> View shopper page
+                </LinkButton>
+              ) : (
+                <Button variant="primary" onClick={publish} disabled={publishing} className="flex-1 lg:flex-none">
+                  <Globe className="w-4 h-4" /> {publishing ? "Publishing…" : "Publish to shopper portal"}
+                </Button>
+              )}
+              <Button onClick={() => setTab("documents")} className="flex-1 lg:flex-none">
+                <FolderCheck className="w-4 h-4" /> Generate document
+              </Button>
+              <Button onClick={copyLink} size="sm" className="flex-1 lg:flex-none">
+                <Copy className="w-3.5 h-3.5" /> Copy shopper link
+              </Button>
             </div>
           </div>
         </div>
+
+        {/* Factual summary strip: each question answered on its own */}
+        <dl className="mt-4 grid grid-cols-2 lg:grid-cols-6 border-t border-adm-border pt-3 gap-x-4 gap-y-3" aria-label="Vehicle status">
+          {summary.map((f) => (
+            <div key={f.label} className="min-w-0">
+              <dt className="text-[12px] leading-[18px] text-adm-muted">{f.label}</dt>
+              <dd className="mt-0.5">
+                <StatusText tone={f.tone} icon={f.tone !== "neutral" && f.tone !== "info"}>{f.value}</StatusText>
+                {f.detail && <span className="block text-[12px] leading-[18px] text-adm-muted mt-0.5">{f.detail}</span>}
+              </dd>
+            </div>
+          ))}
+        </dl>
       </section>
 
-      <div className="border-b border-border">
-        <div className="flex items-center gap-1 overflow-x-auto -mb-px">
-          {TABS.map((t) => {
-            const active = tab === t.id;
-            return (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                aria-current={active ? "page" : undefined}
-                className={`px-4 py-3.5 text-al-body font-semibold inline-flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
-                  active ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <t.icon className="w-4 h-4" /> {t.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      <LocalTabs tabs={tabs} label="Vehicle file sections" />
 
-      <div className="pt-2">
+      <div>
         {tab === "overview" && <OverviewTab vehicle={vehicle} ready={ready} lifecycle={lifecycle} stockNumber={stockNo} onTab={setTab} onReload={load} />}
         {tab === "documents" && <DocumentsTab vehicle={vehicle} onReload={load} />}
-        {tab === "getready" && <GetReadyTab vehicle={vehicle} lifecycle={lifecycle} />}
+        {tab === "getready" && <GetReadyTab vehicle={vehicle} lifecycle={lifecycle} ready={ready} />}
         {tab === "customer" && <CustomerTab vehicle={vehicle} stockNumber={stockNo} />}
-        {tab === "compliance" && <ComplianceTab vehicle={vehicle} ready={ready} recall={recall} onReload={load} />}
+        {tab === "compliance" && <ComplianceTab vehicle={vehicle} ready={ready} recall={recall} lifecycle={lifecycle} onReload={load} />}
+        {tab === "history" && <HistoryTab vehicle={vehicle} lifecycle={lifecycle} />}
       </div>
 
-      <div className="lg:hidden fixed bottom-0 inset-x-0 z-30 border-t border-border bg-card px-4 py-3 space-y-2">
+      <div className="lg:hidden fixed bottom-0 inset-x-0 z-30 border-t border-adm-border bg-adm-surface px-4 py-3 space-y-2">
         {published ? (
           <div className="flex gap-2">
-            <a
-              href={viewUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="flex-1 h-11 rounded-xl bg-primary text-primary-foreground text-al-body font-semibold inline-flex items-center justify-center gap-1.5"
-            >
+            <LinkButton to={viewUrl} variant="primary" target="_blank" rel="noreferrer" className="flex-1">
               <ExternalLink className="w-4 h-4" /> View shopper page
-            </a>
-            <button
-              onClick={copyLink}
-              aria-label="Copy shopper link"
-              className="h-11 px-4 rounded-xl border border-border bg-card text-foreground inline-flex items-center justify-center"
-            >
+            </LinkButton>
+            <Button onClick={copyLink} aria-label="Copy shopper link">
               <Copy className="w-4 h-4" />
-            </button>
+            </Button>
           </div>
         ) : (
-          <button
-            onClick={publish}
-            disabled={publishing}
-            className="w-full h-11 rounded-xl bg-primary text-primary-foreground text-al-body font-semibold inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
-          >
+          <Button variant="primary" onClick={publish} disabled={publishing} className="w-full">
             <Globe className="w-4 h-4" /> {publishing ? "Publishing…" : "Publish to shopper portal"}
-          </button>
+          </Button>
         )}
       </div>
-    </div>
+    </PageBody>
   );
 };
 

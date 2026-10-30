@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
-  AlertTriangle, ArrowRight, Check, ExternalLink, FileText, History, Loader2,
-  RefreshCw, Search, Sparkles,
+  AlertTriangle, ArrowRight, Check, ExternalLink, FileText, Loader2,
+  RefreshCw, Search,
 } from "lucide-react";
+import { PageBody, PageHeader, LocalTabs, Panel, WorkTable, Th, Td, Button, StatusText, InlineNote, type Tone, type LocalTab } from "@/components/product";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
@@ -22,10 +23,10 @@ import FactoryStickerWorkspace from "./FactoryStickerWorkspace";
 // indistinguishable from one built automatically.
 
 const STEPS = [
-  { n: 1, title: "Vehicle & VIN", detail: "Choose or enter the vehicle" },
-  { n: 2, title: "OEM Data & Template", detail: "Match OEM & build data" },
-  { n: 3, title: "Review & Validate", detail: "Check data integrity" },
-  { n: 4, title: "Generate & Publish", detail: "Create and publish the PDF" },
+  { n: 1, title: "Vehicle", detail: "Choose or enter the vehicle" },
+  { n: 2, title: "OEM data", detail: "Match OEM and build data" },
+  { n: 3, title: "Review", detail: "Check data integrity" },
+  { n: 4, title: "Publish", detail: "Generate and publish after review" },
 ];
 
 const VIN_RE = /^[A-HJ-NPR-Z0-9]{17}$/;
@@ -56,14 +57,14 @@ interface HistoryRow {
   current_document_id: string | null;
 }
 
-const STATUS_TONE: Record<string, string> = {
-  PUBLISHED: "bg-emerald-50 text-emerald-700",
-  APPROVED: "bg-emerald-50 text-emerald-700",
-  REVIEW_REQUIRED: "bg-amber-50 text-amber-700",
-  READY_TO_GENERATE: "bg-blue-50 text-blue-700",
-  PENDING_DATA: "bg-muted text-muted-foreground",
-  FAILED_RETRYABLE: "bg-rose-50 text-rose-700",
-  FAILED_PERMANENT: "bg-rose-50 text-rose-700",
+const STATUS_TONE: Record<string, Tone> = {
+  PUBLISHED: "success",
+  APPROVED: "success",
+  REVIEW_REQUIRED: "warning",
+  READY_TO_GENERATE: "info",
+  PENDING_DATA: "neutral",
+  FAILED_RETRYABLE: "danger",
+  FAILED_PERMANENT: "danger",
 };
 
 const humanize = (s: string) => s.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).trim();
@@ -72,30 +73,24 @@ const fmtWhen = (d?: string | null) =>
 
 function StepRail({ active }: { active: number }) {
   return (
-    <ol className="flex items-stretch gap-2 overflow-x-auto pb-1" aria-label="Window sticker steps">
+    <ol className="flex items-stretch gap-0 overflow-x-auto border border-adm-border rounded-[4px] bg-adm-surface" aria-label="Window sticker steps">
       {STEPS.map((s, i) => {
         const state = s.n < active ? "done" : s.n === active ? "current" : "todo";
         return (
-          <li key={s.n} className="flex items-center gap-2 shrink-0">
-            <div className="flex items-center gap-2">
-              <span
-                aria-hidden
-                className={`w-6 h-6 rounded-full grid place-items-center text-[11px] font-bold ${
-                  state === "done" ? "bg-emerald-600 text-white"
-                    : state === "current" ? "bg-blue-600 text-white"
-                      : "bg-muted text-muted-foreground"
-                }`}
-              >
-                {state === "done" ? <Check className="w-3.5 h-3.5" /> : s.n}
-              </span>
-              <span className="min-w-0">
-                <span className={`block text-[12.5px] font-bold ${state === "todo" ? "text-muted-foreground" : "text-foreground"}`}>
-                  {s.title}
-                </span>
-                <span className="block text-[11px] text-muted-foreground">{s.detail}</span>
-              </span>
-            </div>
-            {i < STEPS.length - 1 && <ArrowRight className="w-4 h-4 text-muted-foreground/60 mx-1" aria-hidden />}
+          <li
+            key={s.n}
+            aria-current={state === "current" ? "step" : undefined}
+            className={`flex-1 min-w-[150px] flex items-center gap-2 px-3 py-2 ${i > 0 ? "border-l border-adm-border" : ""} ${state === "current" ? "border-b-2 border-b-adm-primary" : ""}`}
+          >
+            <span aria-hidden className={`w-6 h-6 rounded-full grid place-items-center text-[12px] font-bold shrink-0 ${
+              state === "done" ? "bg-adm-success text-white" : state === "current" ? "bg-adm-primary text-white" : "bg-adm-workspace text-adm-muted"
+            }`}>
+              {state === "done" ? <Check className="w-3.5 h-3.5" /> : s.n}
+            </span>
+            <span className="min-w-0">
+              <span className={`block text-[14px] leading-[20px] font-semibold ${state === "todo" ? "text-adm-muted" : "text-adm-ink"}`}>{s.title}</span>
+              <span className="block text-[12px] leading-[18px] text-adm-muted truncate">{s.detail}</span>
+            </span>
           </li>
         );
       })}
@@ -254,274 +249,228 @@ export default function WindowStickerStudio() {
 
   if (!tenantId) {
     return (
-      <div className="p-4 md:p-6">
-        <p className="text-sm text-muted-foreground">Select a dealership to use the Window Sticker Studio.</p>
-      </div>
+      <PageBody>
+        <PageHeader title="Window Sticker Studio" description="Create, validate and publish VIN-specific OEM window stickers." />
+        <InlineNote tone="info" title="Select a dealership">The Studio works inside one dealership at a time.</InlineNote>
+      </PageBody>
     );
   }
 
+  const studioTabs: LocalTab[] = [
+    { key: "create", label: "Create", to: "/window-sticker-studio" + (selectedId ? `?vehicle=${encodeURIComponent(selectedId)}` : ""), active: tab === "create" },
+    { key: "history", label: "History", to: "/window-sticker-studio?tab=history", active: tab === "history" },
+  ];
+
   return (
-    <div className="p-4 md:p-6">
-      <div className="max-w-[1600px] mx-auto space-y-4">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div>
-            <h1 className="text-lg font-bold text-foreground inline-flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-blue-600" /> Window Sticker Studio
-            </h1>
-            <p className="text-[12.5px] text-muted-foreground mt-0.5">
-              Create, validate and publish VIN-specific OEM window stickers.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setTab(tab === "history" ? "create" : "history")}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-[13px] font-semibold hover:bg-muted/40"
-            >
-              <History className="w-3.5 h-3.5" /> {tab === "history" ? "Create" : "History"}
-            </button>
-          </div>
-        </div>
+    <PageBody width="wide">
+      <PageHeader
+        title="Window Sticker Studio"
+        description="Create, validate and publish VIN-specific OEM window stickers. Nothing is fetched or generated until you choose to."
+      />
 
-        {tab === "create" && (
-          <>
-            <div className="rounded-2xl border border-border bg-card p-4">
-              <StepRail active={selectedId ? 2 : 1} />
-            </div>
+      <LocalTabs tabs={studioTabs} label="Window sticker studio" />
 
-            {selectedId ? (
-              <>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={clearSelection}
-                    className="h-8 px-3 rounded-md border border-border text-[12.5px] font-semibold hover:bg-muted/40"
+      {tab === "create" && (
+        <>
+          <StepRail active={selectedId ? 2 : 1} />
+
+          {selectedId ? (
+            <>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button size="sm" onClick={clearSelection}>Choose a different vehicle</Button>
+                <Link
+                  to={`/vehicle-file/${selectedId}`}
+                  className="min-h-[32px] px-3 rounded-md border border-adm-border bg-adm-surface text-[13px] font-semibold hover:bg-adm-workspace inline-flex items-center gap-1.5"
+                >
+                  <ExternalLink className="w-3 h-3" /> Vehicle File
+                </Link>
+              </div>
+              {/* Steps 2-4 are the shared per-vehicle workspace, not a
+                  second implementation of the same pipeline. */}
+              <FactoryStickerWorkspace vehicleId={selectedId} embedded />
+            </>
+          ) : (
+            <div className="grid lg:grid-cols-[1fr_360px] gap-4">
+              <Panel title="Select an existing vehicle">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="relative flex-1 min-w-[220px]">
+                    <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-adm-muted" />
+                    <input
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") runSearch(); }}
+                      placeholder="VIN, stock number, year, make or model"
+                      className="w-full min-h-[36px] pl-8 pr-3 rounded-md border border-adm-border bg-adm-surface text-[14px]"
+                      aria-label="Search inventory"
+                    />
+                  </div>
+                  <select
+                    value={conditionFilter}
+                    onChange={(e) => setConditionFilter(e.target.value)}
+                    className="min-h-[36px] px-2 rounded-md border border-adm-border bg-adm-surface text-[14px]"
+                    aria-label="Condition"
                   >
-                    Choose a different vehicle
-                  </button>
-                  <Link
-                    to={`/vehicle-file/${selectedId}`}
-                    className="h-8 px-3 rounded-md border border-border text-[12.5px] font-semibold hover:bg-muted/40 inline-flex items-center gap-1.5"
-                  >
-                    <ExternalLink className="w-3 h-3" /> Vehicle File
-                  </Link>
+                    <option value="">All conditions</option>
+                    <option value="new">New</option>
+                    <option value="used">Used</option>
+                    <option value="cpo">CPO</option>
+                  </select>
+                  <Button variant="primary" onClick={runSearch} disabled={searching}>
+                    {searching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />} Search
+                  </Button>
                 </div>
-                {/* Steps 2-4 are the shared per-vehicle workspace, not a
-                    second implementation of the same pipeline. */}
-                <FactoryStickerWorkspace vehicleId={selectedId} embedded />
-              </>
-            ) : (
-              <div className="grid lg:grid-cols-[1fr_360px] gap-4">
-                <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
-                  <h2 className="text-sm font-bold text-foreground">Select an existing vehicle</h2>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <div className="relative flex-1 min-w-[220px]">
-                      <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                      <input
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") runSearch(); }}
-                        placeholder="VIN, stock number, year, make or model"
-                        className="w-full h-9 pl-8 pr-3 rounded-md border border-border bg-background text-[13px]"
-                        aria-label="Search inventory"
-                      />
-                    </div>
-                    <select
-                      value={conditionFilter}
-                      onChange={(e) => setConditionFilter(e.target.value)}
-                      className="h-9 px-2 rounded-md border border-border bg-background text-[13px]"
-                      aria-label="Condition"
-                    >
-                      <option value="">All conditions</option>
-                      <option value="new">New</option>
-                      <option value="used">Used</option>
-                      <option value="cpo">CPO</option>
-                    </select>
+
+                <div className="divide-y divide-adm-border rounded-[4px] border border-adm-border overflow-hidden mt-3">
+                  {hits === null && <p className="p-3 text-[14px] text-adm-muted">Loading inventory...</p>}
+                  {hits?.length === 0 && (
+                    <p className="p-3 text-[14px] text-adm-muted">
+                      No vehicles matched. Try a different search, or start from a VIN.
+                    </p>
+                  )}
+                  {hits?.map((v) => (
                     <button
+                      key={v.id}
                       type="button"
-                      onClick={runSearch}
-                      disabled={searching}
-                      className="h-9 px-3 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-semibold inline-flex items-center gap-1.5 disabled:opacity-50"
+                      onClick={() => select(v.id)}
+                      className="w-full text-left min-h-[52px] px-3 py-2 hover:bg-adm-workspace flex items-center justify-between gap-3"
                     >
-                      {searching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />} Search
-                    </button>
-                  </div>
-
-                  <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
-                    {hits === null && <p className="p-3 text-[12.5px] text-muted-foreground">Loading inventory…</p>}
-                    {hits?.length === 0 && (
-                      <p className="p-3 text-[12.5px] text-muted-foreground">
-                        No vehicles matched. Try a different search, or start from a VIN.
-                      </p>
-                    )}
-                    {hits?.map((v) => (
-                      <button
-                        key={v.id}
-                        type="button"
-                        onClick={() => select(v.id)}
-                        className="w-full text-left p-3 hover:bg-muted/40 flex items-center justify-between gap-3"
-                      >
-                        <span className="min-w-0">
-                          <span className="block text-[13px] font-semibold text-foreground truncate">
-                            {v.ymm || "Vehicle"}
-                          </span>
-                          <span className="block text-[11.5px] text-muted-foreground truncate">
-                            {v.vin || "no VIN"}
-                            {v.stock_number ? ` · Stock ${v.stock_number}` : ""}
-                            {v.condition ? ` · ${humanize(v.condition)}` : ""}
-                            {v.status ? ` · ${humanize(v.status)}` : ""}
-                          </span>
+                      <span className="min-w-0">
+                        <span className="block text-[14px] leading-[20px] font-semibold text-adm-ink truncate">
+                          {v.ymm || "Vehicle"}
                         </span>
-                        <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0" />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-border bg-card p-4 space-y-3 h-fit">
-                  <h2 className="text-sm font-bold text-foreground">Create from VIN</h2>
-                  <p className="text-[12px] text-muted-foreground">
-                    For a vehicle that did not arrive through the nightly inventory feed. The Studio checks this
-                    dealership's records first and never creates a duplicate.
-                  </p>
-                  <input
-                    value={vinInput}
-                    onChange={(e) => setVinInput(e.target.value)}
-                    placeholder="17-character VIN"
-                    maxLength={17}
-                    className="w-full h-9 px-3 rounded-md border border-border bg-background text-[13px] font-mono uppercase"
-                    aria-label="VIN"
-                  />
-                  {vinInput.trim() && !vinValid && (
-                    <p className="text-[11.5px] text-rose-600 inline-flex items-start gap-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" /> That is not a valid 17-character VIN.
-                    </p>
-                  )}
-                  {vinDuplicate && (
-                    <p className="text-[11.5px] text-amber-700 inline-flex items-start gap-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
-                      <span>
-                        This VIN already exists in your inventory ({vinDuplicate.ymm || "vehicle"}). Continue opens the
-                        existing record instead of creating a second one.
+                        <span className="block text-[12px] leading-[18px] text-adm-muted truncate">
+                          {v.vin || "no VIN"}
+                          {v.stock_number ? ` | Stock ${v.stock_number}` : ""}
+                          {v.condition ? ` | ${humanize(v.condition)}` : ""}
+                          {v.status ? ` | ${humanize(v.status)}` : ""}
+                        </span>
                       </span>
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    onClick={startFromVin}
-                    disabled={!vinValid || busy || !canCreate}
-                    className="w-full h-9 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
-                  >
-                    {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowRight className="w-3.5 h-3.5" />}
-                    {vinDuplicate ? "Open existing vehicle" : "Continue"}
-                  </button>
-                  {!canCreate && (
-                    <p className="text-[11px] text-muted-foreground">
-                      Starting a sticker from a VIN needs manager authority. You can still open an existing vehicle.
-                    </p>
-                  )}
-                  {canCreate && !canPublish && (
-                    <p className="text-[11px] text-muted-foreground">
-                      Publishing to the customer passport needs manager authority — you can still review the draft.
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-          </>
-        )}
-
-        {tab === "history" && (
-          <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-sm font-bold text-foreground flex-1">Window sticker history</h2>
-              <div className="relative min-w-[220px]">
-                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Filter by VIN or brand"
-                  className="w-full h-9 pl-8 pr-3 rounded-md border border-border bg-background text-[13px]"
-                  aria-label="Filter history"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={loadHistory}
-                className="h-9 px-3 rounded-md border border-border text-[13px] font-semibold hover:bg-muted/40 inline-flex items-center gap-1.5"
-              >
-                <RefreshCw className="w-3.5 h-3.5" /> Refresh
-              </button>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-[12.5px]">
-                <thead>
-                  <tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground border-b border-border">
-                    <th className="py-2 pr-3 font-semibold">VIN</th>
-                    <th className="py-2 pr-3 font-semibold">Brand / template</th>
-                    <th className="py-2 pr-3 font-semibold">Status</th>
-                    <th className="py-2 pr-3 font-semibold">MSRP</th>
-                    <th className="py-2 pr-3 font-semibold">Updated</th>
-                    <th className="py-2 font-semibold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filteredHistory === null && (
-                    <tr><td colSpan={6} className="py-3 text-muted-foreground">Loading…</td></tr>
-                  )}
-                  {filteredHistory?.length === 0 && (
-                    <tr><td colSpan={6} className="py-3 text-muted-foreground">No window sticker records yet.</td></tr>
-                  )}
-                  {filteredHistory?.map((r) => (
-                    <tr key={r.id} className="align-top">
-                      <td className="py-2.5 pr-3 font-mono text-[11.5px]">{r.vin}</td>
-                      <td className="py-2.5 pr-3">
-                        <span className="block font-semibold text-foreground">{r.canonical_oem_id ? humanize(r.canonical_oem_id) : "—"}</span>
-                        <span className="block text-[11px] text-muted-foreground">
-                          {r.template_family_id || "no template"}{r.template_version ? ` v${r.template_version}` : ""}
-                        </span>
-                      </td>
-                      <td className="py-2.5 pr-3">
-                        <span className={`inline-flex text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${STATUS_TONE[r.generation_status] || "bg-muted text-muted-foreground"}`}>
-                          {humanize(r.generation_status)}
-                        </span>
-                        {r.review_required && r.review_reason && (
-                          <span className="block text-[11px] text-amber-700 mt-0.5 max-w-[280px]">{r.review_reason}</span>
-                        )}
-                      </td>
-                      <td className="py-2.5 pr-3 text-muted-foreground">
-                        {r.reconciliation_status ? humanize(r.reconciliation_status) : "—"}
-                      </td>
-                      <td className="py-2.5 pr-3 text-muted-foreground">{fmtWhen(r.published_at || r.updated_at)}</td>
-                      <td className="py-2.5">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <button
-                            type="button"
-                            onClick={() => select(r.vehicle_id)}
-                            className="h-7 px-2 rounded border border-border text-[11.5px] font-semibold hover:bg-muted/40"
-                          >
-                            Open
-                          </button>
-                          <Link
-                            to={`/vehicle-file/${r.vehicle_id}`}
-                            className="h-7 px-2 rounded border border-border text-[11.5px] font-semibold hover:bg-muted/40 inline-flex items-center"
-                          >
-                            Vehicle File
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
+                      <ArrowRight className="w-4 h-4 text-adm-muted shrink-0" />
+                    </button>
                   ))}
-                </tbody>
-              </table>
+                </div>
+              </Panel>
+
+              <Panel title="Create from VIN" className="h-fit">
+                <p className="text-[13px] leading-[18px] text-adm-muted">
+                  For a vehicle that did not arrive through the nightly inventory feed. The Studio checks this
+                  dealership&apos;s records first and never creates a duplicate.
+                </p>
+                <input
+                  value={vinInput}
+                  onChange={(e) => setVinInput(e.target.value)}
+                  placeholder="17-character VIN"
+                  maxLength={17}
+                  className="w-full min-h-[36px] px-3 rounded-md border border-adm-border bg-adm-surface text-[14px] font-mono uppercase mt-3"
+                  aria-label="VIN"
+                />
+                {vinInput.trim() && !vinValid && (
+                  <p className="text-[12px] leading-[18px] text-adm-danger inline-flex items-start gap-1.5 mt-2">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" /> That is not a valid 17-character VIN.
+                  </p>
+                )}
+                {vinDuplicate && (
+                  <p className="text-[12px] leading-[18px] text-adm-warning inline-flex items-start gap-1.5 mt-2">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
+                    <span>
+                      This VIN already exists in your inventory ({vinDuplicate.ymm || "vehicle"}). Continue opens the
+                      existing record instead of creating a second one.
+                    </span>
+                  </p>
+                )}
+                <Button variant="primary" className="w-full mt-3" onClick={startFromVin} disabled={!vinValid || busy || !canCreate}>
+                  {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowRight className="w-3.5 h-3.5" />}
+                  {vinDuplicate ? "Open existing vehicle" : "Continue"}
+                </Button>
+                {!canCreate && (
+                  <p className="text-[12px] leading-[18px] text-adm-muted mt-2">
+                    Starting a sticker from a VIN needs manager authority. You can still open an existing vehicle.
+                  </p>
+                )}
+                {canCreate && !canPublish && (
+                  <p className="text-[12px] leading-[18px] text-adm-muted mt-2">
+                    Publishing to the customer passport needs manager authority. You can still review the draft.
+                  </p>
+                )}
+              </Panel>
             </div>
-            <p className="text-[11px] text-muted-foreground inline-flex items-center gap-1.5">
-              <FileText className="w-3.5 h-3.5" /> Approved document versions are preserved and never overwritten.
-            </p>
+          )}
+        </>
+      )}
+
+      {tab === "history" && (
+        <Panel title="Window sticker history">
+          <div className="flex items-center gap-2 flex-wrap mb-3">
+            <div className="relative min-w-[220px] flex-1 max-w-md">
+              <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-adm-muted" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Filter by VIN or brand"
+                className="w-full min-h-[36px] pl-8 pr-3 rounded-md border border-adm-border bg-adm-surface text-[14px]"
+                aria-label="Filter history"
+              />
+            </div>
+            <Button onClick={loadHistory}><RefreshCw className="w-3.5 h-3.5" /> Refresh</Button>
           </div>
-        )}
-      </div>
-    </div>
+
+          <WorkTable caption="Window sticker history" minWidth={760}>
+            <thead>
+              <tr>
+                <Th>VIN</Th>
+                <Th>Brand / template</Th>
+                <Th>Status</Th>
+                <Th>Reconciliation</Th>
+                <Th>Updated</Th>
+                <Th align="right">Actions</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredHistory === null && (
+                <tr><Td className="text-adm-muted" >Loading...</Td></tr>
+              )}
+              {filteredHistory?.length === 0 && (
+                <tr><Td className="text-adm-muted">No window sticker records yet.</Td></tr>
+              )}
+              {filteredHistory?.map((r) => (
+                <tr key={r.id} className="align-top hover:bg-adm-workspace">
+                  <Td className="font-mono text-[12px]">{r.vin}</Td>
+                  <Td>
+                    <span className="block font-semibold text-adm-ink">{r.canonical_oem_id ? humanize(r.canonical_oem_id) : "Unknown"}</span>
+                    <span className="block text-[12px] leading-[18px] text-adm-muted">
+                      {r.template_family_id || "no template"}{r.template_version ? ` v${r.template_version}` : ""}
+                    </span>
+                  </Td>
+                  <Td>
+                    <StatusText tone={STATUS_TONE[r.generation_status] ?? "neutral"}>{humanize(r.generation_status)}</StatusText>
+                    {r.review_required && r.review_reason && (
+                      <span className="block text-[12px] leading-[18px] text-adm-warning mt-0.5 max-w-[280px]">{r.review_reason}</span>
+                    )}
+                  </Td>
+                  <Td className="text-adm-muted">
+                    {r.reconciliation_status ? humanize(r.reconciliation_status) : "Unknown"}
+                  </Td>
+                  <Td className="text-adm-muted whitespace-nowrap">{fmtWhen(r.published_at || r.updated_at)}</Td>
+                  <Td align="right">
+                    <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                      <Button size="sm" onClick={() => select(r.vehicle_id)}>Open</Button>
+                      <Link
+                        to={`/vehicle-file/${r.vehicle_id}`}
+                        className="min-h-[32px] px-3 rounded-md border border-adm-border bg-adm-surface text-[13px] font-semibold hover:bg-adm-workspace inline-flex items-center"
+                      >
+                        Vehicle File
+                      </Link>
+                    </div>
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </WorkTable>
+          <p className="text-[12px] leading-[18px] text-adm-muted inline-flex items-center gap-1.5 mt-3">
+            <FileText className="w-3.5 h-3.5" /> Approved document versions are preserved and never overwritten.
+          </p>
+        </Panel>
+      )}
+    </PageBody>
   );
 }

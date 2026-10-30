@@ -11,7 +11,7 @@ import {
 import {
   STATE_LABEL, STATE_NEXT_ACTION, STATE_OWNER, type LifecycleState,
 } from "@/lib/lifecycle/states";
-import type { VehicleRow } from "./types";
+import type { ReadinessSummary, VehicleRow } from "./types";
 
 interface PrepRow {
   id: string;
@@ -115,7 +115,7 @@ const PrepCard = ({ row, onOpen }: { row: PrepRow; onOpen: () => void }) => {
   );
 };
 
-export const GetReadyTab = ({ vehicle, lifecycle }: { vehicle: VehicleRow; lifecycle: LifecycleResult }) => {
+export const GetReadyTab = ({ vehicle, lifecycle, ready }: { vehicle: VehicleRow; lifecycle: LifecycleResult; ready?: ReadinessSummary }) => {
   const navigate = useNavigate();
   const { row, loading, error, tracked } = lifecycle;
   const [prep, setPrep] = useState<PrepRow[]>([]);
@@ -260,6 +260,26 @@ export const GetReadyTab = ({ vehicle, lifecycle }: { vehicle: VehicleRow; lifec
             )}
           </Card>
         </>
+      )}
+
+      {ready && (
+        <Card title="Checklist">
+          <ul className="divide-y divide-adm-border">
+            {ready.checks.map((c) => (
+              <li key={c.label} className="flex items-center justify-between gap-3 py-2 text-[14px] leading-[20px]">
+                <span className="inline-flex items-center gap-2 min-w-0">
+                  {c.ok
+                    ? <CheckCircle2 className="w-4 h-4 shrink-0 text-adm-success" aria-hidden="true" />
+                    : <AlertTriangle className={`w-4 h-4 shrink-0 ${c.blocks ? "text-adm-danger" : "text-adm-warning"}`} aria-hidden="true" />}
+                  <span className="truncate">{c.label}</span>
+                </span>
+                <span className="text-[12px] leading-[18px] text-adm-muted shrink-0">
+                  {c.ok ? (fmtWhen(c.when) ?? "Complete") : c.blocks ? "Open, blocks publish" : "Open"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
       )}
 
       <Card title="Publishing gate">

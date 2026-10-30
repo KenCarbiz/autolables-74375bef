@@ -6,6 +6,7 @@ import {
   RefreshCw, Rocket, Tag,
 } from "lucide-react";
 import { toast } from "sonner";
+import { PageBody, PageHeader, MetricStrip, WorkTable, Th, Td } from "@/components/product";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { dealerRoleHome, hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
@@ -90,25 +91,15 @@ export default function DocumentsPrintCenter() {
     }
   };
 
-  // AppShell renders the title in the desktop chrome, so the in-content copy is
-  // mobile-only — same convention as DescriptionOperations.
-  const header = (
-    <div className="mb-4 lg:hidden">
-      <h1 className="font-display text-[26px] font-bold tracking-tight text-foreground leading-none">
-        Documents &amp; Print Center
-      </h1>
-      <p className="text-sm text-muted-foreground mt-1">
-        One versioned document package for the vehicle, printer, and customer Passport.
-      </p>
-    </div>
-  );
-
   const shell = (children: React.ReactNode) => (
     <CommandCapabilityProvider role={member?.role} isAdmin={isAdmin}>
-      <div className="max-w-[1480px] mx-auto p-4 sm:p-6">
-        {header}
+      <PageBody width="wide">
+        <PageHeader
+          title="Print Center"
+          description="One versioned document package for the vehicle, printer, and customer Passport. Printing does not publish, approve or rewrite a stored document."
+        />
         {children}
-      </div>
+      </PageBody>
     </CommandCapabilityProvider>
   );
 
@@ -275,13 +266,18 @@ export default function DocumentsPrintCenter() {
             </>
           }
         />
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <CommandStatCard label="Ready" value={counts.ready} Icon={FileCheck} tone="emerald" accentTop />
-          <CommandStatCard label="Blocked" value={counts.blocked} Icon={FileX} tone="red" accentTop />
-          <CommandStatCard label="Customer Visible" value={counts.customerVisible} Icon={FileSearch} tone="blue" accentTop />
-          <CommandStatCard label="Internal Only" value={counts.internalOnly} Icon={FileLock} tone="violet" accentTop />
-        </div>
       </div>
+
+      <MetricStrip
+        label="Document status for this vehicle"
+        className="mb-4"
+        metrics={[
+          { label: "Ready", value: counts.ready, hint: `of ${docCount} documents`, tone: "success" },
+          { label: "Blocked", value: counts.blocked, hint: `of ${docCount} documents`, tone: counts.blocked > 0 ? "danger" : "neutral" },
+          { label: "Customer visible", value: counts.customerVisible, hint: "shown in the Passport" },
+          { label: "Internal only", value: counts.internalOnly, hint: "not shown to the customer" },
+        ]}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
         {/* Documents table. With no rows the EmptyState IS the card — nested
@@ -295,19 +291,18 @@ export default function DocumentsPrintCenter() {
         ) : (
           <CommandCard title="Documents">
             <>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[860px]">
+              <WorkTable caption="Documents for this vehicle" minWidth={860}>
                   <thead>
-                    <tr className="text-[11.5px] font-semibold text-muted-foreground border-b border-border">
-                      <th scope="col" className="px-3 py-2.5">Document</th>
-                      <th scope="col" className="px-3 py-2.5">Current Version</th>
-                      <th scope="col" className="px-3 py-2.5">Internal Status</th>
-                      <th scope="col" className="px-3 py-2.5">Passport Visibility</th>
-                      <th scope="col" className="px-3 py-2.5">Print Status</th>
-                      <th scope="col" className="px-3 py-2.5 text-right">Action</th>
+                    <tr>
+                      <Th>Document</Th>
+                      <Th>Current version</Th>
+                      <Th>Internal status</Th>
+                      <Th>Passport visibility</Th>
+                      <Th>Print status</Th>
+                      <Th align="right">Action</Th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border">
+                  <tbody>
                     {documents.map((d) => {
                       const RowIcon = d.kind === "qr" ? QrCode : FileText;
                       // A non-current row is not automatically a draft — it can be
@@ -316,29 +311,29 @@ export default function DocumentsPrintCenter() {
                         ? "Current"
                         : d.internalStatus.label === "Draft" ? "Draft" : null;
                       return (
-                        <tr key={d.id} className="hover:bg-primary/[0.025] transition-colors">
-                          <td className="px-3 py-3">
+                        <tr key={d.id} className="hover:bg-adm-workspace">
+                          <Td>
                             <span className="inline-flex items-center gap-2 min-w-0">
                               <RowIcon className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden="true" />
                               <span className="text-[12.5px] font-semibold text-foreground truncate">{d.label}</span>
                             </span>
-                          </td>
-                          <td className="px-3 py-3 whitespace-nowrap">
+                          </Td>
+                          <Td className="whitespace-nowrap">
                             <span className="text-[12.5px] font-bold text-foreground">{d.version}</span>
                             {versionNote ? (
                               <span className="text-[11.5px] text-muted-foreground ml-1.5">{versionNote}</span>
                             ) : null}
-                          </td>
-                          <td className="px-3 py-3">
+                          </Td>
+                          <Td>
                             <StatusPill tone={d.internalStatus.tone}>{d.internalStatus.label}</StatusPill>
-                          </td>
-                          <td className="px-3 py-3">
+                          </Td>
+                          <Td>
                             <StatusPill tone={d.passportVisibility.tone}>{d.passportVisibility.label}</StatusPill>
-                          </td>
-                          <td className="px-3 py-3">
+                          </Td>
+                          <Td>
                             <StatusPill tone={d.printStatus.tone}>{d.printStatus.label}</StatusPill>
-                          </td>
-                          <td className="px-3 py-3 text-right">
+                          </Td>
+                          <Td align="right">
                             <span className="inline-flex items-center gap-1 justify-end">
                               {/* Reprint follows the same confirm-at-the-printer
                                   pattern as the packet: nothing is recorded
@@ -383,14 +378,13 @@ export default function DocumentsPrintCenter() {
                                 }
                               />
                             </span>
-                          </td>
+                          </Td>
                         </tr>
                       );
                     })}
                   </tbody>
-                </table>
-              </div>
-              <p className="text-[11.5px] text-muted-foreground mt-3">
+              </WorkTable>
+              <p className="text-[12px] leading-[18px] text-adm-muted mt-3">
                 Showing 1 to {docCount} of {docCount} documents
               </p>
             </>
@@ -447,7 +441,7 @@ export default function DocumentsPrintCenter() {
                 className="w-full"
                 wrapperClassName="flex w-full"
                 onClick={() => runPrint("packet")}>
-                Print Complete Vehicle Packet
+                Print bundle
               </CommandAction>
               <CommandAction
                 capability="can_print"

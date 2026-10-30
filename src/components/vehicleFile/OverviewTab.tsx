@@ -8,7 +8,8 @@ import { Card, DeepLink, EmptyNote, Pair, StatRow, TabHeader, btn, fmtWhen, sinc
 import { type LifecycleResult } from "./lifecycle";
 import { STATE_LABEL, STATE_NEXT_ACTION, STATE_OWNER } from "@/lib/lifecycle/states";
 import DescriptionCard from "./DescriptionCard";
-import { readinessLabel, type ReadinessSummary, type TabId, type VehicleRow } from "./types";
+import { type ReadinessSummary, type TabId, type VehicleRow } from "./types";
+import { deriveStatusFacts } from "./statusFacts";
 
 interface Interest {
   lastView: string | null;
@@ -59,7 +60,7 @@ export const OverviewTab = ({ vehicle, ready, lifecycle, stockNumber, onTab, onR
   const { row: lifecycleRow, loading: lifecycleLoading, tracked } = lifecycle;
   const interest = useCustomerInterest(vehicle);
   const [repulling, setRepulling] = useState(false);
-  const readiness = readinessLabel(ready);
+  const facts = deriveStatusFacts({ vehicle, ready, lifecycle });
   const gallery = listingGallery(vehicle);
   const videos = vehicle.videos || [];
   const state = lifecycleRow?.state ?? null;
@@ -107,9 +108,9 @@ export const OverviewTab = ({ vehicle, ready, lifecycle, stockNumber, onTab, onR
       />
 
       <Card title="Status" action={
-        <span className={`text-al-meta font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${
-          readiness.ready ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
-        }`}>{readiness.label}</span>
+        <span className={`text-[12px] leading-[18px] font-semibold px-2 py-[3px] rounded-[2px] ${
+          facts.retail.ready ? "bg-adm-success-bg text-adm-success" : "bg-adm-warning-bg text-adm-warning"
+        }`}>{facts.retail.value}{facts.retail.detail ? `: ${facts.retail.detail}` : ""}</span>
       }>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           <Pair
@@ -118,7 +119,7 @@ export const OverviewTab = ({ vehicle, ready, lifecycle, stockNumber, onTab, onR
           />
           <Pair label="Owner" value={state ? STATE_OWNER[state] : tracked ? "Inventory intake" : "Merchandising"} />
           <Pair label="Time in stage" value={state ? (sinceLabel(lifecycleRow?.state_changed_at) ?? "Unknown") : "Not applicable"} />
-          <Pair label="Digital status" value={vehicle.status === "published" ? "Live on the shopper portal" : vehicle.status === "archived" ? "Archived" : "Draft — not published"} />
+          <Pair label="Publication" value={vehicle.status === "published" ? "Published to the shopper portal" : vehicle.status === "archived" ? "Archived" : "Draft, not published"} />
         </div>
 
         <div className="rounded-xl border border-border bg-muted/30 p-4">

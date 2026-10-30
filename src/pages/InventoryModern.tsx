@@ -27,6 +27,8 @@ import { legacyMarketView, type LegacyListingFields } from "@/lib/market/surface
 import { presentLegacyPosition } from "@/lib/market/presentation";
 import { MARKET_BATCH_NOTICE } from "@/lib/market/batchTransition";
 import { AdvertisedPriceBand } from "@/components/inventory/AdvertisedPriceBand";
+import { PageBody, PageHeader, MetricStrip, LocalTabs, WorkTable, Th, Td, Button, StatusText, type LocalTab, type Tone } from "@/components/product";
+import { summarizeReadiness } from "@/lib/inventory/readinessSummary";
 
 // ──────────────────────────────────────────────────────────────
 // Inventory — dealer's primary workspace, as an Inventory Command
@@ -123,15 +125,20 @@ const InventoryModern = () => {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
-  const [condition, setCondition] = useState<ConditionFilter>("all");
   const [derived, setDerived] = useState<DerivedFilter>("all");
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(PAGE_SIZE);
   const [sortKey, setSortKey] = useState<SortKey>("updated");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
-  const [sortMenuOpen, setSortMenuOpen] = useState(false);
-  const [filterMenuOpen, setFilterMenuOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
+  // Condition lives in the URL so New / Used / CPO survive reload and back.
+  const urlCondition = searchParams.get("condition");
+  const condition: ConditionFilter = urlCondition === "new" || urlCondition === "used" || urlCondition === "cpo" ? urlCondition : "all";
+  const setCondition = (c: ConditionFilter) => {
+    const next = new URLSearchParams(searchParams);
+    if (c === "all") next.delete("condition"); else next.set("condition", c);
+    setSearchParams(next, { replace: true });
+  };
   const [showAdd, setShowAdd] = useState(searchParams.get("add") === "1");
   const [showImport, setShowImport] = useState(false);
   const [scraping, setScraping] = useState(false);
@@ -435,6 +442,7 @@ const InventoryModern = () => {
       readinessSum += rowReadiness(r);
     }
     const total = rows.length;
+    const readiness = summarizeReadiness(rows.map(rowReadiness));
     const archived = rows.filter((r) => r.status === "archived").length;
     const health = total ? Math.round((clean / total) * 100) : 100;
     return {
@@ -447,6 +455,9 @@ const InventoryModern = () => {
       newCount, usedCount, cpoCount,
       needsSticker, missingAddendum, priceVerify,
       readyToPublish: clean,
+      checklistComplete: readiness.complete,
+      checklistRatePct: readiness.completeRatePct,
+      meanCompletenessPct: readiness.meanCompletenessPct,
       vinDecoded, openRecallsTotal, openRecallVehicles, needsAttention,
       avgReadiness: total ? Math.round(readinessSum / total) : 0,
       avgBelowMarket: marketCount ? Math.round(marketSum / marketCount) : 0,
@@ -496,255 +507,200 @@ const InventoryModern = () => {
   const dealerName = (settings.dealer_name && settings.dealer_name !== "Your Dealership" && settings.dealer_name) || (tenant?.name && tenant.name !== "AutoLabels.io" && tenant.name) || "Your Dealership";
   const dealerLoc = [settings.dealer_city, settings.dealer_state].filter(Boolean).join(", ");
 
+  const conditionTabs: LocalTab[] = [
+    { key: "all", label: "All", to: "/inventory", count: loading ? null : counts.total, active: condition === "all" },
+    { key: "new", label: "New", to: "/inventory?condition=new", count: loading ? null : counts.newCount, active: condition === "new" },
+    { key: "used", label: "Used", to: "/inventory?condition=used", count: loading ? null : counts.usedCount, active: condition === "used" },
+    { key: "cpo", label: "CPO", to: "/inventory?condition=cpo", count: loading ? null : counts.cpoCount, active: condition === "cpo" },
+  ];
+
+  const moreActions: KebabItem[] = [
+    { label: "Scan VIN", icon: ScanLine, onClick: openScan },
+    { label: "OEM Window Sticker", icon: Printer, onClick: () => navigate("/window-sticker-studio") },
+    { label: "New Addendum", icon: FileSignature, onClick: () => navigate("/addendum") },
+    { label: "Check Recalls", icon: ShieldCheck, onClick: runRecallBatch },
+    { label: "Check Market Prices", icon: CircleDollarSign, onClick: runMarketBatch, disabled: true, title: MARKET_BATCH_NOTICE },
+    ...(settings.feature_price_verification ? [{ label: scraping ? "Verifying…" : "Verify Prices", icon: RefreshCw, onClick: runPriceScrape }] : []),
+    { label: "CSV Import", icon: Upload, onClick: () => setShowImport(true) },
+  ];
+
+  const below = counts.avgBelowMarket;
+
   return (
-    <div className="p-4 lg:p-6 max-w-[1600px] mx-auto space-y-5">
-      <div className="flex flex-col xl:flex-row gap-5">
-        {/* Main column */}
-        <div className="flex-1 min-w-0 space-y-5">
-          <ExecKpiStrip counts={counts} onMetric={onHealthMetric} onMarket={runMarketBatch} />
+    <PageBody width="wide">
+      <PageHeader
+        title="Inventory"
+        scope={dealerName + (dealerLoc ? `, ${dealerLoc}` : "")}
+        description="Every active vehicle with its checklist, recall, price and publication state."
+        actions={
+          <>
+            <ActionsMenu items={moreActions} />
+            <Button variant="primary" onClick={() => setShowAdd(true)}><Plus className="w-4 h-4" /> Add vehicle</Button>
+          </>
+        }
+      />
+      <span id="market-batch-notice" className="sr-only">{MARKET_BATCH_NOTICE}</span>
 
-          {/* Search + selects */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="relative flex-1 min-w-[200px] max-w-md">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search VIN, stock #, year, make, model, trim…" className="w-full h-9 pl-8 pr-3 rounded-xl border border-border bg-background text-sm" />
-            </div>
-            <select value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)} className="h-9 px-2.5 rounded-xl border border-border bg-background text-sm">
-              <option value="all">All statuses</option><option value="draft">Draft</option><option value="published">Published</option><option value="archived">Archived</option>
-            </select>
-            <select value={condition} onChange={(e) => setCondition(e.target.value as ConditionFilter)} className="h-9 px-2.5 rounded-xl border border-border bg-background text-sm">
-              <option value="all">New &amp; used</option><option value="new">New</option><option value="used">Used</option><option value="cpo">CPO</option>
-            </select>
+      <MetricStrip
+        label="Inventory summary"
+        metrics={[
+          {
+            label: "Active vehicles", value: loading ? null : counts.total, loading,
+            hint: `${counts.newCount} new, ${counts.usedCount} used, ${counts.cpoCount} CPO`,
+          },
+          {
+            label: "Checklist complete", value: loading ? null : counts.checklistComplete, loading,
+            tone: counts.checklistComplete > 0 ? "success" : "neutral",
+            hint: `of ${counts.total} vehicles pass all 5 checks${counts.checklistRatePct != null ? ` (${counts.checklistRatePct}%)` : ""}`,
+          },
+          {
+            label: "Average checklist completeness", value: loading || counts.meanCompletenessPct == null ? null : `${counts.meanCompletenessPct}%`, loading,
+            hint: `mean of 5 checks across ${counts.total} vehicles`,
+          },
+          {
+            label: "Needs attention", value: loading ? null : counts.needsAttention, loading,
+            tone: counts.needsAttention > 0 ? "warning" : "neutral",
+            hint: `${counts.openRecallVehicles} with a recall reported, ${counts.priceVerify} price reviews`,
+            href: undefined,
+          },
+        ]}
+      />
+
+      <p className="-mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] leading-[18px] text-adm-muted">
+        <span>VIN decoded {counts.vinDecoded} of {counts.total}</span>
+        <button type="button" className="underline hover:text-adm-ink" onClick={() => onHealthMetric("needs-sticker")}>Missing stickers {counts.needsSticker}</button>
+        <button type="button" className="underline hover:text-adm-ink" onClick={() => onHealthMetric("missing-addendum")}>Missing addendums {counts.missingAddendum}</button>
+        <button type="button" className="underline hover:text-adm-ink" onClick={() => onHealthMetric("open-recalls")}>Recall reported {counts.openRecallVehicles}</button>
+        <button type="button" className="underline hover:text-adm-ink" onClick={() => onHealthMetric("price-reviews")}>Price reviews {counts.priceVerify}</button>
+        <button type="button" className="underline hover:text-adm-ink" onClick={runMarketBatch} disabled title={MARKET_BATCH_NOTICE} aria-describedby="market-batch-notice">
+          Average market position ${Math.abs(below).toLocaleString()} {below >= 0 ? "below" : "above"}
+        </button>
+      </p>
+
+      <section className="flex flex-col gap-3" aria-label="Vehicles">
+        <LocalTabs tabs={conditionTabs} label="Condition" />
+
+        {/* Compact toolbar: search, three selects, sort, view */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-[200px] max-w-md">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-adm-muted" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search inventory" placeholder="Search VIN, stock #, year, make, model, trim" className="w-full min-h-[36px] pl-8 pr-3 rounded-md border border-adm-border bg-adm-surface text-[14px]" />
           </div>
-
-          {/* Quick-filter pills */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <Pill label="All Vehicles" count={counts.total} active={status === "all" && condition === "all" && derived === "all"} onClick={() => { setStatus("all"); setCondition("all"); setDerived("all"); }} />
-            <Pill label="New" count={counts.newCount} active={condition === "new"} onClick={() => { setDerived("all"); setStatus("all"); setCondition("new"); }} />
-            <Pill label="Used" count={counts.usedCount} active={condition === "used"} onClick={() => { setDerived("all"); setStatus("all"); setCondition("used"); }} />
-            <Pill label="CPO" count={counts.cpoCount} active={condition === "cpo"} onClick={() => { setDerived("all"); setStatus("all"); setCondition("cpo"); }} />
-            <Pill label="Needs Sticker" count={counts.needsSticker} tone="amber" active={derived === "needs-sticker"} onClick={() => { setStatus("all"); setCondition("all"); setDerived("needs-sticker"); }} />
-            <Pill label="Missing Addendum" count={counts.missingAddendum} tone="red" active={derived === "missing-addendum"} onClick={() => { setStatus("all"); setCondition("all"); setDerived("missing-addendum"); }} />
-            <Pill label="Price Verification" count={counts.priceVerify} tone="amber" active={derived === "price-verify"} onClick={() => { setStatus("all"); setCondition("all"); setDerived("price-verify"); }} />
-            <Pill label="Published" count={counts.published} tone="emerald" active={status === "published"} onClick={() => { setDerived("all"); setCondition("all"); setStatus("published"); }} />
-            <Pill label="Draft" count={counts.draft} active={status === "draft"} onClick={() => { setDerived("all"); setCondition("all"); setStatus("draft"); }} />
-            <div className="ml-auto flex items-center gap-2 relative">
-              {/* Add Filter — opens a popover with toggle filters */}
-              <div className="relative">
-                <button
-                  onClick={() => { setFilterMenuOpen((v) => !v); setSortMenuOpen(false); }}
-                  className={`h-8 px-3 rounded-full border border-dashed text-xs font-semibold inline-flex items-center gap-1 transition-colors ${filterMenuOpen ? "border-blue-500 bg-blue-50 text-blue-700" : "border-border bg-card text-foreground hover:bg-muted"}`}
-                >
-                  <Plus className="w-3.5 h-3.5 text-blue-600" /> Add Filter
-                  {(status !== "all" || condition !== "all" || derived !== "all") && (
-                    <span className="ml-1 min-w-[16px] h-4 px-1 rounded-full bg-blue-600 text-white text-[10px] font-bold inline-flex items-center justify-center">
-                      {(status !== "all" ? 1 : 0) + (condition !== "all" ? 1 : 0) + (derived !== "all" ? 1 : 0)}
-                    </span>
-                  )}
-                </button>
-                {filterMenuOpen && (
-                  <div className="absolute right-0 top-full mt-1 w-64 rounded-xl border border-border bg-popover shadow-lg z-20 p-3 space-y-2.5">
-                    <div>
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Status</label>
-                      <select value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)} className="mt-1 w-full h-8 rounded-lg border border-border bg-background text-xs px-2">
-                        <option value="all">All statuses</option><option value="draft">Draft</option><option value="published">Published</option><option value="archived">Archived</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Condition</label>
-                      <select value={condition} onChange={(e) => setCondition(e.target.value as ConditionFilter)} className="mt-1 w-full h-8 rounded-lg border border-border bg-background text-xs px-2">
-                        <option value="all">New &amp; used</option><option value="new">New</option><option value="used">Used</option><option value="cpo">CPO</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Attention</label>
-                      <select value={derived} onChange={(e) => setDerived(e.target.value as DerivedFilter)} className="mt-1 w-full h-8 rounded-lg border border-border bg-background text-xs px-2">
-                        <option value="all">All</option>
-                        <option value="needs-sticker">Needs Sticker</option>
-                        <option value="missing-addendum">Missing Addendum</option>
-                        <option value="price-verify">Price Verification</option>
-                        <option value="open-recalls">Open Recalls</option>
-                        <option value="needs-attention">Needs Attention</option>
-                      </select>
-                    </div>
-                    <div className="flex justify-between pt-1">
-                      <button onClick={() => { setStatus("all"); setCondition("all"); setDerived("all"); }} className="text-[11px] font-semibold text-muted-foreground hover:text-foreground">Clear all</button>
-                      <button onClick={() => setFilterMenuOpen(false)} className="text-[11px] font-semibold text-blue-600 hover:text-blue-700">Done</button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Sort dropdown */}
-              <div className="relative">
-                <button
-                  onClick={() => { setSortMenuOpen((v) => !v); setFilterMenuOpen(false); }}
-                  className={`h-8 px-3 rounded-full border text-xs font-semibold inline-flex items-center gap-1.5 transition-colors ${sortMenuOpen ? "border-blue-500 bg-blue-50 text-blue-700" : "border-border bg-card text-foreground hover:bg-muted"}`}
-                >
-                  Sort: {SORT_LABEL[sortKey]}
-                  <ChevronRight className="w-3.5 h-3.5 rotate-90 text-muted-foreground" />
-                </button>
-                {sortMenuOpen && (
-                  <div className="absolute right-0 top-full mt-1 w-56 rounded-xl border border-border bg-popover shadow-lg z-20 p-1">
-                    {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
-                      <button
-                        key={k}
-                        onClick={() => { setSortKey(k); setSortMenuOpen(false); }}
-                        className={`w-full text-left px-2.5 py-2 rounded-lg text-xs font-medium transition-colors ${k === sortKey ? "bg-blue-50 text-blue-700" : "text-foreground hover:bg-muted"}`}
-                      >
-                        {SORT_LABEL[k]}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* List / Grid toggle */}
-              <div className="h-8 inline-flex items-center rounded-lg border border-border bg-card overflow-hidden">
-                <button
-                  onClick={() => setViewMode("list")}
-                  className={`w-8 h-8 inline-flex items-center justify-center transition-colors ${viewMode === "list" ? "bg-blue-50 text-blue-700" : "text-muted-foreground hover:bg-muted"}`}
-                  title="List view"
-                ><ClipboardList className="w-4 h-4" /></button>
-                <button
-                  onClick={() => setViewMode("grid")}
-                  className={`w-8 h-8 inline-flex items-center justify-center transition-colors ${viewMode === "grid" ? "bg-blue-50 text-blue-700" : "text-muted-foreground hover:bg-muted"}`}
-                  title="Grid view"
-                ><Building2 className="w-4 h-4" /></button>
-              </div>
-            </div>
-          </div>
-
-          {/* List */}
-          {loading ? (
-            <InventorySkeleton />
-          ) : filtered.length === 0 ? (
-            <EmptyState onAdd={() => setShowAdd(true)} total={rows.length} />
-          ) : (
-            <>
-              {/* Table view (tablet/desktop only when list mode) */}
-              <div className={`${viewMode === "list" ? "hidden md:block" : "hidden"} rounded-2xl border border-border bg-card shadow-sm overflow-x-auto`}>
-                <table className="w-full text-sm min-w-[760px]">
-                  <thead className="bg-muted/40 text-[11px] uppercase tracking-wide text-muted-foreground">
-                    <tr>
-                      <th className="text-left font-semibold px-4 py-2.5">Vehicle</th>
-                      <th className="text-left font-semibold px-3 py-2.5">Status</th>
-                      <th className="text-left font-semibold px-3 py-2.5">Readiness</th>
-                      <th className="text-left font-semibold px-3 py-2.5">Compliance</th>
-                      <th className="text-left font-semibold px-3 py-2.5">Advertised Price</th>
-                      <th className="text-left font-semibold px-3 py-2.5">Publishing</th>
-                      <th className="text-left font-semibold px-3 py-2.5">Updated</th>
-                      <th className="text-right font-semibold px-3 py-2.5">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {pageRows.map((r) => (
-                      <tr key={r.id} className="group hover:bg-muted/30 cursor-pointer transition-colors" onClick={() => navigate(`/vehicle-file/${r.id}`)}>
-                        <td className="px-4 py-2 align-middle">
-                          <div className="flex items-center gap-3">
-                            <Thumb r={r} />
-                            <div className="min-w-0 leading-tight">
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-semibold text-foreground truncate">{r.ymm || "(needs decode)"}</span>
-                                {r.condition && <CondBadge condition={r.condition} />}
-                              </div>
-                              {r.trim && <p className="text-xs text-muted-foreground truncate mt-px">{r.trim}</p>}
-                              <p className="text-[11px] text-muted-foreground/90 font-mono truncate mt-0.5">
-                                Stock {r.stock_number ? `#${r.stock_number}` : "—"} • VIN …{(r.vin || "").slice(-6)}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-3 py-2 align-middle"><SimpleStatusPill status={r.status} /></td>
-                        <td className="px-3 py-2 align-middle">
-                          <ReadinessCell r={r} signal={signalFor(r)} pct={rowReadiness(r)} />
-                        </td>
-                        <td className="px-3 py-2 align-middle">
-                          <ComplianceCell ymm={r.ymm} row={r} />
-                        </td>
-                        <td className="px-3 py-2 align-middle">
-                          <PriceCell price={r.price} docFee={settings.doc_fee_amount} ap={byVin.get((r.vin || "").toUpperCase())} position={r.market_position} value={r.market_value} />
-                        </td>
-                        <td className="px-3 py-2 align-middle" onClick={(e) => e.stopPropagation()}>
-                          <PortalChip status={r.status} />
-                        </td>
-                        <td className="px-3 py-2 align-middle">{r.updated_at ? <UpdatedCell iso={r.updated_at} /> : <span className="text-xs text-muted-foreground">—</span>}</td>
-                        <td className="px-3 py-2 text-right align-middle" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex justify-end items-center gap-1">
-                            <div className="hidden md:flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <HoverBtn title="Open vehicle" onClick={() => navigate(`/vehicle-file/${r.id}`)}><ExternalLink className="w-3.5 h-3.5" /></HoverBtn>
-                              <HoverBtn title="Generate sticker" onClick={() => navigate(`${r.condition === "new" ? "/new-car-sticker" : "/used-car-sticker"}?vehicleId=${r.id}`)}><Printer className="w-3.5 h-3.5" /></HoverBtn>
-                              {r.status === "published" && <HoverBtn title="View customer packet" onClick={() => window.open(`/v3/${r.slug}`, "_blank", "noopener")}><Eye className="w-3.5 h-3.5" /></HoverBtn>}
-                              <HoverBtn title="Quick recall check" onClick={() => quickRecall(r.vin)}><ShieldCheck className="w-3.5 h-3.5" /></HoverBtn>
-                            </div>
-                            <KebabMenu items={rowActions(r)} />
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Cards — always on mobile, and on desktop when Grid view is selected */}
-              <div className={`${viewMode === "grid" ? "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5" : "md:hidden space-y-2.5"}`}>
-                {pageRows.map((r) => (
-                  <VehicleCard
-                    key={r.id}
-                    r={r}
-                    signal={signalFor(r)}
-                    readiness={rowReadiness(r)}
-                    onOpen={() => navigate(`/vehicle-file/${r.id}`)}
-                    onSticker={() => navigate(`${r.condition === "new" ? "/new-car-sticker" : "/used-car-sticker"}?vehicleId=${r.id}`)}
-                    onView={() => window.open(`/v3/${r.slug}`, "_blank", "noopener")}
-                    items={rowActions(r)}
-                  />
-                ))}
-              </div>
-
-              <Pagination page={safePage} pageCount={pageCount} total={filtered.length} pageSize={perPage} onPage={setPage} onPageSize={setPerPage} />
-            </>
+          <select aria-label="Filter by status" value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)} className="min-h-[36px] px-2.5 rounded-md border border-adm-border bg-adm-surface text-[14px]">
+            <option value="all">All statuses</option><option value="draft">Draft ({counts.draft})</option><option value="published">Published ({counts.published})</option><option value="archived">Archived</option>
+          </select>
+          <select aria-label="Filter by attention" value={derived} onChange={(e) => setDerived(e.target.value as DerivedFilter)} className="min-h-[36px] px-2.5 rounded-md border border-adm-border bg-adm-surface text-[14px]">
+            <option value="all">All vehicles</option>
+            <option value="needs-sticker">Needs sticker ({counts.needsSticker})</option>
+            <option value="missing-addendum">Missing addendum ({counts.missingAddendum})</option>
+            <option value="price-verify">Price verification ({counts.priceVerify})</option>
+            <option value="open-recalls">Recall reported ({counts.openRecallVehicles})</option>
+            <option value="needs-attention">Needs attention ({counts.needsAttention})</option>
+          </select>
+          <select aria-label="Sort vehicles" value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} className="min-h-[36px] px-2.5 rounded-md border border-adm-border bg-adm-surface text-[14px]">
+            {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => <option key={k} value={k}>Sort: {SORT_LABEL[k]}</option>)}
+          </select>
+          {(status !== "all" || condition !== "all" || derived !== "all" || q) && (
+            <Button size="sm" variant="ghost" onClick={() => { setStatus("all"); setCondition("all"); setDerived("all"); setQ(""); }}>Clear filters</Button>
           )}
+          <div className="ml-auto inline-flex items-center rounded-md border border-adm-border bg-adm-surface overflow-hidden">
+            <button
+              onClick={() => setViewMode("list")} aria-pressed={viewMode === "list"}
+              className={`w-9 h-9 inline-flex items-center justify-center ${viewMode === "list" ? "bg-adm-selected text-adm-primary" : "text-adm-muted hover:bg-adm-workspace"}`}
+              title="List view" aria-label="List view"
+            ><ClipboardList className="w-4 h-4" /></button>
+            <button
+              onClick={() => setViewMode("grid")} aria-pressed={viewMode === "grid"}
+              className={`w-9 h-9 inline-flex items-center justify-center ${viewMode === "grid" ? "bg-adm-selected text-adm-primary" : "text-adm-muted hover:bg-adm-workspace"}`}
+              title="Grid view" aria-label="Grid view"
+            ><Building2 className="w-4 h-4" /></button>
+          </div>
         </div>
 
-        {/* Sidebar */}
-        <aside className="xl:w-[300px] shrink-0 space-y-4">
-          <div className="rounded-[20px] border border-[#EAECEF] bg-white shadow-[0_1px_3px_rgba(16,24,40,0.04)] p-4">
-            <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground mb-3">Quick Actions</h3>
-            <div className="space-y-2">
-              <QuickAction icon={Plus} label="Add Vehicle" onClick={() => setShowAdd(true)} />
-              <QuickAction icon={ScanLine} label="Scan VIN" onClick={openScan} />
-              <QuickAction icon={Printer} label="OEM Window Sticker" onClick={() => navigate("/window-sticker-studio")} />
-              <QuickAction icon={FileSignature} label="New Addendum" onClick={() => navigate("/addendum")} />
-              <QuickAction icon={ShieldCheck} label="Check Recalls" onClick={runRecallBatch} />
-              <QuickAction
-                icon={CircleDollarSign}
-                label="Check Market Prices"
-                onClick={runMarketBatch}
-                disabled
-                title={MARKET_BATCH_NOTICE}
-              />
-              <span id="market-batch-notice" className="sr-only">{MARKET_BATCH_NOTICE}</span>
-              {settings.feature_price_verification && <QuickAction icon={RefreshCw} label={scraping ? "Verifying…" : "Verify Prices"} onClick={runPriceScrape} />}
-              <QuickAction icon={Upload} label="CSV Import" onClick={() => setShowImport(true)} />
+        {/* List */}
+        {loading ? (
+          <InventorySkeleton />
+        ) : filtered.length === 0 ? (
+          <EmptyState onAdd={() => setShowAdd(true)} total={rows.length} />
+        ) : (
+          <>
+            <div className={`${viewMode === "list" ? "hidden md:block" : "hidden"} rounded-[4px] border border-adm-border bg-adm-surface`}>
+              <WorkTable caption="Inventory vehicles" minWidth={1040}>
+                <thead>
+                  <tr>
+                    <Th>Vehicle</Th>
+                    <Th>Status</Th>
+                    <Th>Checklist</Th>
+                    <Th>Compliance</Th>
+                    <Th align="right">Advertised price</Th>
+                    <Th>Customer page</Th>
+                    <Th>Updated</Th>
+                    <Th align="right">Actions</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageRows.map((r) => (
+                    <tr key={r.id} className="group hover:bg-adm-workspace cursor-pointer" onClick={() => navigate(`/vehicle-file/${r.id}`)}>
+                      <Td className="py-2">
+                        <div className="flex items-center gap-3">
+                          <Thumb r={r} />
+                          <div className="min-w-0 leading-tight">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-semibold text-adm-ink truncate">{r.ymm || "(needs decode)"}</span>
+                              {r.condition && <CondBadge condition={r.condition} />}
+                            </div>
+                            {r.trim && <p className="text-[12px] leading-[18px] text-adm-muted truncate">{r.trim}</p>}
+                            <p className="text-[12px] leading-[18px] text-adm-muted font-mono truncate">
+                              Stock {r.stock_number ? `#${r.stock_number}` : "-"} | VIN ...{(r.vin || "").slice(-6)}
+                            </p>
+                          </div>
+                        </div>
+                      </Td>
+                      <Td className="py-2"><SimpleStatusPill status={r.status} /></Td>
+                      <Td className="py-2"><ReadinessCell r={r} signal={signalFor(r)} pct={rowReadiness(r)} /></Td>
+                      <Td className="py-2"><ComplianceCell ymm={r.ymm} row={r} /></Td>
+                      <Td align="right" className="py-2">
+                        <PriceCell price={r.price} docFee={settings.doc_fee_amount} ap={byVin.get((r.vin || "").toUpperCase())} position={r.market_position} value={r.market_value} />
+                      </Td>
+                      <Td className="py-2" ><PortalChip status={r.status} row={r} /></Td>
+                      <Td className="py-2">{r.updated_at ? <UpdatedCell iso={r.updated_at} /> : <span className="text-[12px] text-adm-muted">Unknown</span>}</Td>
+                      <Td align="right" className="py-2">
+                        <div className="flex justify-end items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <div className="hidden md:flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                            <HoverBtn title="Open vehicle" onClick={() => navigate(`/vehicle-file/${r.id}`)}><ExternalLink className="w-3.5 h-3.5" /></HoverBtn>
+                            <HoverBtn title="Generate sticker" onClick={() => navigate(`${r.condition === "new" ? "/new-car-sticker" : "/used-car-sticker"}?vehicleId=${r.id}`)}><Printer className="w-3.5 h-3.5" /></HoverBtn>
+                            {r.status === "published" && <HoverBtn title="View customer packet" onClick={() => window.open(`/v3/${r.slug}`, "_blank", "noopener")}><Eye className="w-3.5 h-3.5" /></HoverBtn>}
+                            <HoverBtn title="Quick recall check" onClick={() => quickRecall(r.vin)}><ShieldCheck className="w-3.5 h-3.5" /></HoverBtn>
+                          </div>
+                          <KebabMenu items={rowActions(r)} />
+                        </div>
+                      </Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </WorkTable>
             </div>
-          </div>
 
-          <SideCard title="Inventory Insights">
-            <ul className="space-y-3">
-              <InsightStat icon={Car} value={counts.total} label="Total Vehicles" iconTone="blue" onClick={() => onHealthMetric("total")} />
-              <InsightStat icon={CheckCircle2} value={counts.vinDecoded} label="VIN Decoded" iconTone="emerald" badge={counts.total ? `${Math.round((counts.vinDecoded / counts.total) * 100)}%` : undefined} />
-              <InsightStat icon={Printer} value={counts.needsSticker} label="Missing Stickers" iconTone="amber" onClick={() => onHealthMetric("needs-sticker")} />
-              <InsightStat icon={FileText} value={counts.missingAddendum} label="Missing Addendums" iconTone="orange" onClick={() => onHealthMetric("missing-addendum")} />
-              <InsightStat icon={ShieldCheck} value={counts.openRecallVehicles} label="Open Recalls" iconTone="red" onClick={() => onHealthMetric("open-recalls")} />
-              <InsightStat icon={Tag} value={counts.priceVerify} label="Price Reviews" iconTone="violet" onClick={() => onHealthMetric("price-reviews")} />
-            </ul>
-            <div className="mt-4 pt-3 border-t border-border">
-              <button onClick={() => navigate("/admin?tab=analytics")} className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 transition-colors">View full insights →</button>
+            {/* Cards: always on mobile, and on desktop when Grid view is selected */}
+            <div className={`${viewMode === "grid" ? "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5" : "md:hidden space-y-2.5"}`}>
+              {pageRows.map((r) => (
+                <VehicleCard
+                  key={r.id}
+                  r={r}
+                  signal={signalFor(r)}
+                  readiness={rowReadiness(r)}
+                  onOpen={() => navigate(`/vehicle-file/${r.id}`)}
+                  onSticker={() => navigate(`${r.condition === "new" ? "/new-car-sticker" : "/used-car-sticker"}?vehicleId=${r.id}`)}
+                  onView={() => window.open(`/v3/${r.slug}`, "_blank", "noopener")}
+                  items={rowActions(r)}
+                />
+              ))}
             </div>
-          </SideCard>
-        </aside>
-      </div>
+
+            <Pagination page={safePage} pageCount={pageCount} total={filtered.length} pageSize={perPage} onPage={setPage} onPageSize={setPerPage} />
+          </>
+        )}
+      </section>
 
       {/* Modals */}
       {showAdd && (
@@ -753,7 +709,7 @@ const InventoryModern = () => {
       {showImport && (
         <CsvImportModal tenantId={tenant?.id || null} userId={user?.id || null} onClose={() => setShowImport(false)} onImported={() => { setShowImport(false); load(); }} />
       )}
-    </div>
+    </PageBody>
   );
 };
 
@@ -846,83 +802,20 @@ const MiniRing = ({ pct, size = 40 }: { pct: number; size?: number }) => {
 // scroll never clips it).
 const ReadinessCell = ({ r, signal, pct }: { r: VehicleRow; signal: RowSignal; pct: number }) => {
   const checks = [
-    { label: "Vehicle created", short: "vehicle", ok: true },
-    { label: "VIN decoded", short: "VIN decode", ok: !!r.ymm },
-    { label: "Sticker generated", short: "sticker", ok: signal.stickerDone },
-    { label: "Addendum complete", short: "addendum", ok: signal.hasAddendum },
-    { label: "Price verified", short: "price", ok: !r.price || signal.priceVerified },
+    { label: "Vehicle created", ok: true },
+    { label: "VIN decoded", ok: !!r.ymm },
+    { label: "Sticker generated", ok: signal.stickerDone },
+    { label: "Addendum complete", ok: signal.hasAddendum },
+    { label: "Price verified", ok: !r.price || signal.priceVerified },
   ];
-  const missing = checks.filter((c) => !c.ok).length;
-  const label = pct >= 100 ? "Ready" : pct >= 80 ? "Almost Ready" : missing <= 1 ? "Missing Items" : "Several Missing";
-  const labelTone = pct >= 100 ? "text-emerald-700" : pct >= 80 ? "text-blue-700" : missing <= 1 ? "text-amber-700" : "text-red-600";
-  const title = `${pct}% readiness\n` + checks.map((c) => `${c.ok ? "✓" : "✗"} ${c.label}`).join("\n");
-  const shortLabel = pct >= 100 ? "Ready" : label;
+  const passed = checks.filter((c) => c.ok).length;
+  const tone: Tone = passed === checks.length ? "success" : passed >= 4 ? "info" : "warning";
+  const title = `${passed} of ${checks.length} checks pass\n` + checks.map((c) => `${c.ok ? "Pass" : "Open"}: ${c.label}`).join("\n");
   return (
-    <div className="flex items-center gap-2 cursor-help" title={title}>
-      <MiniRing pct={pct} />
-      <div className="min-w-0 leading-tight">
-        <p className={`text-xs font-semibold tracking-tight ${labelTone}`}>{shortLabel}</p>
-        {missing > 0 && <p className="text-[11px] font-semibold text-blue-600 mt-0.5">{missing} {missing === 1 ? "Task" : "Tasks"}</p>}
-      </div>
+    <div className="leading-tight cursor-help" title={title}>
+      <StatusText tone={tone}>{passed} of {checks.length} checks</StatusText>
+      <p className="mt-0.5 text-[12px] leading-[18px] text-adm-muted tabular-nums">{pct}% complete</p>
     </div>
-  );
-};
-
-// ── Sidebar primitives ─────────────────────────────────────────
-const SideCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <div className="rounded-2xl border border-border bg-card shadow-sm p-4">
-    <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground mb-3">{title}</h3>
-    {children}
-  </div>
-);
-
-// Premium navigation pill — matches the reference Quick Actions card exactly:
-// 58px full-pill rows, a 40px soft-blue icon circle, 16px label, right chevron.
-const QuickAction = ({ icon: Icon, label, onClick, disabled, title }: {
-  icon: typeof Car; label: string; onClick: () => void; disabled?: boolean; title?: string;
-}) => (
-  <button
-    onClick={onClick}
-    disabled={disabled}
-    title={title}
-    aria-disabled={disabled ? true : undefined}
-    aria-describedby={disabled ? "market-batch-notice" : undefined}
-    className={`w-full flex items-center gap-2.5 pl-2 pr-3.5 h-[46px] rounded-full border border-[#E8EDF4] bg-[#F8FAFC] transition-all duration-200 text-left ${
-      disabled
-        ? "opacity-60 cursor-not-allowed"
-        : "hover:bg-white hover:border-blue-500 hover:shadow-sm"
-    }`}
-  >
-    <span className="w-8 h-8 rounded-full bg-[#EAF2FF] text-blue-600 flex items-center justify-center shrink-0">
-      <Icon className="w-4 h-4" strokeWidth={2} />
-    </span>
-    <span className="flex-1 text-sm font-semibold text-[#111827] truncate">{label}</span>
-    <ChevronRight className="w-4 h-4 text-[#6B7280] shrink-0" />
-  </button>
-);
-
-// Insight row for the rail — icon square + prominent number over a label,
-// with an optional right-aligned percentage badge.
-const InsightStat = ({ icon: Icon, value, label, iconTone, badge, onClick }: { icon: typeof Car; value: number | string; label: string; iconTone: "blue" | "emerald" | "amber" | "orange" | "red" | "violet"; badge?: string; onClick?: () => void }) => {
-  const ibg = {
-    blue: "bg-blue-600/10 text-blue-600",
-    emerald: "bg-emerald-100 text-emerald-600",
-    amber: "bg-amber-100 text-amber-600",
-    orange: "bg-orange-100 text-orange-600",
-    red: "bg-red-100 text-red-600",
-    violet: "bg-violet-100 text-violet-600",
-  }[iconTone];
-  return (
-    <li>
-      <button onClick={onClick} disabled={!onClick} className="w-full flex items-center gap-3 text-left disabled:cursor-default group/i">
-        <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${ibg}`}><Icon className="w-4 h-4" strokeWidth={2} /></span>
-        <div className="min-w-0 flex-1">
-          <p className="font-display text-lg font-semibold tabular-nums leading-none text-foreground">{typeof value === "number" ? value.toLocaleString() : value}</p>
-          <p className="text-[11px] text-muted-foreground mt-0.5 group-enabled/i:group-hover/i:text-foreground transition-colors">{label}</p>
-        </div>
-        {badge && <span className="text-[11px] font-bold text-emerald-600 shrink-0">{badge}</span>}
-      </button>
-    </li>
   );
 };
 
@@ -936,107 +829,6 @@ const Sparkline = ({ values }: { values: number[] }) => {
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="text-blue-500 shrink-0" preserveAspectRatio="none">
       <polyline points={pts} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
-  );
-};
-
-// ── Executive KPI strip ────────────────────────────────────────
-const BigRing = ({ pct }: { pct: number }) => {
-  const tone = pct >= 80 ? "#10B981" : pct >= 50 ? "#2563EB" : pct >= 30 ? "#F59E0B" : "#EF4444";
-  const r = 17; const c = 2 * Math.PI * r;
-  return (
-    <div className="relative w-[88px] h-[88px] shrink-0">
-      <svg className="w-[88px] h-[88px] -rotate-90" viewBox="0 0 40 40">
-        <circle cx="20" cy="20" r={r} fill="none" stroke="currentColor" strokeWidth="4" className="text-muted" />
-        <circle cx="20" cy="20" r={r} fill="none" stroke={tone} strokeWidth="4" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c - (c * pct) / 100} />
-      </svg>
-      <span className="absolute inset-0 flex items-center justify-center text-[22px] font-bold tabular-nums text-foreground tracking-tight">{pct}%</span>
-    </div>
-  );
-};
-
-const ExecKpi = ({ label, value, sub, icon: Icon, tone, onClick, link }: { label: string; value: string | number; sub: string; icon: typeof Car; tone?: "emerald" | "amber" | "red" | "violet"; onClick: () => void; link?: string }) => {
-  const numCls =
-    tone === "emerald" ? "text-emerald-600" :
-    tone === "amber"   ? "text-amber-600" :
-    tone === "red"     ? "text-red-600" :
-    tone === "violet"  ? "text-violet-600" :
-                         "text-foreground";
-  const ibg =
-    tone === "emerald" ? "bg-emerald-50 text-emerald-600" :
-    tone === "amber"   ? "bg-amber-50 text-amber-600" :
-    tone === "red"     ? "bg-red-50 text-red-600" :
-    tone === "violet"  ? "bg-violet-50 text-violet-600" :
-                         "bg-muted text-muted-foreground";
-  return (
-    <button onClick={onClick} className="group/k shrink-0 min-w-[170px] lg:min-w-0 h-full text-left rounded-2xl border border-border bg-card shadow-sm p-4 hover:shadow-md hover:border-foreground/15 transition-all flex flex-col">
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground leading-tight">{label}</p>
-        <span className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${ibg}`}><Icon className="w-3.5 h-3.5" strokeWidth={2} /></span>
-      </div>
-      <p className={`font-display text-[32px] font-bold tabular-nums leading-none mt-3 ${numCls}`}>{typeof value === "number" ? value.toLocaleString() : value}</p>
-      <p className="text-[11px] mt-2 text-muted-foreground truncate">{sub}</p>
-      {link && <p className="text-[11px] font-semibold text-blue-600 mt-auto pt-2 group-hover/k:underline">{link} →</p>}
-    </button>
-  );
-};
-
-interface KpiCounts {
-  health: number; avgReadiness: number; total: number; readyToPublish: number; newCount: number; usedCount: number;
-  published: number; needsAttention: number; openRecallVehicles: number; priceVerify: number; avgBelowMarket: number;
-}
-const ExecKpiStrip = ({ counts, onMetric, onMarket }: { counts: KpiCounts; onMetric: (k: string) => void; onMarket: () => void }) => {
-  const below = counts.avgBelowMarket;
-  const pct = counts.avgReadiness;
-  const ringTone = pct >= 80 ? "#10B981" : pct >= 50 ? "#2563EB" : pct >= 30 ? "#F59E0B" : "#EF4444";
-  const barTone = pct >= 80 ? "bg-emerald-500" : pct >= 50 ? "bg-blue-500" : pct >= 30 ? "bg-amber-500" : "bg-red-500";
-  const accentDot = pct >= 80 ? "bg-emerald-500" : pct >= 50 ? "bg-blue-500" : pct >= 30 ? "bg-amber-500" : "bg-red-500";
-  return (
-    <div className="grid gap-3 xl:grid-cols-[1.6fr_repeat(6,1fr)]">
-      {/* Premium readiness rectangle */}
-      <button
-        onClick={() => onMetric("ready")}
-        className="group/r text-left rounded-2xl border border-[#E6EAF2] bg-gradient-to-br from-white via-white to-[#F4F8FF] shadow-[0_1px_2px_rgba(16,24,40,0.04),0_8px_24px_-12px_rgba(37,99,235,0.18)] p-4 hover:shadow-[0_2px_4px_rgba(16,24,40,0.06),0_12px_28px_-12px_rgba(37,99,235,0.25)] hover:border-blue-200 transition-all flex flex-col h-full"
-      >
-        <div className="flex items-center justify-between gap-2">
-          <p className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-            <span className={`h-1.5 w-1.5 rounded-full ${accentDot}`} />
-            Inventory Readiness
-          </p>
-          <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-blue-600/80">Live</span>
-        </div>
-        <div className="mt-3 flex items-center gap-4 flex-1">
-          <BigRing pct={pct} />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-baseline gap-2">
-              <p className="font-display text-2xl font-bold text-foreground leading-none tabular-nums">{counts.readyToPublish}</p>
-              <p className="text-xs font-semibold text-muted-foreground">of {counts.total} ready to publish</p>
-            </div>
-            <div className="mt-2.5 h-1.5 w-full rounded-full bg-muted overflow-hidden">
-              <div className={`h-full rounded-full ${barTone} transition-all`} style={{ width: `${Math.max(2, pct)}%`, boxShadow: `0 0 8px ${ringTone}66` }} />
-            </div>
-          </div>
-        </div>
-        <p className="text-[11px] font-semibold text-blue-600 mt-auto pt-2 group-hover/r:underline">View readiness details →</p>
-      </button>
-      <ExecKpi label="Total Vehicles" value={counts.total} sub={`${counts.newCount} new • ${counts.usedCount} used`} icon={Car} onClick={() => onMetric("total")} link="View all vehicles" />
-      <ExecKpi label="Published" value={counts.published} sub="live on portal" icon={CheckCircle2} tone="emerald" onClick={() => onMetric("published")} link="View published" />
-      <ExecKpi label="Needs Attention" value={counts.needsAttention} sub="require action" icon={AlertCircle} tone="amber" onClick={() => onMetric("needs-attention")} link="View list" />
-      <ExecKpi label="Open Recalls" value={counts.openRecallVehicles} sub="vehicles" icon={ShieldAlert} tone={counts.openRecallVehicles ? "red" : "emerald"} onClick={() => onMetric("open-recalls")} link="View recalls" />
-      <ExecKpi label="Price Reviews" value={counts.priceVerify} sub="require review" icon={Tag} tone="violet" onClick={() => onMetric("price-reviews")} link="View price reviews" />
-      <ExecKpi label="Avg Market Position" value={`$${Math.abs(below).toLocaleString()}`} sub={below >= 0 ? "below market" : "above market"} icon={TrendingUp} tone={below >= 0 ? "emerald" : "amber"} onClick={onMarket} link="View market report" />
-    </div>
-  );
-};
-
-const Pill = ({ label, count, active, tone, onClick }: { label: string; count: number; active: boolean; tone?: "amber" | "red" | "emerald"; onClick: () => void }) => {
-  const activeCls = "bg-blue-600 text-white border-blue-600";
-  const idleCls = "bg-card text-foreground border-border hover:bg-muted";
-  const countTone = active ? "bg-white/20 text-white" : tone === "amber" ? "bg-amber-100 text-amber-700" : tone === "red" ? "bg-red-100 text-red-700" : tone === "emerald" ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground";
-  return (
-    <button onClick={onClick} className={`h-8 pl-3 pr-2 rounded-full border text-xs font-semibold inline-flex items-center gap-1.5 transition-colors ${active ? activeCls : idleCls}`}>
-      {label}
-      <span className={`min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold inline-flex items-center justify-center tabular-nums ${countTone}`}>{count}</span>
-    </button>
   );
 };
 
@@ -1115,32 +907,30 @@ const RecallChip = ({ row }: { row: RecallRowInput }) => {
   return <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Recall Pending</span>;
 };
 
-const PortalChip = ({ status }: { status: VehicleRow["status"] }) => {
-  const cfg = status === "published"
-    ? { dot: "bg-emerald-500", text: "text-emerald-700", label: "Live" }
-    : status === "archived"
-      ? { dot: "bg-slate-400", text: "text-muted-foreground", label: "Archived" }
-      : { dot: "bg-slate-300", text: "text-muted-foreground", label: "Not Live" };
+// Customer page column. The inventory row knows the listing's publish status
+// and its recall reading; it does not know what a given public surface serves.
+// So this says "Published" (the status) rather than "Live", and names a
+// reported recall beside it instead of leaving a bare green mark. Serving
+// policy itself is unchanged and enforced elsewhere.
+const PortalChip = ({ status, row }: { status: VehicleRow["status"]; row: RecallRowInput }) => {
+  const v = deriveRecallView(row);
+  if (status === "archived") return <StatusText tone="neutral">Archived</StatusText>;
+  if (status !== "published") return <StatusText tone="neutral">Not published</StatusText>;
   return (
-    <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${cfg.text}`}>
-      <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />{cfg.label}
-    </span>
+    <div className="flex flex-col items-start gap-1">
+      <StatusText tone={v.riskSignalled ? "warning" : "success"} icon>Published</StatusText>
+      {v.riskSignalled && (
+        <span className="text-[12px] leading-[18px] text-adm-danger">{v.doNotDrive ? "Do-not-drive recall reported" : "Recall reported"}</span>
+      )}
+    </div>
   );
 };
 
 // Simple status pill — clean dot + label, no oval background.
-const SimpleStatusPill = ({ status }: { status: VehicleRow["status"] }) => {
-  const cfg = status === "published"
-    ? { dot: "bg-emerald-500", text: "text-emerald-700", label: "Published" }
-    : status === "archived"
-      ? { dot: "bg-slate-400", text: "text-muted-foreground", label: "Archived" }
-      : { dot: "bg-amber-500", text: "text-amber-700", label: "Draft" };
-  return (
-    <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${cfg.text}`}>
-      <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />{cfg.label}
-    </span>
-  );
-};
+const SimpleStatusPill = ({ status }: { status: VehicleRow["status"] }) =>
+  status === "published" ? <StatusText tone="success" icon>Published</StatusText>
+    : status === "archived" ? <StatusText tone="neutral">Archived</StatusText>
+    : <StatusText tone="warning">Draft</StatusText>;
 
 // Compliance cell — two status badges (VIN decode + recall), icon + label.
 const ComplianceBadge = ({ tone, icon: Icon, label }: { tone: "green" | "amber" | "red" | "muted"; icon: typeof CheckCircle2; label: string }) => {
@@ -1228,7 +1018,7 @@ const StatusPill = ({ status, signal }: { status: VehicleRow["status"]; signal?:
   );
 };
 
-interface KebabItem { label: string; icon: typeof Car; onClick: () => void; danger?: boolean; }
+interface KebabItem { label: string; icon: typeof Car; onClick: () => void; danger?: boolean; disabled?: boolean; title?: string; }
 
 const HoverBtn = ({ title, onClick, children }: { title: string; onClick: () => void; children: React.ReactNode }) => (
   <button title={title} onClick={onClick} className="w-7 h-7 rounded-lg border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground inline-flex items-center justify-center transition-colors">{children}</button>
@@ -1251,7 +1041,35 @@ const KebabMenu = ({ items }: { items: KebabItem[] }) => {
       {open && (
         <div className="absolute right-0 top-full mt-1 w-52 rounded-xl border border-border bg-popover shadow-lg z-20 p-1">
           {items.map((it, i) => (
-            <button key={i} onClick={() => { setOpen(false); it.onClick(); }} className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium text-left transition-colors ${it.danger ? "text-red-600 hover:bg-red-50" : "text-foreground hover:bg-muted"}`}>
+            <button key={i} disabled={it.disabled} title={it.title} aria-describedby={it.disabled ? "market-batch-notice" : undefined} onClick={() => { setOpen(false); it.onClick(); }} className={`disabled:opacity-50 disabled:cursor-not-allowed w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium text-left transition-colors ${it.danger ? "text-red-600 hover:bg-red-50" : "text-foreground hover:bg-muted"}`}>
+              <it.icon className="w-4 h-4 shrink-0" />{it.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Header secondary actions, in one menu instead of a fixed side column.
+const ActionsMenu = ({ items }: { items: KebabItem[] }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+  return (
+    <div className="relative" ref={ref}>
+      <Button aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        More actions <ChevronRight className="w-4 h-4 rotate-90" />
+      </Button>
+      {open && (
+        <div role="menu" className="absolute right-0 top-full mt-1 w-56 rounded-[6px] border border-adm-border bg-adm-surface z-20 p-1">
+          {items.map((it, i) => (
+            <button key={i} role="menuitem" disabled={it.disabled} title={it.title} aria-describedby={it.disabled ? "market-batch-notice" : undefined} onClick={() => { setOpen(false); it.onClick(); }} className="w-full min-h-[36px] flex items-center gap-2.5 px-2.5 rounded-[4px] text-[14px] text-left text-adm-ink hover:bg-adm-workspace disabled:opacity-50 disabled:cursor-not-allowed">
               <it.icon className="w-4 h-4 shrink-0" />{it.label}
             </button>
           ))}

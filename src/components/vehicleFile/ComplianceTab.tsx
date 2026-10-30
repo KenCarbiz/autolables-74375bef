@@ -17,7 +17,10 @@ import { Card, EmptyNote, Pair, TabHeader, btn, btnLarge, fmtWhen } from "./prim
 import RecallCard from "./RecallCard";
 import PriceIntegrityCards from "./PriceIntegrityCard";
 import SignaturesSection, { useVehicleSignatures } from "./SignaturesSection";
-import { readinessLabel, type ReadinessSummary, type VehicleRow } from "./types";
+import { type ReadinessSummary, type VehicleRow } from "./types";
+import { deriveStatusFacts, recallFact } from "./statusFacts";
+import type { LifecycleResult } from "./lifecycle";
+import { StatusText, WorkTable, Th, Td } from "@/components/product";
 
 const TruthConflictsCard = ({ truth, loading }: { truth: VehicleTruth; loading: boolean }) => {
   const blocking = truth.conflicts.filter((c) => c.blocks_generation);
@@ -94,9 +97,10 @@ const OfficialFormsCard = ({ vehicle }: { vehicle: VehicleRow }) => {
   );
 };
 
-export const ComplianceTab = ({ vehicle, ready, recall, onReload }: {
+export const ComplianceTab = ({ vehicle, ready, recall, lifecycle, onReload }: {
   vehicle: VehicleRow;
   ready: ReadinessSummary;
+  lifecycle: LifecycleResult;
   recall: ReturnType<typeof useRecallTask>;
   onReload: () => void;
 }) => {
@@ -106,7 +110,9 @@ export const ComplianceTab = ({ vehicle, ready, recall, onReload }: {
   const { events } = useVehicleEvidence(vehicle.id, vehicle.vin, vehicle.tenant_id);
   const { truth, loading: truthLoading } = useVehicleTruth(vehicle.tenant_id, vehicle.id);
   const [building, setBuilding] = useState(false);
-  const readiness = readinessLabel(ready);
+  const facts = deriveStatusFacts({ vehicle, ready, lifecycle });
+  const recallLine = recallFact(vehicle);
+  const readiness = { label: facts.retail.value };
 
   // The defense packet is the whole compliance state of one VIN in a single
   // file: what was checked, what was signed, what was advertised, and the
@@ -202,26 +208,51 @@ export const ComplianceTab = ({ vehicle, ready, recall, onReload }: {
         }
       />
 
-      <Card title="Compliance status" action={
-        <span className={`text-al-meta font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${
-          readiness.ready ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
-        }`}>{readiness.label}</span>
-      }>
-        {ready.remaining.length === 0 ? (
-          <p className="text-al-body text-emerald-700 inline-flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4 shrink-0" /> Every tracked item on this vehicle is complete.
+      <Card title="Compliance status">
+        <dl className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-3" aria-label="Compliance status">
+          {[recallLine, facts.signing, facts.delivery, facts.retail].map((f) => (
+            <div key={f.label} className="min-w-0">
+              <dt className="text-[12px] leading-[18px] text-adm-muted">{f.label}</dt>
+              <dd className="mt-0.5">
+                <StatusText tone={f.tone} icon={f.tone !== "neutral" && f.tone !== "info"}>{f.value}</StatusText>
+                {f.detail && <span className="block text-[12px] leading-[18px] text-adm-muted mt-0.5">{f.detail}</span>}
+              </dd>
+            </div>
+          ))}
+        </dl>
+
+        <div id="vf-compliance-blockers" className="scroll-mt-24">
+          <p className="text-[14px] leading-[20px] font-semibold text-adm-ink mb-2">
+            Current blockers and open items ({ready.remaining.length + (recallLine.tone === "neutral" ? 1 : 0)})
           </p>
-        ) : (
-          <ul className="space-y-1.5">
-            {ready.remaining.map((c) => (
-              <li key={c.label} className={`text-al-body inline-flex items-center gap-1.5 ${c.blocks ? "text-amber-700" : "text-muted-foreground"}`}>
-                <AlertTriangle className="w-4 h-4 shrink-0" /> {c.label}{c.blocks ? " — blocks publish" : ""}
-              </li>
-            ))}
-          </ul>
-        )}
+          {ready.remaining.length === 0 && recallLine.tone !== "neutral" ? (
+            <p className="text-[14px] leading-[20px] text-adm-muted">Every tracked item on this vehicle is complete.</p>
+          ) : (
+            <WorkTable caption="Current blockers" minWidth={520}>
+              <thead>
+                <tr><Th>Item</Th><Th>Effect</Th><Th>Where to resolve</Th></tr>
+              </thead>
+              <tbody>
+                {recallLine.tone === "neutral" && (
+                  <tr>
+                    <Td>Recall: Unknown for this VIN</Td>
+                    <Td><StatusText tone="neutral">Not cleared</StatusText></Td>
+                    <Td><a className="text-adm-primary underline" href="#vf-recall-card">Recall card below</a></Td>
+                  </tr>
+                )}
+                {ready.remaining.map((c) => (
+                  <tr key={c.label}>
+                    <Td>{c.label}</Td>
+                    <Td>{c.blocks ? <StatusText tone="danger" icon>Blocks publish</StatusText> : <StatusText tone="warning">Open item</StatusText>}</Td>
+                    <Td className="text-adm-muted">This tab, or the matching section</Td>
+                  </tr>
+                ))}
+              </tbody>
+            </WorkTable>
+          )}
+        </div>
         {events.length === 0 && (
-          <p className="text-al-meta text-muted-foreground">
+          <p className="text-[12px] leading-[18px] text-adm-muted">
             No evidence events are recorded for this VIN yet, so a defense packet cannot be built.
           </p>
         )}
@@ -229,7 +260,7 @@ export const ComplianceTab = ({ vehicle, ready, recall, onReload }: {
 
       <PriceIntegrityCards vehicle={vehicle} />
 
-      <RecallCard vehicle={vehicle} recall={recall} />
+      <div id="vf-recall-card" className="scroll-mt-24"><RecallCard vehicle={vehicle} recall={recall} /></div>
 
       <OfficialFormsCard vehicle={vehicle} />
 

@@ -12,7 +12,7 @@ import { useOperatingMetrics } from "@/hooks/useOperatingMetrics";
 import {
   useDescriptionOperations, useDescriptionPermissions, type DescriptionCaseRow,
 } from "@/hooks/useDescriptionOps";
-import { OperationsKpiCard, type KpiTone } from "@/components/description/OperationsKpiCard";
+import { PageBody, PageHeader, MetricStrip, Button, InlineNote, StatusText, type Tone } from "@/components/product";
 import {
   VehicleDiagnosticPanel, type DiagnosticException,
 } from "@/components/description/VehicleDiagnosticPanel";
@@ -30,13 +30,13 @@ type SortKey = "vehicle" | "state" | "confidence" | "updated";
 
 type OpsState = "published" | "ready" | "needs_review" | "waiting_on_data" | "failed" | "in_progress";
 
-const STATE_META: Record<OpsState, { label: string; className: string }> = {
-  published:       { label: "Published",       className: "bg-emerald-50 text-emerald-700" },
-  ready:           { label: "Ready",           className: "bg-emerald-50 text-emerald-700" },
-  needs_review:    { label: "Needs Review",    className: "bg-amber-50 text-amber-700" },
-  waiting_on_data: { label: "Waiting on Data", className: "bg-blue-50 text-blue-700" },
-  failed:          { label: "Failed",          className: "bg-rose-50 text-rose-700" },
-  in_progress:     { label: "In Progress",     className: "bg-muted text-muted-foreground" },
+const STATE_META: Record<OpsState, { label: string; tone: Tone }> = {
+  published:       { label: "Published",       tone: "success" },
+  ready:           { label: "Ready",           tone: "success" },
+  needs_review:    { label: "Needs review",    tone: "warning" },
+  waiting_on_data: { label: "Waiting on data", tone: "info" },
+  failed:          { label: "Failed",          tone: "danger" },
+  in_progress:     { label: "In progress",     tone: "neutral" },
 };
 
 const ACTION_LABEL: Record<OpsState, string> = {
@@ -223,6 +223,9 @@ export default function DescriptionOperations() {
   }, [menu]);
 
   const runReconcile = async () => {
+    // Reconciliation can start description generation, which can incur cost.
+    // The buttons say "Review", so nothing runs until the person confirms.
+    if (typeof window !== "undefined" && !window.confirm("Reconciliation checks up to 25 vehicles and may start description generation, which can incur cost. Continue?")) return;
     setSyncing(true);
     const res = await reconcile(25);
     setSyncing(false);
@@ -365,122 +368,61 @@ export default function DescriptionOperations() {
 
   if (!tenantId) {
     return (
-      <div className="p-4 sm:p-6">
-        <p className="text-al-body text-muted-foreground">
-          Select a dealership to see description coverage for its vehicles.
-        </p>
-      </div>
+      <PageBody>
+        <PageHeader title="Description Operations" description="Which vehicles have a description, and which ones need a person." />
+        <InlineNote tone="info" title="Select a dealership">
+          Description coverage is shown for one dealership at a time.
+        </InlineNote>
+      </PageBody>
     );
   }
 
-  const kpiCards: {
-    key: "all" | OpsState; label: string; value: number | string; scope: string;
-    detail?: string; tone: KpiTone; icon: typeof Car;
-  }[] = [
+  const loadingRows = allRows === null;
+  const metricList = [
     {
-      key: "all", label: "Active vehicles", value: metricsLoading ? "—" : metrics.activeInventory,
-      scope: "Current snapshot - inventory not archived",
-      detail: metricsLoading ? undefined : `${metrics.newInventory} new - ${metrics.usedInventory} used`,
-      tone: "neutral", icon: Car,
+      label: "Active vehicles", value: metricsLoading || metricsError ? null : metrics.activeInventory, loading: metricsLoading,
+      hint: metricsLoading ? undefined : metricsError ? "Inventory counts unavailable" : `${metrics.newInventory} new, ${metrics.usedInventory} used. Current snapshot.`,
     },
+    { label: "Published", value: loadingRows ? null : kpis.published, loading: loadingRows, tone: "success" as Tone, hint: "Distinct vehicles live with nothing outstanding" },
     {
-      key: "published", label: "Published", value: kpis.published,
-      scope: "Current snapshot - distinct vehicles",
-      detail: "Live on the shopper listing, nothing outstanding",
-      tone: "positive", icon: ShieldCheck,
+      label: "Needs review", value: loadingRows ? null : kpis.needs_review, loading: loadingRows, tone: "warning" as Tone,
+      hint: `Distinct vehicles, folded from ${openEventCount} open exception event${openEventCount === 1 ? "" : "s"}`,
     },
-    {
-      key: "needs_review", label: "Needs review", value: kpis.needs_review,
-      scope: "Current snapshot - distinct vehicles",
-      detail: `Folded from ${openEventCount} open exception event${openEventCount === 1 ? "" : "s"}`,
-      tone: "attention", icon: AlertTriangle,
-    },
-    {
-      key: "waiting_on_data", label: "Waiting on data", value: kpis.waiting_on_data,
-      scope: "Current snapshot - distinct vehicles",
-      detail: "No description possible until facts arrive",
-      tone: "neutral", icon: Database,
-    },
-    {
-      key: "failed", label: "Failed generation", value: kpis.failed,
-      scope: "Current snapshot - distinct vehicles",
-      detail: "Last attempt failed or was blocked",
-      tone: "critical", icon: XCircle,
-    },
+    { label: "Failed generation", value: loadingRows ? null : kpis.failed, loading: loadingRows, tone: "danger" as Tone, hint: "Distinct vehicles, last attempt failed or blocked" },
   ];
 
   return (
-    <div className="max-w-[1480px] mx-auto p-4 sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
-        {/* The app chrome carries this title on desktop; repeating it there
-            would show it twice, so the in-content copy is mobile-only. */}
-        <div className="min-w-0 lg:hidden">
-          <h1 className="text-al-page text-foreground">Description Operations</h1>
-          <p className="text-al-body text-muted-foreground mt-1">
-            Which vehicles have a description, and which ones need a person.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap ml-auto">
-          {perms.canGenerate && (
-            <button
-              type="button" onClick={runReconcile} disabled={syncing}
-              className="min-h-[44px] px-3.5 rounded-xl border border-border bg-card text-al-meta font-semibold text-foreground hover:border-primary inline-flex items-center gap-1.5 disabled:opacity-60"
-            >
-              {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Run reconciliation
-            </button>
-          )}
-          {perms.canConfigure && (
-            <button
-              type="button" onClick={() => navigate("/admin?tab=merchandising-seo")}
-              className="min-h-[44px] px-3.5 rounded-xl border border-border bg-card text-al-meta font-semibold text-foreground hover:border-primary inline-flex items-center gap-1.5"
-            >
-              <Settings2 className="w-4 h-4" /> Automation settings
-            </button>
-          )}
-          <button
-            type="button" onClick={() => applyStateFilter("needs_review")}
-            className="min-h-[44px] px-4 rounded-xl bg-primary text-primary-foreground text-al-meta font-semibold inline-flex items-center gap-1.5"
-          >
-            <AlertTriangle className="w-4 h-4" /> Review vehicles
-            {kpis.needs_review > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-card/20 tabular-nums">{kpis.needs_review}</span>
+    <PageBody width="wide">
+      <PageHeader
+        title="Description Operations"
+        description="Which vehicles have a description, and which ones need a person."
+        actions={
+          <>
+            {perms.canGenerate && (
+              <Button onClick={runReconcile} disabled={syncing}>
+                {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Review reconciliation
+              </Button>
             )}
-          </button>
-        </div>
-      </div>
+            {perms.canConfigure && (
+              <Button onClick={() => navigate("/admin?tab=merchandising-seo")}>
+                <Settings2 className="w-4 h-4" /> Automation settings
+              </Button>
+            )}
+            <Button variant="primary" onClick={() => applyStateFilter("needs_review")}>
+              Review vehicles{kpis.needs_review > 0 ? ` (${kpis.needs_review})` : ""}
+            </Button>
+          </>
+        }
+      />
 
-      {allRows === null ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 mb-3">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-[124px] rounded-2xl border border-border bg-card animate-pulse" />
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 mb-3">
-          {kpiCards.map((k) => (
-            <OperationsKpiCard
-              key={k.key}
-              label={k.label}
-              value={k.value}
-              scope={k.scope}
-              detail={k.detail}
-              tone={k.tone}
-              icon={k.icon}
-              active={stateFilter === k.key}
-              onClick={() => applyStateFilter(k.key === "all" ? "all" : k.key)}
-            />
-          ))}
-        </div>
-      )}
+      <MetricStrip label="Description coverage" metrics={metricList} />
 
       {metricsError && (
-        <p className="text-al-meta text-rose-600 mb-3 inline-flex items-center gap-1.5">
-          <AlertTriangle className="w-3.5 h-3.5" /> Inventory counts unavailable: {metricsError}
-        </p>
+        <InlineNote tone="warning" title="Inventory counts unavailable">{metricsError}</InlineNote>
       )}
 
       {allRows && (
-        <p className="text-al-meta text-muted-foreground mb-3">
+        <p className="text-[12px] leading-[18px] text-adm-muted -mt-3">
           {allRows.length} vehicle{allRows.length === 1 ? "" : "s"} classified: {kpis.published} published,{" "}
           {kpis.needs_review} needs review, {kpis.waiting_on_data} waiting on data, {kpis.failed} failed,{" "}
           {allRows.length - kpis.published - kpis.needs_review - kpis.waiting_on_data - kpis.failed} ready or in progress.
@@ -492,26 +434,20 @@ export default function DescriptionOperations() {
       )}
 
       {summary && summary.missing > 0 && (
-        <div className="rounded-2xl border border-border bg-card p-3 mb-3 flex items-center justify-between gap-3 flex-wrap">
-          <p className="text-al-body text-foreground inline-flex items-center gap-2 min-w-0">
-            <Database className="w-4 h-4 shrink-0 text-muted-foreground" />
-            <span>
-              <b>{summary.missing}</b> active vehicle{summary.missing === 1 ? "" : "s"} never started a description.
-              Vehicles added outside the inventory feed are picked up by reconciliation.
-            </span>
-          </p>
-          {perms.canGenerate && (
-            <button
-              type="button" onClick={runReconcile} disabled={syncing}
-              className="min-h-[44px] px-3.5 rounded-lg bg-primary text-primary-foreground text-al-meta font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 shrink-0"
-            >
-              {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Initialize now
-            </button>
-          )}
-        </div>
+        <InlineNote
+          tone="warning"
+          title={`${summary.missing} active vehicle${summary.missing === 1 ? "" : "s"} never started a description`}
+          action={perms.canGenerate ? (
+            <Button size="sm" onClick={runReconcile} disabled={syncing}>
+              {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Review and initialize
+            </Button>
+          ) : undefined}
+        >
+          Vehicles added outside the inventory feed are picked up by reconciliation.
+        </InlineNote>
       )}
 
-      <div className="flex flex-wrap items-center gap-2 mb-3">
+      <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[220px]">
           <Search className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
@@ -561,7 +497,7 @@ export default function DescriptionOperations() {
         </button>
       </div>
 
-      <div className="rounded-2xl border border-border bg-card overflow-hidden">
+      <div className="rounded-[6px] border border-adm-border bg-adm-surface overflow-hidden">
         {error || exceptionError ? (
           <div className="p-8 text-center">
             <XCircle className="w-8 h-8 text-rose-500 mx-auto mb-2" />
@@ -596,7 +532,7 @@ export default function DescriptionOperations() {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse min-w-[1100px]">
                 <thead>
-                  <tr className="text-al-meta font-semibold uppercase tracking-wide text-muted-foreground border-b border-border">
+                  <tr className="text-al-meta font-semibold text-adm-muted bg-adm-workspace border-b border-adm-border">
                     <th className="px-2 py-2.5"><span className="sr-only">Expand diagnostics</span></th>
                     <SortHead k="vehicle">Vehicle</SortHead>
                     <SortHead k="state">Description state</SortHead>
@@ -650,9 +586,7 @@ export default function DescriptionOperations() {
                             </div>
                           </td>
                           <td className="px-3 py-3">
-                            <span className={`inline-flex text-al-meta font-bold uppercase tracking-wide px-2 py-0.5 rounded-full whitespace-nowrap ${state.className}`}>
-                              {state.label}
-                            </span>
+                            <StatusText tone={state.tone} icon>{state.label}</StatusText>
                           </td>
                           <td className="px-3 py-3">
                             <span className={`block text-al-body font-semibold ${conf.className}`}>{conf.word}</span>
@@ -787,7 +721,7 @@ export default function DescriptionOperations() {
                       key={n} type="button" onClick={() => setPage(n)}
                       aria-current={n === page ? "page" : undefined}
                       className={`min-w-[44px] h-11 px-2 rounded-lg text-al-meta font-semibold ${
-                        n === page ? "bg-primary text-primary-foreground" : "border border-border text-foreground"}`}
+                        n === page ? "bg-adm-primary text-white" : "border border-border text-foreground"}`}
                     >
                       {n + 1}
                     </button>
@@ -843,10 +777,10 @@ export default function DescriptionOperations() {
         </>
       )}
 
-      <p className="text-al-meta text-muted-foreground mt-3 inline-flex items-center gap-1.5">
+      <p className="text-[12px] leading-[18px] text-adm-muted inline-flex items-center gap-1.5">
         <Clock className="w-3.5 h-3.5" />
         Descriptions generate automatically at ingest. Every count above is vehicles, not validation events.
       </p>
-    </div>
+    </PageBody>
   );
 }

@@ -63,31 +63,28 @@ describe("the batch handler makes no request", () => {
 
 describe("the control is disabled and announced", () => {
   it("marks the action disabled with a title and an accessible description", () => {
-    expect(code).toMatch(/label="Check Market Prices"[\s\S]{0,160}disabled/);
-    expect(code).toContain("title={MARKET_BATCH_NOTICE}");
-    expect(code).toContain('aria-describedby={disabled ? "market-batch-notice" : undefined}');
+    // The header "More actions" menu carries the item; it is built disabled.
+    expect(code).toMatch(/label: "Check Market Prices"[\s\S]{0,160}disabled: true/);
+    expect(code).toContain("title: MARKET_BATCH_NOTICE");
+    expect(code).toContain('aria-describedby={it.disabled ? "market-batch-notice" : undefined}');
     expect(code).toContain('<span id="market-batch-notice" className="sr-only">{MARKET_BATCH_NOTICE}</span>');
   });
 
   it("passes the disabled attribute to the real button element", () => {
-    expect(code).toMatch(/<button\b[\s\S]{0,220}disabled=\{disabled\}/);
-    expect(code).toContain('aria-disabled={disabled ? true : undefined}');
+    expect(code).toMatch(/<button\b[^>]*disabled=\{it\.disabled\}/);
   });
 
-  it("drops the hover affordance only while disabled", () => {
-    expect(code).toContain('"opacity-60 cursor-not-allowed"');
-    expect(code).toContain('"hover:bg-white hover:border-blue-500 hover:shadow-sm"');
+  it("the secondary market-position link is disabled too", () => {
+    expect(code).toMatch(/onClick=\{runMarketBatch\} disabled title=\{MARKET_BATCH_NOTICE\}/);
   });
 
-  it("leaves every other quick action untouched", () => {
-    for (const label of [
-      "Add Vehicle", "Scan VIN", "OEM Window Sticker", "New Addendum",
-      "Check Recalls", "CSV Import",
-    ]) {
-      expect(code, label).toContain(`label="${label}"`);
+  it("leaves every other action untouched", () => {
+    for (const label of ["Scan VIN", "OEM Window Sticker", "New Addendum", "Check Recalls", "CSV Import"]) {
+      expect(code, label).toContain(`label: "${label}"`);
     }
+    expect(code).toContain("Add vehicle");
     // And their handlers are still live.
-    expect(code).toContain("onClick={runRecallBatch}");
+    expect(code).toContain("onClick: runRecallBatch");
   });
 });
 
