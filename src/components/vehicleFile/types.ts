@@ -8,9 +8,9 @@
 import type { TitleVerification } from "@/hooks/useVehicleListing";
 import { deriveRecallView } from "@/lib/vehicleTruth/recallView";
 
-export type TabId = "overview" | "documents" | "getready" | "customer" | "compliance";
+export type TabId = "overview" | "documents" | "getready" | "customer" | "compliance" | "history";
 
-export const VALID_TABS: TabId[] = ["overview", "documents", "getready", "customer", "compliance"];
+export const VALID_TABS: TabId[] = ["overview", "documents", "getready", "customer", "compliance", "history"];
 
 // Deep links from Inventory, Print Queue, Ready Board, the Command Palette and
 // the Deal Flow panel still point at the pre-consolidation tab names. They keep

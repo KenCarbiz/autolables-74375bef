@@ -8,6 +8,8 @@ import FactoryStickerCard from "@/components/vehicle/FactoryStickerCard";
 import GeneratedDocumentsSection from "@/components/vehicle/GeneratedDocumentsSection";
 import DealDocumentsPanel from "@/components/vehicle/DealDocumentsPanel";
 import { Card, TabHeader, btnLarge } from "./primitives";
+import { WorkTable, Th, Td, StatusText, type Tone } from "@/components/product";
+import { useDealRecord, dealDocStatus } from "@/hooks/useDealRecord";
 import { BrochureFinderRow, OwnersManualFinderRow } from "./OemDocFinders";
 import StickerGenerators from "./StickerGenerators";
 import AddendumSection from "./AddendumSection";
@@ -29,6 +31,68 @@ const SAFETY_FORM: Record<string, string> = {
   ME: "Maine safety inspection",
   RI: "Rhode Island safety & emissions inspection",
   MO: "Missouri safety inspection",
+};
+
+interface RegisterRow {
+  key: string;
+  group: string;
+  name: string;
+  status: string;
+  tone: Tone;
+  packet: string;
+  href?: string;
+}
+
+// One grouped register of what is on file for this VIN, read from the listing
+// row and the deal record. Condition rules decide which forms apply: the FTC
+// Buyers Guide and the safety inspection are used and CPO documents only.
+// Nothing here generates or publishes anything.
+const DocumentRegister = ({ vehicle }: { vehicle: VehicleRow }) => {
+  const { record, loading } = useDealRecord(vehicle.vin, vehicle.id, vehicle.tenant_id);
+  const isUsed = vehicle.condition !== "new";
+  const modules = vehicle.packet_modules || {};
+  const packetFor = (key: string) => (key in modules ? (modules[key] ? "Included" : "Not included") : "Unknown");
+  const oem = (vehicle as unknown as { oem_sticker_url?: string | null }).oem_sticker_url ?? null;
+
+  const rows: RegisterRow[] = [
+    { key: "oem", group: "Stickers and build record", name: "OEM window sticker", status: oem ? "On file" : "Not on file", tone: oem ? "success" : "neutral", packet: packetFor("oem_sticker"), href: oem ?? undefined },
+  ];
+  if (isUsed) {
+    const docs = record ? dealDocStatus(record) : null;
+    rows.push(
+      { key: "bg", group: "Forms", name: "FTC Buyers Guide", status: loading ? "Reading" : docs?.buyersGuide ? `Filed${record?.buyersGuide?.version != null ? ` (v${record.buyersGuide.version})` : ""}` : "Not filed", tone: docs?.buyersGuide ? "success" : "warning", packet: "Internal record" },
+      { key: "k208", group: "Forms", name: "Safety inspection", status: loading ? "Reading" : docs?.k208 ? "Executed" : "Not executed", tone: docs?.k208 ? "success" : "warning", packet: "Internal record" },
+    );
+  }
+  (vehicle.documents || []).forEach((d, i) => {
+    rows.push({ key: `up-${i}`, group: "Uploaded files", name: d.name || d.type || "Document", status: "On file", tone: "success", packet: packetFor(d.type), href: d.url });
+  });
+
+  return (
+    <Card title="Document register">
+      <WorkTable caption="Documents on file for this vehicle" minWidth={640}>
+        <thead>
+          <tr><Th>Document</Th><Th>Group</Th><Th>Status</Th><Th>Customer packet</Th><Th align="right">Action</Th></tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.key}>
+              <Td className="font-semibold">{r.name}</Td>
+              <Td className="text-adm-muted">{r.group}</Td>
+              <Td><StatusText tone={r.tone}>{r.status}</StatusText></Td>
+              <Td className="text-adm-muted">{r.packet}</Td>
+              <Td align="right">
+                {r.href ? <a className="text-adm-primary underline" href={r.href} target="_blank" rel="noreferrer">Open</a> : <span className="text-adm-muted">-</span>}
+              </Td>
+            </tr>
+          ))}
+        </tbody>
+      </WorkTable>
+      <p className="text-[12px] leading-[18px] text-adm-muted">
+        Customer packet shows Unknown where the packet settings do not name the document. Titles, registrations and identity documents are private and are not listed here.
+      </p>
+    </Card>
+  );
 };
 
 const SECTION_IDS = {
@@ -90,6 +154,8 @@ export const DocumentsTab = ({ vehicle, onReload }: { vehicle: VehicleRow; onRel
           </button>
         }
       />
+
+      <DocumentRegister vehicle={vehicle} />
 
       {picker && (
         <Card title="What do you need to produce?">
