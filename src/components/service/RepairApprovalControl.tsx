@@ -1,4 +1,7 @@
+import { useId } from "react";
 import { toast } from "sonner";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { StatusText, type Tone } from "@/components/product";
 import {
   REPAIR_APPROVALS,
@@ -27,6 +30,7 @@ export const RepairApprovalControl = ({
   formatAt: (iso: string | null) => string;
   onDecide: (decision: RepairApproval) => void;
 }) => {
+  const idBase = useId();
   const decided = record.approval !== "pending" && record.decidedBy ? `${nameOf(record.decidedBy)}, ${formatAt(record.decidedAt)}` : null;
   return (
     <div className="rounded-lg border border-adm-border bg-adm-surface px-3 py-2">
@@ -38,18 +42,26 @@ export const RepairApprovalControl = ({
         </span>
       </div>
       {canSet && (
-        <select
+        <RadioGroup
           aria-label="Repair approval"
           value={record.approval}
           disabled={busy}
-          onChange={(e) => {
-            if (!isRepairApproval(e.target.value)) return;
-            onDecide(e.target.value);
+          onValueChange={(v) => {
+            if (!isRepairApproval(v)) return;
+            onDecide(v);
           }}
-          className="mt-2 h-9 w-full rounded-lg border border-adm-border bg-adm-surface px-2 text-sm disabled:opacity-50 sm:w-60"
+          className="mt-2 flex flex-wrap gap-x-4 gap-y-1"
         >
-          {REPAIR_APPROVALS.map((a) => <option key={a} value={a}>{REPAIR_APPROVAL_LABEL[a]}</option>)}
-        </select>
+          {REPAIR_APPROVALS.map((a) => {
+            const optionId = `${idBase}-${a}`;
+            return (
+              <div key={a} className="flex min-h-[32px] items-center gap-1.5">
+                <RadioGroupItem id={optionId} value={a} className="h-5 w-5" />
+                <Label htmlFor={optionId} className="cursor-pointer text-[14px] leading-[20px] font-normal text-adm-ink">{REPAIR_APPROVAL_LABEL[a]}</Label>
+              </div>
+            );
+          })}
+        </RadioGroup>
       )}
       <p className="mt-1 text-[12px] leading-[18px] text-adm-muted">{REPAIR_APPROVAL_HELP}</p>
     </div>

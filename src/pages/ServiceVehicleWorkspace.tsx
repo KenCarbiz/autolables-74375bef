@@ -245,6 +245,7 @@ export default function ServiceVehicleWorkspace() {
   const findings = useMemo(() => buildFindings((newestSigned ?? newestActive)?.checklist), [newestSigned, newestActive]);
   const activeFinding = findings.find((f) => f.id === selectedFinding) ?? findings.find((f) => f.result === "failed") ?? findings[0] ?? null;
   const activeFailure = activeFinding ? failures.find((f) => f.item_id === activeFinding.id) : undefined;
+  const findingApprovals = useRepairApprovals(activeFailure ? [activeFailure.id] : []);
 
   const grItems: GetReadyItem[] = useMemo(() => (gr?.items || []).filter(Boolean), [gr]);
   const grStarted = !!gr && (gr.status !== "pending" || grItems.some((i) => i.status === "complete"));
@@ -531,6 +532,16 @@ export default function ServiceVehicleWorkspace() {
                 repairLabel={activeFailure ? REPAIR_STATE_LABELS[activeFailure.repair_state as RepairState] ?? null : null}
                 photos={Array.isArray(activeFailure?.photos) ? activeFailure.photos : []}
                 vehicleFileHref={`/vehicle-file/${veh.id}`}
+                approval={activeFailure && findingApprovals.approvals?.status === "available" ? (
+                  <RepairApprovalControl
+                    record={findingApprovals.approvals.data.get(activeFailure.id) ?? { approval: "pending", decidedBy: null, decidedAt: null }}
+                    canSet={canApprove}
+                    busy={findingApprovals.decide.isPending}
+                    nameOf={(id) => memberName(members.find((m) => m.user_id === id))}
+                    formatAt={(iso) => formatCommandDateTime(iso) ?? ""}
+                    onDecide={(decision) => findingApprovals.decide.mutate({ failureId: activeFailure.id, decision }, { onError: notifyRepairApprovalError })}
+                  />
+                ) : undefined}
                 inspectedLabel={newestSigned?.signed_at
                   ? `Inspected ${new Date(newestSigned.signed_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}${newestSigned.inspector_name ? ` | Technician ${newestSigned.inspector_name}` : ""}`
                   : null}

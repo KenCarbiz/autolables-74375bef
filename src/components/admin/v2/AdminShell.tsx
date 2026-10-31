@@ -48,7 +48,7 @@ export const AdminChildTabs = ({ tabs, activeId, ariaLabel, boxed = false }: { t
   const shown = tabs.filter((t) => showMore || !t.unpictured || t.id === activeId);
   const more = tabs.filter((t) => t.unpictured && t.id !== activeId);
   return (
-    <nav aria-label={ariaLabel} className={boxed ? "rounded-t-[6px] border border-b-0 border-adm-border bg-adm-surface px-4 -mb-4" : "border-b border-adm-border"}>
+    <nav aria-label={ariaLabel} className={boxed ? "rounded-t-[6px] border border-adm-border bg-adm-surface px-4" : "border-b border-adm-border"}>
       <ScrollRegion label={ariaLabel} tone="workspace" revealSelector='[aria-current="page"]'>
       <ul className="flex items-stretch gap-9 min-w-max">
         {shown.map((t) => {
@@ -135,7 +135,7 @@ export const AdminShell = ({
         <AdminSectionNav sections={sections} activeId={activeSection.id} tabFor={firstTabFor} />
         {activeSection.subheading && <h2 className="text-[24px] leading-[32px] font-bold text-adm-ink !mt-5">{activeSection.subheading}</h2>}
         <AdminChildTabs tabs={tabsForSection} activeId={activeTab.id} ariaLabel={`${activeSection.label} views`} boxed={BOXED_TAB_SECTIONS.includes(activeSection.id)} />
-        <div>{children}</div>
+        <div className={BOXED_TAB_SECTIONS.includes(activeSection.id) && tabsForSection.length > 1 ? "!mt-0 [&>*:first-child]:!mt-0 [&>*:first-child]:rounded-t-none [&>*:first-child]:border-t-0" : undefined}>{children}</div>
       </div>
     </AdminPageContainer>
   );

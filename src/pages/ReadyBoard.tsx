@@ -66,7 +66,7 @@ export default function ReadyBoard() {
   // The selected view lives in the URL so reload and back keep it.
   const [searchParams] = useSearchParams();
   const viewParam = searchParams.get("view");
-  const bucket: Bucket = viewParam === "getready" || viewParam === "ready" || viewParam === "all" ? viewParam : "acceptance";
+  const bucket: Bucket = viewParam === "getready" || viewParam === "ready" || viewParam === "acceptance" ? viewParam : "all";
   const [qrVin, setQrVin] = useState<string | null>(null);
   const [qrToken, setQrToken] = useState<string | null>(null);
 

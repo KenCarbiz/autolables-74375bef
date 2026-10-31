@@ -57,7 +57,7 @@ export const StatusText = ({ tone = "neutral", children, className }: { tone?: T
 );
 
 const HERO_TONE: Record<Tone, string> = {
-  neutral: "bg-adm-workspace",
+  neutral: "bg-adm-border/60",
   success: "bg-adm-success-bg",
   warning: "bg-adm-warning-bg",
   danger: "bg-adm-danger-bg",

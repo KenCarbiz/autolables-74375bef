@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Camera, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -82,6 +82,7 @@ export function FindingDetail({
   vehicleFileHref,
   onAddPhotos,
   inspectedLabel,
+  approval,
 }: {
   finding: Finding | null;
   repairLabel: string | null;
@@ -89,6 +90,7 @@ export function FindingDetail({
   vehicleFileHref: string;
   onAddPhotos?: (files: FileList | null) => void;
   inspectedLabel?: string | null;
+  approval?: ReactNode;
 }) {
   if (!finding) {
     return (
@@ -130,6 +132,7 @@ export function FindingDetail({
             </label>
           </div>
         )}
+        {approval}
         <div>
           <p className="font-semibold text-adm-ink">Repair status</p>
           <p className="text-adm-muted">{repairLabel ?? "No repair recorded for this item."}</p>

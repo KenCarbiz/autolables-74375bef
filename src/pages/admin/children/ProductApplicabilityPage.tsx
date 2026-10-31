@@ -109,7 +109,7 @@ const Panel = ({ title, description, children, bodyClassName }: { title: string;
   </section>
 );
 
-const Badge = ({ tone, children }: { tone: Tone; children: ReactNode }) => <StatusChip tone={tone}>{children}</StatusChip>;
+const Badge = ({ tone, children }: { tone: Tone; children: ReactNode }) => <StatusChip tone={tone} className={cn("px-3 py-1 text-[13px]", tone === "neutral" && "bg-adm-border/60")}>{children}</StatusChip>;
 
 const conditionSummary = (c: ApplicabilityDraft["conditions"]): string => {
   const parts = [c.new ? "New" : null, c.used ? "Used" : null, c.cpo ? "CPO" : null].filter(Boolean);

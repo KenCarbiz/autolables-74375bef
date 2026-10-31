@@ -87,7 +87,6 @@ const TAB_STATES: Record<Exclude<TabKey, "all">, string[]> = {
 };
 
 const TABS: { key: TabKey; label: string }[] = [
-  { key: "all", label: "All" },
   { key: "unassigned", label: "Unassigned" },
   { key: "inspection", label: "Inspection" },
   { key: "waiting", label: "Waiting" },
@@ -95,7 +94,13 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "reinspect", label: "Reinspect" },
   { key: "k208", label: "K-208" },
   { key: "completed", label: "Completed" },
+  { key: "all", label: "All" },
 ];
+
+const stageWord = (state: string): string | null => {
+  const hit = TABS.find((t) => t.key !== "all" && TAB_STATES[t.key].includes(state));
+  return hit ? hit.label : null;
+};
 
 const TAB_EMPTY: Record<TabKey, { title: string; detail: string }> = {
   all: {
@@ -180,7 +185,7 @@ export default function ServiceWriterDesk() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const tab: TabKey = TABS.some((t) => t.key === tabParam) ? (tabParam as TabKey) : "all";
+  const tab: TabKey = TABS.some((t) => t.key === tabParam) ? (tabParam as TabKey) : "unassigned";
 
   const overdueHours = settings.service_overdue_hours || 24;
 
@@ -458,8 +463,8 @@ export default function ServiceWriterDesk() {
                       </div>
                     </div>
                   </Td>
-                  <Td className="whitespace-nowrap">
-                    <StatusText tone={r.state === "SERVICE_UNASSIGNED" ? "neutral" : PRODUCT_TONE[STATE_STATUS[r.state as ServiceFloorState] || "WAITING"]}>{stateLabel(r.state)}</StatusText>
+                  <Td className="whitespace-nowrap" title={stateLabel(r.state)}>
+                    <StatusText tone={r.state === "SERVICE_UNASSIGNED" ? "neutral" : PRODUCT_TONE[STATE_STATUS[r.state as ServiceFloorState] || "WAITING"]} >{stageWord(r.state) ?? stateLabel(r.state)}</StatusText>
                   </Td>
                   <Td className="text-adm-muted">{r.assignedName ?? "Unassigned"}</Td>
                   <Td align="right" className="tabular-nums whitespace-nowrap">{durationLabel(r.ageHours)}</Td>

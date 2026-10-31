@@ -59,7 +59,6 @@ const DOC_TONE: Record<string, Tone> = {
   rejected: "danger",
 };
 
-const dealTone = (state: DealEntry["state"]): Tone => (state === "draft" ? "neutral" : state === "out_for_signature" ? "warning" : "success");
 
 const shortDay = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "Unknown");
 
@@ -260,10 +259,10 @@ const DealDetail = () => {
         title={
           <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
             Deal {shortId(deal.id)}
-            <StatusText tone={dealTone(deal.state)}>{deal.stateLabel}</StatusText>
+            <StatusText tone={eligibility.tone} className="px-2.5 py-1 text-[13px]">{eligibility.label}</StatusText>
           </span>
         }
-        description={deal.returnInfo ? deal.returnInfo.label : deal.stateDetail}
+        description={`${deal.stateLabel} | ${deal.returnInfo ? deal.returnInfo.label : deal.stateDetail}`}
         actions={
           <>
             {(deal.listingId || (deal.customerId && deal.customerName)) && (
