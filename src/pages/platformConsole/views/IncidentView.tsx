@@ -95,7 +95,7 @@ function IncidentBody({ m }: { m: IncidentRecord }) {
           </Panel>
           <Panel id="pc-inc-evidence" title="Investigation and evidence" helper={m.evidenceHelper} className="min-h-[306px]">
             <div className="mt-[26px] flex flex-wrap gap-3">
-              {importHref && <Link to={importHref} className="inline-flex h-11 w-[220px] items-center rounded-[6px] bg-[#075BE8] px-[14px] text-[13px] font-bold text-white hover:bg-[#064fca] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#075BE8]">{m.importLabel}</Link>}
+              {importHref && <Link to={importHref} className="inline-flex h-11 w-[220px] max-w-full items-center rounded-[6px] bg-[#075BE8] px-[14px] text-[13px] font-bold text-white hover:bg-[#064fca] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#075BE8]">{m.importLabel}</Link>}
               <ReviewAction kind="incident_view_evidence" scope={scope} label="Inspect sanitized evidence" title="Inspect sanitized evidence" summary="Evidence reads are audited. Private payloads stay redacted." facts={[{ label: "Incident", value: m.id }]} className="w-[240px] justify-start" submitLabel="Request access" />
             </div>
             <p id="pc-inc-note" className="mt-[41px] text-[13px] font-bold leading-[18px]">Internal note</p>

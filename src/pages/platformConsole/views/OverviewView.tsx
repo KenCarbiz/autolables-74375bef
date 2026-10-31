@@ -1,6 +1,7 @@
 import { ConsoleFrame } from "@/components/platformConsole/ConsoleFrame";
-import { Chip, DataTable, MetricGrid, Panel, StageStrip, TextLink, Timeline, ViewState, type Column } from "@/components/platformConsole/ui";
+import { Chip, DataTable, MetricCard, MetricGrid, Panel, StageStrip, TextLink, Timeline, ViewState, type Column } from "@/components/platformConsole/ui";
 import { ConsoleIcon } from "@/components/platformConsole/icons";
+import { PhoneActionBar } from "@/components/platformConsole/uiB";
 import { useConsoleNow, useConsoleView } from "@/lib/platformConsole/dataSource";
 import { loadOverview, type OverviewModel } from "@/lib/platformConsole/live/overview";
 import { relativeAge } from "@/lib/platformConsole/live/read";
@@ -40,34 +41,50 @@ export default function OverviewView() {
 
 function OverviewBody({ model, updated }: { model: OverviewModel; updated: string }) {
   const channel = model.liveChannel === "connected" ? "connected" : model.liveChannel === "polling" ? "refreshes on request" : "disconnected; showing last known data";
+  const phoneAttention = model.phone?.attention ?? model.attention.map((r) => ({ id: r.id, title: `${r.store} · ${r.issue}`, detail: r.detail ?? r.age, tone: (r.severity === "high" ? "bad" : "warn") as Tone, href: r.href }));
+  const phoneOperations = model.phone?.operations ?? model.operations;
+  const lead = model.metrics[0];
   return (
     <>
-      <MetricGrid metrics={model.metrics} label="Platform status" />
+      {/* Phone: one lead metric and compact cards; the full grid and table start at md. */}
+      <div className="flex flex-col gap-4 pb-24 md:hidden">
+        <MetricCard metric={model.phone ? { ...lead, helper: model.phone.metricHelper } : lead} />
+        <section aria-labelledby="pc-attn-m" className="rounded-[8px] border border-[#D7E1ED] bg-white px-4 pb-[35px] pt-[15px]">
+          <h2 id="pc-attn-m" className="px-1 text-[17px] font-bold leading-[22px]">Needs attention</h2>
+          <p className="mt-[6px] px-1 text-[12px] leading-[16px] text-[#52677C]">Highest customer impact first</p>
+          {phoneAttention.length === 0 ? (
+            <p className="mt-4 text-[13px] text-[#52677C]">{model.attentionNote}</p>
+          ) : (
+            <ul className="mt-[11px] flex flex-col gap-[14px]">
+              {phoneAttention.map((r) => (
+                <li key={r.id} className="flex gap-[10px]">
+                  <ConsoleIcon name="warning" size={20} className={r.tone === "bad" ? "text-[#B42332]" : "text-[#885608]"} />
+                  <div>
+                    <p className="text-[13px] font-bold leading-[18px]">{r.title}</p>
+                    <p className="mt-[7px] text-[12px] leading-[16px] text-[#52677C]">{r.detail}</p>
+                    <Link to={r.href} className="-mb-[10px] mt-[5px] inline-flex min-h-[44px] items-start pt-[4px] text-[12px] font-bold text-[#075BE8]">Inspect issue →</Link>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+        <section aria-labelledby="pc-live-m" className="rounded-[8px] border border-[#D7E1ED] bg-white px-4 pb-3 pt-[15px]">
+          <h2 id="pc-live-m" className="px-1 text-[17px] font-bold leading-[22px]">Live operations</h2>
+          <p className="mt-[6px] px-1 text-[12px] leading-[16px] text-[#52677C]">Updated {updated}</p>
+          <div className="mt-[17px]">
+            {phoneOperations.length === 0 ? <p className="text-[13px] text-[#52677C]">{model.operationsNote}</p> : <Timeline items={phoneOperations} label="Recent operations" />}
+          </div>
+        </section>
+        <PhoneActionBar note="Read-only monitoring by default" detailsTitle="Platform overview" detailsSummary="Open an affected record. Nothing here changes data.">
+          {phoneAttention.map((r) => <Link key={r.id} to={r.href} className="flex min-h-11 items-center rounded-[6px] border border-[#D7E1ED] px-3 text-[13px] font-bold text-[#075BE8]">{r.title}</Link>)}
+        </PhoneActionBar>
+      </div>
 
-      {/* Phone: compact cards replace the table. */}
-      <section aria-labelledby="pc-attn-m" className="rounded-[8px] border border-[#D7E1ED] bg-white px-5 pb-5 pt-[19px] md:hidden">
-        <h2 id="pc-attn-m" className="text-[17px] font-bold leading-[22px]">Needs attention</h2>
-        <p className="mt-[6px] text-[12px] text-[#52677C]">Highest customer impact first</p>
-        {model.attention.length === 0 ? (
-          <p className="mt-4 text-[13px] text-[#52677C]">{model.attentionNote}</p>
-        ) : (
-          <ul className="mt-4 flex flex-col gap-[22px]">
-            {model.attention.map((r) => (
-              <li key={r.id} className="flex gap-[10px]">
-                <ConsoleIcon name="warning" size={20} className={r.severity === "high" ? "text-[#B42332]" : "text-[#885608]"} />
-                <div>
-                  <p className="text-[13px] font-bold">{r.store} · {r.issue}</p>
-                  <p className="mt-1 text-[12px] text-[#52677C]">{r.detail ?? r.age}</p>
-                  <Link to={r.href} className="mt-2 inline-flex min-h-[24px] items-center text-[12px] font-bold text-[#075BE8]">Inspect issue →</Link>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <div className="hidden md:block"><MetricGrid metrics={model.metrics} label="Platform status" /></div>
 
-      <div className="grid grid-cols-1 gap-[22px] xl:grid-cols-[minmax(0,860fr)_minmax(0,438fr)]">
-        <Panel id="pc-attn" title="Needs attention" helper="Sorted by customer impact · acknowledging does not resolve the fault" className="hidden min-h-[358px] md:block">
+      <div className="hidden grid-cols-1 gap-[22px] md:grid xl:grid-cols-[minmax(0,860fr)_minmax(0,438fr)]">
+        <Panel id="pc-attn" title="Needs attention" helper="Sorted by customer impact · acknowledging does not resolve the fault" className="min-h-[358px]">
           {model.attention.length === 0 ? (
             <p className="mt-6 text-[13px] text-[#52677C]">{model.attentionNote}</p>
           ) : (

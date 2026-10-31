@@ -1,4 +1,4 @@
-import type { AttentionRow, MetricModel, StageModel, TimelineItem } from "../types";
+import type { AttentionRow, MetricModel, StageModel, TimelineItem, Tone } from "../types";
 import { consolePath } from "../sections";
 import { readRows, relativeAge, settle, sinceHours } from "./read";
 
@@ -12,6 +12,12 @@ export interface OverviewModel {
   stages: StageModel[];
   stagesNote: string;
   liveChannel: "connected" | "disconnected" | "polling";
+  /** Phone wording, when the phone reference differs from the desktop one. Live falls back to the desktop rows. */
+  phone?: {
+    metricHelper: string;
+    attention: { id: string; title: string; detail: string; tone: Tone; href: string }[];
+    operations: TimelineItem[];
+  };
 }
 
 interface StoreRow { id: string; display_name: string; status: string; subscription_status: string; feed_import_paused: boolean }

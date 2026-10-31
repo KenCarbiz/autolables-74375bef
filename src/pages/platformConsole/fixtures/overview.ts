@@ -32,3 +32,20 @@ export const OVERVIEW_FIXTURE: OverviewModel = {
   stagesNote: "Illustrative counts · inspect each stage for its source and time window",
   liveChannel: "connected",
 };
+
+/** M01: the phone reference words some rows differently from the desktop one. */
+export const OVERVIEW_PHONE_FIXTURE: OverviewModel = {
+  ...OVERVIEW_FIXTURE,
+  phone: {
+    metricHelper: "2 data issues · 1 access issue",
+    attention: [
+      { id: "a", title: "Store A · Import held", detail: "Schema change · 18 min", tone: "warn", href: "/platform-console/data/imports/IMP-1042" },
+      { id: "c", title: "Store C · Download failed", detail: "Customer journey · 7 min", tone: "bad", href: "/platform-console/incidents/INC-028" },
+      { id: "b", title: "Store B · Access mismatch", detail: "Billing reconciliation · 1 hr", tone: "warn", href: "/platform-console/usage/billing" },
+    ],
+    operations: [
+      { id: "1", tone: "good", title: "File received", detail: "Store A · queued durably" },
+      { id: "2", tone: "warn", title: "Validation held publication", detail: "Prior good inventory retained" },
+    ],
+  },
+};

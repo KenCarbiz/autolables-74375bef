@@ -76,12 +76,13 @@ export const FootNote = ({ children, className }: { children: ReactNode; classNa
  */
 export function PhoneActionBar({ note, detailsTitle, detailsSummary, actionLabel = "View details", children }: { note: string; detailsTitle: string; detailsSummary: string; actionLabel?: string; children?: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const triggerId = `${useId()}-details`;
   return (
     <div className="fixed inset-x-0 bottom-0 z-30 h-20 border-t border-[#D7E1ED] bg-white md:hidden" role="region" aria-label="Screen actions">
       <p className="absolute left-4 top-[19px] text-[11px] leading-[16px] text-[#52677C]">{note}</p>
-      <button type="button" onClick={() => setOpen(true)} className="absolute bottom-0 right-4 h-11 w-[174px] rounded-t-[6px] border border-b-0 border-[#D7E1ED] bg-white px-[14px] text-left text-[13px] font-bold text-[#132A42] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#075BE8]">{actionLabel}</button>
+      <button id={triggerId} type="button" onClick={() => setOpen(true)} className="absolute bottom-0 right-4 h-11 w-[174px] rounded-t-[6px] border border-b-0 border-[#D7E1ED] bg-white px-[14px] text-left text-[13px] font-bold text-[#132A42] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#075BE8]">{actionLabel}</button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="w-[calc(100vw-32px)] max-w-[520px] rounded-[8px] border-[#D7E1ED] bg-white p-6 text-[#132A42]">
+        <DialogContent onCloseAutoFocus={(e) => { e.preventDefault(); document.getElementById(triggerId)?.focus(); }} className="w-[calc(100vw-32px)] max-w-[520px] rounded-[8px] border-[#D7E1ED] bg-white p-6 text-[#132A42]">
           <DialogTitle className="text-[17px] font-bold leading-[22px]">{detailsTitle}</DialogTitle>
           <DialogDescription className="text-[13px] leading-[18px] text-[#52677C]">{detailsSummary}</DialogDescription>
           <div className="flex flex-col gap-3">{children}</div>
@@ -120,6 +121,7 @@ export function ReviewAction({ label, icon, variant = "secondary", className, ki
   const [outcome, setOutcome] = useState<{ tone: Tone; text: string } | null>(null);
   const op = useRef(`${kind}-${Math.random().toString(36).slice(2, 10)}`);
   const reasonId = useId();
+  const triggerId = `${reasonId}-trigger`;
 
   const submit = async () => {
     setBusy(true);
@@ -136,12 +138,12 @@ export function ReviewAction({ label, icon, variant = "secondary", className, ki
 
   return (
     <>
-      <ConsoleButton variant={variant} className={className} onClick={() => { setOutcome(null); setOpen(true); }}>
+      <ConsoleButton id={triggerId} variant={variant} className={cn("max-w-full", className)} onClick={() => { setOutcome(null); setOpen(true); }}>
         {icon && <ConsoleIcon name={icon} />}
         {label}
       </ConsoleButton>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[90vh] w-[calc(100vw-32px)] max-w-[520px] overflow-y-auto rounded-[8px] border-[#D7E1ED] bg-white p-6 text-[#132A42]">
+        <DialogContent onCloseAutoFocus={(e) => { e.preventDefault(); document.getElementById(triggerId)?.focus(); }} className="max-h-[90vh] w-[calc(100vw-32px)] max-w-[520px] overflow-y-auto rounded-[8px] border-[#D7E1ED] bg-white p-6 text-[#132A42]">
           <DialogTitle className="text-[17px] font-bold leading-[22px]">{title}</DialogTitle>
           <DialogDescription className="text-[13px] leading-[18px] text-[#52677C]">{summary}</DialogDescription>
           {facts.length > 0 && (
