@@ -237,7 +237,9 @@ describe("the master band covers the vAuto floor", () => {
   it("matches the vAuto channel policy it has to feed", () => {
     const policy = readFileSync(join(fnDir,
       "_shared/description-channel-policy.ts"), "utf8");
-    expect(policy).toMatch(/recommendedMin: 3221, recommendedMax: 3879/);
+    // Superseded 2026-10-31 (DriveSignal kit): vAuto is now an exact 3,921
+    // export fitted from a longer draft pool, not a 3,221-3,879 band.
+    expect(policy).toMatch(/exactTotal: 3921, singleLine: true, asciiOnly: true/);
     expect(policy).not.toMatch(/recommendedMin: 3200/);
   });
 
@@ -308,7 +310,7 @@ describe("the master is supplied enough material for its own band", () => {
       "_shared/description-channel-policy.ts"), "utf8");
     const vauto = policy.slice(policy.indexOf('key: "vauto"'),
                                policy.indexOf('key: "vauto"') + 1400);
-    expect(vauto).toMatch(/recommendedMin: 3221, recommendedMax: 3879/);
+    expect(vauto).toMatch(/exactTotal: 3921/);
     expect(vauto).toMatch(/featureBudget: 35/);
     expect(vauto).not.toMatch(/featureBudget: 10/);
   });
