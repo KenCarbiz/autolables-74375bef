@@ -3,6 +3,9 @@ import { OVERVIEW_FIXTURE } from "./overview";
 // builder B
 import { INCIDENT_FIXTURE, INCIDENT_PHONE_FIXTURE } from "./incident";
 import { USAGE_FIXTURE, USAGE_PHONE_FIXTURE } from "./usage";
+import { BILLING_FIXTURE } from "./billing";
+import { ACCESS_FIXTURE } from "./access";
+import { TEMPLATES_FIXTURE } from "./templates";
 // end builder B
 
 // Reference screen id -> the console path it renders and the synthetic data it
@@ -28,5 +31,8 @@ export const CONSOLE_FIXTURES: Record<string, ConsoleFixtureEntry> = {
   "M04-incident": { path: "/platform-console/incidents/INC-028", frame: "phone", fixture: base("M04-incident", { incident: INCIDENT_PHONE_FIXTURE }) },
   "D11-usage": { path: "/platform-console/usage", frame: "desktop", fixture: base("D11-usage", { usage: USAGE_FIXTURE }) },
   "M05-usage": { path: "/platform-console/usage", frame: "phone", fixture: base("M05-usage", { usage: USAGE_PHONE_FIXTURE }) },
+  "D19-billing": { path: "/platform-console/usage/billing", frame: "desktop", fixture: base("D19-billing", { billing: BILLING_FIXTURE }) },
+  "D12-access": { path: "/platform-console/access", frame: "desktop", fixture: base("D12-access", { access: ACCESS_FIXTURE }) },
+  "D13-templates": { path: "/platform-console/templates", frame: "desktop", fixture: base("D13-templates", { templates: TEMPLATES_FIXTURE }) },
   // end builder B
 };
