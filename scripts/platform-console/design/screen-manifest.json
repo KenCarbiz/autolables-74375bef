@@ -1,0 +1,1052 @@
+[
+  {
+    "id": "D01-overview",
+    "width": 1600,
+    "height": 1000,
+    "contentROI": [
+      248,
+      64,
+      1320,
+      936
+    ],
+    "workROI": [
+      248,
+      274,
+      1320,
+      680
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "D02-stores",
+    "width": 1600,
+    "height": 1000,
+    "contentROI": [
+      248,
+      64,
+      1320,
+      936
+    ],
+    "workROI": [
+      248,
+      274,
+      1320,
+      680
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "D03-store",
+    "width": 1600,
+    "height": 1000,
+    "contentROI": [
+      248,
+      64,
+      1320,
+      936
+    ],
+    "workROI": [
+      248,
+      274,
+      1320,
+      680
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "D04-connections",
+    "width": 1600,
+    "height": 1000,
+    "contentROI": [
+      248,
+      64,
+      1320,
+      936
+    ],
+    "workROI": [
+      248,
+      274,
+      1320,
+      680
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "D05-files",
+    "width": 1600,
+    "height": 1000,
+    "contentROI": [
+      248,
+      64,
+      1320,
+      936
+    ],
+    "workROI": [
+      248,
+      274,
+      1320,
+      680
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "D06-feeds",
+    "width": 1600,
+    "height": 1000,
+    "contentROI": [
+      248,
+      64,
+      1320,
+      936
+    ],
+    "workROI": [
+      248,
+      274,
+      1320,
+      680
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "D07-import",
+    "width": 1600,
+    "height": 1000,
+    "contentROI": [
+      248,
+      64,
+      1320,
+      936
+    ],
+    "workROI": [
+      248,
+      274,
+      1320,
+      680
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "D08-quality",
+    "width": 1600,
+    "height": 1000,
+    "contentROI": [
+      248,
+      64,
+      1320,
+      936
+    ],
+    "workROI": [
+      248,
+      274,
+      1320,
+      680
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "D09-lineage",
+    "width": 1600,
+    "height": 1000,
+    "contentROI": [
+      248,
+      64,
+      1320,
+      936
+    ],
+    "workROI": [
+      248,
+      274,
+      1320,
+      680
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "D10-ratings",
+    "width": 1600,
+    "height": 1000,
+    "contentROI": [
+      248,
+      64,
+      1320,
+      936
+    ],
+    "workROI": [
+      248,
+      274,
+      1320,
+      680
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "D11-usage",
+    "width": 1600,
+    "height": 1000,
+    "contentROI": [
+      248,
+      64,
+      1320,
+      936
+    ],
+    "workROI": [
+      248,
+      274,
+      1320,
+      680
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "D12-access",
+    "width": 1600,
+    "height": 1000,
+    "contentROI": [
+      248,
+      64,
+      1320,
+      936
+    ],
+    "workROI": [
+      248,
+      274,
+      1320,
+      680
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "D13-templates",
+    "width": 1600,
+    "height": 1000,
+    "contentROI": [
+      248,
+      64,
+      1320,
+      936
+    ],
+    "workROI": [
+      248,
+      274,
+      1320,
+      680
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "D14-audit",
+    "width": 1600,
+    "height": 1000,
+    "contentROI": [
+      248,
+      64,
+      1320,
+      936
+    ],
+    "workROI": [
+      248,
+      274,
+      1320,
+      680
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "D15-reliability",
+    "width": 1600,
+    "height": 1000,
+    "contentROI": [
+      248,
+      64,
+      1320,
+      936
+    ],
+    "workROI": [
+      248,
+      274,
+      1320,
+      680
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "D16-incident",
+    "width": 1600,
+    "height": 1000,
+    "contentROI": [
+      248,
+      64,
+      1320,
+      936
+    ],
+    "workROI": [
+      248,
+      274,
+      1320,
+      680
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "D17-action",
+    "width": 1600,
+    "height": 1000,
+    "contentROI": [
+      248,
+      64,
+      1320,
+      936
+    ],
+    "workROI": [
+      248,
+      274,
+      1320,
+      680
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "D18-mapping",
+    "width": 1600,
+    "height": 1000,
+    "contentROI": [
+      248,
+      64,
+      1320,
+      936
+    ],
+    "workROI": [
+      248,
+      274,
+      1320,
+      680
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "D19-billing",
+    "width": 1600,
+    "height": 1000,
+    "contentROI": [
+      248,
+      64,
+      1320,
+      936
+    ],
+    "workROI": [
+      248,
+      274,
+      1320,
+      680
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "D20-monitoring",
+    "width": 1600,
+    "height": 1000,
+    "contentROI": [
+      248,
+      64,
+      1320,
+      936
+    ],
+    "workROI": [
+      248,
+      274,
+      1320,
+      680
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "M01-overview",
+    "width": 390,
+    "height": 1120,
+    "contentROI": [
+      0,
+      64,
+      390,
+      1056
+    ],
+    "workROI": [
+      16,
+      212,
+      358,
+      828
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "M02-files",
+    "width": 390,
+    "height": 1120,
+    "contentROI": [
+      0,
+      64,
+      390,
+      1056
+    ],
+    "workROI": [
+      16,
+      212,
+      358,
+      828
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "M03-import",
+    "width": 390,
+    "height": 1120,
+    "contentROI": [
+      0,
+      64,
+      390,
+      1056
+    ],
+    "workROI": [
+      16,
+      212,
+      358,
+      828
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "M04-incident",
+    "width": 390,
+    "height": 1120,
+    "contentROI": [
+      0,
+      64,
+      390,
+      1056
+    ],
+    "workROI": [
+      16,
+      212,
+      358,
+      828
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "M05-usage",
+    "width": 390,
+    "height": 1120,
+    "contentROI": [
+      0,
+      64,
+      390,
+      1056
+    ],
+    "workROI": [
+      16,
+      212,
+      358,
+      828
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "M06-action",
+    "width": 390,
+    "height": 1120,
+    "contentROI": [
+      0,
+      64,
+      390,
+      1056
+    ],
+    "workROI": [
+      16,
+      212,
+      358,
+      828
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "T01-overview",
+    "width": 768,
+    "height": 1120,
+    "contentROI": [
+      0,
+      64,
+      768,
+      1056
+    ],
+    "workROI": [
+      16,
+      212,
+      736,
+      828
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "T02-files",
+    "width": 768,
+    "height": 1120,
+    "contentROI": [
+      0,
+      64,
+      768,
+      1056
+    ],
+    "workROI": [
+      16,
+      212,
+      736,
+      828
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "S01-disconnected",
+    "width": 1600,
+    "height": 1000,
+    "contentROI": [
+      248,
+      64,
+      1320,
+      936
+    ],
+    "workROI": [
+      248,
+      274,
+      1320,
+      680
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  },
+  {
+    "id": "S02-uninstrumented",
+    "width": 1600,
+    "height": 1000,
+    "contentROI": [
+      248,
+      64,
+      1320,
+      936
+    ],
+    "workROI": [
+      248,
+      274,
+      1320,
+      680
+    ],
+    "annotations": [
+      [
+        "Scope and environment stay visible.",
+        "All illustrated data is synthetic."
+      ],
+      [
+        "Use measured states and timestamps.",
+        "Unknown never becomes green or $0."
+      ],
+      [
+        "Rows link to affected records.",
+        "Preserve tenant-scoped permissions."
+      ],
+      [
+        "Read-only refresh is not replay.",
+        "Review cost and effects before action."
+      ]
+    ]
+  }
+]
