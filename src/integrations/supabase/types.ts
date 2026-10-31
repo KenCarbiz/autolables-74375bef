@@ -222,6 +222,7 @@ export type Database = {
           customer_signature_data: string | null
           customer_signature_type: string | null
           customer_signed_at: string | null
+          deal_number: string | null
           dealer_snapshot: Json | null
           delivered_at: string | null
           delivered_by: string | null
@@ -294,6 +295,7 @@ export type Database = {
           customer_signature_data?: string | null
           customer_signature_type?: string | null
           customer_signed_at?: string | null
+          deal_number?: string | null
           dealer_snapshot?: Json | null
           delivered_at?: string | null
           delivered_by?: string | null
@@ -366,6 +368,7 @@ export type Database = {
           customer_signature_data?: string | null
           customer_signature_type?: string | null
           customer_signed_at?: string | null
+          deal_number?: string | null
           dealer_snapshot?: Json | null
           delivered_at?: string | null
           delivered_by?: string | null
@@ -854,6 +857,99 @@ export type Database = {
           version?: string
         }
         Relationships: []
+      }
+      compliance_issue_owner_history: {
+        Row: {
+          changed_at: string
+          changed_by: string
+          id: string
+          issue_key: string
+          owner_user_id: string | null
+          previous_owner_user_id: string | null
+          tenant_id: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by: string
+          id?: string
+          issue_key: string
+          owner_user_id?: string | null
+          previous_owner_user_id?: string | null
+          tenant_id: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string
+          id?: string
+          issue_key?: string
+          owner_user_id?: string | null
+          previous_owner_user_id?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_issue_owner_history_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compliance_issue_owner_history_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      compliance_issue_owners: {
+        Row: {
+          assigned_at: string
+          assigned_by: string | null
+          created_at: string
+          id: string
+          issue_key: string
+          owner_user_id: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by?: string | null
+          created_at?: string
+          id?: string
+          issue_key: string
+          owner_user_id?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string | null
+          created_at?: string
+          id?: string
+          issue_key?: string
+          owner_user_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_issue_owners_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compliance_issue_owners_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ct_mvp_certification_runs: {
         Row: {
@@ -6600,6 +6696,7 @@ export type Database = {
           accessories_installed: Json
           created_at: string
           created_by: string | null
+          due_at: string | null
           foreman_ip: string | null
           foreman_name: string
           foreman_signature_data: string | null
@@ -6625,6 +6722,7 @@ export type Database = {
           accessories_installed?: Json
           created_at?: string
           created_by?: string | null
+          due_at?: string | null
           foreman_ip?: string | null
           foreman_name: string
           foreman_signature_data?: string | null
@@ -6650,6 +6748,7 @@ export type Database = {
           accessories_installed?: Json
           created_at?: string
           created_by?: string | null
+          due_at?: string | null
           foreman_ip?: string | null
           foreman_name?: string
           foreman_signature_data?: string | null
@@ -7542,6 +7641,9 @@ export type Database = {
           photos: Json
           reinspected_at: string | null
           reinspected_by: string | null
+          repair_approval: string
+          repair_approval_at: string | null
+          repair_approval_by: string | null
           repair_state: string
           ro_number: string | null
           tenant_id: string
@@ -7558,6 +7660,9 @@ export type Database = {
           photos?: Json
           reinspected_at?: string | null
           reinspected_by?: string | null
+          repair_approval?: string
+          repair_approval_at?: string | null
+          repair_approval_by?: string | null
           repair_state?: string
           ro_number?: string | null
           tenant_id: string
@@ -7574,6 +7679,9 @@ export type Database = {
           photos?: Json
           reinspected_at?: string | null
           reinspected_by?: string | null
+          repair_approval?: string
+          repair_approval_at?: string | null
+          repair_approval_by?: string | null
           repair_state?: string
           ro_number?: string | null
           tenant_id?: string
@@ -7597,6 +7705,54 @@ export type Database = {
           },
           {
             foreignKeyName: "safety_inspection_item_failures_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      safety_inspection_repair_approval_history: {
+        Row: {
+          approval: string
+          changed_at: string
+          changed_by: string | null
+          failure_id: string
+          id: string
+          inspection_id: string | null
+          previous_approval: string | null
+          tenant_id: string
+        }
+        Insert: {
+          approval: string
+          changed_at?: string
+          changed_by?: string | null
+          failure_id: string
+          id?: string
+          inspection_id?: string | null
+          previous_approval?: string | null
+          tenant_id: string
+        }
+        Update: {
+          approval?: string
+          changed_at?: string
+          changed_by?: string | null
+          failure_id?: string
+          id?: string
+          inspection_id?: string | null
+          previous_approval?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "safety_inspection_repair_approval_history_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "safety_inspection_repair_approval_history_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -11402,6 +11558,14 @@ export type Database = {
         Args: { p_tenant_id: string }
         Returns: undefined
       }
+      assign_compliance_issue_owner: {
+        Args: {
+          p_issue_key: string
+          p_owner_user_id?: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
       assign_safety_inspection: {
         Args: { p_inspection_id: string; p_user_id: string }
         Returns: Json
@@ -11504,6 +11668,10 @@ export type Database = {
       close_resolved_description_exceptions: {
         Args: { p_case_id: string; p_keep_types?: string[] }
         Returns: number
+      }
+      compliance_owner_eligible: {
+        Args: { p_tenant_id: string; p_user_id: string }
+        Returns: boolean
       }
       create_draft_addendum: {
         Args: { p_tenant_id: string; p_vin: string }
@@ -12237,6 +12405,13 @@ export type Database = {
       oem_franchise_min_new_units: { Args: never; Returns: number }
       oem_make_from_ymm: { Args: { _ymm: string }; Returns: string }
       operating_metrics: { Args: { p_tenant_id: string }; Returns: Json }
+      platform_vehicle_counts: {
+        Args: never
+        Returns: {
+          active_vehicles: number
+          tenant_id: string
+        }[]
+      }
       provider_call_admit: {
         Args: {
           p_caller: string
@@ -12797,6 +12972,10 @@ export type Database = {
       set_marketcheck_allowed: {
         Args: { _allowed: boolean; _tenant_id: string }
         Returns: undefined
+      }
+      set_repair_approval: {
+        Args: { p_decision: string; p_failure_id: string }
+        Returns: Json
       }
       set_tenant_member_role: {
         Args: { p_member_id: string; p_role: string }
