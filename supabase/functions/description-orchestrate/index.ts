@@ -27,6 +27,7 @@ import {
   preferredLengthBand, featureBudgetForLength, LENGTH_POLICY,
 } from "../_shared/description-core.ts";
 import { repairContent, hasRepairableFindings } from "../_shared/description-repair.ts";
+import { fitNarrativeExact, disclosureDecision, type ApprovedDisclosure } from "../_shared/description-exact-fit.ts";
 import { preflight, preflightSummary } from "../_shared/description-preflight.ts";
 import {
   evaluateBudget, coerceBudgetConfig, parseSpendUsage, withUsageFloor, budgetUnavailable,
@@ -1361,10 +1362,29 @@ async function orchestrateVehicle(
       // vehicle once and then making nine more calls is precisely how a
       // 500/day cap let 506 through: the count was read before the first of
       // ten calls and never read again.
-      const channelPrompt = buildChannelPromptV3(masterText2, policy, channelPacket);
+      // Exact-length export (vAuto 3,921): the writer drafts a narrative pool
+      // sized from what is left after the approved CTA and disclosure, and
+      // the deterministic fitter lands the total. draftPolicy governs only the
+      // draft; the final text is checked against the real policy.
+      let exactCta: string | null = null;
+      let exactDisclosure: ApprovedDisclosure | null = null;
+      let draftPolicy: ChannelPolicy = policy;
+      if (policy.exactTotal) {
+        exactCta = String(voice.channelOverrides?.[key]?.ctaTemplate || voice.ctaTemplate || "").trim() || null;
+        exactDisclosure = await disclosureDecision(settings);
+        const reserved = (exactCta ? exactCta.length + 1 : 0)
+          + (exactDisclosure.text ? exactDisclosure.text.length + 1 : 0);
+        const narrativeBudget = Math.max(400, policy.exactTotal - reserved);
+        draftPolicy = {
+          ...policy, exactTotal: policy.exactTotal,
+          recommendedMin: narrativeBudget + 150, recommendedMax: narrativeBudget + 500,
+          characterLimit: narrativeBudget + 800,
+        };
+      }
+      const channelPrompt = buildChannelPromptV3(masterText2, draftPolicy, channelPacket);
       const channelBudget = await guard.authorize(`channel_generation:${key}`, {
         estimatedCost: estimateRequestCost(
-          settings.generation_model, channelPrompt, policy.characterLimit).amount,
+          settings.generation_model, channelPrompt, draftPolicy.characterLimit).amount,
       });
       if (!channelBudget.withinBudget) {
         budgetStoppedChannels = enabled.slice(enabled.indexOf(key));
@@ -1377,7 +1397,7 @@ async function orchestrateVehicle(
       try {
         const raw = await generateChannelText(
           channelPrompt,
-          settings, policy.characterLimit,
+          settings, draftPolicy.characterLimit,
           { admin, tenantId, vehicleId, caseId, channel: key });
         let content = raw, seoTitle: string | null = null, metaDesc: string | null = null;
         if (policy.seoFields) {
@@ -1389,7 +1409,11 @@ async function orchestrateVehicle(
           } catch { /* fall back to raw text */ }
         }
         content = withRequiredDisclosure(content, settings);
-        let cFindings = validateContentV3(content, snap, settings, channelPacket, policy);
+        // The draft pool is validated and repaired against the draft policy,
+        // so the removal-only repair never trims it toward the export cap
+        // before the fitter has chosen sentences.
+        const workPolicy: ChannelPolicy = policy.exactTotal ? { ...draftPolicy, exactTotal: null } : policy;
+        let cFindings = validateContentV3(content, snap, settings, channelPacket, workPolicy);
         let cRepair: Record<string, unknown> | null = null;
         // Same removal-only repair per channel. A channel variant is the most
         // common place a length or formatting rule bites, and those are the
@@ -1397,10 +1421,10 @@ async function orchestrateVehicle(
         if (hasRepairableFindings(cFindings) || cFindings.some((f) =>
             ["CHANNEL_LENGTH_EXCEEDED", "CHANNEL_FORMAT_INVALID", "CHANNEL_EMOJI_NOT_ALLOWED"]
               .includes(f.validator_code))) {
-          const r = repairContent(content, cFindings, policy,
+          const r = repairContent(content, cFindings, workPolicy,
             dealerDisclosures(settings, policy.requiredDisclosures));
           if (r.changed) {
-            const after = validateContentV3(r.content, snap, settings, channelPacket, policy);
+            const after = validateContentV3(r.content, snap, settings, channelPacket, workPolicy);
             const beforeBlocking = cFindings.filter((f) => f.blocking).length;
             const afterBlocking = after.filter((f) => f.blocking).length;
             // Removing the only blocker is an improvement even when the total
@@ -1417,6 +1441,39 @@ async function orchestrateVehicle(
               cRepair = { applied: r.applied, unrepairable: r.unrepairable };
             }
           }
+        }
+        let exactFit: Record<string, unknown> | null = null;
+        if (policy.exactTotal && exactDisclosure) {
+          const fit = fitNarrativeExact({
+            narrative: content, cta: exactCta, disclosure: exactDisclosure,
+            profile: { exactTotal: policy.exactTotal, localMax: policy.characterLimit,
+              singleLine: policy.singleLine, asciiOnly: policy.asciiOnly, countUnit: "codePoints" },
+          });
+          exactFit = { ok: fit.ok, code: fit.code, ...fit.meta };
+          if (fit.ok && fit.text) {
+            content = fit.text;
+            cFindings = validateContentV3(content, snap, settings, channelPacket, policy);
+            // Dropping sentences can orphan a reference ("It also..."). The
+            // fitted export is always reviewed before anyone copies it out.
+            cFindings.push({
+              validator_code: "EXACT_FIT_REVIEW_REQUIRED", severity: "warning", blocking: false,
+              message: `${policy.label} fitted to exactly ${policy.exactTotal} characters by keeping ${fit.meta.sentencesKept} of ${Number(fit.meta.sentencesKept) + Number(fit.meta.sentencesDropped)} sentences. Review the final text before export.`,
+            });
+            if (!exactCta) {
+              cFindings.push({
+                validator_code: "EXACT_FIT_NO_APPROVED_CTA", severity: "warning", blocking: false,
+                message: "No approved call to action is configured, so the export carries narrative and disclosure only.",
+              });
+            }
+          } else {
+            cFindings = cFindings.filter((f) => f.validator_code !== "EXACT_LENGTH_MISMATCH");
+            cFindings.push({
+              validator_code: fit.code === "EXACT_LENGTH_UNREACHABLE" ? "EXACT_LENGTH_UNREACHABLE" : "EXACT_FIT_BLOCKED",
+              severity: "blocking", blocking: true,
+              message: `${policy.label} could not be fitted to exactly ${policy.exactTotal} characters (${fit.code}). Held for review; nothing was padded or cut.`,
+            });
+          }
+          cRepair = { ...(cRepair || {}), exact_fit: exactFit };
         }
         const cStatus = cFindings.some((f) => f.blocking) ? "blocked"
           : cFindings.some((f) => f.severity === "warning") ? "warning" : "passed";
@@ -1441,7 +1498,7 @@ async function orchestrateVehicle(
           tenant_id: tenantId, vehicle_id: vehicleId, description_case_id: caseId,
           master_version_id: version.id, channel: key, content,
           seo_title: seoTitle, meta_description: metaDesc,
-          character_count: content.length, character_limit: policy.characterLimit,
+          character_count: [...content].length, character_limit: policy.exactTotal ?? policy.characterLimit,
           word_count: cScore.readability.words,
           read_time_seconds: Math.max(10, Math.round((cScore.readability.words / 200) * 60)),
           channel_policy_version: policyVersion, score_breakdown_json: cScore,
