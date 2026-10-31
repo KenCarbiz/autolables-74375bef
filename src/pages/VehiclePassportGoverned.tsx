@@ -22,7 +22,8 @@ import { usePublishedWindowSticker } from "@/hooks/usePublishedWindowSticker";
 import VehiclePriceBreakdown from "@/components/passport/VehiclePriceBreakdown";
 import AutoLabelsVerifiedCard from "@/components/passport/AutoLabelsVerifiedCard";
 import { buildPassportSaleCard } from "@/lib/passport/saleCard";
-import { estimateAffordability } from "@/lib/affordability";
+import { previewEstimatorPayload } from "@/lib/payment/previewExample";
+import { CUSTOMER_UNAVAILABLE_MESSAGE, chargeTreatment, estimateAssumptionLine, formatPayment, resolveEstimate } from "@/lib/payment/estimator";
 import { readPaymentPrefs, clearPaymentPrefs, type PaymentPrefs } from "@/lib/passport/paymentPrefs";
 import { resolveStickyButtons, type StickyBottomButtons } from "@/lib/stickyButtons";
 import { MOCK_LISTING, MOCK_NEW_2026, MOCK_SPARSE, MOCK_NEW_MSRP, MOCK_USED_FEE } from "./VehiclePassportV3";
@@ -221,12 +222,19 @@ export default function VehiclePassportGoverned() {
   // the shared review fixture (a real recall cross-source conflict + pending title)
   // so the governed passport's exception states can be reviewed against the report.
   const previewScenario = search.get("scenario");
-  const previewData = (previewScenario === "review" ? MOCK_REVIEW_LISTING
-    : previewScenario === "new2026" ? MOCK_NEW_2026
-    : previewScenario === "sparse" ? MOCK_SPARSE
-    : previewScenario === "newmsrp" ? MOCK_NEW_MSRP
-    : previewScenario === "usedfee" ? MOCK_USED_FEE
-    : MOCK_LISTING) as unknown as VehicleListing;
+  // &estimator=example attaches a clearly synthetic estimator to the preview
+  // fixture so the payment module can be reviewed; without it a preview shows
+  // the Passport as a store with the estimator off. Never written anywhere.
+  const previewEstimator = search.get("estimator") === "example";
+  const previewData = useMemo(() => {
+    const base = (previewScenario === "review" ? MOCK_REVIEW_LISTING
+      : previewScenario === "new2026" ? MOCK_NEW_2026
+      : previewScenario === "sparse" ? MOCK_SPARSE
+      : previewScenario === "newmsrp" ? MOCK_NEW_MSRP
+      : previewScenario === "usedfee" ? MOCK_USED_FEE
+      : MOCK_LISTING) as unknown as VehicleListing;
+    return (previewEstimator ? { ...base, payment_estimator: previewEstimatorPayload() } : base) as VehicleListing;
+  }, [previewScenario, previewEstimator]);
   const { listing, loading, notFound, rateLimited } = usePublicListing(rawSlug, { preview: isPreview, previewData });
 
   // The shared public-claim safeguard — the same decision PublicListing,
@@ -522,20 +530,21 @@ export default function VehiclePassportGoverned() {
   const saleCard = buildPassportSaleCard(d, condition);
 
   // Reflect the shopper's own payment scenario when they set one on the Today's
-  // Price ladder — recomputed with the SAME estimator so the number matches the
-  // ladder exactly. Only when the dealer enables payment display (d.estMonthly).
-  // Still an illustration, never an offer; Reset returns to the dealer default.
-  const customPayment = (payPrefs && price != null && d.estMonthly != null)
-    ? (() => {
-        const dp = Math.min(Math.max(0, payPrefs.down), price);
-        const m = estimateAffordability({ price, downPayment: dp, aprPercent: Math.max(0, payPrefs.apr) }, [payPrefs.term])[0]?.monthly_payment;
-        return m != null && Number.isFinite(m) ? { monthly: Math.round(m), down: dp, term: payPrefs.term, apr: payPrefs.apr } : null;
-      })()
+  // Price ladder — recomputed through the SAME shared resolver and this store's
+  // rule, so the number matches the calculator exactly. Only when the store's
+  // estimator is on and covers this vehicle. Still an illustration, never an
+  // offer; Reset returns to the store default.
+  const estimatorOn = d.paymentEstimator != null;
+  const customEstimate = payPrefs && d.paymentEstimator
+    ? resolveEstimate(d.paymentEstimator, { modelYear: d.modelYear, sellingPrice: price }, { downPayment: payPrefs.down, termMonths: payPrefs.term, aprPercent: payPrefs.apr })
     : null;
-  const payMonthly = customPayment ? customPayment.monthly : d.estMonthly;
-  const payAssumptions = customPayment
-    ? `${customPayment.term} mo · ${fmt$(customPayment.down)} down · ${customPayment.apr.toFixed(2)}% APR (example)`
-    : d.paymentAssumptions;
+  const customPayment = customEstimate?.status === "available" ? customEstimate : null;
+  const shownEstimate = customPayment ?? (d.paymentEstimate.status === "available" ? d.paymentEstimate : null);
+  const payMonthly = shownEstimate ? shownEstimate.monthlyPayment : null;
+  const payAssumptions = shownEstimate ? estimateAssumptionLine(shownEstimate) : "";
+  // On, but this vehicle has no matching rule, year or price: say so instead of a number.
+  const payUnavailable = estimatorOn && !shownEstimate;
+  const payCharges = chargeTreatment(d.priceIncludesDoc);
   const resetPayment = () => { clearPaymentPrefs(listing); setPayPrefs(null); };
 
   // ── Intelligence chips: derive the 3 strongest vehicle-specific reasons.
@@ -566,7 +575,9 @@ export default function VehiclePassportGoverned() {
   })();
 
   // ── Sticky CTA (existing dealer-configurable button set)
-  const stickyCfg = resolveStickyButtons((listing as unknown as { sticky_bottom_buttons?: StickyBottomButtons }).sticky_bottom_buttons);
+  const stickyResolved = resolveStickyButtons((listing as unknown as { sticky_bottom_buttons?: StickyBottomButtons }).sticky_bottom_buttons);
+  // The payment-calculator button is an estimator CTA: it goes when the store's estimator is off.
+  const stickyCfg = { ...stickyResolved, items: stickyResolved.items.filter((b) => estimatorOn || b.key !== "calculate_payment") };
   const stickyAction = (k: string): { icon: React.ElementType; onClick: () => void } => {
     const tap = (cta: string) => trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta } });
     // Call / Text stay native; the no-phone fallback opens the governed V3
@@ -742,7 +753,7 @@ export default function VehiclePassportGoverned() {
         const watchEnabled = (listing as unknown as { price_drop_watch?: boolean }).price_drop_watch !== false;
         const actionTiles: { label: string; icon: React.ElementType; onClick: () => void; active?: boolean }[] = [
           { label: "Value My Trade", icon: RefreshCw, onClick: () => openTrade() },
-          { label: "Build My Payment", icon: DollarSign, onClick: () => { trackPassportEvent("payment_builder_started", { placement: "action_center" }); go("todays-price"); } },
+          ...(estimatorOn ? [{ label: "Build My Payment", icon: DollarSign, onClick: () => { trackPassportEvent("payment_builder_started", { placement: "action_center" }); go("todays-price"); } }] : []),
           { label: "Ask a Question", icon: MessageSquare, onClick: () => { trackPassportEvent("contact_started", { placement: "action_center" }); go("contact"); } },
           { label: "Documents", icon: FileText, onClick: () => openPanel("documents") },
           { label: "Save", icon: Bookmark, onClick: handleSave, active: isSaved },
@@ -862,21 +873,26 @@ export default function VehiclePassportGoverned() {
                   <div className="mt-0.5 text-[32px] font-extrabold tabular-nums leading-none" style={{ color: NAVY }}>{price != null ? fmt$(price) : "—"}</div>
                 </>}
 
-            {/* 6 — Payment module: ONLY when d.estMonthly is present. This is the same
-                dealer setting (passport_payment_display.payment → getPaymentDisplay)
-                that gates the desktop estimate; when off, estMonthly is null and this
-                renders nothing (no empty card, no gap). Never an offer or approval. */}
+            {/* 6 — Payment module: driven by the store's payment estimator through the
+                shared resolver. Off: nothing renders. On with no matching rule: the
+                unavailable card, never a number. Never an offer or approval. */}
+            {payUnavailable && (
+              <div className={`${CARD} mt-3 px-4 py-3.5`} data-module="payment" data-payment-state="unavailable">
+                <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>Estimated payment</span>
+                <p className="mt-1 text-[13px] leading-snug" style={{ color: NAVY }}>{CUSTOMER_UNAVAILABLE_MESSAGE}</p>
+              </div>
+            )}
             {payMonthly != null && (
               <div className={`${CARD} mt-3 px-4 py-3.5`} data-module="payment">
                 <div className="flex items-center justify-between gap-2">
                   <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>
-                    {customPayment ? "Your estimate" : "Estimated payment (Example)"}
+                    {customPayment ? "Your estimated payment" : "Estimated payment"}
                     {customPayment && <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9.5px] font-bold" style={{ background: "#EFF6FF", color: BLUE }}>EDITED</span>}
                   </span>
                   <button onClick={() => openAction("payment")} aria-label="How this payment is estimated" className="h-8 w-8 -mr-1.5 grid place-items-center rounded-full hover:bg-slate-50"><Info className="w-[18px] h-[18px]" style={{ color: SUB }} /></button>
                 </div>
                 <div className="mt-1 flex items-baseline gap-1">
-                  <span className="text-[30px] font-extrabold tabular-nums leading-none" style={{ color: NAVY }}>{fmt$(payMonthly)}</span>
+                  <span className="text-[30px] font-extrabold tabular-nums leading-none" style={{ color: NAVY }}>{formatPayment(payMonthly)}</span>
                   <span className="text-[15px] font-bold" style={{ color: SUB }}>/mo</span>
                 </div>
                 {payAssumptions && <div className="mt-1 text-[12px]" style={{ color: SUB }}>{payAssumptions}</div>}
@@ -884,7 +900,7 @@ export default function VehiclePassportGoverned() {
                   <button onClick={() => { trackPassportEvent("payment_builder_started", { placement: "price_ladder" }); go("todays-price"); }} className="inline-flex items-center gap-1 text-[13px] font-bold" style={{ color: BLUE }}>Build My Payment <ChevronRight className="w-4 h-4" /></button>
                   {customPayment && <button onClick={resetPayment} className="text-[13px] font-semibold" style={{ color: SUB }}>Reset to default</button>}
                 </div>
-                <p className="mt-2.5 pt-2.5 border-t text-[11px] leading-snug" style={{ borderColor: BORDER, color: SUB }}>Estimated payment for illustration only. Terms, rates, taxes, fees and approval may vary. This is not a financing offer.</p>
+                <p className="mt-2.5 pt-2.5 border-t text-[11px] leading-snug" style={{ borderColor: BORDER, color: SUB }}>Estimated payment for illustration only, using the dealership's assumed APR. Not a credit approval, a guaranteed rate or a financing offer. {payCharges.summary}</p>
               </div>
             )}
           </section>
@@ -1259,7 +1275,7 @@ export default function VehiclePassportGoverned() {
         const actReserve = { label: "Request Vehicle Hold", onClick: () => { trackPassportEvent("reservation_started", { placement: "action_center" }); go("reserve"); } };
         const actGrid1 = [
           { label: "Value My Trade", icon: RefreshCw, onClick: () => openTrade() },
-          { label: "Build My Payment", icon: DollarSign, onClick: () => { trackPassportEvent("payment_builder_started", { placement: "action_center" }); go("todays-price"); } },
+          ...(estimatorOn ? [{ label: "Build My Payment", icon: DollarSign, onClick: () => { trackPassportEvent("payment_builder_started", { placement: "action_center" }); go("todays-price"); } }] : []),
         ];
         const actGrid2 = [
           { label: "Ask a Question", icon: MessageSquare, onClick: () => { trackPassportEvent("contact_started", { placement: "action_center" }); go("contact"); } },
@@ -1626,9 +1642,12 @@ export default function VehiclePassportGoverned() {
                   </div>
                   {/* Example payment — an estimate only, never an offer or approval.
                       Reflects the shopper's own scenario when they set one on the ladder. */}
+                  {payUnavailable && (
+                    <div className="mt-1.5 text-[12px]" style={{ color: SUB }} data-payment-state="unavailable">{CUSTOMER_UNAVAILABLE_MESSAGE}</div>
+                  )}
                   {payMonthly != null && (
                     <div className="mt-1.5 text-[12px]" style={{ color: SUB }}>
-                      {customPayment ? "Your est. " : "Est. "}<span className="font-bold tabular-nums" style={{ color: NAVY }}>{fmt$(payMonthly)}/mo</span>{payAssumptions ? ` · ${payAssumptions}` : ""}
+                      {customPayment ? "Your estimated payment " : "Estimated payment "}<span className="font-bold tabular-nums" style={{ color: NAVY }}>{formatPayment(payMonthly)}/mo</span>{payAssumptions ? ` · ${payAssumptions}` : ""}
                       {customPayment && <button onClick={resetPayment} className="ml-2 font-semibold underline" style={{ color: BLUE }}>Reset</button>}
                     </div>
                   )}
@@ -1690,7 +1709,7 @@ export default function VehiclePassportGoverned() {
       })()}
 
       {/* ── Sticky bottom CTA (mobile / tablet only — desktop uses the action center) ── */}
-      {!isDesktop && stickyCfg.enabled && (
+      {!isDesktop && stickyCfg.enabled && stickyCfg.items.length > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-50 border-t bg-white/95 backdrop-blur" style={{ borderColor: BORDER, paddingBottom: "env(safe-area-inset-bottom)" }}>
           <div className="max-w-lg mx-auto px-3 py-2.5 grid gap-2" style={{ gridTemplateColumns: `repeat(${stickyCfg.items.length}, minmax(0,1fr))` }}>
             {stickyCfg.items.map((b) => {

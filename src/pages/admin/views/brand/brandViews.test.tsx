@@ -148,11 +148,13 @@ describe("brand views render from the 02 fixture", () => {
     expect(h.invoke).not.toHaveBeenCalled();
   });
 
-  it("Document defaults renders the generator defaults and payment toggles", () => {
+  it("Document defaults renders the generator defaults and the payment estimator entry", () => {
     renderFixture(DocumentDefaultsView);
     expect(screen.getByLabelText("New-car addendum")).toHaveProperty("value", "standard");
     expect(screen.getByLabelText("FTC used-car warranty (Buyers Guide)")).toHaveProperty("value", "as_is");
-    expect(screen.getAllByRole("switch")).toHaveLength(4);
+    expect(screen.queryAllByRole("switch")).toHaveLength(0);
+    expect(screen.getByText("Passport payment estimator")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Configure estimator" })).toBeTruthy();
   });
 });
 
@@ -356,15 +358,11 @@ describe("other brand views in live mode", () => {
     await waitFor(() => expect(screen.getByText(/Price read: \$12,345/)).toBeTruthy());
   });
 
-  it("Document defaults saves the payment display as one object", async () => {
+  it("Document defaults links to the store's payment estimator instead of display toggles", async () => {
     renderLive(DocumentDefaultsView);
-    fireEvent.click(screen.getByRole("switch", { name: "Interest rate (APR)" }));
-    fireEvent.click(reviewButton());
-    expect(within(screen.getByLabelText("Changes to apply")).getByText("payment on, down payment on, term on, APR off")).toBeTruthy();
-    await act(async () => { fireEvent.click(applyButton()); });
-    await waitFor(() => expect(h.ctx.updateSettings).toHaveBeenCalledTimes(1));
-    const patch = h.ctx.updateSettings.mock.calls[0][0] as unknown as { passport_payment_display: { interestRate: boolean } };
-    expect(Object.keys(patch)).toEqual(["passport_payment_display"]);
-    expect(patch.passport_payment_display.interestRate).toBe(false);
+    expect(screen.queryByRole("switch", { name: "Interest rate (APR)" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Configure estimator" }).getAttribute("href")).toBe("/admin/brand/payment-estimator");
+    await waitFor(() => expect(screen.getByText(/Status couldn't be read here/)).toBeTruthy());
+    expect(h.ctx.updateSettings).not.toHaveBeenCalled();
   });
 });
