@@ -8,7 +8,7 @@ import { usePrepSignOff, type PrepSignOff as PrepSignOffRow, type InstallPhoto, 
 import { useGetReady, type GetReadyRecord } from "@/hooks/useGetReady";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { usePrepDueDates, type PrepDueView } from "@/hooks/useApprovedFields";
-import { NO_DUE_DATE_LABEL, canSetPrepDue } from "@/lib/approvedFields/prepDue";
+import { canSetPrepDue } from "@/lib/approvedFields/prepDue";
 import { derivePrepNextAction } from "@/lib/approvedFields/prepNextAction";
 import { PrepDueEditor } from "@/components/admin/PrepDueEditor";
 import { useEmailDistribution } from "@/hooks/useEmailDistribution";
@@ -33,13 +33,53 @@ const vendorLabel = (accs: Array<{ installed_by?: string }>) => {
   return names.length === 0 ? "Unknown" : names.length === 1 ? names[0] : `${names[0]} +${names.length - 1}`;
 };
 
-const DueCell = ({ view }: { view: PrepDueView | null }) => {
-  if (!view || view.source === "none") return <span className="text-adm-muted">{NO_DUE_DATE_LABEL}</span>;
+const shortDue = (dueAt: string, timeZone: string | null | undefined) => {
+  try {
+    return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: timeZone || undefined }).format(new Date(dueAt));
+  } catch {
+    return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(dueAt));
+  }
+};
+
+const DueCell = ({ view, timeZone }: { view: PrepDueView | null; timeZone: string | null | undefined }) => {
+  if (!view || view.source === "none" || !view.dueAt) return <span className="text-adm-muted">None</span>;
+  const overdue = view.state === "overdue";
   return (
-    <span className="inline-flex items-center gap-1.5">
-      <span className={view.state === "overdue" ? "font-semibold text-adm-danger" : "text-adm-ink"} title={view.label}>{view.label}</span>
-      {view.state === "overdue" && <StatusText tone="danger">Overdue</StatusText>}
+    <span className={overdue ? "font-semibold text-adm-danger" : "text-adm-ink"} title={overdue ? `Overdue, due ${view.label}` : view.label}>
+      {shortDue(view.dueAt, timeZone)}
     </span>
+  );
+};
+
+const PrepDueRow = ({ view, canEdit, timeZone, pending, onSave }: { view: PrepDueView | null; canEdit: boolean; timeZone: string | null | undefined; pending: boolean; onSave: (dueAt: string | null) => void }) => {
+  const [editing, setEditing] = useState(false);
+  return (
+    <>
+      <div className="flex items-baseline justify-between gap-3">
+        <dt className="text-adm-muted">Due</dt>
+        <dd className="inline-flex items-baseline gap-2 text-right">
+          <span className={view?.state === "overdue" ? "font-semibold text-adm-danger" : view?.dueAt ? "text-adm-ink" : "text-adm-muted"}>{view?.dueAt ? view.label : "None"}</span>
+          {canEdit && (
+            <button type="button" onClick={() => setEditing((e) => !e)} aria-expanded={editing} className="text-[13px] font-medium text-adm-primary hover:underline">
+              {editing ? "Close" : "Edit"}
+            </button>
+          )}
+        </dd>
+      </div>
+      {canEdit && editing && (
+        <div className="pt-1">
+          <PrepDueEditor
+            dueAt={view?.source === "set" ? view.dueAt : null}
+            timeZone={timeZone}
+            pending={pending}
+            onSave={(dueAt) => {
+              onSave(dueAt);
+              setEditing(false);
+            }}
+          />
+        </div>
+      )}
+    </>
   );
 };
 
@@ -239,7 +279,6 @@ const PrepSignOff = () => {
                   <Th className="!px-2">Vehicle</Th>
                   <Th className="!px-2">Task</Th>
                   <Th className="!px-2">Vendor</Th>
-                  <Th className="whitespace-nowrap !px-2">Proof</Th>
                   {prepDue.available && <Th className="whitespace-nowrap !px-2">Due</Th>}
                   <Th className="!px-2">Status</Th>
                   <Th className="whitespace-nowrap !px-2">Next action</Th>
@@ -249,17 +288,16 @@ const PrepSignOff = () => {
               <tbody>
                 {filtered.map(s => (
                   <tr key={s.id} className={`h-12 cursor-pointer ${selected?.id === s.id ? "bg-adm-selected" : "hover:bg-adm-workspace"}`} onClick={() => select(s.id)}>
-                    <Td className="max-w-[260px] min-w-[220px] !px-2">
+                    <Td className="max-w-[170px] min-w-[140px] !px-2">
                       <p className="truncate text-[13px] font-semibold text-adm-ink" title={`${s.ymm || s.vin}${s.stock_number ? ` - Stock ${s.stock_number}` : ""}`}>{s.ymm || s.vin}</p>
                     </Td>
                     <Td className="max-w-[120px] !px-2">
                       <p className="truncate" title={taskLabel(s.accessories_installed)}>{taskLabel(s.accessories_installed)}</p>
                     </Td>
                     <Td className="whitespace-nowrap !px-2">{vendorLabel(s.accessories_installed)}</Td>
-                    <Td className="whitespace-nowrap !px-2 text-adm-muted">{s.install_photos?.length ? `${s.install_photos.length} ${s.install_photos.length === 1 ? "photo" : "photos"}` : "Install photo"}</Td>
                     {prepDue.available && (
                       <Td className="whitespace-nowrap !px-2">
-                        <DueCell view={prepDue.view(s)} />
+                        <DueCell view={prepDue.view(s)} timeZone={dealerSettings.dealer_timezone} />
                       </Td>
                     )}
                     <Td className="!px-2">
@@ -267,7 +305,7 @@ const PrepSignOff = () => {
                         {s.status.charAt(0).toUpperCase() + s.status.slice(1)}
                       </StatusText>
                     </Td>
-                    <Td className="max-w-[200px] !px-2">
+                    <Td className="max-w-[180px] whitespace-nowrap !px-2">
                       <NextActionCell row={s} dueAt={prepDue.view(s)?.dueAt ?? null} />
                     </Td>
                     <Td align="right" className="!px-2">
@@ -318,25 +356,24 @@ const PrepSignOff = () => {
                       <div key={k} className="flex justify-between gap-3"><dt className="text-adm-muted">{k}</dt><dd className="text-adm-ink text-right">{v}</dd></div>
                     ))}
                     {prepDue.available && (
-                      <div className="flex justify-between gap-3"><dt className="text-adm-muted">Due</dt><dd className="text-right"><DueCell view={prepDue.view(selected)} /></dd></div>
+                      <PrepDueRow
+                        key={selected.id}
+                        view={prepDue.view(selected)}
+                        canEdit={canEditDue}
+                        timeZone={dealerSettings.dealer_timezone}
+                        pending={prepDue.setDue.isPending}
+                        onSave={(dueAt) =>
+                          prepDue.setDue.mutate(
+                            { prepId: selected.id, dueAt },
+                            {
+                              onSuccess: () => toast.success(dueAt ? "Due date set" : "Due date cleared"),
+                              onError: (e) => toast.error(e instanceof Error ? e.message : "Due date could not be saved"),
+                            },
+                          )
+                        }
+                      />
                     )}
                   </dl>
-                  {prepDue.available && canEditDue && (
-                    <PrepDueEditor
-                      dueAt={prepDue.view(selected)?.source === "set" ? prepDue.view(selected)?.dueAt ?? null : null}
-                      timeZone={dealerSettings.dealer_timezone}
-                      pending={prepDue.setDue.isPending}
-                      onSave={(dueAt) =>
-                        prepDue.setDue.mutate(
-                          { prepId: selected.id, dueAt },
-                          {
-                            onSuccess: () => toast.success(dueAt ? "Due date set" : "Due date cleared"),
-                            onError: (e) => toast.error(e instanceof Error ? e.message : "Due date could not be saved"),
-                          },
-                        )
-                      }
-                    />
-                  )}
                   <div>
                     <p className="font-semibold text-adm-ink mb-1">Installed accessories</p>
                     {selected.accessories_installed.length === 0 ? (

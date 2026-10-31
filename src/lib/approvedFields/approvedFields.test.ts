@@ -313,7 +313,7 @@ describe("platform vehicle counts", () => {
   it("maps aggregate rows per dealership", async () => {
     const r = await fetchPlatformVehicleCounts(fakeClient({ data: [{ tenant_id: "t1", active_vehicles: 1340 }, { tenant_id: "t2", active_vehicles: 0 }], error: null }));
     expect(r.status === "available" && [...r.data.entries()]).toEqual([["t1", 1340], ["t2", 0]]);
-    expect(vehicleCountLabel(r, "t1")).toBe("1,340 active");
+    expect(vehicleCountLabel(r, "t1")).toBe("1,340");
     expect(vehicleCountLabel({ status: "unavailable" }, "t1")).toBe("—");
   });
 });

@@ -146,6 +146,7 @@ export default function SyncRunPage() {
   const refusal = outcome === "provider_rate_limited" || outcome === "provider_auth_failed" || outcome === "provider_error" || outcome === "transport_error";
   const badgeTone: HealthTone = refusal ? "danger" : meta.tone;
   const writes = inventoryWrites(impact);
+  const nothingToRetry = outcome === "success";
   const pinRetained = meta.inventoryPreserved === true;
   const zone = zoneLabel(viewer.timeZone, now);
   const DiagnosisIcon = DIAGNOSIS_ICON[diagnosis.tone];
@@ -337,14 +338,14 @@ export default function SyncRunPage() {
               </div>
               <div className={INSET_RULE} aria-hidden="true" />
               <div className="pl-[18px] pr-[22px] pt-[14px] pb-[19px]">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className={cn("grid grid-cols-1 gap-3", !nothingToRetry && "sm:grid-cols-2")}>
                   <AdminLinkButton to={feedHref} variant={meta.retryable ? "outline" : "primary"} className="min-h-[44px] sm:min-h-[44px] text-[15px] font-medium gap-3">
                     <ArrowLeft className="w-5 h-5" aria-hidden="true" />
                     Back to feed
                   </AdminLinkButton>
-                  <AdminButton variant={meta.retryable ? "primary" : "outline"} className="min-h-[44px] sm:min-h-[44px] text-[15px]" onClick={() => setRetryOpen((o) => !o)} aria-expanded={retryOpen}>Review retry options</AdminButton>
+                  {!nothingToRetry && <AdminButton variant={meta.retryable ? "primary" : "outline"} className="min-h-[44px] sm:min-h-[44px] text-[15px]" onClick={() => setRetryOpen((o) => !o)} aria-expanded={retryOpen}>Review retry options</AdminButton>}
                 </div>
-                {retryOpen && (
+                {retryOpen && !nothingToRetry && (
                   <InlineNote tone="info" title="Retry options" className="mt-3">
                     {meta.retryable
                       ? "The next scheduled run retries automatically. A manual run can be started from the Inventory feed tab by a settings manager after a confirmation that states its cost; it is disabled while the provider is rate limiting."

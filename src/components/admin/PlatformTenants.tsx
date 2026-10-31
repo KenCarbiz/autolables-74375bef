@@ -212,14 +212,24 @@ export const PlatformTenants = () => {
         />
       ) : (
         <div className="rounded-[6px] border border-adm-border bg-adm-surface overflow-hidden">
-          <AdminTable caption="Tenants">
+          <AdminTable caption="Tenants" className="[&_table]:table-fixed [&_th]:!px-2 [&_td]:!px-2">
+            <colgroup>
+              <col />
+              <col className="w-[96px]" />
+              <col className="w-[96px]" />
+              <col className="w-[72px]" />
+              {isAdmin && <col className="w-[72px]" />}
+              <col className="w-[112px]" />
+              <col className="w-[84px]" />
+              <col className="w-[48px]" />
+            </colgroup>
             <thead>
               <tr>
                 {sortTh("Tenant", "name")}
                 {sortTh("Plan", "plan")}
                 {sortTh("Status", "status")}
                 {sortTh("Members", "member_count", "right")}
-                {isAdmin && <Th align="right" className="whitespace-nowrap">Vehicles</Th>}
+                {isAdmin && <Th align="right" className="whitespace-nowrap"><span title="Active vehicles">Vehicles</span></Th>}
                 {sortTh("Last activity", "last_activity")}
                 <Th className="whitespace-nowrap">Last sync</Th>
                 <Th align="right"><span className="sr-only">Actions</span></Th>
@@ -237,20 +247,20 @@ export const PlatformTenants = () => {
                       </Link>
                     </Td>
                     <Td>
-                      <div className="flex items-center gap-2">
-                        <span className="whitespace-nowrap">{TIER_LABEL[current] ?? String(current).replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase())}</span>
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <span className="truncate whitespace-nowrap" title={TIER_LABEL[current] ?? String(current)}>{TIER_LABEL[current] ?? String(current).replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase())}</span>
                         {mc?.allowed && (
-                          <span title={`MarketCheck scrape ${mc.enabled ? "on" : "granted, dealer not enabled yet"}${mc.last_run_at ? ` · last run ${formatDate(mc.last_run_at)}` : ""}`} className={mc.enabled ? "text-adm-success" : "text-adm-warning"}>
+                          <span title={`MarketCheck scrape ${mc.enabled ? "on" : "granted, dealer not enabled yet"}${mc.last_run_at ? ` · last run ${formatDate(mc.last_run_at)}` : ""}`} className={`shrink-0 ${mc.enabled ? "text-adm-success" : "text-adm-warning"}`}>
                             <Database className="w-5 h-5" aria-hidden="true" />
                           </span>
                         )}
                       </div>
                     </Td>
-                    <Td><StatusText tone={t.is_active ? "success" : "neutral"}>{t.is_active ? "Active" : "Suspended"}</StatusText></Td>
+                    <Td className="whitespace-nowrap"><StatusText tone={t.is_active ? "success" : "neutral"}>{t.is_active ? "Active" : "Suspended"}</StatusText></Td>
                     <Td align="right">{t.member_count}</Td>
-                    {isAdmin && <Td align="right" className="whitespace-nowrap tabular-nums text-adm-muted">{vehicleCountLabel(vehicleCounts, t.id)}</Td>}
-                    <Td className="whitespace-nowrap text-adm-muted">{formatDate(t.last_activity)}</Td>
-                    <Td className="whitespace-nowrap text-adm-muted">{mc?.last_run_at ? formatDate(mc.last_run_at) : "No sync"}</Td>
+                    {isAdmin && <Td align="right" className="whitespace-nowrap tabular-nums text-adm-muted" title={`${vehicleCountLabel(vehicleCounts, t.id)} active vehicles`}>{vehicleCountLabel(vehicleCounts, t.id)}</Td>}
+                    <Td className="truncate whitespace-nowrap text-adm-muted" title={formatDate(t.last_activity)}>{formatDate(t.last_activity)}</Td>
+                    <Td className="truncate whitespace-nowrap text-adm-muted" title={mc?.last_run_at ? formatDate(mc.last_run_at) : "No sync"}>{mc?.last_run_at ? formatDate(mc.last_run_at) : "No sync"}</Td>
                     <Td align="right">
                       <div className="inline-flex items-center gap-1 justify-end">
                         <AdminButton variant="ghost" size="sm" className="px-2" onClick={() => setEditing(t)}>Edit</AdminButton>

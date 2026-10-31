@@ -22,5 +22,5 @@ export function fetchPlatformVehicleCounts(client: DbClient): Promise<Optional<M
 export const vehicleCountLabel = (counts: Optional<Map<string, number>> | undefined, tenantId: string): string => {
   if (!counts || counts.status !== "available") return "—";
   const n = counts.data.get(tenantId) ?? 0;
-  return `${n.toLocaleString("en-US")} active`;
+  return n.toLocaleString("en-US");
 };
