@@ -18,6 +18,15 @@ function subscribePhone(cb: () => void) {
 /** True below the md breakpoint. Used where the phone reference uses different wording, not just a different layout. */
 export const useIsPhone = () => useSyncExternalStore(subscribePhone, () => window.matchMedia(PHONE_QUERY).matches, () => false);
 
+const COMPACT_QUERY = "(max-width: 1023px)";
+function subscribeCompact(cb: () => void) {
+  const mq = window.matchMedia(COMPACT_QUERY);
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+}
+/** True below lg. Screens drawn as stacked cards on tablet use this instead of the md breakpoint. */
+export const useIsCompact = () => useSyncExternalStore(subscribeCompact, () => window.matchMedia(COMPACT_QUERY).matches, () => false);
+
 const TONE_ICON: Record<Tone, ConsoleIconName> = { neutral: "info", good: "check", warn: "warning", bad: "warning", info: "info" };
 
 /** Status chip: icon and text, never colour alone. */
@@ -96,15 +105,15 @@ export const FilterSelect = ({ label, value, options, onChange, className }: { l
 );
 
 /** Phone: fixed bar with a reassurance line and the screen's one action. */
-export const StickyActionBar = ({ children, note = "Read-only monitoring by default" }: { children?: ReactNode; note?: string }) => (
-  <div className="fixed inset-x-0 bottom-0 z-20 flex h-[80px] items-start justify-between border-t border-[#D7E1ED] bg-white px-4 md:hidden">
+export const StickyActionBar = ({ children, note = "Read-only monitoring by default", compact }: { children?: ReactNode; note?: string; compact?: boolean }) => (
+  <div className={cn("fixed inset-x-0 bottom-0 z-20 flex h-[80px] items-start justify-between border-t border-[#D7E1ED] bg-white px-4", !compact && "md:hidden")}>
     <p className="pt-[17px] text-[11px] leading-[16px] text-[#52677C]">{note}</p>
     <div className="mt-[36px]">{children}</div>
   </div>
 );
 
 /** Spacer so the last card is not hidden behind the fixed bar. */
-export const StickyBarSpacer = () => <div aria-hidden="true" className="h-[72px] md:hidden" />;
+export const StickyBarSpacer = ({ compact }: { compact?: boolean }) => <div aria-hidden="true" className={cn("h-[72px]", !compact && "md:hidden")} />;
 
 /** Plain text lines inside a panel, e.g. "Store B: view inventory only". */
 export const PanelLines = ({ lines, className, small }: { lines: { text: string; strong?: boolean }[]; className?: string; small?: boolean }) => (
