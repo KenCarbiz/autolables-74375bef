@@ -99,10 +99,13 @@ Deno.serve(async (req) => {
       // can't read the id back) and advance rotation memory.
       const twoMinAgo = new Date(Date.now() - 2 * 60_000).toISOString();
       const { data: fresh } = await admin.from("leads")
-        .select("id").eq("store_id", row.store_id).eq("vehicle_vin", row.vin)
+        .select("id, routing").eq("store_id", row.store_id).eq("vehicle_vin", row.vin)
         .eq("name", name).gte("created_at", twoMinAgo)
         .order("created_at", { ascending: false }).limit(1);
       const leadId = fresh?.[0]?.id || null;
+      // A group-inventory interest lead carries the sibling vehicle it is about;
+      // routing stays with this (the originating) listing, and that context is kept.
+      const groupInventory = ((fresh?.[0]?.routing ?? null) as { group_inventory?: unknown } | null)?.group_inventory ?? null;
       if (leadId) {
         const isAgentTarget = ["crm_owner", "vehicle_assigned_agent", "sales_rotation"].includes(routing.routingTargetType);
         await admin.from("leads").update({
@@ -114,8 +117,9 @@ Deno.serve(async (req) => {
             routingReason: routing.routingReason,
             displayMode: routing.displayMode,
             afterHours: routing.afterHours,
+            ...(groupInventory ? { group_inventory: groupInventory } : {}),
           },
-          sub_source: String(body.sub_source || "") || null,
+          sub_source: String(body.sub_source || "") || (groupInventory ? "group_inventory" : null),
         }).eq("id", leadId).then(() => {}, () => {});
       }
       if (routing.routingTargetType === "sales_rotation" && routing.routingTargetId) {

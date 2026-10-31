@@ -10,12 +10,25 @@
 
 export type AdmissionReason =
   | "ungated" | "admitted" | "monthly_cap" | "reserve_for_essential" | "tenant_budget"
-  | "unconfigured" | "disabled" | "lane_cap" | "lane_usd_cap" | "unpriced";
+  | "unconfigured" | "disabled" | "lane_cap" | "lane_usd_cap" | "unpriced" | "store_policy" | "account_quota";
 
 const KNOWN_REASONS: readonly AdmissionReason[] = [
   "ungated", "admitted", "monthly_cap", "reserve_for_essential", "tenant_budget",
-  "unconfigured", "disabled", "lane_cap", "lane_usd_cap", "unpriced",
+  "unconfigured", "disabled", "lane_cap", "lane_usd_cap", "unpriced", "store_policy", "account_quota",
 ];
+
+// How a provider answer settles an account reservation (migration 0007). No
+// answer at all, or a server error, may still have been billed: it settles as
+// billing uncertain and is never retried automatically. Explicit refusals
+// (quota, rate, authorization) are not billed. Every other answer, including
+// "no result", is counted as consumed.
+export type Settlement = "consumed" | "no_charge" | "billing_uncertain";
+export function settlementForAnswer(status: number | null | undefined): Settlement {
+  if (status == null || status === 0) return "billing_uncertain";
+  if (status === 429 || status === 401 || status === 403) return "no_charge";
+  if (status >= 500) return "billing_uncertain";
+  return "consumed";
+}
 
 // Fail-closed lanes (proposed migration 20261106000000). The inventory feed
 // and enrichment never share an allowance; a missing, disabled or exhausted
@@ -139,6 +152,10 @@ export interface AdmitResult {
   cap: number | null;
   reserve: number | null;
   reason: AdmissionReason | "gate_unavailable";
+  /** The account-wide reservation (migration 0007), when one was taken. */
+  accountRequestId?: string | null;
+  /** Why the account coordinator refused, when it did. */
+  accountReason?: string | null;
 }
 
 // The RPC answers one row; a missing or malformed answer is an unavailable
