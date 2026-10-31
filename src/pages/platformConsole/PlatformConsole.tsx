@@ -14,6 +14,7 @@ export const CONSOLE_ROUTES: { pattern: string; view: View }[] = [
   { pattern: CONSOLE_BASE, view: lazy(() => import("./views/OverviewView")) },
   // builder B
   { pattern: `${CONSOLE_BASE}/incidents/:incidentId`, view: lazy(() => import("./views/IncidentView")) },
+  { pattern: `${CONSOLE_BASE}/usage`, view: lazy(() => import("./views/UsageView")) },
   // end builder B
 ];
 
