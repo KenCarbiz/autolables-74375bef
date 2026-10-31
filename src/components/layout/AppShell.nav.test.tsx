@@ -165,12 +165,10 @@ describe("AppShell rail rendering", () => {
 
   it.each([
     ["/inventory", ["Inventory", "Inventory Intelligence", "Work Queue"]],
-    ["/queue", ["Inventory", "Inventory Intelligence", "Work Queue"]],
     ["/window-sticker-studio", ["OEM Window Sticker Studio", "Description Operations", "Print Center"]],
-    ["/prep", ["Get Ready Command", "Service Writer Desk", "Service Desk", "Prep & Vendors", "Ready Board", "Recon Approvals"]],
+    ["/get-ready-command", ["Get Ready Command", "Service Writer Desk", "Service Desk", "Prep & Vendors", "Ready Board", "Recon Approvals"]],
     ["/customers", ["Customers", "Deals", "Invoices"]],
-    ["/invoices", ["Customers", "Deals", "Invoices"]],
-  ])("links every former child of the section from the page at %s", (path, labels) => {
+  ])("links every former child of the section from its landing page %s", (path, labels) => {
     renderShell(path);
     const tabs = screen.getByRole("navigation", { name: /pages$/ });
     expect(Array.from(tabs.querySelectorAll("a")).map((a) => a.textContent?.replace(/\s*\([^)]*\)$/, ""))).toEqual(labels);
@@ -228,13 +226,18 @@ describe("AppShell rail rendering", () => {
     expect(within(primaryNav()).getByRole("link", { name: "Administration" })).toBeInTheDocument();
   });
 
-  it("shows a 99+ recon count on the section row and on the Recon Approvals tab", () => {
+  it("shows a 99+ recon count on the section row from a child screen", () => {
     renderShell("/recon");
     const rail = primaryNav();
     expect(within(rail).getByText("99+")).toBeInTheDocument();
     expect(within(rail).getByRole("link", { name: "Get Ready 150 pending in Get Ready" })).toHaveAttribute("href", "/get-ready-command");
     expect(within(rail).queryByRole("link", { name: /Recon Approvals/ })).toBeNull();
-    expect(within(screen.getByRole("navigation", { name: "Get Ready pages" })).getByRole("link", { name: /^Recon Approvals/ })).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByRole("navigation", { name: "Get Ready pages" })).toBeNull();
+  });
+
+  it.each(["/queue", "/prep", "/invoices", "/recon"])("keeps a single header on the child screen %s", (path) => {
+    renderShell(path);
+    expect(screen.queryByRole("navigation", { name: /pages$/ })).toBeNull();
   });
 
   it("rolls a section's queue up onto the section row from the real count", () => {
