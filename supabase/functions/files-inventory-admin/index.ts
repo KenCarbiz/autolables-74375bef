@@ -6,10 +6,13 @@ import {
 } from "../_shared/filescom/policy.ts";
 import { parseCsv } from "../_shared/filescom/csv.ts";
 import { compareIdentity, runDryRun, type TenantProfile } from "../_shared/filescom/dryRun.ts";
+import { PipelineError, partitionDryRun, processImportJob, type Db } from "../_shared/filescom/pipeline.ts";
 
-// Platform-admin console for the Files.com inventory connector (phase 1).
-// Reads Files.com with a read-only key, records connector state, and runs
-// dry-run validation. It never writes vehicle_listings or calls MarketCheck.
+// Platform-admin console for the Files.com inventory connector. Reads
+// Files.com with a read-only key, records connector state, runs dry runs
+// (single-identity and per-partition) and, for an approved feed, Import now.
+// Inventory is written only by inventory_apply_store_snapshot; this function
+// never writes vehicle tables itself and never calls MarketCheck.
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -204,6 +207,32 @@ Deno.serve(async (req) => {
       case "validate":
         if (!key) return json(409, { error: "FILESCOM_API_KEY_missing" });
         return json(200, await validate(db, key, needPath(), userId!));
+      case "partition_dry_run": {
+        if (!key) return json(409, { error: "FILESCOM_API_KEY_missing" });
+        const path = needPath();
+        try { return json(200, await partitionDryRun({ db: db as unknown as Db, key, fetchFn: fetch }, path, userId)); }
+        catch (e) { if (e instanceof PipelineError) throw new FcError(e.code); throw e; }
+      }
+      case "import_now": {
+        if (!key) return json(409, { error: "FILESCOM_API_KEY_missing" });
+        const path = needPath();
+        const enq = await db.rpc("inventory_feed_enqueue", { p_path: path, p_trigger: "manual", p_requested_by: userId, p_event_id: null });
+        if (enq.error) throw new FcError("enqueue_failed");
+        const e = enq.data as { enqueued: boolean; reason?: string; job_id?: string };
+        if (!e.job_id) return json(409, { error: e.reason ?? "not_enqueued" });
+        const { data: claimed, error: cerr } = await db.rpc("inventory_feed_claim_job", { p_job_id: e.job_id, p_lock_seconds: 600 });
+        if (cerr) throw new FcError("claim_failed");
+        const job = (Array.isArray(claimed) ? claimed[0] : null) as { id: string; path: string; lock_token: string; attempts: number; max_attempts: number } | null;
+        if (!job) return json(409, { error: e.reason === "coalesced" ? "job_already_running" : "ingestion_paused_or_job_busy", jobId: e.job_id });
+        try {
+          const out = await processImportJob({ db: db as unknown as Db, key, fetchFn: fetch }, job);
+          return json(200, { jobId: job.id, status: out.status, error: out.error ?? null, result: out.result ?? null });
+        } catch (err) {
+          const code = err instanceof PipelineError ? err.code : "import_error";
+          await db.rpc("inventory_feed_finish_job", { p_job_id: job.id, p_lock_token: job.lock_token, p_status: "failed", p_error: code, p_retryable: true, p_result: null, p_run_id: null, p_version_key: null });
+          return json(502, { error: code, jobId: job.id });
+        }
+      }
       case "search_tenants": {
         const q = typeof body.q === "string" ? body.q.trim().slice(0, 80) : "";
         if (q.length < 2) return json(200, { tenants: [] });

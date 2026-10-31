@@ -65,6 +65,7 @@ describe("opening an Administration screen starts no edge function", () => {
     "/admin/products/:productId/applicability": "/admin/products/product-1/applicability",
     "/admin/customer-experience/escalation": "/admin/customer-experience/escalation",
     "/admin/integrations/files-com": "/admin/integrations/files-com",
+    "/admin/integrations/inventory-network": "/admin/integrations/inventory-network",
     "/admin/customer-experience/preview": "/admin/customer-experience/preview",
     "/admin/documents/print-calibration": "/admin/documents/print-calibration",
     "/admin/integrations/runs/:runId": "/admin/integrations/runs/run-1",

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -108,6 +109,7 @@ export default function FilesComFeedPage() {
       actions={<Button variant="primary" disabled={!d || !config || keyMissing || run.isPending} onClick={() => run.mutate({ action: "discover" })}>Discover files</Button>}
     >
       <div className="space-y-4">
+        <p className="text-[13px] text-adm-muted">Several stores in one feed file? Use the <Link className="font-semibold text-adm-primary hover:underline" to="/admin/integrations/inventory-network">Inventory network console</Link>.</p>
         {notice && <InlineNote tone={notice.tone} title={notice.text} />}
         {q.isError && <InlineNote tone="danger" title="Could not load the connector" action={<Button size="sm" onClick={() => q.refetch()}>Retry</Button>}>{(q.error as Error).message}</InlineNote>}
         {q.isLoading && <SkeletonBlock className="h-64 w-full" />}

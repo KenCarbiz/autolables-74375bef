@@ -173,6 +173,18 @@ export function approvalDecision(b: ApprovalBinding | null, run: ApprovalRun, fi
   if (!run || run.binding_id !== b.id || run.tenant_id !== b.tenant_id) return { ok: false, error: "dry_run_against_proposed_dealer_required" };
   const rep = (run.report ?? null) as { outcome?: unknown; identity?: unknown; identities?: unknown; bindingProposedAt?: unknown; identityReview?: { verdict?: unknown } | null } | null;
   if (run.status !== "passed" || !rep || rep.outcome !== "passed") return { ok: false, error: "dry_run_not_passed" };
+  // Phase 2 partition dry run: the binding only admits the file to the group.
+  // Each dealer partition still needs its own approved store mapping before a
+  // row is imported, so a multi-dealer file is allowed here, but the admin must
+  // explicitly confirm the file belongs to this group.
+  if ((rep as { kind?: unknown }).kind === "partition_dry_run") {
+    if (typeof rep.identities !== "number" || rep.identities < 1) return { ok: false, error: "no_dealer_partitions" };
+    if (rep.bindingProposedAt !== b.proposed_at) return { ok: false, error: "proposal_changed_since_dry_run" };
+    if (!file || file.last_run_id !== run.id || !run.content_sha256 || file.last_content_sha256 !== run.content_sha256) return { ok: false, error: "file_changed_since_dry_run" };
+    if (run.remote_size === null || run.remote_mtime === null || file.remote_size !== run.remote_size || file.remote_mtime !== run.remote_mtime) return { ok: false, error: "file_changed_since_dry_run" };
+    if (acknowledge !== true) return { ok: false, error: "group_membership_not_confirmed" };
+    return { ok: true, review: { partitions: rep.identities }, acknowledged: true };
+  }
   if (!rep.identity || rep.identities !== 1) return { ok: false, error: "dealer_identity_not_single" };
   if (rep.bindingProposedAt !== b.proposed_at) return { ok: false, error: "proposal_changed_since_dry_run" };
   if (!file || file.last_run_id !== run.id || !run.content_sha256 || file.last_content_sha256 !== run.content_sha256) return { ok: false, error: "file_changed_since_dry_run" };
@@ -198,8 +210,14 @@ export function authorizePlatformAdmin(input: { userId: string | null; hasPlatfo
   return { ok: true };
 }
 
-// Phase 1 writes only connector tables. Anything else is a programming error.
-export const CONNECTOR_TABLES = new Set(["inventory_feed_bindings", "inventory_feed_files", "inventory_feed_events", "inventory_feed_runs"]);
+// The connector's TypeScript writes only its own ledger, queue and staging
+// tables. Inventory itself (store_inventory, vehicle_listings) is written only
+// by the SQL function inventory_apply_store_snapshot, inside one transaction
+// per store snapshot. Anything else is a programming error.
+export const CONNECTOR_TABLES = new Set([
+  "inventory_feed_bindings", "inventory_feed_files", "inventory_feed_events", "inventory_feed_runs",
+  "inventory_feed_versions", "inventory_store_snapshots", "inventory_snapshot_vehicles",
+]);
 export function assertConnectorWrite(table: string): void {
   if (!CONNECTOR_TABLES.has(table)) throw new Error(`write_forbidden:${table}`);
 }

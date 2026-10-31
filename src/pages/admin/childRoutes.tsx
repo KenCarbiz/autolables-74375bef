@@ -24,6 +24,7 @@ export const ADMIN_CHILD_ROUTE_ELEMENTS: AdminChildRoute[] = [
   { path: "/admin/integrations/providers/:providerId", element: lazyElement(() => import("./children/ProviderDetailPage")) },
   { path: "/admin/integrations/jobs/:jobId", element: lazyElement(() => import("./children/JobDetailPage")) },
   { path: "/admin/integrations/files-com", element: lazyElement(() => import("./children/FilesComFeedPage")) },
+  { path: "/admin/integrations/inventory-network", element: lazyElement(() => import("./children/InventoryNetworkPage")) },
 ];
 
 export { lazyElement };
