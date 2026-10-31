@@ -99,6 +99,9 @@ describe("deciding whether a partition may be imported", () => {
     expect(shrinkGuard(40, 6).held).toBe(false);
     expect(shrinkGuard(10, 5).held).toBe(false);
     expect(shrinkGuard(40, 25, 90).held).toBe(false);
+    expect(shrinkGuard(6, 5).held).toBe(false);
+    expect(shrinkGuard(6, 5, 20, 2).held).toBe(true);
+    expect(shrinkGuard(6, 1, 20, 2).held).toBe(false);
     const r = partitionFeed(H, [row("MP15397")]);
     if (!r.ok) throw new Error();
     const stock = Array.from({ length: 40 }, (_, i) => ({ vin: `5NMJ${String(i).padStart(13, "0")}`, feed_price: 1, mileage: 1, presence: "present" }));
@@ -213,6 +216,25 @@ describe("import pipeline", () => {
     expect(f.writes).not.toContain("store_inventory");
     expect(f.writes).not.toContain("vehicle_listings");
     expect(files.calls.every((u) => u.startsWith(FILESCOM_ORIGIN))).toBe(true);
+  });
+
+  it("reports a dealer the file delivered before but omits now, and a held snapshot as held", async () => {
+    const body = csvOf([row("MP15397"), row("MP15397")]);
+    const files = fakeFiles(body);
+    const t = seed();
+    t.inventory_store_snapshots = [{ id: "old", path: PATH, source_dealer_id: "MP25214", status: "applied", created_at: "2026-10-30T00:00:00Z" }];
+    const f = fakeDb(t, {
+      inventory_feed_claim_version: () => ({ claimed: true, version_id: "v1" }),
+      inventory_apply_store_snapshot: () => ({ applied: false, reason: "held_for_review", rules: ["absent_vs_live"] }),
+      inventory_feed_finish_job: (a) => a.p_status,
+    });
+    f.tables.inventory_feed_versions = [{ id: "v1" }];
+    const out = await processImportJob({ db: f.db, key: "k", fetchFn: files.fetchFn }, job);
+    const parts = (out.result as { partitions: Array<{ sourceDealerId: string; status: string; reason: string | null }> }).partitions;
+    expect(parts).toEqual([expect.objectContaining({ sourceDealerId: "MP15397", status: "held", reason: "held_for_review" })]);
+    const run = (f.tables.inventory_feed_runs ?? []).at(-1) as { report?: { missingPartitions?: string[] }; failure_reason?: string } | undefined;
+    expect(run?.report?.missingPartitions).toEqual(["MP25214"]);
+    expect(run?.failure_reason).toContain("MP25214:partition_missing");
   });
 
   it("a Files.com-only refresh makes zero MarketCheck calls and reserves no provider quota", async () => {

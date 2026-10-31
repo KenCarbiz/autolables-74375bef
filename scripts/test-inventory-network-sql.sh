@@ -22,4 +22,9 @@ $P -d "$DB" -f drizzle/migrations/0010_store_mapping_review.sql
 $P -d "$DB" -f supabase/tests/inventory_network/40_mapping_review.sql
 $P -d "$DB" -f drizzle/migrations/0012_snapshot_shrink_guard.sql
 $P -d "$DB" -f supabase/tests/inventory_network/50_shrink_guard.sql
+$P -d "$DB" -f drizzle/migrations/0014_inventory_duplicate_reconciliation.sql
+$P -d "$DB" -f supabase/tests/inventory_network/60_dedupe_stub.sql
+$P -d "$DB" -f supabase/tests/inventory_network/61_dedupe.sql
+$P -d "$DB" -f drizzle/migrations/0016_feed_completeness_hold.sql
+$P -d "$DB" -f supabase/tests/inventory_network/70_completeness_hold.sql
 $P -d "$DB" -f supabase/tests/inventory_network/55_feed_completeness.sql

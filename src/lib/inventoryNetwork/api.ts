@@ -56,7 +56,7 @@ export interface StoreInventoryRow {
 }
 
 export interface InventoryVinConflict {
-  id: string; group_id: string; vin: string; kind: "other_store" | "legacy_listing" | "other_store_listing";
+  id: string; group_id: string; vin: string; kind: "other_store" | "legacy_listing" | "other_store_listing" | "archived_listing" | "reconciled_listing_unresolved";
   claiming_store_id: string; existing_store_id: string | null; existing_inventory_id: string | null; existing_listing_id: string | null;
   snapshot_id: string | null; status: "open" | "transferred" | "adopted" | "dismissed";
   first_seen_at: string; last_seen_at: string; resolved_at: string | null; note: string | null;
@@ -71,7 +71,12 @@ export interface InventoryFeedJob {
   last_error: string | null; result: unknown; created_at: string; started_at: string | null; finished_at: string | null;
 }
 
-export type SnapshotStatus = "staged" | "applied" | "quarantined" | "rejected" | "superseded" | "failed";
+export type SnapshotStatus = "staged" | "held" | "applied" | "quarantined" | "rejected" | "superseded" | "failed";
+export interface SnapshotHold {
+  rules: Array<"absent_vs_live" | "count_drop_vs_trusted">; live: number; absent: number; allowed_absent: number;
+  valid: number; trusted_valid: number | null; drop_vs_trusted: number; held_at: string;
+}
+export interface HeldSnapshot { id: string; store_id: string; path: string; source_dealer_id: string; created_at: string; valid_count: number; report: { hold?: SnapshotHold } | null }
 export interface InventoryStoreSnapshot {
   id: string; run_id: string | null; job_id: string | null; path: string; source_dealer_id: string;
   store_id: string | null; group_id: string | null; mapping_id: string | null; clean: boolean;
@@ -212,6 +217,15 @@ export interface ImportPartitionResult {
 export interface ImportNowResult { jobId: string; status: string; result: { partitions: ImportPartitionResult[] } | null }
 
 const RULES: Array<[RegExp, string]> = [
+  [/preview_hash_mismatch/, "That preview changed. Reload it and review the exact version you want to approve."],
+  [/preview_not_eligible/, "This set needs a person's decision outside automatic reconciliation, so it cannot be approved here."],
+  [/preview_not_pending/, "This preview was already approved, applied or invalidated."],
+  [/idempotency_key_reused/, "That request key belongs to another action. Reload and try again."],
+  [/undo_plan_changed/, "The records changed while you were reviewing. Reload the recovery plan."],
+  [/dedupe_detection_disabled/, "Duplicate detection is switched off."],
+  [/listing_reconciled_archived/, "This listing was archived as a duplicate. Use the reviewed recovery flow to reopen it."],
+  [/inventory_dedupe_auto_needs_limits/, "Automatic reconciliation needs owner-approved limits first."],
+  [/batch_previews_must_be_approved/, "Every set in a batch must have an approved, current preview."],
   [/platform_admin_required|permission denied|row-level security|42501/i, "Only platform administrators can do this. Sign in with a platform administrator account."],
   [/could not find the function|schema cache|function public\.\S+ does not exist|relation "?\S+"? does not exist|42883|42P01/i, "The inventory network database update has not been applied to this project yet."],
   [/identity_not_confirmed/, "The address matches but the dealer name differs. Tick the name acknowledgement to approve."],
@@ -347,6 +361,10 @@ export const listFeedControls = () => rows<InventoryFeedControls>(db.from("inven
 export const listFeedJobs = (limit = 100) => rows<InventoryFeedJob>(db.from("inventory_feed_jobs").select("*").order("created_at", { ascending: false }).limit(limit));
 export const listSnapshots = (limit = 100) =>
   rows<InventoryStoreSnapshot>(db.from("inventory_store_snapshots").select("id,run_id,job_id,path,source_dealer_id,store_id,group_id,mapping_id,clean,status,reason,row_count,valid_count,invalid_count,duplicate_count,price_missing_count,photo_missing_count,created_at,applied_at").order("created_at", { ascending: false }).limit(limit));
+export const listHeldSnapshots = (groupId: string) =>
+  rows<HeldSnapshot>(db.from("inventory_store_snapshots").select("id,store_id,path,source_dealer_id,created_at,valid_count,report").eq("group_id", groupId).eq("status", "held").order("created_at", { ascending: false }).limit(50));
+export const resolveHeldSnapshot = (snapshotId: string, action: "apply_full" | "apply_without_absence" | "reject", reason: string) =>
+  rpc<{ applied: boolean; reason?: string }>("inv_admin_resolve_held_snapshot", { p_snapshot_id: snapshotId, p_action: action, p_reason: reason });
 export const listSharingRules = (groupId: string) => rows<InventorySharingRule>(db.from("inventory_sharing_rules").select("*").eq("group_id", groupId).eq("status", "active").order("priority"));
 export const listEnrichmentPolicies = () => rows<StoreEnrichmentPolicy>(db.from("store_enrichment_policies").select("*"));
 export const listProviderUsage = (storeId: string) => rows<StoreProviderUsage>(db.from("store_provider_usage").select("*").eq("store_id", storeId).order("at", { ascending: false }).limit(100));
@@ -532,3 +550,91 @@ export interface MappingPreview {
 
 export const isTestPath = (path: string) => /webhooktest/i.test(path);
 export const isSetupError = (e: unknown) => explainError(e) === friendlyMessage("42883");
+
+// -- Duplicate reconciliation (migration 0014) ---------------------------------
+
+export type DedupeKind = "duplicate_listings" | "unlinked_inventory" | "archived_episode" | "broken_link" | "cross_tenant" | "store_identity";
+export type DedupeDisposition = "eligible" | "needs_review" | "blocked";
+export type DedupeVerb = "KEEP" | "LINK" | "PRESERVE" | "ARCHIVE" | "BLOCKED";
+
+export interface DedupeControls {
+  detection_enabled: boolean; auto_reconcile_enabled: boolean; purge_enabled: boolean; emergency_stop: boolean;
+  max_sets_per_run: number; max_store_share_pct: number; max_unresolved_conflicts: number; max_failures: number;
+  preview_ttl_minutes: number; approval_ttl_minutes: number; limits_approved_at: string | null; reason: string | null; updated_at: string;
+}
+export interface DedupeCandidate {
+  id: string; store_id: string | null; store_name: string | null; vin_suffix: string; kind: DedupeKind; status: "open" | "resolved";
+  disposition: DedupeDisposition; reasons: string[]; first_seen_at: string; last_checked_at: string;
+  summary: { action?: string; canonical_listing_id?: string | null; redundant_listing_ids?: string[]; inventory_id?: string | null; listing_count?: number };
+  vehicle: { year: number | null; make: string | null; model: string | null; trim: string | null; stock_number: string | null } | null;
+  listing_ymm: string | null;
+}
+export interface DedupePreviewRow {
+  id: string; candidate_id: string | null; vin_suffix: string; kind: DedupeKind; action: string; disposition: DedupeDisposition;
+  status: "pending" | "approved" | "applied" | "rejected" | "invalidated"; status_reason: string | null; created_at: string; expires_at: string;
+  approval_expires_at: string | null; plan_sha256: string; applied_operation_id: string | null;
+}
+export interface DedupeOperation {
+  id: string; kind: "apply" | "undo"; status: "applied" | "rejected" | "failed"; reason: string | null; action: string | null; vin_suffix: string;
+  preview_id: string | null; undo_of: string | null; batch_id: string | null; created_at: string; result: Record<string, unknown>; undone: boolean;
+}
+export interface DedupeAlias { alias_listing_id: string; canonical_listing_id: string; vin_suffix: string; alias_slug: string | null; operation_id: string; created_at: string; retired_at: string | null }
+export interface DedupeBatch { batch_id: string; status: string; stop_reason: string | null; total: number; applied: number; failed: number; skipped: number; pending: number }
+export interface DedupeOverview {
+  controls: DedupeControls; policy_version: string; last_checked_at: string | null;
+  store_controls: Array<{ store_id: string; paused: boolean; reason: string | null; updated_at: string }>;
+  candidates: DedupeCandidate[]; previews: DedupePreviewRow[]; operations: DedupeOperation[]; reconciled: DedupeAlias[]; batches: DedupeBatch[];
+}
+export interface DedupeListing {
+  id: string; slug: string | null; status: string; owning_store_id: string | null; inventory_record_id: string | null; feed_source: string | null;
+  ymm: string | null; trim: string | null; condition: string | null; mileage: number | null; price: number | null; created_at: string | null; published_at: string | null;
+  archived_at: string | null; archive_reason: string | null; market_value: number | null; market_checked_at: string | null;
+}
+export interface DedupeScore { protected: number; public_identity: number; evidence: number; side_effect: number; unchecked: number; published: boolean; linked: boolean; established: boolean }
+export interface DedupePlan {
+  policy_version: string; preview_id: string; expires_at: string; generated_at: string; vin_suffix: string; store_name: string | null; kind: DedupeKind;
+  action: string; disposition: DedupeDisposition; reasons: string[]; canonical_listing_id: string | null; redundant_listing_ids: string[]; inventory_id: string | null;
+  listings: DedupeListing[]; inventory: { id: string; presence: string; listing_id: string | null; stock_number: string | null; first_seen_at: string; last_seen_at: string; enrichment_status: string } | null;
+  scores: Record<string, DedupeScore>; decisions: Array<{ record: string; id?: string; verb: DedupeVerb; why: string }>;
+  domains: Array<Record<string, unknown> & { domain: string; authority: string; effective_source: string }>;
+  conflicts: Array<{ field: string; canonical: unknown; redundant: unknown; rule: string }>;
+  blocked_dependencies: Array<{ listing_id: string; table: string; label: string; class: string; count: number | null }>;
+  expected_counts: Record<string, number>; provider_calls: number; storage_operations: number; fingerprint: string;
+}
+export interface DedupePreview {
+  id: string; status: DedupePreviewRow["status"]; status_reason: string | null; plan_sha256: string; expires_at: string; approval_expires_at: string | null;
+  approved_at: string | null; applied_operation_id: string | null; plan: DedupePlan;
+}
+export interface DedupeRecoveryPlan {
+  operation_id?: string; reversible: boolean; reason: string | null; plan_sha256?: string;
+  changed_since?: Array<{ record: string; id: string; changed_fields: string[] }>; restores?: Record<string, string>; not_restored?: string[];
+}
+export interface DedupeApplyResult { applied?: boolean; replayed?: boolean; reason?: string; operation_id?: string; archived_listing_ids?: string[]; canonical_listing_id?: string }
+
+export const getDedupeOverview = (groupId: string) => rpc<DedupeOverview>("inv_dedupe_overview", { p_group_id: groupId });
+export const runDedupeScan = (groupId: string) => rpc<{ candidates: number; checked_at: string }>("inv_dedupe_scan", { p_group_id: groupId });
+export const createDedupePreview = (candidateId: string) => rpc<{ preview_id: string; plan_sha256: string; expires_at: string }>("inv_dedupe_create_preview", { p_candidate_id: candidateId });
+export const getDedupePreview = (previewId: string) => rpc<DedupePreview>("inv_dedupe_get_preview", { p_preview_id: previewId });
+export const approveDedupePreview = (previewId: string, sha: string) => rpc<{ approved: boolean; reason?: string }>("inv_dedupe_approve", { p_preview_id: previewId, p_plan_sha256: sha });
+export const applyDedupePreview = (previewId: string, idempotencyKey: string) => rpc<DedupeApplyResult>("inv_dedupe_apply", { p_preview_id: previewId, p_idempotency_key: idempotencyKey });
+export const getDedupeRecoveryPlan = (operationId: string) => rpc<DedupeRecoveryPlan>("inv_dedupe_recovery_plan", { p_operation_id: operationId });
+export const undoDedupeOperation = (operationId: string, sha: string, idempotencyKey: string) =>
+  rpc<{ undone: boolean; reason?: string }>("inv_dedupe_undo", { p_operation_id: operationId, p_plan_sha256: sha, p_idempotency_key: idempotencyKey });
+export const setDedupeControls = (patch: { detection_enabled?: boolean; emergency_stop?: boolean }, reason: string) => rpc<void>("inv_dedupe_set_controls", { p: { ...patch, reason } });
+export const setDedupeStorePause = (storeId: string, paused: boolean, reason: string) => rpc<void>("inv_dedupe_set_store_pause", { p_store_id: storeId, p_paused: paused, p_reason: reason });
+export const revealDedupeVin = (candidateId: string) => rpc<string>("inv_dedupe_reveal_vin", { p_candidate_id: candidateId });
+export const checkDedupePurge = (listingId: string) => rpc<{ eligible: boolean; reasons: string[]; note: string }>("inv_dedupe_purge_check", { p_listing_id: listingId });
+
+/** One key per preview, kept for the session, so a retry after a timeout replays instead of applying twice. */
+export function dedupeIdempotencyKey(scope: string, id: string): string {
+  const name = `dedupe-key:${scope}:${id}`;
+  try {
+    const existing = sessionStorage.getItem(name);
+    if (existing) return existing;
+    const key = `${scope}:${id}:${crypto.randomUUID()}`;
+    sessionStorage.setItem(name, key);
+    return key;
+  } catch {
+    return `${scope}:${id}:${Date.now()}`;
+  }
+}

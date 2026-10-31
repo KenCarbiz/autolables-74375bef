@@ -92,6 +92,41 @@
       "when": 1793476000000,
       "tag": "0012_snapshot_shrink_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793479495926,
+      "tag": "0013_apply_snapshot_shrink_guard",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793480000001,
+      "tag": "0014_inventory_duplicate_reconciliation",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1793480135797,
+      "tag": "0015_apply_inventory_duplicate_reconciliation",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1793484000000,
+      "tag": "0016_feed_completeness_hold",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793484000001,
+      "tag": "0017_apply_feed_completeness_hold",
+      "breakpoints": true
     }
   ]
 }

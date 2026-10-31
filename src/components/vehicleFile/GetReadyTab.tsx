@@ -18,6 +18,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { VEHICLE_NOTE_ACTION, cleanNote, notesFromAudit, type NoteAuditRow } from "./vehicleNotes";
 import { STATE_LABEL, type LifecycleState } from "@/lib/lifecycle/states";
 import type { ReadinessSummary, VehicleRow } from "./types";
+import { useEntitlements } from "@/hooks/useEntitlements";
+import { canDispatchGetReady } from "@/lib/commandCenter/dispatchAuthority";
+import { clearanceReasonLabel } from "@/lib/service/workspaceStatus";
 
 interface PrepRow {
   id: string;
@@ -115,13 +118,16 @@ const PrepCard = ({ row, onOpen }: { row: PrepRow; onOpen: () => void }) => {
 export const GetReadyTab = ({ vehicle, lifecycle, ready, strip }: { vehicle: VehicleRow; lifecycle: LifecycleResult; ready?: ReadinessSummary; strip?: ReactNode }) => {
   const navigate = useNavigate();
   const { row, loading, error, tracked } = lifecycle;
+  const { user, isAdmin } = useAuth();
+  const { member } = useEntitlements();
+  const canDecide = canDispatchGetReady(member?.role, isAdmin);
+  const [acting, setActing] = useState(false);
   const [prep, setPrep] = useState<PrepRow[]>([]);
   const [gates, setGates] = useState<GateEvent[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [noteRows, setNoteRows] = useState<NoteAuditRow[]>([]);
   const [draft, setDraft] = useState("");
   const [savingNote, setSavingNote] = useState(false);
-  const { user } = useAuth();
   const { tenant } = useTenant();
 
   const loadHistory = useCallback(async () => {
@@ -179,6 +185,39 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready, strip }: { vehicle: Veh
 
   const state = row?.state ?? null;
   const offRail = !!state && OFF_RAIL.includes(state);
+  const stageAction = canDecide && state === "AWAITING_MANAGER_AUTHORIZATION"
+    ? { label: "Authorize for Get Ready", rpc: "authorize_vehicle_for_get_ready" }
+    : canDecide && state === "FINAL_READY_VERIFICATION"
+      ? { label: "Mark retail ready", rpc: "mark_vehicle_retail_ready" }
+      : null;
+
+  const runStageAction = async () => {
+    if (!stageAction) return;
+    setActing(true);
+    try {
+      // deno-lint-ignore no-explicit-any
+      const { data, error: err } = await (supabase as any).rpc(stageAction.rpc, { p_vehicle_id: vehicle.id, p_note: null });
+      if (err) { toast.error(err.message === "not_authorized" ? "Only a manager can complete this stage." : "The stage could not be completed."); return; }
+      if (data?.ok === false) {
+        if (data.reason === "not_cleared") {
+          const blockers = ((data.blockers as string[]) || []).map(clearanceReasonLabel).join(". ");
+          toast.error(blockers ? `Not cleared for delivery: ${blockers}` : "Not cleared for delivery yet.");
+        } else if (data.reason === "not_certified") {
+          toast.error("Licensee certification is still pending on the K-208.");
+        } else if (data.reason === "already_authorized") {
+          toast.error("Already authorized for Get Ready.");
+        } else {
+          toast.error("This stage can't be completed right now.");
+        }
+        return;
+      }
+      toast.success(stageAction.rpc === "mark_vehicle_retail_ready" ? "Vehicle marked retail ready." : "Authorized for Get Ready. Service is notified.");
+      lifecycle.reload();
+      void loadHistory();
+    } finally {
+      setActing(false);
+    }
+  };
   const latestPrep = prep[0] ?? null;
   const unlocked = !!latestPrep?.listing_unlocked;
 
@@ -192,7 +231,12 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready, strip }: { vehicle: Veh
       strip={strip}
       actions={
         <>
-          <Button variant="primary" onClick={() => navigate(`/get-ready-command/${vehicle.id}`)}>
+          {stageAction && (
+            <Button variant="primary" onClick={() => void runStageAction()} disabled={acting}>
+              {acting ? "Saving" : stageAction.label}
+            </Button>
+          )}
+          <Button variant={stageAction ? undefined : "primary"} onClick={() => navigate(`/get-ready-command/${vehicle.id}`)}>
             Open Get Ready Command <ArrowUpRight className="w-5 h-5" />
           </Button>
           <DropdownMenu>
