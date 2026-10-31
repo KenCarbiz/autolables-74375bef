@@ -20,7 +20,8 @@ export const exactIdentity = (over: Partial<IdentitySummary> = {}): IdentitySumm
   vin: VIN, year: 2024, make: "EXAMPLE", model: "CROSSOVER", trim: "TOURING", version: null,
   drivetrain: "AWD", engine: "2.0T", transmission: "AT", exteriorColor: "Blue", interiorColor: "Black",
   mileage: 24_000, matchLevel: "EXACT_VIN", factoryVerified: true, decodeSource: "neovin",
-  providerConfidence: 0.96, freshness: current(), ...over,
+  decodeAuthority: "factory_build", recordSource: "build_oem",
+  providerConfidence: 0.96, providerConfidenceRaw: 96, providerConfidenceScale: "percent_0_100", freshness: current(), ...over,
 });
 
 export const verifiedTitle = (over: Partial<TitleOdometerSummary> = {}): TitleOdometerSummary => ({

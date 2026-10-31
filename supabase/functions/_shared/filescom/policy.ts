@@ -13,7 +13,7 @@ const toHex = (buf: ArrayBuffer): string =>
   Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
 
 export async function sha256Hex(bytes: Uint8Array): Promise<string> {
-  return toHex(await crypto.subtle.digest("SHA-256", bytes));
+  return toHex(await crypto.subtle.digest("SHA-256", bytes as Uint8Array<ArrayBuffer>));
 }
 
 export function constantTimeEqual(a: string, b: string): boolean {
@@ -30,7 +30,7 @@ export async function verifySignatureV2(secret: string | undefined | null, rawBo
   if (!secret) return false;
   if (!header || !/^[0-9a-f]{64}$/.test(header)) return false;
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const expected = toHex(await crypto.subtle.sign("HMAC", key, rawBody));
+  const expected = toHex(await crypto.subtle.sign("HMAC", key, rawBody as Uint8Array<ArrayBuffer>));
   return constantTimeEqual(expected, header);
 }
 

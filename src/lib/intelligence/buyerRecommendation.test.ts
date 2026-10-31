@@ -20,6 +20,10 @@ const score = (n: number | null, applicable = true): VehicleScoreResult => ({
   label: n == null ? null : n >= 90 ? "Outstanding" : n >= 80 ? "Excellent" : n >= 70 ? "Good" : n >= 55 ? "Fair" : "Caution",
   domains: [],
   applicable,
+  publication: !applicable ? "not_applicable" : n == null ? "insufficient_evidence" : "eligible",
+  assessedWeightPct: n == null ? 0 : 100,
+  missingDomains: [],
+  policyVersion: "public-score-policy-v1",
   reasons: [],
 });
 
@@ -168,6 +172,12 @@ describe("insufficient evidence", () => {
     expect(limited.reasons).toContain("Data Confidence is limited");
     const missing = buildBuyerRecommendation({ ...strong(), dataConfidence: null });
     expect(missing.state).toBe("NOT_ENOUGH_VERIFIED_INFORMATION");
+  });
+
+  it("a provisional score below the public evidence minimum cannot carry a recommendation, however high", () => {
+    const r = buildBuyerRecommendation({ ...strong(), vehicleScore: { ...score(99), label: null, publication: "provisional", assessedWeightPct: 35, missingDomains: ["integrity", "condition"] } });
+    expect(r.state).toBe("NOT_ENOUGH_VERIFIED_INFORMATION");
+    expect(r.reasons[0]).toMatch(/provisional/);
   });
 
   it("a score that is not applicable counts as no score", () => {

@@ -167,12 +167,30 @@ export interface IdentitySummary {
   interiorColor: string | null;
   mileage: number | null;
   matchLevel: IdentityMatchLevel;
-  /** True only at EXACT_VIN or EXACT_BUILD. The exact-only claims hang on this. */
+  /**
+   * True only when the VIN is exactly identified AND the decode says its
+   * record came from factory build data (NeoVIN record_source build_oem or
+   * build_specs). A non-generic decode built from listings identifies the VIN
+   * but does not verify the factory build.
+   */
   factoryVerified: boolean;
   decodeSource: DecodeSource;
+  /** Where the decoded record came from, per the provider. */
+  decodeAuthority: DecodeAuthority;
+  /** The provider's record_source value as sent, or null. */
+  recordSource: string | null;
+  /** Normalized to 0-1 by an explicit adapter; null when the raw value or its scale is unknown. */
   providerConfidence: number | null;
+  /** The raw value exactly as stored, and the scale the adapter applied to it. */
+  providerConfidenceRaw: number | string | null;
+  providerConfidenceScale: ConfidenceScale;
   freshness: Freshness;
 }
+
+export type DecodeAuthority = "factory_build" | "listing_derived" | "unknown";
+
+/** "percent_0_100" is NeoVIN record_confidence, documented as max(0, 100 - penalty). */
+export type ConfidenceScale = "percent_0_100" | "unit_0_1" | "unknown";
 
 export interface FactoryPackage { name: string; msrp: number | null; installed: boolean }
 
@@ -457,13 +475,21 @@ export interface ScoreDomainResult {
   missing: string[];
 }
 
+export type ScorePublication = "eligible" | "provisional" | "insufficient_evidence" | "not_applicable";
+
 export interface VehicleScoreResult {
   version: string;
-  /** Null for new vehicles and when no domain could be assessed. */
+  /** Null for new vehicles and when no domain could be assessed. Internal unless publication is eligible. */
   score: number | null;
+  /** Null unless the result meets the public evidence minimum. */
   label: ScoreLabel | null;
   domains: ScoreDomainResult[];
   applicable: boolean;
+  publication: ScorePublication;
+  /** Share of total domain weight that was actually assessed, 0-100. */
+  assessedWeightPct: number;
+  missingDomains: ScoreDomainKey[];
+  policyVersion: string;
   reasons: string[];
 }
 
@@ -553,7 +579,11 @@ export interface UsedPassportReadModel {
   vehicleType: "used";
   vehicle: IdentitySummary;
   media: VehicleMedia;
-  vehicleScore: { score: number | null; label: ScoreLabel | null; version: string; domains: ScoreDomainView[] };
+  /** Score and label are null unless publication is eligible; a provisional file shows its coverage and missing domains instead. */
+  vehicleScore: {
+    score: number | null; label: ScoreLabel | null; version: string; domains: ScoreDomainView[];
+    publication: ScorePublication; assessedWeightPct: number; missingDomains: ScoreDomainKey[];
+  };
   dataConfidence: { level: DataConfidenceLevel; coveragePct?: number; reasons: string[] };
   titleOdometer: TitleOdometerSummary;
   dealerProvenance: ProvenanceSummary;

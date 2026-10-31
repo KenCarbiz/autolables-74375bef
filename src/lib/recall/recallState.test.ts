@@ -358,3 +358,44 @@ describe("the two scopes cannot be confused", () => {
     expect(payload).not.toHaveProperty("open_recall_count");
   });
 });
+
+describe("documented AutoRecalls contract (GET /v2/car/autorecalls/{vin})", () => {
+  const item = (over: Record<string, unknown> = {}, recalls: unknown[] = []) => ({
+    vehicle: { vin: prov.vin, make: "NISSAN", year: 2024, numberOfRecalls: recalls.length, recallsAvailable: true, errorReasonCode: "", ...over },
+    recalls,
+  });
+  const body = (...items: unknown[]) => ({ apiVersion: "2", data: { itemsEffected: items.length, totalItems: items.length, currentItemCount: items.length, items } });
+  const autoRecall = (n: string, recallState = "Incomplete") => ({
+    oemRecallNumber: `OEM-${n}`, nhtsaNumber: n, recallState, recallTitle: "AIR BAGS",
+    recallDescription: "Inflator may rupture.", riskDescription: "Injury risk.", remedyDescription: "Replace inflator.", recallIssueDate: "2026-07-15",
+  });
+
+  it("an answered VIN with an empty recall list is VERIFIED_CLEAR", () => {
+    const a = classifyMarketcheckVinRecall(ok(body(item())), prov);
+    expect(a.state).toBe("VERIFIED_CLEAR");
+  });
+
+  it("an incomplete campaign is OPEN and a completed one is closed", () => {
+    const a = classifyMarketcheckVinRecall(ok(body(item({}, [autoRecall("26V455000"), autoRecall("24V111000", "Complete")]))), prov);
+    expect(a.state).toBe("OPEN");
+    expect(a.openCount).toBe(1);
+    expect(a.closedCount).toBe(1);
+  });
+
+  it("a response for a different VIN is never an answer about this one", () => {
+    const a = classifyMarketcheckVinRecall(ok(body(item({ vin: "1HGCM82633A004352" }))), prov);
+    expect(a.state).toBe("UNKNOWN");
+  });
+
+  it("recallsAvailable false, an error reason, or a count without a list is UNKNOWN, not clear", () => {
+    expect(classifyMarketcheckVinRecall(ok(body(item({ recallsAvailable: false }))), prov).state).toBe("UNKNOWN");
+    expect(classifyMarketcheckVinRecall(ok(body(item({ errorReasonCode: "VIN_NOT_FOUND" }))), prov).state).toBe("UNKNOWN");
+    expect(classifyMarketcheckVinRecall(ok(body(item({ numberOfRecalls: 2 }))), prov).state).toBe("UNKNOWN");
+    expect(classifyMarketcheckVinRecall(ok(body()), prov).state).toBe("UNKNOWN");
+  });
+
+  it("422 (VIN not found / data unavailable) is UNKNOWN", () => {
+    const a = classifyMarketcheckVinRecall({ kind: "response", status: 422, body: { code: 422, message: "VIN not found" } }, prov);
+    expect(a.state).toBe("UNKNOWN");
+  });
+});

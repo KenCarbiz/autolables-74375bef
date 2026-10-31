@@ -14,7 +14,8 @@ const parts = (): AutocurbHandoffParts => ({
   identity: {
     vin: VIN, year: 2025, make: "EXAMPLE", model: "MODEL", trim: "TRIM", version: null, drivetrain: "AWD",
     engine: null, transmission: null, exteriorColor: null, interiorColor: null, mileage: 41287,
-    matchLevel: "EXACT_VIN", factoryVerified: true, decodeSource: "neovin", providerConfidence: 0.98, freshness: fresh,
+    matchLevel: "EXACT_VIN", factoryVerified: true, decodeSource: "neovin",
+    decodeAuthority: "factory_build", recordSource: "build_oem", providerConfidence: 0.98, providerConfidenceRaw: 98, providerConfidenceScale: "percent_0_100", freshness: fresh,
   },
   mileage: { current: 41287, observedAt: "2026-10-27T00:00:00Z", source: "feed", authority: "provider_listing", chronologyConsistent: true },
   titleOdometer: {

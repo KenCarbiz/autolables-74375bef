@@ -19,6 +19,10 @@ const vehicleScore = (): VehicleScoreResult => ({
   score: 94,
   label: "Outstanding",
   applicable: true,
+  publication: "eligible",
+  assessedWeightPct: 100,
+  missingDomains: [],
+  policyVersion: "public-score-policy-v1",
   reasons: [],
   domains: [
     { key: "integrity", weight: 35, score: 96, evidence: ["no_adverse_title_brand_reported"], adverse: [], missing: [] },
@@ -153,6 +157,7 @@ describe("the used passport read model", () => {
         { key: "provenance", score: 95, weight: 20 },
         { key: "documentation_safety", score: 90, weight: 15 },
       ],
+      publication: "eligible", assessedWeightPct: 100, missingDomains: [],
     });
     expect(m.dataConfidence).toEqual({ level: "high", coveragePct: 97, reasons: ["exact_identity", "all_domains_assessed"] });
     expect(m.marketValue).toBe(inputs().marketValue === m.marketValue ? m.marketValue : m.marketValue);

@@ -46,19 +46,10 @@ const MC_BASE = "https://api.marketcheck.com/v2";
 // VIN: 17 chars, letters/digits, excluding I, O, Q.
 const validVin = (vin: string) => /^[A-HJ-NPR-Z0-9]{17}$/i.test(vin);
 
-// Candidate MarketCheck recall endpoints (the path/host has moved across API
-// generations; we try each until one answers so the feature works without a
-// docs round-trip, and report which one matched for diagnostics).
-const recallEndpoints = (vin: string): string[] => {
-  const k = encodeURIComponent(MC_KEY);
-  const v = encodeURIComponent(vin);
-  return [
-    `${MC_BASE}/recall/car/${v}?api_key=${k}`,
-    `https://mc-api.marketcheck.com/v2/recall/car/${v}?api_key=${k}`,
-    `${MC_BASE}/recall/car?api_key=${k}&vin=${v}`,
-    `${MC_BASE}/recalls/car/${v}?api_key=${k}`,
-  ];
-};
+// The documented AutoRecalls contract, and only that. The old ladder guessed
+// four paths and could spend up to four calls per VIN on 404s.
+const recallEndpoints = (vin: string): string[] =>
+  [`${MC_BASE}/car/autorecalls/${encodeURIComponent(vin)}?api_key=${encodeURIComponent(MC_KEY)}`];
 const redact = (u: string) => u.replace(/api_key=[^&]+/, "api_key=***");
 
 const httpGet: HttpGet = async (url) => {

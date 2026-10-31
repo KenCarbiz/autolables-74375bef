@@ -5,7 +5,7 @@ import {
   type VehicleScoreInput,
 } from "./vehicleScore";
 import {
-  exactIdentity, fullInput, inspectedCondition, knownProvenance, recall, thinInput, unknownCondition, verifiedTitle,
+  exactIdentity, fullInput, inspectedCondition, knownProvenance, recall, thinInput, unknownCondition, unknownRecall, unverifiedTitle, verifiedTitle,
 } from "./scoreFixtures.test";
 
 const domain = (r: ReturnType<typeof buildVehicleScore>, key: string) => r.domains.find((d) => d.key === key)!;
@@ -58,13 +58,42 @@ describe("weights and renormalization", () => {
 });
 
 describe("missing evidence does not lower the score", () => {
-  it("a thin file and a full file with no adverse findings land on the same score", () => {
+  it("a thin file is not assessed: an unchecked title and odometer are not a clean 100", () => {
     const full = buildVehicleScore(fullInput());
     const thin = buildVehicleScore(thinInput());
     expect(full.score).toBe(100);
-    expect(thin.score).toBe(100);
-    expect(thin.reasons.some((x) => x.startsWith("weights_renormalized"))).toBe(true);
+    expect(full.publication).toBe("eligible");
+    expect(full.label).not.toBeNull();
+    expect(thin.score).toBeNull();
+    expect(thin.label).toBeNull();
+    expect(thin.publication).toBe("insufficient_evidence");
+    expect(thin.assessedWeightPct).toBe(0);
+    expect(thin.missingDomains).toEqual(["integrity", "condition", "provenance", "documentation_safety"]);
+    expect(domain(thin, "integrity").score).toBeNull();
     expect(domain(thin, "integrity").missing).toEqual(["title_not_verified", "odometer_not_checked"]);
+  });
+
+  it("a partial file keeps an internal score but carries no public label", () => {
+    const partial = buildVehicleScore(fullInput({ titleOdometer: unverifiedTitle(), condition: unknownCondition() }));
+    expect(partial.score).not.toBeNull();
+    expect(partial.label).toBeNull();
+    expect(partial.publication).toBe("provisional");
+    expect(partial.missingDomains).toEqual(["integrity", "condition"]);
+    expect(partial.assessedWeightPct).toBe(35);
+    expect(partial.reasons).toContain("public_ineligible:required_domain_not_assessed:integrity");
+  });
+
+  it("documents alone cannot assess the safety domain without an answered VIN recall check", () => {
+    const r = buildVehicleScore(fullInput({ recall: unknownRecall() }));
+    expect(domain(r, "documentation_safety").score).toBeNull();
+    expect(r.publication).toBe("provisional");
+    expect(r.label).toBeNull();
+  });
+
+  it("an adverse odometer finding still lowers integrity when the title is unchecked", () => {
+    const r = buildVehicleScore(fullInput({ titleOdometer: { ...unverifiedTitle(), odometerStatus: "conflict" } }));
+    expect(domain(r, "integrity").score).toBe(100 - SCORE_DEDUCTIONS.integrity.odometerConflict);
+    expect(r.label).toBeNull();
   });
 
   it("a documentation fact known to be absent is evidence, not a finding", () => {

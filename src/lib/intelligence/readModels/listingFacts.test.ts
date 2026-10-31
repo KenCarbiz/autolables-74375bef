@@ -55,6 +55,40 @@ describe("helpers", () => {
 });
 
 describe("identity", () => {
+  it("an exact VIN decoded from listings identifies the VIN but is not factory verified", () => {
+    const id = identityFromRow(withAttrs({ build_sheet: { ...exactSheet(), taxonomy: { record_source: "used_mc_listing" } } }), NOW);
+    expect(id.matchLevel).toBe("EXACT_VIN");
+    expect(id.decodeAuthority).toBe("listing_derived");
+    expect(id.factoryVerified).toBe(false);
+    const unknownSource = identityFromRow(withAttrs({ build_sheet: { ...exactSheet(), taxonomy: undefined } }), NOW);
+    expect(unknownSource.decodeAuthority).toBe("unknown");
+    expect(unknownSource.factoryVerified).toBe(false);
+  });
+
+  it("a basic decoder answer is a trim-line match, never an exact VIN build", () => {
+    const id = identityFromRow(withAttrs({ build_sheet: { ...exactSheet(), source: "basic_decode", request_tier: "basic_decoder" } }), NOW);
+    expect(id.matchLevel).toBe("YMMT");
+    expect(id.decodeSource).toBe("basic_decode");
+    expect(id.factoryVerified).toBe(false);
+  });
+
+  it("normalizes NeoVIN record_confidence from its documented 0-100 scale and keeps the raw value", () => {
+    const id = identityFromRow(withAttrs({ neovin_confidence: { record_confidence: 65 } }), NOW);
+    expect(id.providerConfidence).toBe(0.65);
+    expect(id.providerConfidenceRaw).toBe(65);
+    expect(id.providerConfidenceScale).toBe("percent_0_100");
+  });
+
+  it("an out-of-range or categorical confidence keeps its raw form with no numeric reading", () => {
+    const big = identityFromRow(withAttrs({ neovin_confidence: { record_confidence: 140 } }), NOW);
+    expect(big.providerConfidence).toBeNull();
+    expect(big.providerConfidenceRaw).toBe(140);
+    expect(big.providerConfidenceScale).toBe("unknown");
+    const cat = identityFromRow(withAttrs({ neovin_confidence: { record_confidence: undefined, trim_confidence: "equipment_code" } }), NOW);
+    expect(cat.providerConfidence).toBeNull();
+    expect(cat.providerConfidenceScale).toBe("unknown");
+  });
+
   it("is EXACT_VIN and factory verified on an exact NeoVIN sheet", () => {
     const id = identityFromRow(usedRow(), NOW);
     expect(id.matchLevel).toBe("EXACT_VIN");
@@ -227,8 +261,12 @@ describe("warranty", () => {
   it("says why remaining coverage is not calculated when no in-service date exists", () => {
     const w = warrantyFromRow({ ...usedRow(), in_service_date: null }, NOW);
     expect(w.remainingCoverage).toBe("not_calculated_without_in_service_date");
+    // A listing-history date is advertising chronology, never a warranty start.
     const fromHistory = warrantyFromRow({ ...usedRow(), in_service_date: null, history_payload: { inServiceDate: "2025-04-01" } }, NOW);
-    expect(fromHistory.inServiceDate).toBe("2025-04-01");
+    expect(fromHistory.inServiceDate).toBeNull();
+    const proxyColumn = warrantyFromRow({ ...usedRow(), in_service_date: "2025-04-01", history_payload: { firstSeen: "2025-04-01T10:00:00Z" } }, NOW);
+    expect(proxyColumn.inServiceDate).toBeNull();
+    expect(proxyColumn.remainingCoverage).toBe("not_calculated_without_in_service_date");
   });
 
   it("falls back to the stored warranty_info and is unknown without either", () => {

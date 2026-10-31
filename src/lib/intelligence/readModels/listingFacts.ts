@@ -16,6 +16,7 @@
 //   - the provider's sold figures are inferred and the summary says so;
 //   - raw provider payloads are read here and never copied into a summary.
 
+import { verifiedInServiceDate } from "../../warranty/inServiceEvidence.ts";
 import { capability } from "../../market/providerRegistry.ts";
 import { isExactIdentity, mayClaim, type IdentityMatchLevel } from "../../market/identityMatch.ts";
 import { COHORT_MATCH_LEVELS, type CohortMatchLevel } from "../../market/cohortLadder.ts";
@@ -26,7 +27,7 @@ import {
 import {
   resolveFreshness,
   type AvailabilityState, type AvailabilitySummary, type DealerOfferSummary, type DecodeSource, type FactoryPackage,
-  type Freshness, type IdentitySummary, type IncentiveSummary, type MarketContextSummary, type MarketTrend,
+  type DecodeAuthority, type Freshness, type IdentitySummary, type IncentiveSummary, type MarketContextSummary, type MarketTrend,
   type MsrpBreakdown, type PriceChannel, type PriceChannelObservation, type PriceIntegritySummary, type PublicState,
   type RecallSummary, type SalesVelocity, type VehicleMedia, type VinRecallContractState, type WarrantySummary,
   type WarrantyTerm,
@@ -161,18 +162,38 @@ const buildSheetOf = (mc: Bag): Bag | null => {
   return sheet && typeof sheet === "object" && !Array.isArray(sheet) ? (sheet as Bag) : null;
 };
 
-const decodeLevel = (sheet: Bag | null): IdentityMatchLevel | null =>
-  sheet == null ? null : sheet.generic === true ? "GENERIC_CANDIDATE" : "EXACT_VIN";
+const isBasicDecode = (sheet: Bag): boolean => sheet.source === "basic_decode" || sheet.request_tier === "basic_decoder";
 
-/** NeoVIN reports several confidences; the record-level one describes the decode as a whole. */
-const providerConfidenceOf = (mc: Bag, sheet: Bag): number | null => {
+/** A basic decoder answer names the trim line, not this VIN's build. */
+const decodeLevel = (sheet: Bag | null): IdentityMatchLevel | null =>
+  sheet == null ? null : sheet.generic === true ? "GENERIC_CANDIDATE" : isBasicDecode(sheet) ? "YMMT" : "EXACT_VIN";
+
+/**
+ * NeoVIN record_confidence is the only numeric whole-record confidence, and the
+ * data dictionary defines it as max(0, 100 - penalty): a 0-100 scale. The
+ * other *_confidence fields are categorical strings (equipment_code, single,
+ * mc_build_specs) and are not numbers to compare. A value outside the declared
+ * range keeps its raw form with no numeric interpretation.
+ */
+export function decodeConfidenceOf(mc: Bag, sheet: Bag): Pick<IdentitySummary, "providerConfidence" | "providerConfidenceRaw" | "providerConfidenceScale"> {
   const c = { ...bag(sheet.confidence), ...bag(mc.neovin_confidence) };
-  for (const k of ["record_confidence", "listing_confidence", "trim_confidence"]) {
-    const n = num(c[k]);
-    if (n != null) return n;
-  }
-  return null;
-};
+  const raw = c.record_confidence;
+  const rawOut = typeof raw === "number" || typeof raw === "string" ? raw : null;
+  const n = num(raw);
+  if (n == null || n < 0 || n > 100) return { providerConfidence: null, providerConfidenceRaw: rawOut, providerConfidenceScale: "unknown" };
+  return { providerConfidence: n / 100, providerConfidenceRaw: rawOut, providerConfidenceScale: "percent_0_100" };
+}
+
+const recordSourceOf = (mc: Bag, sheet: Bag): string | null =>
+  str(bag(sheet.taxonomy).record_source) ?? str(bag(mc.taxonomy).record_source);
+
+/** build_oem / build_specs are factory build data; *_mc_listing records are assembled from listings. */
+export function decodeAuthorityOf(recordSource: string | null): DecodeAuthority {
+  const v = (recordSource ?? "").toLowerCase();
+  if (/^build_(oem|specs)/.test(v)) return "factory_build";
+  if (v.includes("listing")) return "listing_derived";
+  return "unknown";
+}
 
 const colorName = (v: unknown): string | null => (typeof v === "string" ? str(v) : str(bag(v).name));
 
@@ -186,7 +207,7 @@ export function identityFromRow(row: ListingRowLike, nowMs: number): IdentitySum
   const decoded = decodeLevel(sheet);
   if (decoded != null) {
     matchLevel = decoded;
-    decodeSource = "neovin";
+    decodeSource = sheet && isBasicDecode(sheet) ? "basic_decode" : "neovin";
   } else if (year != null && make && model) {
     matchLevel = "YMM";
     decodeSource = Object.keys(mc).length ? "feed" : "none";
@@ -195,6 +216,8 @@ export function identityFromRow(row: ListingRowLike, nowMs: number): IdentitySum
     decodeSource = "none";
   }
 
+  const recordSource = sheet ? recordSourceOf(mc, sheet) : null;
+  const decodeAuthority: DecodeAuthority = sheet && !isBasicDecode(sheet) ? decodeAuthorityOf(recordSource) : "unknown";
   const exact = sheet != null && mayClaim("exact_trim_version_identity", matchLevel);
   const colors: Bag = exact ? bag(sheet.colors) : {};
   return {
@@ -211,9 +234,11 @@ export function identityFromRow(row: ListingRowLike, nowMs: number): IdentitySum
     interiorColor: colorName(colors.interior) ?? str(mc.interior_color) ?? str(mc.base_int_color),
     mileage: num(row.mileage),
     matchLevel,
-    factoryVerified: isExactIdentity(matchLevel),
+    factoryVerified: isExactIdentity(matchLevel) && decodeAuthority === "factory_build",
     decodeSource,
-    providerConfidence: sheet ? providerConfidenceOf(mc, sheet) : null,
+    decodeAuthority,
+    recordSource,
+    ...(sheet ? decodeConfidenceOf(mc, sheet) : { providerConfidence: null, providerConfidenceRaw: null, providerConfidenceScale: "unknown" as const }),
     freshness: freshnessOf(sheet ? str(sheet.decoded_at) : null, READ_MODEL_TTL_DAYS.factoryDecode, nowMs),
   };
 }
@@ -379,7 +404,8 @@ export function warrantyFromRow(row: ListingRowLike, nowMs: number): WarrantySum
   const mc = bag(row.mc_attributes);
   const history = bag(row.history_payload);
   const info = bag(row.warranty_info);
-  const inServiceDate = str(row.in_service_date) ?? str(history.inServiceDate) ?? str(info.in_service_date);
+  // Listing history (first advertised / first seen) never starts a warranty.
+  const inServiceDate = verifiedInServiceDate(row.in_service_date, history) ?? verifiedInServiceDate(info.in_service_date, history);
   // Remaining coverage needs a computation this contract has no fields for
   // yet, so a dated vehicle reports unknown rather than a figure.
   const remaining = (terms: WarrantyTerm[]): WarrantySummary["remainingCoverage"] =>

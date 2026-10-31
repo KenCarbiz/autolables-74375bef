@@ -14,6 +14,7 @@ $P -d "$DB" -f drizzle/migrations/0004_filescom_inventory_connector.sql
 $P -d "$DB" -f drizzle/migrations/0006_multistore_inventory_network.sql
 $P -d "$DB" -f drizzle/migrations/0007_marketcheck_pilot_coordinator.sql
 $P -d "$DB" -f drizzle/migrations/0008_marketcheck_bulk_feeds.sql
+$P -d "$DB" -f supabase/manual/files_inventory_worker_schedule.sql
 $P -d "$DB" -f supabase/tests/inventory_network/10_behaviour.sql
 $P -d "$DB" -f supabase/tests/inventory_network/20_pilot_coordinator.sql
 $P -d "$DB" -f supabase/tests/inventory_network/30_bulk_feeds.sql

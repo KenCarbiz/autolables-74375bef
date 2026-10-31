@@ -42,7 +42,7 @@ an explicit platform-admin action.
 5. **Dry run all six feeds** with `Dry run` in the console.
 6. **Map and approve** each DealerId to its store; approve each file binding.
 7. **Resume ingestion** in the console and run `Import now` per approved feed.
-8. **Schedule the worker** once imports look right:
+8. **Schedule the worker** once imports look right: first run `supabase/manual/files_inventory_worker_schedule.sql` in the Supabase SQL editor (it reads Vault, so the Lovable migration tool will not apply it), then
    `select schedule_files_inventory_worker('*/10 * * * *');` (needs the Vault
    entries `supabase_url` and `service_role_key`, same as the MarketCheck sync).
    Then turn on Reconciliation in the console. To stop: `select unschedule_files_inventory_worker();`
