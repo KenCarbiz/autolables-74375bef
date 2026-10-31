@@ -128,6 +128,20 @@ export default function InventoryFeedView() {
 
   return (
     <div className="space-y-4">
+      {viewer.isAdmin && (
+        <AdminCard>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-[16px] leading-6 font-semibold text-adm-ink">Files.com inventory network</h2>
+              <p className="mt-1 text-[13px] leading-5 text-adm-muted">Manage store assignments, feed mapping and import runs. The MarketCheck sync details are below.</p>
+            </div>
+            <AdminLinkButton to="/admin/integrations/inventory-network" variant="outline">
+              <Database className="h-4 w-4" aria-hidden="true" />
+              Open inventory network
+            </AdminLinkButton>
+          </div>
+        </AdminCard>
+      )}
       {banner && (
         <FeedBanner
           verdict={banner}
