@@ -36,6 +36,13 @@
       "when": 1793382488986,
       "tag": "0004_filescom_inventory_connector",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793430364871,
+      "tag": "0005_v2_approved_fields",
+      "breakpoints": true
     }
   ]
 }

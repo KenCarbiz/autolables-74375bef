@@ -110,7 +110,7 @@ export async function assignComplianceOwner(
       client.rpc("assign_compliance_issue_owner", {
         p_tenant_id: args.tenantId,
         p_issue_key: args.issueKey,
-        p_owner_user_id: args.ownerUserId,
+        p_owner_user_id: args.ownerUserId ?? undefined,
       }),
     (data) => {
       const changed = data && typeof data === "object" && !Array.isArray(data) ? (data as { changed?: unknown }).changed : undefined;

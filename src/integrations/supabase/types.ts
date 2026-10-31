@@ -11561,7 +11561,7 @@ export type Database = {
       assign_compliance_issue_owner: {
         Args: {
           p_issue_key: string
-          p_owner_user_id?: string | null
+          p_owner_user_id?: string
           p_tenant_id: string
         }
         Returns: Json
