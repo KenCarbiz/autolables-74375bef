@@ -7746,6 +7746,108 @@ export type Database = {
         }
         Relationships: []
       }
+      passport_payment_estimator_settings: {
+        Row: {
+          config: Json
+          created_at: string
+          enabled: boolean
+          last_request_id: string | null
+          store_id: string
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+          version: number
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          enabled?: boolean
+          last_request_id?: string | null
+          store_id: string
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          enabled?: boolean
+          last_request_id?: string | null
+          store_id?: string
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "passport_payment_estimator_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "passport_payment_estimator_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      passport_payment_estimator_versions: {
+        Row: {
+          actor: string | null
+          config: Json
+          created_at: string
+          id: string
+          prev_config: Json | null
+          request_id: string | null
+          store_id: string
+          tenant_id: string
+          version: number
+        }
+        Insert: {
+          actor?: string | null
+          config: Json
+          created_at?: string
+          id?: string
+          prev_config?: Json | null
+          request_id?: string | null
+          store_id: string
+          tenant_id: string
+          version: number
+        }
+        Update: {
+          actor?: string | null
+          config?: Json
+          created_at?: string
+          id?: string
+          prev_config?: Json | null
+          request_id?: string | null
+          store_id?: string
+          tenant_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "passport_payment_estimator_versions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "passport_payment_estimator_versions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       passport_sms_verifications: {
         Row: {
           attempts: number
@@ -13609,6 +13711,16 @@ export type Database = {
         Args: { _doc: Json; _vehicle_id: string }
         Returns: Json
       }
+      apply_payment_estimator_settings: {
+        Args: {
+          _base_version: number
+          _config: Json
+          _request_id: string
+          _store_id: string
+          _tenant_id: string
+        }
+        Returns: Json
+      }
       approve_description_version: {
         Args: {
           p_approve?: boolean
@@ -14750,6 +14862,11 @@ export type Database = {
       oem_franchise_min_new_units: { Args: never; Returns: number }
       oem_make_from_ymm: { Args: { _ymm: string }; Returns: string }
       operating_metrics: { Args: { p_tenant_id: string }; Returns: Json }
+      payment_estimator_config_errors: {
+        Args: { _config: Json }
+        Returns: string[]
+      }
+      payment_estimator_num: { Args: { v: Json }; Returns: number }
       platform_vehicle_counts: {
         Args: never
         Returns: {
