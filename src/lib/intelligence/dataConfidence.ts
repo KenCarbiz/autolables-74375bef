@@ -11,7 +11,7 @@
 // confidence are different conclusions, and the public surface shows the
 // level, not a percentage that would read as false precision.
 
-import { identityConfidenceCeiling, type IdentityConfidenceCeiling } from "../market/identityMatch.ts";
+import { identityConfidenceCeiling, isExactIdentity as isExactLevel, type IdentityConfidenceCeiling } from "../market/identityMatch.ts";
 import {
   SCORE_DOMAINS,
   type ConditionSummary, type DataConfidenceLevel, type DataConfidenceResult, type Freshness,
@@ -46,7 +46,7 @@ export const DATA_CONFIDENCE_RULES = {
   /** Coverage points removed per unresolved conflict, and the most removed. */
   conflictPenalty: 10,
   conflictPenaltyCap: 30,
-  /** Below this factory-decode confidence the identity evidence is discounted. */
+  /** Below this normalized (0-1) factory-decode confidence the identity evidence is discounted. */
   providerConfidenceFloor: 0.7,
   providerConfidencePenalty: 5,
 } as const;
@@ -149,9 +149,17 @@ export function buildDataConfidence(input: DataConfidenceInput, options: DataCon
     pct -= Math.min(rules.conflictPenaltyCap, conflicts.length * rules.conflictPenalty);
     reasons.push(`unresolved_conflicts:${conflicts.length}`);
   }
-  if (input.identity.providerConfidence != null && input.identity.providerConfidence < rules.providerConfidenceFloor) {
+  // providerConfidence is already normalized to 0-1 by the identity adapter;
+  // a raw value of unknown scale is never compared with the floor.
+  const idc = input.identity;
+  if (idc.providerConfidence != null && idc.providerConfidenceScale !== "unknown" && idc.providerConfidence < rules.providerConfidenceFloor) {
     pct -= rules.providerConfidencePenalty;
-    reasons.push(`factory_decode_confidence_low:${input.identity.providerConfidence}`);
+    reasons.push(`factory_decode_confidence_low:${idc.providerConfidence}`);
+  } else if (idc.providerConfidenceRaw != null && idc.providerConfidenceScale === "unknown") {
+    reasons.push("factory_decode_confidence_scale_unknown");
+  }
+  if (input.vehicleType === "used" && isExactLevel(idc.matchLevel) && idc.decodeAuthority !== "factory_build") {
+    reasons.push(`decode_not_factory_build:${idc.decodeAuthority}`);
   }
   if (staleFacts.length) reasons.push(`stale_facts:${staleFacts.length}`);
   pct = Math.max(0, Math.min(100, pct));

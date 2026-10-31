@@ -4,8 +4,9 @@
 // scored from its own evidence and nothing else. The score describes the
 // vehicle; it has no input for the market, the asking price, demand or a deal
 // rating, so none of them can move it. Absence of evidence is not a finding:
-// a domain nobody has assessed is null and drops out of the weighted total,
-// and Data Confidence (dataConfidence.ts) is where that absence shows.
+// a domain nobody has assessed is null, the result reports the assessed share
+// of weight and the missing domains beside the score, and a result below the
+// public evidence minimum carries no label (PUBLIC_SCORE_POLICY).
 //
 // Only an actual adverse finding lowers a domain: a title brand, an odometer
 // conflict, an open recall, a major condition item. New vehicles get no used
@@ -19,7 +20,7 @@ import {
   type ScoreDomainKey, type ScoreDomainResult, type ScoreLabel, type TitleOdometerSummary, type VehicleScoreResult,
 } from "./contracts.ts";
 
-export const VEHICLE_SCORE_VERSION = "vehicle-score-v1.0.0-shadow";
+export const VEHICLE_SCORE_VERSION = "vehicle-score-v1.1.0-shadow";
 
 export interface DocumentationFacts {
   serviceRecordCount: number | null;
@@ -135,6 +136,11 @@ function integrityDomain(identity: IdentitySummary, title: TitleOdometerSummary)
     default: d.missing.push("odometer_not_checked");
   }
 
+  // Integrity is assessed by an answered title check. Without one, an actual
+  // adverse finding still lowers the domain, but nothing else may stand in
+  // for a clean title: an unchecked title and odometer are not a 100.
+  const titleAnswered = !d.missing.includes("title_not_verified");
+  if (!titleAnswered && !d.adverse.length) return d;
   d.score = clamp(100 - deduction);
   return d;
 }
@@ -226,13 +232,14 @@ function documentationSafetyDomain(recall: RecallSummary, docs: DocumentationFac
   }
   if (recall.doNotDrive) { assessed = true; deduction += r.doNotDrive; d.adverse.push("do_not_drive"); }
 
+  // Documents add depth to the domain but cannot assess it on their own: the
+  // safety half needs an answered VIN recall check (or a do-not-drive notice).
   const doc = (present: boolean | null, key: string) => {
     if (present == null) { d.missing.push(`${key}_unknown`); return; }
-    assessed = true;
     d.evidence.push(present ? key : `${key}_absent`);
   };
   if (docs.serviceRecordCount == null) d.missing.push("service_records_unknown");
-  else { assessed = true; d.evidence.push(`service_records:${docs.serviceRecordCount}`); }
+  else d.evidence.push(`service_records:${docs.serviceRecordCount}`);
   doc(docs.inspectionEvidenceOnFile, "inspection_evidence_on_file");
   doc(docs.warrantyDocumented, "warranty_documented");
   doc(docs.windowStickerOnFile, "window_sticker_on_file");
@@ -242,17 +249,48 @@ function documentationSafetyDomain(recall: RecallSummary, docs: DocumentationFac
   return d;
 }
 
+/**
+ * Minimum evidence for a PUBLIC overall score and label (policy v1). Below it
+ * the score is an internal, provisional assessment: computed, explained, and
+ * never shown to a customer as a rating.
+ */
+export const PUBLIC_SCORE_POLICY = {
+  version: "public-score-policy-v1",
+  requiredDomains: ["integrity", "condition", "documentation_safety"] as ScoreDomainKey[],
+  /** Share of total weight that must be assessed. */
+  minAssessedWeightPct: 85,
+} as const;
+
+function publicEligibility(domains: ScoreDomainResult[], input: VehicleScoreInput): { eligible: boolean; reasons: string[] } {
+  const reasons: string[] = [];
+  const by = Object.fromEntries(domains.map((d) => [d.key, d])) as Record<ScoreDomainKey, ScoreDomainResult>;
+  for (const key of PUBLIC_SCORE_POLICY.requiredDomains) {
+    if (by[key]?.score == null) reasons.push(`required_domain_not_assessed:${key}`);
+  }
+  if (input.titleOdometer.state !== "VERIFIED_NO_ADVERSE_REPORTED" && input.titleOdometer.state !== "REVIEW_REQUIRED"
+      && !(input.titleOdometer.titleBrandsReported.length || input.titleOdometer.junkSalvageTotalLossReported.length)) {
+    reasons.push("title_not_verified");
+  }
+  if (input.condition.state !== "verified") reasons.push(`condition_${input.condition.state}`);
+  const total = domains.reduce((a, d) => a + d.weight, 0);
+  const assessed = domains.filter((d) => d.score != null).reduce((a, d) => a + d.weight, 0);
+  const pct = total > 0 ? (assessed / total) * 100 : 0;
+  if (pct < PUBLIC_SCORE_POLICY.minAssessedWeightPct) reasons.push(`assessed_weight_below_minimum:${Math.round(pct)}`);
+  return { eligible: reasons.length === 0, reasons };
+}
+
 export function buildVehicleScore(input: VehicleScoreInput, options: VehicleScoreOptions = {}): VehicleScoreResult {
   const bands = { ...DEFAULT_SCORE_LABEL_BANDS, ...(options.labelBands ?? {}) };
   const weights: Record<ScoreDomainKey, number> = { ...SCORE_WEIGHTS, ...(options.weights ?? {}) };
 
+  const empty = { assessedWeightPct: 0, missingDomains: [] as ScoreDomainKey[], policyVersion: PUBLIC_SCORE_POLICY.version };
   if (input.vehicleType === "new") {
-    return { version: VEHICLE_SCORE_VERSION, score: null, label: null, domains: [], applicable: false, reasons: ["vehicle_type_new_no_used_score"] };
+    return { version: VEHICLE_SCORE_VERSION, score: null, label: null, domains: [], applicable: false, publication: "not_applicable", ...empty, reasons: ["vehicle_type_new_no_used_score"] };
   }
   if (!mayClaim("vehicle_score_evidence", input.identity.matchLevel)) {
     return {
-      version: VEHICLE_SCORE_VERSION, score: null, label: null, domains: [], applicable: true,
-      reasons: [`identity_not_exact:${input.identity.matchLevel}`],
+      version: VEHICLE_SCORE_VERSION, score: null, label: null, domains: [], applicable: true, publication: "insufficient_evidence",
+      ...empty, missingDomains: [...SCORE_DOMAINS], reasons: [`identity_not_exact:${input.identity.matchLevel}`],
     };
   }
 
@@ -268,9 +306,15 @@ export function buildVehicleScore(input: VehicleScoreInput, options: VehicleScor
   }));
 
   const assessed = domains.filter((d) => d.score != null);
+  const missingDomains = domains.filter((d) => d.score == null).map((d) => d.key);
+  const totalWeight = domains.reduce((a, d) => a + d.weight, 0);
+  const assessedWeightPct = totalWeight > 0 ? Math.round((assessed.reduce((a, d) => a + d.weight, 0) / totalWeight) * 100) : 0;
   const reasons: string[] = [];
   if (!assessed.length) {
-    return { version: VEHICLE_SCORE_VERSION, score: null, label: null, domains, applicable: true, reasons: ["no_assessable_evidence"] };
+    return {
+      version: VEHICLE_SCORE_VERSION, score: null, label: null, domains, applicable: true, publication: "insufficient_evidence",
+      assessedWeightPct, missingDomains, policyVersion: PUBLIC_SCORE_POLICY.version, reasons: ["no_assessable_evidence"],
+    };
   }
   const weightSum = assessed.reduce((a, d) => a + d.weight, 0);
   const score = weightSum > 0
@@ -285,5 +329,13 @@ export function buildVehicleScore(input: VehicleScoreInput, options: VehicleScor
   const adverse = domains.flatMap((d) => d.adverse);
   if (adverse.length) reasons.push(`adverse_findings:${adverse.length}`);
 
-  return { version: VEHICLE_SCORE_VERSION, score, label: scoreLabel(score, bands), domains, applicable: true, reasons };
+  // A partial file keeps its internal score and loses the public label: the
+  // label is a claim about the whole vehicle and needs the whole minimum.
+  const gate = publicEligibility(domains, input);
+  reasons.push(...gate.reasons.map((r) => `public_ineligible:${r}`));
+  return {
+    version: VEHICLE_SCORE_VERSION, score, label: gate.eligible ? scoreLabel(score, bands) : null, domains, applicable: true,
+    publication: gate.eligible ? "eligible" : "provisional",
+    assessedWeightPct, missingDomains, policyVersion: PUBLIC_SCORE_POLICY.version, reasons,
+  };
 }

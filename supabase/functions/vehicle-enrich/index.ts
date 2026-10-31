@@ -469,7 +469,7 @@ async function fetchHistory(vin: string) {
     const b: any = await res.json().catch(() => ({}));
     // deno-lint-ignore no-explicit-any
     const raw: any[] = Array.isArray(b?.listings) ? b.listings : Array.isArray(b) ? b : [];
-    if (!raw.length) return { available: false, entries: [], owners: null, inServiceDate: null, firstSeen: null };
+    if (!raw.length) return { available: false, entries: [], owners: null, inServiceDate: null, firstNewListingSeen: null, firstSeen: null, checked_at: new Date().toISOString(), source: "marketcheck" };
     // deno-lint-ignore no-explicit-any
     const ts = (l: any) => Number(l.last_seen_at ?? l.first_seen_at ?? l.seen_at ?? 0) || (l.last_seen_at_date ? Date.parse(l.last_seen_at_date) / 1000 : 0);
     const entries = raw.map((l) => ({
@@ -490,16 +490,17 @@ async function fetchHistory(vin: string) {
     // true owner count only comes from a title history (CARFAX/AutoCheck), which
     // this feed is not. Leave it null so the Passport reads honestly.
     const firstSeen = entries.find((e) => e.first_seen)?.first_seen ?? null;
-    // In-service date ≈ first time this VIN appeared as a NEW car (warranty
-    // clock starts at first retail sale; first-new-listing is the closest
-    // defensible proxy available from listing data).
+    // When a VIN was first advertised is not when it entered service: the
+    // warranty clock starts at first retail delivery, which listing data does
+    // not record. The first new-car listing is kept as advertising chronology
+    // under its own name and never offered as an in-service date.
     const firstNew = entries.find((e) => String(e.inventory_type || "").toLowerCase() === "new");
-    const inServiceDate = firstNew?.first_seen ?? firstSeen;
     return {
       available: true,
       entries: entries.map(({ _ts, ...e }) => e),
       owners: null,
-      inServiceDate,
+      inServiceDate: null,
+      firstNewListingSeen: firstNew?.first_seen ?? null,
       firstSeen,
       checked_at: new Date().toISOString(),
       source: "marketcheck",
@@ -696,7 +697,7 @@ async function fetchRecalls(
 
 async function mcRecallOutcome(vin: string): Promise<HttpOutcome> {
   try {
-    const res = await mcFetch(`${MC_BASE}/recall/car/${encodeURIComponent(vin)}?api_key=${encodeURIComponent(MC_KEY)}`, 10000);
+    const res = await mcFetch(`${MC_BASE}/car/autorecalls/${encodeURIComponent(vin)}?api_key=${encodeURIComponent(MC_KEY)}`, 10000);
     if (!res) return { kind: "transport_error", reason: "no_response" };
     const body = await res.json().catch(() => undefined);
     return { kind: "response", status: res.status, body };
@@ -999,7 +1000,6 @@ serve(async (req) => {
   }
   if (history) {
     patch.history_payload = history;
-    if (history.inServiceDate) patch.in_service_date = history.inServiceDate;
   }
   if (recalls) {
     // The VIN columns take a VIN answer only, and only when it answered: an

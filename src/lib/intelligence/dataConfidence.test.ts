@@ -33,11 +33,12 @@ describe("coverage and the public level", () => {
 });
 
 describe("missing evidence moves confidence, not the score", () => {
-  it("the same vehicle with a full file and a thin file keeps its score band and loses confidence", () => {
+  it("a thin file earns no score or label and loses confidence; it is never scored worse for missing evidence", () => {
     const fullScore = buildVehicleScore(fullInput());
     const thinScore = buildVehicleScore(thinInput());
-    expect(fullScore.label).toBe(thinScore.label);
-    expect(fullScore.score).toBe(thinScore.score);
+    expect(fullScore.label).not.toBeNull();
+    expect(thinScore.score).toBeNull();
+    expect(thinScore.label).toBeNull();
     expect(buildDataConfidence(fullInput()).level).toBe("high");
     expect(buildDataConfidence(thinInput()).level).toBe("limited");
   });
@@ -78,6 +79,19 @@ describe("what lowers confidence", () => {
     const r = buildDataConfidence(fullInput({ identity: exactIdentity({ providerConfidence: 0.55 }) }));
     expect(r.coveragePct).toBe(100 - DATA_CONFIDENCE_RULES.providerConfidencePenalty);
     expect(r.reasons).toContain("factory_decode_confidence_low:0.55");
+  });
+
+  it("a raw confidence of unknown scale is never compared with the 0.7 floor", () => {
+    const r = buildDataConfidence(fullInput({ identity: exactIdentity({ providerConfidence: null, providerConfidenceRaw: 55, providerConfidenceScale: "unknown" }) }));
+    expect(r.reasons.some((x) => x.startsWith("factory_decode_confidence_low"))).toBe(false);
+    expect(r.reasons).toContain("factory_decode_confidence_scale_unknown");
+    expect(r.reasons).toContain("missing_facts:1");
+  });
+
+  it("a listing-derived decode is not a factory-verified identity", () => {
+    const r = buildDataConfidence(fullInput({ identity: exactIdentity({ decodeAuthority: "listing_derived", factoryVerified: false }) }));
+    expect(r.coveragePct).toBeLessThan(100);
+    expect(r.reasons).toContain("decode_not_factory_build:listing_derived");
   });
 
   it("a seller self-report counts as weaker authority than an inspection", () => {

@@ -510,16 +510,17 @@ function readNhtsaBody(body: unknown): NhtsaBody | null {
 export function toRecallCampaigns(results: readonly unknown[]): RecallCampaign[] {
   return results.map((raw) => {
     const r = bag(raw);
-    const status = text(r.status) ?? text(r.recall_status) ?? "";
+    const status = (text(r.recallState) ?? text(r.status) ?? text(r.recall_status) ?? "").toLowerCase();
+    const closed = status.includes("close") || /^(complete|completed|remedied|repaired)$/.test(status);
     return {
-      campaign: text(r.NHTSACampaignNumber) ?? text(r.CampaignNumber) ?? text(r.campaign_id) ?? text(r.id),
-      component: text(r.Component) ?? text(r.component) ?? text(r.components),
-      summary: text(r.Summary) ?? text(r.summary) ?? text(r.description) ?? text(r.defect_summary),
-      consequence: text(r.Consequence) ?? text(r.consequence) ?? text(r.consequence_summary),
-      remedy: text(r.Remedy) ?? text(r.remedy) ?? text(r.corrective_action) ?? text(r.remedy_summary),
-      manufacturer: text(r.Manufacturer) ?? text(r.manufacturer) ?? text(r.make) ?? text(r.mfr),
-      reportDate: text(r.ReportReceivedDate) ?? text(r.report_date) ?? text(r.recall_date) ?? text(r.report_received_date),
-      status: status.toLowerCase().includes("close") ? "closed" : "open",
+      campaign: text(r.NHTSACampaignNumber) ?? text(r.CampaignNumber) ?? text(r.nhtsaNumber) ?? text(r.oemRecallNumber) ?? text(r.campaign_id) ?? text(r.id),
+      component: text(r.Component) ?? text(r.component) ?? text(r.components) ?? text(r.recallTitle),
+      summary: text(r.Summary) ?? text(r.summary) ?? text(r.recallDescription) ?? text(r.description) ?? text(r.defect_summary),
+      consequence: text(r.Consequence) ?? text(r.consequence) ?? text(r.riskDescription) ?? text(r.consequence_summary),
+      remedy: text(r.Remedy) ?? text(r.remedy) ?? text(r.remedyDescription) ?? text(r.corrective_action) ?? text(r.remedy_summary),
+      manufacturer: text(r.Manufacturer) ?? text(r.manufacturer) ?? text(r.oemDescription) ?? text(r.make) ?? text(r.mfr),
+      reportDate: text(r.ReportReceivedDate) ?? text(r.report_date) ?? text(r.recallIssueDate) ?? text(r.recall_date) ?? text(r.report_received_date),
+      status: closed ? "closed" : "open",
     };
   });
 }
@@ -621,6 +622,8 @@ export function classifyMarketcheckVinRecall(outcome: HttpOutcome, p: VinProvena
   if (status < 200 || status >= 300) return vinUnknown(p, `marketcheck_http_${status}`);
 
   const b = bag(body);
+  const data = bag(b.data);
+  if (Array.isArray(data.items)) return classifyAutoRecallsBody(data.items as unknown[], p);
   const list = Array.isArray(body)
     ? body as unknown[]
     : Array.isArray(b.recalls)
@@ -632,6 +635,26 @@ export function classifyMarketcheckVinRecall(outcome: HttpOutcome, p: VinProvena
   // answer either — it is a shape we do not understand.
   if (list === null) return vinUnknown(p, "marketcheck_response_shape_unrecognised");
   return vinAnswerFromCampaigns(p, toRecallCampaigns(list));
+}
+
+// The documented AutoRecalls contract (GET /v2/car/autorecalls/{vin}):
+// { data: { items: [{ vehicle: { vin, recallsAvailable, numberOfRecalls,
+// errorReasonCode, ... }, recalls: [...] }] } }. The item must be for the VIN
+// we asked about, the provider must say recall data is available for it, and
+// it must not carry an error reason. Anything less is not an answer.
+function classifyAutoRecallsBody(items: readonly unknown[], p: VinProvenance): VinRecallAnswer {
+  const want = upper(p.vin);
+  const item = items.map(bag).find((it) => upper(text(bag(it.vehicle).vin) ?? "") === want);
+  if (!item) return vinUnknown(p, items.length ? "marketcheck_vin_mismatch" : "marketcheck_no_items");
+  const vehicle = bag(item.vehicle);
+  const errorCode = text(vehicle.errorReasonCode);
+  if (errorCode) return vinUnknown(p, `marketcheck_error_reason:${errorCode}`);
+  if (vehicle.recallsAvailable !== true) return vinUnknown(p, "marketcheck_recalls_not_available");
+  if (!Array.isArray(item.recalls)) return vinUnknown(p, "marketcheck_response_shape_unrecognised");
+  const campaigns = toRecallCampaigns(item.recalls as unknown[]);
+  const declared = typeof vehicle.numberOfRecalls === "number" ? vehicle.numberOfRecalls : null;
+  if (declared != null && declared > 0 && campaigns.length === 0) return vinUnknown(p, "marketcheck_recall_count_without_list");
+  return vinAnswerFromCampaigns(p, campaigns);
 }
 
 // ── Models catalogue, cached per (year, make) for the life of one run ───────

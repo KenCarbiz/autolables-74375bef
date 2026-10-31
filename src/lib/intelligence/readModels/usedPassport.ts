@@ -62,7 +62,7 @@ export function buildUsedPassportReadModel(input: UsedPassportInputs): UsedPassp
   const marketContext = input.marketContext ?? facts.marketContext;
   const offer = facts.dealerOffer;
   const score = input.vehicleScore;
-  const scoreApplies = score.applicable && score.score != null;
+  const scoreApplies = score.applicable && score.score != null && score.publication === "eligible";
   const coverage = input.dataConfidence.coveragePct;
 
   const freshness: FreshnessSummary[] = [
@@ -86,6 +86,9 @@ export function buildUsedPassportReadModel(input: UsedPassportInputs): UsedPassp
       label: scoreApplies ? score.label : null,
       version: score.version,
       domains: score.domains.map((d) => ({ key: d.key, score: d.score, weight: d.weight })),
+      publication: score.publication,
+      assessedWeightPct: score.assessedWeightPct,
+      missingDomains: [...score.missingDomains],
     },
     dataConfidence: {
       level: input.dataConfidence.level,

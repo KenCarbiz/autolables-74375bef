@@ -1,3 +1,4 @@
+import { verifiedInServiceDate } from "@/lib/warranty/inServiceEvidence";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 import { deriveRecallView, type RecallView } from "@/lib/vehicleTruth/recallView";
 import { resolveDisplayPrice, getPriceDisplayMode, buildDiscountBreakdown, type PriceDisplayMode, type DiscountBreakdown } from "@/lib/priceModel";
@@ -501,7 +502,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     available: true,
     entries: (Array.isArray(histRaw.entries) ? histRaw.entries : []) as HistEntries,
     owners: n(histRaw.owners),
-    inServiceDate: (histRaw.inServiceDate as string) || null,
+    inServiceDate: null,
     firstSeen: (histRaw.firstSeen as string) || null,
   } : null;
 
@@ -641,7 +642,13 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     ((listing.photos?.length ?? 0) > 0 || listing.hero_image_url ? 1 : 0);
   const dealerVerified = verificationChecks >= 2;
 
-  const warranty = listing.warranty_info || {};
+  // A used in-service date that only repeats a listing-history date (first
+  // advertised, first seen) is dropped: it cannot start a warranty countdown.
+  const warranty: NonNullable<VehicleListing["warranty_info"]> = (() => {
+    const w = listing.warranty_info || {};
+    if (isNew || !w.in_service_date || verifiedInServiceDate(w.in_service_date, histRaw)) return w;
+    return { ...w, in_service_date: undefined };
+  })();
   const warrantyStr = (() => {
     const yrs = warranty.factory_months ? Math.round(warranty.factory_months / 12) : null;
     const mi = warranty.factory_miles ? `${(warranty.factory_miles / 1000).toFixed(0)},000 mi` : null;
@@ -778,7 +785,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   if (saveVsMsrp) whyBuy.push(`Priced ${fmt$(saveVsMsrp)} below MSRP`);
   else if (belowOriginalMsrp) whyBuy.push(`Priced ${fmt$(belowOriginalMsrp)} below original MSRP`);
   if (belowMarket && belowMarket > 0) whyBuy.push(`${fmt$(belowMarket)} below market average`);
-  if (warrantyStr && !warrantyExpired) whyBuy.push("Factory warranty remaining");
+  if (warrantyStr && !warrantyExpired) whyBuy.push(isNew || warranty.in_service_date ? "Factory warranty remaining" : "Factory warranty terms on record");
   if (recall.vin.clearClaimAllowed) whyBuy.push("No open recalls");
   if (dealerVerified) whyBuy.push("Dealer-verified listing");
   if (ownerCount === 1) whyBuy.push("One owner — personal use");

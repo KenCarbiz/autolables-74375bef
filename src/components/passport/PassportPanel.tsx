@@ -2179,7 +2179,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const isFactoryCpo = eff.mode === "cpo_factory";
       const year = (listing.ymm || "").match(/\b(19|20)\d{2}\b/)?.[0] ?? null;
       const fmtDate = (s?: string | Date | null) => s ? new Date(s).toLocaleDateString() : null;
-      const inService = w.in_service_date || d.history?.inServiceDate || null;
+      const inService = w.in_service_date || null;
       const prep = listing.prep_status?.foreman_signed_at || null;
       const services = (listing.service_records || []).filter((s) => s && (s.date || s.type || s.mileage));
       const hasHistory = d.ownerCount != null || d.accidentCount != null || d.cleanTitle || d.serviceCount > 0 || d.hasRecallCheck;
