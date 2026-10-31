@@ -164,11 +164,11 @@ describe("AppShell rail rendering", () => {
   });
 
   it.each([
-    ["/inventory", ["Inventory", "Inventory Intelligence", "Work Queue"]],
-    ["/window-sticker-studio", ["OEM Window Sticker Studio", "Description Operations", "Print Center"]],
-    ["/get-ready-command", ["Get Ready Command", "Service Writer Desk", "Service Desk", "Prep & Vendors", "Ready Board", "Recon Approvals"]],
-    ["/customers", ["Customers", "Deals", "Invoices"]],
-  ])("links every former child of the section from its landing page %s", (path, labels) => {
+    ["/inventory", ["Inventory Intelligence", "Work Queue"]],
+    ["/window-sticker-studio", ["Description Operations", "Print Center"]],
+    ["/get-ready-command", ["Service Writer Desk", "Service Desk", "Prep & Vendors", "Ready Board", "Recon Approvals"]],
+    ["/customers", ["Deals", "Invoices"]],
+  ])("links every other screen of the section from a text-link row on its landing page %s", (path, labels) => {
     renderShell(path);
     const tabs = screen.getByRole("navigation", { name: /pages$/ });
     expect(Array.from(tabs.querySelectorAll("a")).map((a) => a.textContent?.replace(/\s*\([^)]*\)$/, ""))).toEqual(labels);

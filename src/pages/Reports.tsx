@@ -166,7 +166,6 @@ const Reports = () => {
   const addonRate = addonAccepted + addonDeclined > 0
     ? Math.round((addonAccepted / (addonAccepted + addonDeclined)) * 100) : null;
 
-  const docTypes = Object.entries(r.byType).sort((a, b) => b[1] - a[1]);
 
   const exportCsv = () => {
     const rows = [
@@ -240,12 +239,6 @@ const Reports = () => {
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,460px)] items-start">
                 <div className="flex flex-col gap-3">
                   <DailyChart title="Documents generated" data={r.genByDay} days={days} />
-                  {docTypes.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-[6px] border border-adm-border bg-adm-surface px-4 py-3 text-[13px] leading-[18px] text-adm-muted">
-                      <span className="font-semibold text-adm-ink">By type</span>
-                      {docTypes.map(([type, count]) => <span key={type} className="whitespace-nowrap">{type.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase())} <span className="font-semibold tabular-nums text-adm-ink">{count.toLocaleString()}</span></span>)}
-                    </div>
-                  )}
                 </div>
                 <section className="rounded-[6px] border border-adm-border bg-adm-surface">
                   <h3 className="px-4 pt-4 text-[16px] leading-[22px] font-semibold text-adm-ink">Activity by week</h3>

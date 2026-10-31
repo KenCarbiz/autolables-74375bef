@@ -187,7 +187,7 @@ describe("compliance owner", () => {
       tenantId: "t1", issueKey: "vehicle_listings:v1", ownerUserId: null,
     });
     expect(ok).toEqual({ ok: true, data: { changed: true } });
-    expect(calls).toContain('rpc:assign_compliance_issue_owner:{"p_tenant_id":"t1","p_issue_key":"vehicle_listings:v1","p_owner_user_id":null}');
+    expect(calls).toContain('rpc:assign_compliance_issue_owner:{"p_tenant_id":"t1","p_issue_key":"vehicle_listings:v1"}');
     const denied = await assignComplianceOwner(fakeClient({ data: null, error: { code: "42501", message: "not authorized to assign compliance owners" } }), {
       tenantId: "t1", issueKey: "vehicle_listings:v1", ownerUserId: "u2",
     });

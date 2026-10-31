@@ -4,6 +4,7 @@ import { countDisplay, type CountValue, type RunOutcome } from "@/lib/admin/heal
 import { canApply, diffFields, initialReviewApply, isUnchanged, newIdempotencyKey, reviewApplyReducer, type ImpactSnapshot, type ReviewApplyEvent, type ReviewApplyState } from "@/lib/admin/reviewApply";
 import type { FeedConfigRow } from "@/lib/admin/integrations/feed";
 import { runFeedNow, saveFeedConfig, type FeedConfigDraft } from "@/lib/admin/integrations/queries";
+import { FilterSelect } from "@/components/product";
 import { AdminButton, AdminCard, AdminTable, InlineNote, KeyValueList, Td, Th } from "@/components/admin/v2/primitives";
 import type { Viewer } from "./common";
 
@@ -183,20 +184,14 @@ export default function FeedSettingsCard({ tenantId, config, configLoadFailed, a
               <input id="feed-cap" type="number" min={1} value={draft.max_vehicles} onChange={(e) => edit({ max_vehicles: Number(e.target.value) })} className={INPUT} />
             </Field>
             <Field label={FIELD_LABEL.frequency} htmlFor="feed-frequency">
-              <select id="feed-frequency" value={draft.frequency} onChange={(e) => edit({ frequency: e.target.value })} className={INPUT}>
-                {FREQUENCIES.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
-              </select>
+              <FilterSelect label={FIELD_LABEL.frequency} className="w-full" value={draft.frequency} onChange={(v) => edit({ frequency: v })} options={FREQUENCIES.map((f) => ({ value: f.value, label: f.label }))} />
             </Field>
             <Field label={FIELD_LABEL.run_hour} htmlFor="feed-hour">
-              <select id="feed-hour" value={draft.run_hour} onChange={(e) => edit({ run_hour: Number(e.target.value) })} className={INPUT}>
-                {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}
-              </select>
+              <FilterSelect label={FIELD_LABEL.run_hour} className="w-full" value={String(draft.run_hour)} onChange={(v) => edit({ run_hour: Number(v) })} options={Array.from({ length: 24 }, (_, h) => ({ value: String(h), label: `${String(h).padStart(2, "0")}:00` }))} />
             </Field>
             {draft.frequency !== "nightly" && (
               <Field label={FIELD_LABEL.day_of_week} htmlFor="feed-day">
-                <select id="feed-day" value={draft.day_of_week} onChange={(e) => edit({ day_of_week: Number(e.target.value) })} className={INPUT}>
-                  {DAYS.map((d, i) => <option key={d} value={i}>{d}</option>)}
-                </select>
+                <FilterSelect label={FIELD_LABEL.day_of_week} className="w-full" value={String(draft.day_of_week)} onChange={(v) => edit({ day_of_week: Number(v) })} options={DAYS.map((d, i) => ({ value: String(i), label: d }))} />
               </Field>
             )}
             {state.validation.length > 0 && (

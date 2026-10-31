@@ -544,6 +544,9 @@ describe("edge function gateway configuration", () => {
       // Signal House mints no Supabase JWT; the function authenticates the
       // delivery itself against SIGNALHOUSE_WEBHOOK_SECRET.
       "signalhouse-webhook": false,
+      // Files.com folder webhooks carry no Supabase JWT; the receiver
+      // verifies X-Files-Signature-V2 against FILESCOM_WEBHOOK_SECRET.
+      "files-inventory-notify": false,
     });
   });
 
