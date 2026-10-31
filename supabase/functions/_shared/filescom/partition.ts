@@ -226,11 +226,12 @@ export function decidePartition(p: Partition, mapping: MappingRef | null, bindin
 export type ShrinkGuard = { held: boolean; live: number; absent: number; allowed: number };
 export type InventoryDiff = { compared: boolean; additions: number; updates: number; unchanged: number; absenceCandidates: number; shrinkGuard: ShrinkGuard };
 
-// Mirrors inventory_apply_store_snapshot (0012): absence counts only while the
-// store's live cars missing from the snapshot stay within max(5, pct of live).
+// Mirrors the absent-vs-live rule of inventory_apply_store_snapshot: a full
+// snapshot is held when more of the store's live cars are missing than
+// max(minAbsent - 1, pct of live). minAbsent null keeps the 0012 floor (6).
 export const DEFAULT_MAX_SHRINK_PCT = 20;
-export function shrinkGuard(live: number, absent: number, maxShrinkPct = DEFAULT_MAX_SHRINK_PCT): ShrinkGuard {
-  const allowed = Math.max(5, Math.ceil((live * maxShrinkPct) / 100));
+export function shrinkGuard(live: number, absent: number, maxShrinkPct = DEFAULT_MAX_SHRINK_PCT, minAbsent: number | null = null): ShrinkGuard {
+  const allowed = Math.max((minAbsent ?? 6) - 1, Math.ceil((live * maxShrinkPct) / 100));
   return { held: absent > allowed, live, absent, allowed };
 }
 

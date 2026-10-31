@@ -61,7 +61,7 @@ export const storeAddress = (s: { street?: string | null; city?: string | null; 
 
 export const STATUS_TONE: Record<string, Tone> = {
   applied: "success", passed: "success", approved: "success", succeeded: "success", ready: "success", match: "success", active: "success", subscribed: "success",
-  quarantined: "warning", partial: "warning", mapping_pending: "warning", pending: "info", staged: "info", running: "info", queued: "info", incomplete: "warning",
+  quarantined: "warning", held: "warning", partial: "warning", mapping_pending: "warning", pending: "info", staged: "info", running: "info", queued: "info", incomplete: "warning",
   rejected: "danger", failed: "danger", dead: "danger", conflict: "danger", mismatch: "danger", suspended: "danger",
   superseded: "neutral", skipped: "neutral", cancelled: "neutral", disabled: "neutral", unmapped: "neutral", unknown: "neutral", revoked: "neutral", unsubscribed: "neutral", inactive: "neutral",
 };

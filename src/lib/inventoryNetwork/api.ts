@@ -71,7 +71,12 @@ export interface InventoryFeedJob {
   last_error: string | null; result: unknown; created_at: string; started_at: string | null; finished_at: string | null;
 }
 
-export type SnapshotStatus = "staged" | "applied" | "quarantined" | "rejected" | "superseded" | "failed";
+export type SnapshotStatus = "staged" | "held" | "applied" | "quarantined" | "rejected" | "superseded" | "failed";
+export interface SnapshotHold {
+  rules: Array<"absent_vs_live" | "count_drop_vs_trusted">; live: number; absent: number; allowed_absent: number;
+  valid: number; trusted_valid: number | null; drop_vs_trusted: number; held_at: string;
+}
+export interface HeldSnapshot { id: string; store_id: string; path: string; source_dealer_id: string; created_at: string; valid_count: number; report: { hold?: SnapshotHold } | null }
 export interface InventoryStoreSnapshot {
   id: string; run_id: string | null; job_id: string | null; path: string; source_dealer_id: string;
   store_id: string | null; group_id: string | null; mapping_id: string | null; clean: boolean;
@@ -356,6 +361,10 @@ export const listFeedControls = () => rows<InventoryFeedControls>(db.from("inven
 export const listFeedJobs = (limit = 100) => rows<InventoryFeedJob>(db.from("inventory_feed_jobs").select("*").order("created_at", { ascending: false }).limit(limit));
 export const listSnapshots = (limit = 100) =>
   rows<InventoryStoreSnapshot>(db.from("inventory_store_snapshots").select("id,run_id,job_id,path,source_dealer_id,store_id,group_id,mapping_id,clean,status,reason,row_count,valid_count,invalid_count,duplicate_count,price_missing_count,photo_missing_count,created_at,applied_at").order("created_at", { ascending: false }).limit(limit));
+export const listHeldSnapshots = (groupId: string) =>
+  rows<HeldSnapshot>(db.from("inventory_store_snapshots").select("id,store_id,path,source_dealer_id,created_at,valid_count,report").eq("group_id", groupId).eq("status", "held").order("created_at", { ascending: false }).limit(50));
+export const resolveHeldSnapshot = (snapshotId: string, action: "apply_full" | "apply_without_absence" | "reject", reason: string) =>
+  rpc<{ applied: boolean; reason?: string }>("inv_admin_resolve_held_snapshot", { p_snapshot_id: snapshotId, p_action: action, p_reason: reason });
 export const listSharingRules = (groupId: string) => rows<InventorySharingRule>(db.from("inventory_sharing_rules").select("*").eq("group_id", groupId).eq("status", "active").order("priority"));
 export const listEnrichmentPolicies = () => rows<StoreEnrichmentPolicy>(db.from("store_enrichment_policies").select("*"));
 export const listProviderUsage = (storeId: string) => rows<StoreProviderUsage>(db.from("store_provider_usage").select("*").eq("store_id", storeId).order("at", { ascending: false }).limit(100));
