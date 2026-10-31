@@ -78,7 +78,7 @@ export const LibrarySection = () => {
         <Button variant="primary" onClick={clear}>Clear filters</Button>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
         <Panel flush>
           {rows.length === 0 ? (
             <EmptyState title="No requirement matches these filters" detail="Clear a filter or change the search." compact />

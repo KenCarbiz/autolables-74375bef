@@ -177,7 +177,7 @@ export default function PriceReviewPage() {
             {tab === "history" ? (
               <History row={row} />
             ) : (
-              <DetailLayout
+              <DetailLayout width="wide"
                 main={<Evidence row={row} />}
                 aside={
                   <Panel title="Proposed change" titleSize="md" inset="sm" flush>

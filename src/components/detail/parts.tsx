@@ -50,9 +50,11 @@ export const SummaryList = ({ rows, className, dense = false }: { rows: Array<{ 
   </dl>
 );
 
-/** Main column plus a 340px right panel; the panel stacks under the main column below 1024px. */
-export const DetailLayout = ({ main, aside }: { main: ReactNode; aside: ReactNode }) => (
-  <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+const ASIDE_COLS = { default: "lg:grid-cols-[minmax(0,1fr)_340px]", wide: "lg:grid-cols-[minmax(0,1fr)_400px]", wider: "lg:grid-cols-[minmax(0,1fr)_460px]" };
+
+/** Main column plus a 340px right panel (400 or 460 when widened); the panel stacks under the main column below 1024px. */
+export const DetailLayout = ({ main, aside, width = "default" }: { main: ReactNode; aside: ReactNode; width?: keyof typeof ASIDE_COLS }) => (
+  <div className={cn("grid gap-6 lg:items-start", ASIDE_COLS[width])}>
     <div className="min-w-0 flex flex-col gap-6">{main}</div>
     <aside className="min-w-0 flex flex-col gap-6">{aside}</aside>
   </div>

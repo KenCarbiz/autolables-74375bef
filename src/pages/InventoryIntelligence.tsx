@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import {
   Search,
 } from "lucide-react";
 import { downloadCsv } from "@/lib/csvExport";
 import { vehicleStockNumber } from "@/lib/vehicleStockNumber";
-import { PageBody, PageHeader, Panel, WorkTable, Th, Td, Button, StatusText, FilterSelect, InlineNote, QueryState, type Tone } from "@/components/product";
+import { PageBody, PageHeader, Panel, WorkTable, Th, Td, Button, LinkButton, StatusText, FilterSelect, InlineNote, QueryState, type Tone } from "@/components/product";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import {
@@ -279,7 +278,7 @@ export default function InventoryIntelligence() {
                   </Td>
                   <Td align="right">
                     <div className="flex items-center justify-end gap-3 whitespace-nowrap text-[14px] font-semibold">
-                      <Link to={`/vehicle-file/${vehicle.id}`} className="text-adm-primary hover:underline">Review</Link>
+                      <LinkButton size="sm" to={`/vehicle-file/${vehicle.id}`}>Review</LinkButton>
                     </div>
                   </Td>
                 </tr>
