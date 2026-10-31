@@ -120,6 +120,13 @@
       "when": 1793484000000,
       "tag": "0016_feed_completeness_hold",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793484000001,
+      "tag": "0017_apply_feed_completeness_hold",
+      "breakpoints": true
     }
   ]
 }
