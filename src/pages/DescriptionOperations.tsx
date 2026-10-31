@@ -11,7 +11,7 @@ import { useOperatingMetrics } from "@/hooks/useOperatingMetrics";
 import {
   useDescriptionOperations, useDescriptionPermissions, type DescriptionCaseRow,
 } from "@/hooks/useDescriptionOps";
-import { PageBody, PageHeader, MetricStrip, Button, InlineNote, StatusText, SideDrawer, FilterSelect, type Tone } from "@/components/product";
+import { PageBody, PageHeader, MetricStrip, Button, InlineNote, StatusText, FilterSelect, type Tone } from "@/components/product";
 import {
   VehicleDiagnosticPanel, type DiagnosticException,
 } from "@/components/description/VehicleDiagnosticPanel";
@@ -402,7 +402,7 @@ export default function DescriptionOperations() {
 
   const drawer = selectedRow ? (
     <>
-    <SideDrawer label="Description record" onClose={() => select(null)}>
+    <aside aria-label="Description record" className="flex w-full shrink-0 flex-col self-start rounded-[6px] border border-adm-border bg-adm-surface lg:w-[340px] lg:sticky lg:top-4">
       <div className="flex items-start justify-between gap-3 px-4 pt-4">
         <div className="min-w-0">
           <p className="text-[17px] leading-[24px] font-semibold text-adm-ink truncate">{vehicleStockNumber(selectedRow.vehicle) || "No stock number"}</p>
@@ -498,7 +498,7 @@ export default function DescriptionOperations() {
           <Button className="flex-1" onClick={() => navigate(`/vehicle-file/${selectedRow.vehicleId}`)}>Vehicle file</Button>
         </div>
       </div>
-    </SideDrawer>
+    </aside>
     </>
   ) : null;
 
