@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { resolveCustomerPassportRouting, type PassportAgent } from "../_shared/passport-routing.ts";
 import { matchIihsAward, type IihsAward } from "../_shared/iihs-awards.ts";
 import { resolvePassportVersion } from "../_shared/passport-version.ts";
+import { projectPublicPaymentEstimator } from "../_shared/paymentEstimatorProjection.ts";
 import { PUBLIC_VIEW_DENY, scrubTitleVerification, applyRecallProjection } from "../_shared/lotFeedRow.ts";
 import {
   PUBLIC_MARKET_FLAGS_FIELD, projectPublicMarketFlags,
@@ -174,6 +175,17 @@ serve(async (req) => {
         if (s.advertised_includes_doc_fee != null) row.advertised_excludes_doc_fee = String(s.advertised_includes_doc_fee) !== "true";
         // Dealer payment-estimate display toggles (payment / down / term / APR).
         if (s.passport_payment_display && typeof s.passport_payment_display === "object") row.payment_display = s.passport_payment_display;
+        // This rooftop's published retail payment estimator. Keyed by the
+        // listing's own store (the synthesized default store is the tenant id),
+        // so one rooftop's rates never reach another's Passport. A read failure
+        // projects to off: the Passport shows no estimate rather than guessing.
+        try {
+          const storeKey = String((row.store_id as string) || row.tenant_id);
+          const { data: est, error: estErr } = await admin
+            .from("passport_payment_estimator_settings").select("enabled, version, config")
+            .eq("tenant_id", row.tenant_id).eq("store_id", storeKey).maybeSingle();
+          row.payment_estimator = projectPublicPaymentEstimator(estErr ? null : est);
+        } catch { row.payment_estimator = { enabled: false }; }
         if (s.price_label && typeof s.price_label === "object") priceLabelSetting = s.price_label as Record<string, unknown>;
         // Franchise title policy. A store that never retails branded-title cars
         // may say so, and the passport prints it as the DEALER'S statement —

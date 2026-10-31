@@ -308,7 +308,7 @@ describe("only one persistent CTA system is on screen", () => {
   });
 
   it("keeps the mobile sticky rail, where no action centre is pinned", () => {
-    expect(passport).toMatch(/\{!isDesktop && stickyCfg\.enabled && \(/);
+    expect(passport).toMatch(/\{!isDesktop && stickyCfg\.enabled && stickyCfg\.items\.length > 0 && \(/);
   });
 });
 

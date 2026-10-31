@@ -1,8 +1,9 @@
 import { verifiedInServiceDate } from "@/lib/warranty/inServiceEvidence";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 import { deriveRecallView, type RecallView } from "@/lib/vehicleTruth/recallView";
-import { resolveDisplayPrice, getPriceDisplayMode, buildDiscountBreakdown, type PriceDisplayMode, type DiscountBreakdown } from "@/lib/priceModel";
-import { DEFAULT_APR_PERCENT, getPaymentDisplay, buildPaymentAssumptions } from "@/lib/affordability";
+import { buildDiscountBreakdown, type PriceDisplayMode, type DiscountBreakdown } from "@/lib/priceModel";
+import { resolvePassportSellingPrice } from "@/lib/passport/sellingPrice";
+import { estimateAssumptionLine, listingModelYear, normalizeEstimatorConfig, resolveEstimate, type EstimateResult, type EstimatorConfig } from "@/lib/payment/estimator";
 import type { OemFactoryWarranty } from "@/lib/oemWarranty";
 import { legacyMarketView, type LegacyListingFields } from "@/lib/market/surfaceCompat";
 
@@ -189,8 +190,16 @@ export interface PassportData {
   // The term the dealer's own VDP uses next to its price (e.g. "Sale Price"),
   // captured by the advertised-price crawl. Powers the "Match my website" label.
   websitePriceTerm: string | null;
+  // Estimated monthly payment from this rooftop's configured estimator rule,
+  // at full precision (round only for display). Null when the estimator is off,
+  // unconfigured, or the vehicle has no matching rule, year or price.
   estMonthly: number | null;
   paymentAssumptions: string;
+  // The rooftop's published estimator (null when off or not configured) and the
+  // inputs the shared resolver needs, so every surface recomputes identically.
+  paymentEstimator: EstimatorConfig | null;
+  paymentEstimate: EstimateResult;
+  modelYear: number | null;
   saveVsMsrp: number | null;
   // Used cars are almost always below their original sticker — that's
   // depreciation, not a discount, so it must never render as "You save".
@@ -514,18 +523,20 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   const lp = listing as unknown as {
     advertised_price_before_doc?: number | null; doc_fee?: number | null; website_sale_price?: number | null; price_display_mode?: unknown; advertised_excludes_doc_fee?: boolean | null; price_label?: string | null; website_price_term?: string | null; dealer_discount?: number | null; retail_cash?: number | null; payment_display?: unknown;
   };
-  const priceMode: PriceDisplayMode = getPriceDisplayMode({ price_display_mode: lp.price_display_mode });
-  const advBeforeDoc = lp.advertised_price_before_doc ?? listing.price ?? null;
-  const docFee = lp.doc_fee ?? null;
-  const websiteSalePrice = lp.website_sale_price ?? (advBeforeDoc != null ? advBeforeDoc + (docFee ?? 0) : null);
   // advertised_excludes_doc_fee: default false — every current tenant's advertised
   // `price` already includes the doc fee, so website_sale_price mode shows `price`
-  // and never double-adds the fee (see resolveDisplayPrice).
-  const price = resolveDisplayPrice(
-    { advertised_price_before_doc: advBeforeDoc, doc_fee: docFee, website_sale_price: websiteSalePrice, price: listing.price, advertised_excludes_doc_fee: lp.advertised_excludes_doc_fee ?? null },
-    priceMode,
+  // and never double-adds the fee (see resolveDisplayPrice). The resolution is
+  // shared with the payment estimator's admin preview (resolvePassportSellingPrice).
+  const selling = resolvePassportSellingPrice(
+    { price: listing.price, advertised_price_before_doc: lp.advertised_price_before_doc, doc_fee: lp.doc_fee, website_sale_price: lp.website_sale_price },
+    { price_display_mode: lp.price_display_mode, advertised_excludes_doc_fee: lp.advertised_excludes_doc_fee ?? null },
   );
-  const priceIncludesDoc = priceMode === "website_sale_price";
+  const priceMode: PriceDisplayMode = selling.mode;
+  const advBeforeDoc = selling.advertisedBeforeDoc;
+  const docFee = selling.docFee;
+  const websiteSalePrice = selling.websiteSalePrice;
+  const price = selling.price;
+  const priceIncludesDoc = selling.includesDocFee;
   const isNew = String((listing as { condition?: string }).condition || "").toLowerCase() === "new";
   const msrp = (mc.msrp as number) ?? null;
   // The savings ladder that mirrors the dealer's own VDP. Only meaningful when a
@@ -581,20 +592,19 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   // original sticker is depreciation, exposed separately as belowOriginalMsrp.
   const saveVsMsrp = isNew && msrp != null && price != null && msrp > price ? msrp - price : null;
   const belowOriginalMsrp = !isNew && msrp != null && price != null && msrp > price ? msrp - price : null;
-  // Dealer-controlled payment display: `payment` off hides the whole estimate;
-  // the term / down / APR chips toggle independently. Attached by
-  // public-listing-view from dealer_profiles.settings.passport_payment_display.
-  const paymentDisplay = getPaymentDisplay({ passport_payment_display: lp.payment_display });
-  const PAYMENT_TERM = 72, PAYMENT_DOWN_PCT = 10;
-  const estMonthly = (() => {
-    if (price == null || !paymentDisplay.payment) return null;
-    const r = DEFAULT_APR_PERCENT / 100 / 12, n = PAYMENT_TERM, principal = price * (1 - PAYMENT_DOWN_PCT / 100);
-    const m = Math.round((principal * r) / (1 - Math.pow(1 + r, -n)));
-    return isFinite(m) ? m : null;
-  })();
-  const paymentAssumptions = buildPaymentAssumptions(paymentDisplay, {
-    termMonths: PAYMENT_TERM, downPercent: PAYMENT_DOWN_PCT, aprPercent: DEFAULT_APR_PERCENT,
-  });
+  // Payment estimate: this rooftop's own published rule for the vehicle's
+  // explicit model year, through the one shared resolver. Attached by
+  // public-listing-view as payment_estimator. No config, an off config or no
+  // matching rule means no number. The assumptions always travel with the
+  // number; the legacy passport_payment_display toggles no longer hide them.
+  const rawEstimator = (lp as { payment_estimator?: unknown }).payment_estimator;
+  const paymentEstimator = rawEstimator && typeof rawEstimator === "object" && (rawEstimator as { enabled?: unknown }).enabled === true
+    ? normalizeEstimatorConfig(rawEstimator)
+    : null;
+  const modelYear = listingModelYear(listing as unknown as { year?: unknown; model_year?: unknown; ymm?: string | null });
+  const paymentEstimate = resolveEstimate(paymentEstimator, { modelYear, sellingPrice: price });
+  const estMonthly = paymentEstimate.status === "available" ? paymentEstimate.monthlyPayment : null;
+  const paymentAssumptions = paymentEstimate.status === "available" ? estimateAssumptionLine(paymentEstimate) : "";
 
   // A brand-new car has had no prior owners. For everything else, only trust a
   // real owner signal (MarketCheck owner_count or a CARFAX one-owner flag) —
@@ -833,7 +843,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   };
 
   return {
-    price, msrp, priceLabel, websitePriceTerm, estMonthly, paymentAssumptions, saveVsMsrp, belowOriginalMsrp,
+    price, msrp, priceLabel, websitePriceTerm, estMonthly, paymentAssumptions, paymentEstimator, paymentEstimate, modelYear, saveVsMsrp, belowOriginalMsrp,
     docFee, websiteSalePrice, priceMode, priceIncludesDoc, priceBreakdown,
     dealerDiscount: lp.dealer_discount ?? null, retailCash: lp.retail_cash ?? null,
     recon: (listing as unknown as { recon?: PassportData["recon"] }).recon ?? null,

@@ -16,7 +16,7 @@ export const APPEARANCE_KEYS = ["primary_color"] as const;
 export const HOURS_CONTACT_KEYS = ["dealer_hours", "dealer_phone", "dealer_website_url", "public_landing_url", "dealer_address", "dealer_zip", "dealer_principal", "dealer_license_number"] as const;
 export const WHY_BUY_KEYS = ["dealer_tagline", "why_buy_here", "warranty_programs"] as const;
 export const WEBSITES_KEYS = ["dms_provider", "new_inventory_url", "used_inventory_url", "autotrader_url", "cars_com_url", "cargurus_url", "capital_one_url", "carfax_url", "vdp_price_labels", "vdp_strip_finance_params", "vehicle_conditions"] as const;
-export const DOCUMENT_DEFAULT_KEYS = ["default_new_addendum", "default_used_window", "default_used_addendum", "default_ftc_warranty", "passport_payment_display"] as const;
+export const DOCUMENT_DEFAULT_KEYS = ["default_new_addendum", "default_used_window", "default_used_addendum", "default_ftc_warranty"] as const;
 
 export type IdentityKey = (typeof IDENTITY_KEYS)[number];
 export type AppearanceKey = (typeof APPEARANCE_KEYS)[number];

@@ -68,6 +68,7 @@ describe("opening an Administration screen starts no edge function", () => {
     "/admin/integrations/inventory-network": "/admin/integrations/inventory-network",
     "/admin/customer-experience/preview": "/admin/customer-experience/preview",
     "/admin/documents/print-calibration": "/admin/documents/print-calibration",
+    "/admin/brand/payment-estimator": "/admin/brand/payment-estimator",
     "/admin/integrations/runs/:runId": "/admin/integrations/runs/run-1",
     "/admin/integrations/providers/:providerId": "/admin/integrations/providers/syndication",
     "/admin/integrations/jobs/:jobId": "/admin/integrations/jobs/inventory_sync",

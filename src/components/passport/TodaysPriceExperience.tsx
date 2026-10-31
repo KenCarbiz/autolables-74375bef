@@ -10,8 +10,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { type VehicleListing } from "@/hooks/useVehicleListing";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import { trackLeadSubmitted, trackCustomerEngagement } from "@/lib/engagement/customerEngagement";
-import { estimateAffordability, DEFAULT_APR_PERCENT } from "@/lib/affordability";
-import { savePaymentPrefs } from "@/lib/passport/paymentPrefs";
+import { readPaymentPrefs, savePaymentPrefs } from "@/lib/passport/paymentPrefs";
+import {
+  CUSTOMER_UNAVAILABLE_MESSAGE, chargeTreatment, formatApr, formatPayment, resolveEstimate, type AvailableEstimate,
+} from "@/lib/payment/estimator";
 import { fmt$, type PassportData } from "@/lib/passportV2Data";
 import { priceAvailabilityFromAmount, canEstimatePayment, PAYMENT_UNAVAILABLE_MESSAGE } from "@/lib/passport/priceAvailability";
 import { resolvePassportBack, passportForwardPath } from "@/lib/passportReturn";
@@ -19,9 +21,8 @@ import { readBuildSheet } from "@/lib/buildSheet";
 import { listingGallery, listingHero } from "@/lib/photos";
 import { resolveTodaysPrice } from "@/lib/todaysPrice";
 import {
-  presentApr, creditImpactCopy, estimateDueAtSigning, contactConsentCopy,
-  CREDIT_TIER_DISCLOSURE, EXCLUDED_CHARGES, EXCLUDED_CHARGES_SUMMARY,
-  PAYMENT_CALC_VERSION, type CreditTier, type PaymentCalculationSnapshot,
+  creditImpactCopy, estimateDueAtSigning, contactConsentCopy,
+  PAYMENT_CALC_VERSION, type PaymentCalculationSnapshot,
 } from "@/lib/payment/disclosure";
 
 // This calculator performs NO credit-bureau inquiry. The "no credit impact"
@@ -40,13 +41,11 @@ const performsCreditInquiry = false;
 
 const CARD = "rounded-2xl border border-[#DDE5EE] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_10px_28px_-18px_rgba(16,24,40,0.14)]";
 const field = "w-full h-12 border rounded-xl px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
-const TERMS = [48, 60, 72, 84] as const;
-const CREDIT_PROFILES: { key: string; label: string; range: string; apr: number }[] = [
-  { key: "excellent", label: "Excellent", range: "720+", apr: 6.49 },
-  { key: "good", label: "Good", range: "690–719", apr: DEFAULT_APR_PERCENT },
-  { key: "fair", label: "Fair", range: "630–689", apr: 9.99 },
-  { key: "rebuilding", label: "Rebuilding", range: "629 or less", apr: 13.49 },
-];
+// Terms, APRs and the suggested down payment come only from the store's
+// configured estimator rule for this vehicle (src/lib/payment/estimator.ts).
+// The former hardcoded 48–84 month list, 7.25% default and credit-profile APR
+// presets were removed: they were rates no store had approved.
+const ASSUMED_APR_NOTE = "The dealership's assumed rate for this estimate. It is not a credit decision, a guaranteed APR or a lender offer; your actual rate depends on lender approval.";
 
 const track = (listing: VehicleListing, event: string, extra: Record<string, unknown> = {}) =>
   trackCustomerEngagement({
@@ -238,18 +237,39 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
   // makes the missing number look deliberate. The hooks below stay
   // unconditional (rules of hooks); only the PRESENTATION abstains.
   const priceAvailability = priceAvailabilityFromAmount(d.price);
-  const paymentAvailable = canEstimatePayment(priceAvailability);
   const price = priceAvailability.available ? priceAvailability.amount : 0;
-  const [down, setDown] = useState(() => Math.min(price, Math.round((price * 0.1) / 500) * 500));
-  const [term, setTerm] = useState<(typeof TERMS)[number]>(72);
-  const [apr, setApr] = useState(DEFAULT_APR_PERCENT);
-  const [profile, setProfile] = useState<string | null>(null);
-  const safeDown = Math.min(down, price);
-  const row = estimateAffordability({ price, downPayment: safeDown, aprPercent: Math.max(0, apr) }, [term])[0];
-  const monthly = Math.round(row.monthly_payment);
-  const financed = Math.max(0, price - safeDown);
-  const aprPresentation = useMemo(() => presentApr(apr), [apr]);
+  // The shopper's own adjustments, each null until they touch it so the store
+  // rule supplies the rest. Kept in state across ordinary rerenders; reset when
+  // the vehicle changes, seeded from this session's saved scenario.
+  const vehicleKey = listing.vin || listing.slug || listing.id;
+  type Adjust = { down: number | null; term: number | null; apr: number | null };
+  const fromPrefs = (): Adjust => { const p = readPaymentPrefs(listing); return p ? { down: p.down, term: p.term, apr: p.apr } : { down: null, term: null, apr: null }; };
+  const [adjust, setAdjust] = useState<Adjust>(fromPrefs);
+  const [adjustFor, setAdjustFor] = useState(vehicleKey);
+  if (adjustFor !== vehicleKey) {
+    setAdjustFor(vehicleKey);
+    setAdjust(fromPrefs());
+  }
+  const estimatorOn = d.paymentEstimator != null;
+  const estimate = useMemo(
+    () => resolveEstimate(d.paymentEstimator, { modelYear: d.modelYear, sellingPrice: d.price }, { downPayment: adjust.down, termMonths: adjust.term, aprPercent: adjust.apr }),
+    [d.paymentEstimator, d.modelYear, d.price, adjust.down, adjust.term, adjust.apr],
+  );
+  const est: AvailableEstimate | null = estimate.status === "available" ? estimate : null;
+  // The shared price contract still gates the estimate; the store rule then decides.
+  const paymentAvailable = canEstimatePayment(priceAvailability) && est != null;
+  const controls = d.paymentEstimator?.shopperControls ?? { downPayment: false, term: false, aprOverride: false };
+  const safeDown = est?.downPayment ?? 0;
+  const term = est?.termMonths ?? 0;
+  const apr = est?.aprPercent ?? 0;
+  const monthlyExact = est?.monthlyPayment ?? 0;
+  const monthly = Math.round(monthlyExact * 100) / 100;
+  const financed = est?.amountFinanced ?? 0;
+  const aprLabel = est?.aprOverridden ? "Your assumed APR" : "Assumed APR";
+  const charges = useMemo(() => chargeTreatment(d.priceIncludesDoc), [d.priceIncludesDoc]);
+  const unavailableCopy = priceAvailability.available ? CUSTOMER_UNAVAILABLE_MESSAGE : PAYMENT_UNAVAILABLE_MESSAGE;
   const dueAtSigning = useMemo(() => estimateDueAtSigning({ downPayment: safeDown, firstMonthPayment: monthly }), [safeDown, monthly]);
+  const downMax = Math.max(500, Math.ceil(Math.max(price * 0.5, est?.requestedDownPayment ?? 0) / 500) * 500);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -266,9 +286,9 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
   // remember their scenario for this vehicle so the passport estimate reflects
   // it on return. Session-scoped, illustrative only — never an offer.
   useEffect(() => {
-    if (!started || !copy.showCalculator) return;
-    savePaymentPrefs(listing, { down: safeDown, term, apr });
-  }, [started, copy.showCalculator, listing, safeDown, term, apr]);
+    if (!started || !copy.showCalculator || !estimatorOn) return;
+    savePaymentPrefs(listing, adjust);
+  }, [started, copy.showCalculator, estimatorOn, listing, adjust]);
 
   const emit = (event: string, extra: Record<string, unknown> = {}) => { if (!isPreview) track(listing, event, extra); };
 
@@ -282,17 +302,18 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
     if (email.trim() && !/^\S+@\S+\.\S+$/.test(email.trim())) errs.email = "That email doesn't look right.";
     setErrors(errs);
     if (Object.keys(errs).length) { emit("lead_validation_failed", { fields: Object.keys(errs) }); return; }
-    emit("payment_request_submitted", { mode: copy.mode, term, apr_bucket: Math.round(apr), monthly_bucket: Math.round(monthly / 25) * 25 });
+    emit("payment_request_submitted", { mode: copy.mode, term: paymentAvailable ? term : null, apr_bucket: paymentAvailable ? Math.round(apr) : null, monthly_bucket: paymentAvailable ? Math.round(monthly / 25) * 25 : null });
     if (isPreview) { setSent(true); return; }
     setSending(true);
     // Preserve the exact calculation the shopper modeled so the dealer sees it.
-    const paymentSnapshot: PaymentCalculationSnapshot = {
-      vin: listing.vin, vehiclePrice: price, downPayment: safeDown, termMonths: term,
+    const paymentSnapshot: PaymentCalculationSnapshot | null = est ? {
+      vin: listing.vin, vehiclePrice: est.sellingPrice, downPayment: safeDown, termMonths: term,
       exampleAprPercent: apr, aprIsVerifiedOffer: false, estMonthlyPayment: monthly,
-      amountFinanced: financed, creditTier: (profile?.toLowerCase() as CreditTier | undefined) ?? null,
-      dueAtSigningKnown: dueAtSigning.known, excludedCharges: [...EXCLUDED_CHARGES],
+      amountFinanced: financed, creditTier: null,
+      dueAtSigningKnown: dueAtSigning.known, excludedCharges: [...charges.excluded],
       preferredContact: method, calcVersion: PAYMENT_CALC_VERSION, calculatedAt: new Date().toISOString(),
-    };
+      storeRule: est.ruleLabel, storeAprPercent: est.storeAprPercent, aprIsShopperAssumption: est.aprOverridden,
+    } : null;
     try {
       let src = "website";
       let zip = "";
@@ -301,7 +322,7 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
         zip = sessionStorage.getItem("al_zip") || "";
       } catch { /* storage unavailable */ }
       const terms = copy.showCalculator && paymentAvailable
-        ? `Payment goal ${fmt$(monthly)}/mo · ${term} mo · Example APR ${apr.toFixed(2)}% · ${fmt$(safeDown)} down${profile ? ` · Credit profile ${profile}` : ""}`
+        ? `Estimated payment ${formatPayment(monthly)}/mo · ${term} mo · ${aprLabel} ${formatApr(apr)} · ${fmt$(safeDown)} down`
         : "";
       const dueLine = paymentAvailable ? `Due at signing (est.) ${fmt$(dueAtSigning.known)} (excl. tax/title/reg)` : "";
       const extras = [`Mode ${copy.mode}`, terms, method ? `Prefers ${method}` : "", zip ? `ZIP ${zip}` : "", dueLine, "via vehicle_passport_todays_price_page"].filter(Boolean).join(" · ");
@@ -310,7 +331,7 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
         store_id: listing.store_id, name: name.trim(), email: email.trim() || "", phone: phone.trim() || "",
         vehicle_interest: `${listing.ymm || "Vehicle"} (Today's Price)`,
         vehicle_vin: listing.vin, source: src, status: "new",
-        notes: `[intent=todays_price] Passport V2 — Today's Price · ${extras}${message.trim() ? `: ${message.trim()}` : ""}\n[payment_calculation]${JSON.stringify(paymentSnapshot)}`,
+        notes: `[intent=todays_price] Passport V2 — Today's Price · ${extras}${message.trim() ? `: ${message.trim()}` : ""}${paymentSnapshot ? `\n[payment_calculation]${JSON.stringify(paymentSnapshot)}` : ""}`,
       };
       const routedPayload = {
         ...basePayload, sub_source: "contact",
@@ -320,7 +341,7 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
       let insErr = (await (supabase as unknown as LeadsTable).from("leads").insert(routedPayload)).error;
       if (insErr) insErr = (await (supabase as unknown as LeadsTable).from("leads").insert(basePayload)).error;
       if (insErr) throw insErr;
-      trackLeadSubmitted({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: src === "qr_scan" ? "window_sticker_qr" : "passport", metadata: { intent: "todays_price", event: "todays_price_form_submitted", mode: copy.mode, monthly, term, apr, down: safeDown, calc_version: PAYMENT_CALC_VERSION } });
+      trackLeadSubmitted({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: src === "qr_scan" ? "window_sticker_qr" : "passport", metadata: { intent: "todays_price", event: "todays_price_form_submitted", mode: copy.mode, monthly: paymentAvailable ? monthly : null, term: paymentAvailable ? term : null, apr: paymentAvailable ? apr : null, down: paymentAvailable ? safeDown : null, calc_version: PAYMENT_CALC_VERSION } });
       supabase.functions.invoke("lead-alert", {
         body: { slug: listing.slug, vin: listing.vin, intent: "todays_price", name: name.trim(), phone: phone.trim() || null, email: email.trim() || null, source: src, sub_source: "contact" },
       }).catch(() => { /* alert failure never blocks the shopper */ });
@@ -342,13 +363,13 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
         <h2 className="text-[24px] font-extrabold tracking-tight text-[#0D1B2A]">Sent for dealer review</h2>
         <p className="text-[14px] text-[#64748B] mt-2">{d.dealerName || "The dealership"} received your request and will follow up with available payment details.</p>
         <div className="mt-4 mx-auto max-w-sm rounded-xl border border-[#DDE5EE] bg-[#F5F7FA] p-4 text-left text-[13px] text-[#334155]">
-          {copy.showCalculator && (
+          {copy.showCalculator && estimatorOn && (
             <>
-              <p className="font-bold text-[#0D1B2A]">{paymentAvailable ? `${fmt$(monthly)}/mo · ${term} months` : PAYMENT_UNAVAILABLE_MESSAGE}</p>
+              <p className="font-bold text-[#0D1B2A]">{paymentAvailable ? `Estimated payment ${formatPayment(monthly)}/mo · ${term} months` : unavailableCopy}</p>
               {paymentAvailable && (
                 <>
-                  <p className="mt-1 text-[12px]">Example APR {apr.toFixed(2)}% · {fmt$(safeDown)} down · Est. due at signing {fmt$(dueAtSigning.known)}</p>
-                  <p className="mt-1 text-[11px] text-[#94A3B8]">Excludes tax, title, registration, dealer fees, add-ons, and trade equity.</p>
+                  <p className="mt-1 text-[12px]">{aprLabel} {formatApr(apr)} · {fmt$(safeDown)} down · Est. due at signing {fmt$(dueAtSigning.known)}</p>
+                  <p className="mt-1 text-[11px] text-[#94A3B8]">{charges.summary}</p>
                 </>
               )}
             </>
@@ -383,96 +404,90 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
 
         {/* Right column */}
         <div className="space-y-5 min-w-0 order-2 lg:order-2">
-          {copy.showCalculator && (
-            <div className={`${CARD} p-5 sm:p-6`}>
+          {copy.showCalculator && estimatorOn && (
+            <div className={`${CARD} p-5 sm:p-6`} data-module="payment-calculator">
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
                   <p className="text-[16px] font-bold text-[#0D1B2A]">Build Your Payment</p>
                   <p className="text-[12px] text-[#64748B] mt-0.5">Customize your estimate. {creditImpactCopy(performsCreditInquiry)}</p>
                 </div>
-                <div className="text-right">
+                <div className="text-right" aria-live="polite">
                   <p className="text-[10px] font-bold uppercase tracking-wide text-[#94A3B8]">Estimated Payment</p>
                   {paymentAvailable ? (
                     <>
-                      <p className="text-[28px] font-extrabold tracking-tight text-[#0B6FEA] leading-none mt-0.5">{fmt$(monthly)}<span className="text-[14px] font-semibold text-[#64748B]">/mo</span></p>
-                      <p className="text-[11px] text-[#64748B] mt-1">For {term} months at {aprPresentation.label} {aprPresentation.value}</p>
+                      <p className="text-[28px] font-extrabold tracking-tight text-[#0B6FEA] leading-none mt-0.5">{formatPayment(monthly)}<span className="text-[14px] font-semibold text-[#64748B]">/mo</span></p>
+                      <p className="text-[11px] text-[#64748B] mt-1">For {term} months at {aprLabel} {formatApr(apr)}</p>
                     </>
                   ) : (
-                    <p className="text-[12px] font-semibold text-[#64748B] mt-0.5 max-w-[260px]">{PAYMENT_UNAVAILABLE_MESSAGE}</p>
+                    <p className="text-[12px] font-semibold text-[#64748B] mt-0.5 max-w-[260px]" data-payment-state="unavailable">{unavailableCopy}</p>
                   )}
                 </div>
               </div>
 
-              {/* THE WHOLE ESTIMATE, OR NONE OF IT.
-                  Gating only the monthly figure left "Est. Amount Financed $0",
-                  "Down Payment -$0", a 72-month term and an APR standing beside
-                  an em-dash — a financing estimate for a car with no price. The
-                  excluded-charges notice goes too: it describes what an estimate
-                  leaves out, and there is no estimate to qualify. */}
+              {/* THE WHOLE ESTIMATE, OR NONE OF IT. With no matching store rule,
+                  year or price there is no term, APR, down payment or amount
+                  financed to show either. */}
               {paymentAvailable && (
                 <>
               {/* Excluded charges shown BEFORE interaction — the estimate is
-                  materially incomplete without this context (16 CFR 226, TILA
-                  Reg Z illustrative advertising guidance). */}
+                  materially incomplete without this context. Which charges are
+                  listed follows the price basis, so a fee already inside the
+                  selling price is never also listed as excluded. */}
               <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-3.5">
                 <p className="text-[12px] font-bold text-[#7C2D12] inline-flex items-center gap-1.5"><Info className="w-3.5 h-3.5" /> Estimate excludes these charges</p>
-                <p className="text-[11.5px] text-[#7C2D12] mt-1 leading-snug">{EXCLUDED_CHARGES_SUMMARY}</p>
+                <p className="text-[11.5px] text-[#7C2D12] mt-1 leading-snug">Based on the {charges.basis.charAt(0).toLowerCase()}{charges.basis.slice(1)}. Each excluded charge can materially change your monthly payment.</p>
                 <ul className="text-[11px] text-[#92400E] mt-1.5 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0.5 list-disc pl-4">
-                  {EXCLUDED_CHARGES.map((c) => <li key={c}>{c}</li>)}
+                  {charges.excluded.map((c) => <li key={c}>{c}</li>)}
                 </ul>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_220px] gap-6 mt-5">
                 <div className="space-y-4 min-w-0">
-                  {copy.showDown && (
+                  {copy.showDown && controls.downPayment && (
                     <div>
-                      <div className="flex justify-between text-[12px] text-[#64748B] mb-1"><span>Down Payment</span><span className="font-bold text-[#0D1B2A]">{fmt$(safeDown)}</span></div>
-                      <input type="range" min={0} max={Math.max(500, Math.round((price * 0.5) / 500) * 500)} step={500} value={safeDown} onChange={(e) => { const prev = safeDown; const next = Math.min(Number(e.target.value), price); setDown(next); markStarted(); emit("payment_recalculated", { field: "down_payment", from: prev, to: next, calc_version: PAYMENT_CALC_VERSION }); }} onPointerUp={() => emit("payment_slider_changed", { down: safeDown })} className="w-full accent-[#0B6FEA]" />
+                      <div className="flex justify-between text-[12px] text-[#64748B] mb-1"><label htmlFor="tp-down">Down Payment</label><span className="font-bold text-[#0D1B2A]">{fmt$(safeDown)}</span></div>
+                      <input id="tp-down" type="range" min={0} max={downMax} step={500} value={Math.min(safeDown, downMax)} onChange={(e) => { const prev = safeDown; const next = Math.max(0, Number(e.target.value)); setAdjust((a) => ({ ...a, down: next })); markStarted(); emit("payment_recalculated", { field: "down_payment", from: prev, to: next, calc_version: PAYMENT_CALC_VERSION }); }} onPointerUp={() => emit("payment_slider_changed", { down: safeDown })} className="w-full accent-[#0B6FEA]" />
+                      {est?.downClamped && <p className="text-[11px] text-[#92400E] mt-1">The down payment can't be more than the {fmt$(price)} selling price, so it is shown as {fmt$(safeDown)}.</p>}
                     </div>
                   )}
-                  {copy.showTerm && (
+                  {copy.showTerm && controls.term && (est?.terms.length ?? 0) > 1 && (
                     <div>
-                      <p className="text-[12px] text-[#64748B] mb-1.5">Term</p>
-                      <div className="grid grid-cols-4 gap-2">{TERMS.map((t) => (
-                        <button key={t} onClick={() => { const prev = term; setTerm(t); markStarted(); emit("payment_term_selected", { term: t }); emit("payment_recalculated", { field: "term", from: prev, to: t, calc_version: PAYMENT_CALC_VERSION }); }} className={`h-10 rounded-xl text-[13px] font-semibold border transition-colors ${term === t ? "border-[#0B6FEA] bg-[#EAF4FF] text-[#0B6FEA]" : "border-[#DDE5EE] text-[#64748B] hover:border-border"}`}>{t} mo</button>
+                      <p id="tp-term-label" className="text-[12px] text-[#64748B] mb-1.5">Term</p>
+                      <div role="radiogroup" aria-labelledby="tp-term-label" className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(est?.terms.length ?? 1, 4)}, minmax(0, 1fr))` }}>{(est?.terms ?? []).map((t) => (
+                        <button key={t.months} role="radio" aria-checked={term === t.months} onClick={() => { const prev = term; setAdjust((a) => ({ ...a, term: t.months })); markStarted(); emit("payment_term_selected", { term: t.months }); emit("payment_recalculated", { field: "term", from: prev, to: t.months, calc_version: PAYMENT_CALC_VERSION }); }} className={`h-11 rounded-xl text-[13px] font-semibold border transition-colors ${term === t.months ? "border-[#0B6FEA] bg-[#EAF4FF] text-[#0B6FEA]" : "border-[#DDE5EE] text-[#64748B] hover:border-border"}`}>{t.months} mo</button>
                       ))}</div>
-                    </div>
-                  )}
-                  {copy.showApr && (
-                    <div>
-                      <div className="flex justify-between text-[12px] text-[#64748B] mb-1"><span>{aprPresentation.label}</span><span className="font-bold text-[#0D1B2A]">{aprPresentation.value}</span></div>
-                      <input type="range" min={0} max={16} step={0.25} value={apr} onChange={(e) => { const prev = apr; const next = Math.max(0, Number(e.target.value)); setApr(next); markStarted(); emit("payment_recalculated", { field: "example_apr", from: prev, to: next, calc_version: PAYMENT_CALC_VERSION }); }} onPointerUp={() => emit("example_apr_changed", { apr })} className="w-full accent-[#0B6FEA]" />
-                      <p className="text-[10.5px] text-[#94A3B8] mt-1 leading-snug">{aprPresentation.disclosure} <span className="text-[#64748B]">Source: {aprPresentation.source}.</span></p>
+                      {est?.termAdjusted && <p className="text-[11px] text-[#92400E] mt-1" role="status">The term you chose isn't offered for this vehicle, so the dealership's default of {term} months is shown.</p>}
                     </div>
                   )}
                   <div>
-                    <p className="text-[12px] text-[#64748B] mb-1.5 inline-flex items-center gap-1.5">Credit Profile (Optional) <Info className="w-3 h-3" /></p>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">{CREDIT_PROFILES.map((p) => (
-                      <button key={p.key} onClick={() => { const prev = apr; setProfile(p.label); setApr(p.apr); markStarted(); emit("credit_profile_selected", { profile: p.key }); emit("payment_recalculated", { field: "credit_profile", from: prev, to: p.apr, calc_version: PAYMENT_CALC_VERSION }); }} className={`h-12 rounded-xl border text-center transition-colors ${profile === p.label ? "border-[#0B6FEA] bg-[#EAF4FF]" : "border-[#DDE5EE] hover:border-border"}`}>
-                        <span className={`block text-[12px] font-bold leading-tight ${profile === p.label ? "text-[#0B6FEA]" : "text-[#10202B]"}`}>{p.label}</span>
-                        <span className="block text-[10px] text-[#94A3B8]">{p.range}</span>
-                      </button>
-                    ))}</div>
-                    <p className="text-[10.5px] text-[#94A3B8] mt-1.5">{CREDIT_TIER_DISCLOSURE} {creditImpactCopy(performsCreditInquiry)}</p>
+                    <div className="flex justify-between text-[12px] text-[#64748B] mb-1"><span>{aprLabel}</span><span className="font-bold text-[#0D1B2A]">{formatApr(apr)}</span></div>
+                    {copy.showApr && controls.aprOverride && (
+                      <>
+                        <label htmlFor="tp-apr" className="sr-only">Your assumed APR</label>
+                        <input id="tp-apr" type="range" min={0} max={Math.max(16, Math.ceil(est?.storeAprPercent ?? 0))} step={0.25} value={apr} onChange={(e) => { const prev = apr; const next = Math.max(0, Number(e.target.value)); setAdjust((a) => ({ ...a, apr: next })); markStarted(); emit("payment_recalculated", { field: "example_apr", from: prev, to: next, calc_version: PAYMENT_CALC_VERSION }); }} onPointerUp={() => emit("example_apr_changed", { apr })} className="w-full accent-[#0B6FEA]" />
+                        {est?.aprOverridden && <button type="button" onClick={() => setAdjust((a) => ({ ...a, apr: null }))} className="mt-1 text-[11px] font-semibold text-[#0B6FEA] underline">Use the dealership's assumed APR ({formatApr(est?.storeAprPercent ?? 0)})</button>}
+                      </>
+                    )}
+                    <p className="text-[10.5px] text-[#94A3B8] mt-1 leading-snug">{ASSUMED_APR_NOTE}</p>
                   </div>
                 </div>
 
-                {/* Breakdown panel */}
+                {/* Breakdown panel — every assumption behind the number, always. */}
                 <div className="rounded-xl border border-[#DDE5EE] bg-[#F5F7FA] p-4 self-start">
                   {([
-                    ["Vehicle Price", price ? fmt$(price) : "—"],
+                    ["Selling Price", fmt$(est?.sellingPrice ?? price)],
                     ["Down Payment", `-${fmt$(safeDown)}`],
                     ["Est. Amount Financed", fmt$(financed)],
                     ["Term", `${term} months`],
-                    [aprPresentation.label, aprPresentation.value],
+                    [aprLabel, formatApr(apr)],
                   ] as [string, string][]).map(([k, v]) => (
                     <div key={k} className="flex items-center justify-between gap-3 py-1.5 text-[12.5px]">
                       <span className="text-[#64748B]">{k}</span><span className="font-semibold text-[#10202B] tabular-nums">{v}</span>
                     </div>
                   ))}
                   <div className="flex items-center justify-between gap-3 pt-2.5 mt-1.5 border-t border-[#DDE5EE]">
-                    <span className="text-[12.5px] font-bold text-[#0D1B2A]">Est. Monthly Payment</span>
-                    <span className="text-[16px] font-extrabold text-[#0B6FEA] tabular-nums">{paymentAvailable ? <>{fmt$(monthly)}<span className="text-[11px] font-semibold text-[#64748B]">/mo</span></> : "—"}</span>
+                    <span className="text-[12.5px] font-bold text-[#0D1B2A]">Estimated Payment</span>
+                    <span className="text-[16px] font-extrabold text-[#0B6FEA] tabular-nums">{formatPayment(monthly)}<span className="text-[11px] font-semibold text-[#64748B]">/mo</span></span>
                   </div>
                   <div className="mt-3 pt-3 border-t border-[#DDE5EE]">
                     <p className="text-[11px] font-bold text-[#0D1B2A]">Estimated cash due at signing</p>
@@ -487,6 +502,9 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
                     </div>
                     <p className="text-[10.5px] text-[#94A3B8] mt-1.5 leading-snug">{dueAtSigning.note}</p>
                   </div>
+                  {(adjust.down != null || adjust.term != null || adjust.apr != null) && (
+                    <button type="button" onClick={() => setAdjust({ down: null, term: null, apr: null })} className="mt-3 text-[12px] font-semibold text-[#0B6FEA] underline">Reset to dealership defaults</button>
+                  )}
                 </div>
               </div>
 
@@ -497,13 +515,10 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
                   lead submission so abandonment between the two is measurable. */}
               <div className="mt-5 flex flex-col sm:flex-row sm:items-center gap-3 pt-4 border-t border-[#F1F5F9]">
                 <div className="flex-1 min-w-0">
-                  {/* No estimate, no summary of one. The neutral sentence is said
-                      once, in the header above; repeating it here would state the
-                      same absence twice. The CTA beside this stays either way. */}
                   {paymentAvailable && (
                     <>
                       <p className="text-[11px] font-bold uppercase tracking-wide text-[#94A3B8]">Your estimate</p>
-                      <p className="text-[13px] font-bold text-[#0D1B2A] mt-0.5 truncate">{`${fmt$(monthly)}/mo · ${term} mo · ${aprPresentation.label} ${aprPresentation.value} · ${fmt$(safeDown)} down`}</p>
+                      <p className="text-[13px] font-bold text-[#0D1B2A] mt-0.5 truncate">{`${formatPayment(monthly)}/mo · ${term} mo · ${aprLabel} ${formatApr(apr)} · ${fmt$(safeDown)} down`}</p>
                     </>
                   )}
                 </div>
@@ -513,7 +528,6 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
               <p className="text-[11px] text-[#94A3B8] mt-4">{copy.disclaimer}</p>
             </div>
           )}
-
 
           <div id="tp-form" className={`${CARD} p-5 sm:p-6 scroll-mt-24`}>
             <p className="text-[16px] font-bold text-[#0D1B2A]">Get Dealer-Reviewed Payment Details</p>

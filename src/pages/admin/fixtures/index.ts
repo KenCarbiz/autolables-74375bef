@@ -11,6 +11,7 @@ import fixture10 from "./10";
 import { FIXTURE_11 } from "./11";
 import { FIXTURE_12 } from "./12";
 import { FIXTURE_13 } from "./13";
+import { PAYMENT_ESTIMATOR_FIXTURES } from "./paymentEstimator";
 
 // Design fixtures for the parity harness. Each entry renders one reference
 // screen with synthetic data under /admin/design-fixture/:screen, a route that
@@ -38,4 +39,5 @@ export const ADMIN_FIXTURES: Record<string, AdminScreenFixture> = {
   "11": FIXTURE_11,
   "12": FIXTURE_12,
   "13": FIXTURE_13,
+  ...PAYMENT_ESTIMATOR_FIXTURES,
 };

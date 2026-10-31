@@ -171,7 +171,7 @@ describe("the financing estimate abstains as ONE unit", () => {
     "fmt$(financed)",
     "fmt$(safeDown)",
     "${term} months",
-    "aprPresentation.value",
+    "formatApr(apr)",
   ];
 
   const guardedRegion = (src: string) => {
