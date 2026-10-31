@@ -56,7 +56,7 @@ describe("the route table is readable", () => {
     expect(adminStart).toBeGreaterThan(gatedStart);
     expect(devStart).toBeGreaterThan(adminStart);
     expect(ROUTES.gated).toContain("/dashboard");
-    expect(ROUTES.platform).toEqual(["/platform-admin", "/platform-admin/tenants/:tenantId", "/platform-admin/members/:memberId"]);
+    expect(ROUTES.platform).toEqual(["/platform-admin", "/platform-admin/tenants/:tenantId", "/platform-admin/members/:memberId", "/platform-console/*"]);
   });
 });
 

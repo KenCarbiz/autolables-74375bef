@@ -68,6 +68,7 @@ const AdminV2 = lazy(() => import("./pages/AdminV2"));
 // Development only: the parity fixture page. The dynamic import sits inside the
 // DEV branch so a production bundle carries neither the route nor the chunk.
 const AdminDesignFixture = import.meta.env.DEV ? lazy(() => import("./pages/admin/AdminDesignFixture")) : null;
+const ConsoleDesignFixture = import.meta.env.DEV ? lazy(() => import("./pages/platformConsole/ConsoleDesignFixture")) : null;
 const AdminSmokeTest = lazy(() => import("./pages/AdminSmokeTest"));
 const AddendumIconLibrary = lazy(() => import("./pages/AddendumIconLibrary"));
 const AddendumLabelPrint = lazy(() => import("./pages/AddendumLabelPrint"));
@@ -80,6 +81,7 @@ const DescriptionVoiceSettings = lazy(() => import("./pages/DescriptionVoiceSett
 const WebsiteEmbed = lazy(() => import("./pages/WebsiteEmbed"));
 const AdminSpecsBackfillOne = lazy(() => import("./pages/AdminSpecsBackfillOne"));
 const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin"));
+const PlatformConsole = lazy(() => import("./pages/platformConsole/PlatformConsole"));
 const PlatformTenantDetail = lazy(() => import("./pages/PlatformTenantDetail"));
 const PlatformMemberDetail = lazy(() => import("./pages/PlatformMemberDetail"));
 const Inventory = lazy(() => import("./pages/Inventory"));
@@ -453,12 +455,16 @@ const App = () => (
                         <Route path="/platform-admin" element={<PlatformAdmin />} />
                         <Route path="/platform-admin/tenants/:tenantId" element={<PlatformTenantDetail />} />
                         <Route path="/platform-admin/members/:memberId" element={<PlatformMemberDetail />} />
+                        <Route path="/platform-console/*" element={<PlatformConsole />} />
                       </Route>
 
                       {/* Development only: deterministic Administration screens
                           for the visual parity harness. Never in a production bundle. */}
                       {import.meta.env.DEV && (
                         <Route path="/admin/design-fixture/:screen" element={AdminDesignFixture ? <AdminDesignFixture /> : null} />
+                      )}
+                      {import.meta.env.DEV && (
+                        <Route path="/platform-console-fixture/:screen" element={ConsoleDesignFixture ? <ConsoleDesignFixture /> : null} />
                       )}
 
                     <Route path="*" element={<NotFound />} />
