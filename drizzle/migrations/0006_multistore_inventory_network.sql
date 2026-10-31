@@ -1533,26 +1533,6 @@ BEGIN
   RETURN jsonb_build_object('queued', v_id IS NOT NULL, 'reason', CASE WHEN v_id IS NULL THEN 'already_queued' END);
 END $$;
 
--- ── Scheduling (run explicitly by a platform admin; not executed here) ─────
-
-CREATE OR REPLACE FUNCTION public.schedule_files_inventory_worker(_cron_expr text DEFAULT '*/10 * * * *')
-RETURNS bigint LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, vault, cron AS $$
-DECLARE url text; key text; job_id bigint;
-BEGIN
-  SELECT decrypted_secret INTO url FROM vault.decrypted_secrets WHERE name = 'supabase_url' LIMIT 1;
-  SELECT decrypted_secret INTO key FROM vault.decrypted_secrets WHERE name = 'service_role_key' LIMIT 1;
-  IF url IS NULL OR key IS NULL THEN RAISE EXCEPTION 'supabase_url and service_role_key Vault entries required'; END IF;
-  PERFORM cron.unschedule(jobid) FROM cron.job WHERE jobname = 'files-inventory-worker';
-  SELECT cron.schedule('files-inventory-worker', _cron_expr, format(
-    $job$ SELECT net.http_post(url := %L, headers := jsonb_build_object('Content-Type','application/json','Authorization',%L), body := '{"reconcile":true}'::jsonb, timeout_milliseconds := 120000); $job$,
-    url || '/functions/v1/files-inventory-worker', 'Bearer ' || key)) INTO job_id;
-  RETURN job_id;
-END $$;
-
-CREATE OR REPLACE FUNCTION public.unschedule_files_inventory_worker()
-RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, cron AS $$
-BEGIN PERFORM cron.unschedule(jobid) FROM cron.job WHERE jobname = 'files-inventory-worker'; END $$;
-
 -- ── Function privileges ────────────────────────────────────────────────────
 
 REVOKE ALL ON FUNCTION public.inventory_feed_enqueue(text, text, uuid, uuid) FROM PUBLIC, anon, authenticated;
@@ -1565,13 +1545,10 @@ REVOKE ALL ON FUNCTION public.store_enrichment_admit(uuid, text, text, text, tex
 REVOKE ALL ON FUNCTION public.group_inventory_core(uuid, text, jsonb, integer, integer) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.group_inventory_visible(uuid, text, uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.customer_origin_context(text) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.schedule_files_inventory_worker(text) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.unschedule_files_inventory_worker() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.inventory_feed_enqueue(text, text, uuid, uuid), public.inventory_feed_claim_jobs(integer, integer), public.inventory_feed_claim_job(uuid, integer),
   public.inventory_feed_finish_job(uuid, uuid, text, text, boolean, jsonb, uuid, text), public.inventory_feed_claim_version(text, text, bigint, timestamptz, text, uuid),
   public.inventory_apply_store_snapshot(uuid), public.store_enrichment_admit(uuid, text, text, text, text, numeric),
-  public.group_inventory_core(uuid, text, jsonb, integer, integer), public.group_inventory_visible(uuid, text, uuid), public.customer_origin_context(text),
-  public.schedule_files_inventory_worker(text), public.unschedule_files_inventory_worker() TO service_role;
+  public.group_inventory_core(uuid, text, jsonb, integer, integer), public.group_inventory_visible(uuid, text, uuid), public.customer_origin_context(text) TO service_role;
 
 REVOKE ALL ON FUNCTION public.customer_group_inventory(text, text, jsonb, integer, integer) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.customer_group_inventory_vehicle(text, text, uuid) FROM PUBLIC;
