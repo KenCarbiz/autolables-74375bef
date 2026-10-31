@@ -18,14 +18,20 @@ const controls = { id: 1, ingestion_paused: true, emergency_stop: false, reconci
 const overview = { group, controls, stores: [], exceptions: { open_conflicts: 0, retirement_review: 0, quarantined_partitions_7d: 0, failed_jobs: 0, pending_mappings: 0 } };
 const route = (q: string) => `/admin/integrations/inventory-network?view=duplicates${q}`;
 
+// The fixture previews expire from 21:21 UTC on the day they were generated, so
+// the clock is pinned before that; otherwise the approve button disappears.
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-31T21:20:00Z"));
   resetSupabaseSpy();
   spyResponses.tables.dealer_groups = { data: [group] };
   spyResponses.rpcs.inv_admin_overview = { data: overview };
   spyResponses.rpcs.inv_dedupe_overview = { data: fx.overview };
 });
 
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("Duplicate handling", () => {
   it("lists candidates by suffix only and reads without writing or calling functions", async () => {
@@ -41,9 +47,6 @@ describe("Duplicate handling", () => {
 
   it("shows KEEP, ARCHIVE, LINK and PRESERVE for an eligible preview, with zero provider calls", async () => {
     spyResponses.rpcs.inv_dedupe_get_preview = { data: fx.eligible };
-    // The fixture's preview carries a real expiry; read it while still open.
-    vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(new Date(fx.eligible.expires_at).getTime() - 60_000);
     renderAdmin(<InventoryNetworkPage />, { route: route(`&preview=${fx.eligibleId}`) });
     const list = await screen.findByRole("heading", { name: "What happens to each record" });
     const section = list.closest("section")!;
