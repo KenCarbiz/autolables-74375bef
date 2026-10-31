@@ -287,7 +287,7 @@ export default function DocumentsPrintCenter() {
     <>
       <DegradedNotice degraded={degraded} />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0">
           <p className="mb-1 text-[13px] leading-[18px] font-semibold text-adm-ink">Vehicle</p>
           <div className="flex min-h-[44px] items-center gap-2 rounded-[6px] border border-adm-border bg-adm-surface px-3">
@@ -412,13 +412,10 @@ export default function DocumentsPrintCenter() {
                 </tbody>
               </WorkTable>
             </Panel>
-            <div className="flex flex-col gap-3 px-1 pt-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="min-w-0 text-[13px] leading-[18px] text-adm-muted">
+            <p className="px-1 pt-3 text-[13px] leading-[18px] text-adm-muted">
                 {picked.size} of {docCount} documents selected · {counts.ready} ready · {counts.blocked} blocked · {counts.customerVisible} shown in the Passport
                 {passportHref ? <> · <a href={passportHref} target="_blank" rel="noreferrer" className="font-semibold text-adm-primary hover:underline">Open Passport view</a></> : null}
               </p>
-              <div className="flex shrink-0 sm:w-[220px]">{printAction}</div>
-            </div>
             </>
           )
         }
@@ -459,6 +456,7 @@ export default function DocumentsPrintCenter() {
                 <p className="text-[14px] leading-[20px] text-adm-muted">Select a document to preview it.</p>
               )}
             </Panel>
+            {printAction}
 
             <Panel title="Print bundle">
               <ul className="divide-y divide-adm-border">

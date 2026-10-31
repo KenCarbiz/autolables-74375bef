@@ -23,7 +23,7 @@ import {
   Search, QrCode, ChevronRight, CircleDot, Circle, Wrench, ArrowUp, ArrowDown, Minus, FileText, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button, MetricStrip, FilterSelect, StatusText, Th, Td, WorkTable, type Tone } from "@/components/product";
+import { MetricStrip, FilterSelect, StatusText, Th, Td, WorkTable, type Tone } from "@/components/product";
 
 // ──────────────────────────────────────────────────────────────
 // Service Desk queue — "Vehicles Requiring Service Action" (desktop comp).
@@ -572,13 +572,13 @@ export default function ServiceQueue({ mode = "desk", onCounts }: { mode?: "my_w
                   )}
                   {mode === "desk" && <Td className="whitespace-nowrap"><StatusText tone={K.tone}>{K.label}</StatusText></Td>}
                   <Td align="right" className="whitespace-nowrap">
-                    <Button
-                      size="sm"
-                      variant={r.next.tone === "danger" ? "danger" : "secondary"}
+                    <button
+                      type="button"
                       onClick={(e) => { e.stopPropagation(); openWorkspace(r); }}
+                      className={cn("text-[14px] font-semibold hover:underline", r.next.tone === "danger" ? "text-adm-danger" : "text-adm-primary")}
                     >
                       {r.next.label}
-                    </Button>
+                    </button>
                   </Td>
                 </tr>
               );

@@ -368,7 +368,7 @@ export default function ServiceVehicleWorkspace() {
         />
         <WorkspaceTabs findings={findings.length} repairs={failures.length} reinspections={reinspections} k208={newestActive || newestSigned ? 1 : 0} approvals={pendingRequests} />
 
-        <DetailLayout width="wider"
+        <DetailLayout
           main={
             <>
               {tab === "#inspection" && (
