@@ -1,3 +1,4 @@
+import { shortVehicle } from "@/lib/shortVehicle";
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -86,7 +87,7 @@ const PrepDueRow = ({ view, canEdit, timeZone, pending, onSave }: { view: PrepDu
 const NextActionCell = ({ row, dueAt }: { row: PrepSignOffRow; dueAt: string | null }) => {
   const action = derivePrepNextAction(row, { dueAt });
   return (
-    <p className={`truncate ${action.overdue ? "font-semibold text-adm-danger" : action.key === "none" ? "text-adm-muted" : "text-adm-ink"}`} title={action.label}>
+    <p className={`line-clamp-2 break-words leading-[18px] ${action.overdue ? "font-semibold text-adm-danger" : action.key === "none" ? "text-adm-muted" : "text-adm-ink"}`} title={action.label}>
       {action.label}
     </p>
   );
@@ -288,10 +289,10 @@ const PrepSignOff = () => {
                 {filtered.map(s => (
                   <tr key={s.id} className={`h-12 cursor-pointer ${selected?.id === s.id ? "bg-adm-selected" : "hover:bg-adm-workspace"}`} onClick={() => select(s.id)}>
                     <Td className="max-w-[170px] min-w-[140px] !px-2">
-                      <p className="truncate text-[13px] font-semibold text-adm-ink" title={`${s.ymm || s.vin}${s.stock_number ? ` - Stock ${s.stock_number}` : ""}`}>{s.ymm || s.vin}</p>
+                      <p className="truncate text-[13px] font-semibold text-adm-ink" title={`${s.ymm || s.vin}${s.stock_number ? ` - Stock ${s.stock_number}` : ""}`}>{s.ymm ? shortVehicle(s.ymm) : s.vin}</p>
                     </Td>
-                    <Td className="max-w-[120px] !px-2">
-                      <p className="truncate" title={taskLabel(s.accessories_installed)}>{taskLabel(s.accessories_installed)}</p>
+                    <Td className="min-w-[110px] max-w-[170px] !px-2">
+                      <p className="line-clamp-2 break-words leading-[18px]" title={taskLabel(s.accessories_installed)}>{taskLabel(s.accessories_installed)}</p>
                     </Td>
                     {prepDue.available && (
                       <Td className="whitespace-nowrap !px-2">
@@ -303,7 +304,7 @@ const PrepSignOff = () => {
                         {s.status.charAt(0).toUpperCase() + s.status.slice(1)}
                       </StatusText>
                     </Td>
-                    <Td className="max-w-[180px] whitespace-nowrap !px-2">
+                    <Td className="min-w-[130px] max-w-[190px] !px-2">
                       <NextActionCell row={s} dueAt={prepDue.view(s)?.dueAt ?? null} />
                     </Td>
                     <Td align="right" className="!px-2">

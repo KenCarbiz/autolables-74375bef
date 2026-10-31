@@ -392,7 +392,8 @@ describe("active-route matching", () => {
     expect(activeLabel("/get-ready-command")).toBe("Get Ready Command");
     expect(activeLabel("/get-ready-command/abc-123")).toBe("Get Ready Command");
     expect(activeLabel("/print-center")).toBe("Print Center");
-    expect(activeLabel("/print-center/abc-123")).toBe("Print Center");
+    expect(activeLabel("/print-center/abc-123")).toBe("Inventory");
+    expect(activeLabel("/factory-sticker/abc-123")).toBe("Inventory");
   });
 
   it("lights Customers from both the new and the legacy URL", () => {

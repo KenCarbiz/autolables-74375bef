@@ -34,7 +34,7 @@ export const IdentityStrip = ({ vehicle, facts, tag }: { vehicle: VehicleRow; fa
         {facts.map((f) => (
           <div key={f.label} className="min-w-0">
             <dt className="text-[12px] leading-[18px] text-adm-muted">{f.label}</dt>
-            <dd className="truncate text-[14px] leading-[20px] font-semibold text-adm-ink" title={typeof f.value === "string" ? f.value : undefined}>{f.value}</dd>
+            <dd className="line-clamp-2 break-words text-[14px] leading-[20px] font-semibold text-adm-ink" title={typeof f.value === "string" ? f.value : undefined}>{f.value}</dd>
           </div>
         ))}
       </dl>

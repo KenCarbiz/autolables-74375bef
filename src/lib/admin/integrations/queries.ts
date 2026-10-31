@@ -272,7 +272,7 @@ export async function loadJobLedgers(tenantId: string, heads: LedgerHeads, crawl
   const syncOutcome = heads.latestReal ? outcomeForRun(heads.latestReal) : null;
   const inventory_sync: LedgerFacts | null = heads.failed
     ? null
-    : { lastAttemptAt: heads.latestReal?.started_at ?? null, lastSuccessAt: heads.lastSuccessAt, lastOutcome: syncOutcome === null ? null : syncOutcome === "success" || syncOutcome === "partial" ? "succeeded" : "failed" };
+    : { lastAttemptAt: heads.latestReal?.started_at ?? null, lastSuccessAt: heads.lastSuccessAt, lastOutcome: syncOutcome === null ? null : syncOutcome === "success" || syncOutcome === "partial" ? "succeeded" : "failed", lastRunId: heads.latestReal?.id ?? null };
   const crawlFacts: LedgerFacts | null = crawl ? { lastAttemptAt: crawl.lastAttemptAt, lastSuccessAt: crawl.lastSuccessAt, lastOutcome: crawl.lastOutcome === null ? null : crawl.lastOutcome === "captured" ? "succeeded" : "failed" } : null;
 
   const [enrichedAt, recallAt, descLatest, descSuccess, escalation] = await Promise.all([

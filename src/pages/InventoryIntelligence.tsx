@@ -61,12 +61,21 @@ interface DocRow {
   document_type: string;
   document_status: string;
   version: number;
+  approved_at: string | null;
+  updated_at: string | null;
 }
 
 interface Row {
   vehicle: Vehicle;
   intel: VehicleIntelligenceRow;
+  dates: Record<string, string | null>;
 }
+
+const shortDate = (iso: string | null | undefined): string | null => {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" });
+};
 
 const fmtWhen = (d?: string | null) =>
   d ? new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—";
@@ -108,7 +117,7 @@ export default function InventoryIntelligence() {
       // deno-lint-ignore no-explicit-any
       const { data: docs } = ids.length ? await (supabase as any)
         .from("generated_documents")
-        .select("vehicle_id, document_type, document_status, version")
+        .select("vehicle_id, document_type, document_status, version, approved_at, updated_at")
         .eq("tenant_id", tenantId).in("vehicle_id", ids) : { data: [] };
       const docsByVehicle = new Map<string, DocRow[]>();
       for (const d of (docs || []) as DocRow[]) {
@@ -119,14 +128,17 @@ export default function InventoryIntelligence() {
         const mc = (vehicle.mc_attributes || {}) as Record<string, unknown>;
         const rec = byVehicle.get(vehicle.id);
         const statuses: Record<string, string | null> = {};
+        const dates: Record<string, string | null> = {};
         for (const d of docsByVehicle.get(vehicle.id) || []) {
           const family = familyForDocumentType(d.document_type, vehicle.condition);
           if (!family) continue;
           // Newest version wins.
           statuses[family.id] = d.document_status;
+          dates[family.id] = d.approved_at ?? d.updated_at ?? null;
         }
         return {
           vehicle,
+          dates,
           intel: buildIntelligenceRow({
             condition: vehicle.condition,
             imported: true,
@@ -252,7 +264,7 @@ export default function InventoryIntelligence() {
               </tr>
             </thead>
             <tbody>
-              {filtered?.map(({ vehicle, intel }) => (
+              {filtered?.map(({ vehicle, intel, dates }) => (
                 <tr key={vehicle.id} className="h-12 hover:bg-adm-workspace">
                   <Td className="w-8">
                     <input
@@ -269,11 +281,17 @@ export default function InventoryIntelligence() {
                   <Td><Stage stage={intel.sourceStage} /></Td>
                   {COLUMNS.map((c) => {
                     const f = c.ids.map((id) => intel.families.find((x) => x.family === id)).find((x) => x && x.stage !== "Not Applicable") ?? intel.families.find((x) => x.family === c.ids[0]);
-                    return <Td key={c.key}>{f ? <Stage stage={f.stage} /> : null}</Td>;
+                    const date = f ? shortDate(dates[f.family]) : null;
+                    return (
+                      <Td key={c.key}>
+                        {f ? <Stage stage={f.stage} /> : null}
+                        {f && date && f.stage !== "Not Applicable" && <span className="block text-[11px] leading-[14px] tabular-nums text-adm-muted">{date}</span>}
+                      </Td>
+                    );
                   })}
-                  <Td className="max-w-[140px]">
+                  <Td className="max-w-[170px]">
                     {intel.blocker
-                      ? <span className="block truncate text-[13px] font-medium text-adm-warning" title={intel.blocker}>{intel.blocker}</span>
+                      ? <span className="line-clamp-2 break-words text-[13px] leading-[16px] font-medium text-adm-warning" title={intel.blocker}>{intel.blocker}</span>
                       : <span className="text-[12px] text-adm-muted">None</span>}
                   </Td>
                   <Td align="right">

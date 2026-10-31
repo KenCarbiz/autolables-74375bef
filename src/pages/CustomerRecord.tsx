@@ -176,10 +176,10 @@ const CustomerRecord = () => {
               <p className="text-[14px] leading-[20px] text-adm-muted">Nothing has been captured for this customer yet.</p>
             ) : (
               <>
-              <ol className="relative ml-[124px] border-l border-adm-border">
+              <ol className="relative ml-[124px] border-l-2 border-[#C5D4F7]">
                 {(showAllTimeline ? timeline : timeline.slice(0, 6)).map((a, i) => (
                   <li key={`${a.at}-${i}`} className="relative pb-4 pl-5 last:pb-0">
-                    <span className="absolute -left-[5px] top-[7px] h-[9px] w-[9px] rounded-full bg-adm-primary" aria-hidden="true" />
+                    <span className="absolute -left-[6px] top-[5px] h-[10px] w-[10px] rounded-full bg-adm-primary ring-2 ring-adm-surface" aria-hidden="true" />
                     <span className="absolute -left-[124px] top-[2px] w-[112px] whitespace-nowrap text-right text-[12px] leading-[18px] text-adm-muted" title={relativeTime(a.at)}>{timelineStamp(a.at)}</span>
                     <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{a.label}</p>
                     <p className="text-[13px] leading-[18px] text-adm-muted">{a.detail}</p>

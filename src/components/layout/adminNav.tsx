@@ -230,7 +230,8 @@ export function buildAdminNavSections({ badges, anyAdminTab, role }: BuildNavOpt
             p === "/inventory-v2" ||
             p === "/add-inventory" ||
             (p.startsWith("/vehicle-file/") && !/[?&]tab=(getready|compliance)\b/.test(s)) ||
-            underSegment("/vin-command")(p),
+            underSegment("/vin-command")(p) ||
+            /^\/(print-center|factory-sticker)\/[^/]+/.test(p),
         },
         {
           label: "Inventory Intelligence",

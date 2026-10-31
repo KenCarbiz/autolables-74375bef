@@ -319,7 +319,7 @@ export default function ManagerIntake() {
                       <StatusText tone={(STATE_PILL[r.state] ?? { tone: "neutral" as Tone }).tone}>{(STATE_PILL[r.state] ?? { label: r.state }).label}</StatusText>
                     </Td>
                     <Td align="right">
-                      <button type="button" className="inline-flex h-8 items-center rounded-[6px] border border-adm-border bg-adm-surface px-3 text-[13px] font-medium text-adm-primary hover:bg-adm-workspace" onClick={(e) => { e.stopPropagation(); setDrawer(r); setReason(""); }} aria-label={`Review ${r.ymm}`}>Review</button>
+                      <button type="button" className="inline-flex h-8 items-center rounded-[6px] bg-adm-primary px-3 text-[13px] font-semibold text-white hover:bg-adm-primary/90" onClick={(e) => { e.stopPropagation(); setDrawer(r); setReason(""); }} aria-label={`Review ${r.ymm}`}>Review</button>
                     </Td>
                   </tr>
                 );

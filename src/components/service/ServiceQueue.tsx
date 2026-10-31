@@ -564,7 +564,7 @@ export default function ServiceQueue({ mode = "desk", onCounts }: { mode?: "my_w
                   </Td>
                   <Td className={cn(mode === "desk" && "whitespace-nowrap")}>
                     {mode === "my_work"
-                      ? <span className="block max-w-[100px] truncate" title={r.nextTask}>{r.nextTask}</span>
+                      ? <span className="line-clamp-2 min-w-[120px] max-w-[180px] break-words" title={r.nextTask}>{r.nextTask}</span>
                       : <span className={cn("tabular-nums", r.overdue ? "font-semibold text-adm-danger" : "text-adm-ink")}>{ageDisplay(r)}</span>}
                   </Td>
                   {mode === "desk" && (

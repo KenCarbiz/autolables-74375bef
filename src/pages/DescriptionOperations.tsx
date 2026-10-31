@@ -1,3 +1,4 @@
+import { shortVehicle } from "@/lib/shortVehicle";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -614,8 +615,8 @@ export default function DescriptionOperations() {
                       </td>
                       <td className="px-2 text-[13px] text-adm-muted truncate">{stock || "Unknown"}</td>
                       <td className="px-2 text-[14px] text-adm-ink truncate">
-                        <button type="button" onClick={(e) => { e.stopPropagation(); select(active ? null : r.vehicleId); }} className="text-left max-w-full truncate hover:underline focus-visible:underline">
-                          {r.vehicle.ymm || "Vehicle"}
+                        <button type="button" onClick={(e) => { e.stopPropagation(); select(active ? null : r.vehicleId); }} title={r.vehicle.ymm || "Vehicle"} className="text-left max-w-full truncate hover:underline focus-visible:underline">
+                          {shortVehicle(r.vehicle.ymm || "Vehicle")}
                         </button>
                       </td>
                       <td className="px-2 text-[13px] text-adm-ink truncate">{sourceStatus(r.caseRow)}</td>

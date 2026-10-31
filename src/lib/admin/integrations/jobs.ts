@@ -50,6 +50,7 @@ export interface LedgerFacts {
   lastAttemptAt: string | null;
   lastSuccessAt: string | null;
   lastOutcome: string | null;
+  lastRunId?: string | null;
 }
 
 export type CronLookup = CronStatusRow | null | "unavailable";
@@ -69,6 +70,7 @@ export interface JobRow {
   lastAttemptAt: string | null;
   lastSuccessAt: string | null;
   lastOutcome: string | null;
+  lastRunId: string | null;
   /** Where the success evidence came from. */
   evidence: "rooftop_ledger" | "scheduler" | "none";
 }
@@ -104,6 +106,7 @@ export function deriveJobRow(i: JobInput): JobRow {
     lastAttemptAt: later(ledger?.lastAttemptAt ?? null, cron?.last_start ?? null),
     lastSuccessAt,
     lastOutcome: ledger?.lastOutcome ?? cron?.last_status ?? null,
+    lastRunId: ledger?.lastRunId ?? null,
     evidence,
   };
 }

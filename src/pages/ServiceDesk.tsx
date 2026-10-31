@@ -89,9 +89,9 @@ export default function ServiceDesk() {
           />
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_240px] gap-5 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_240px] gap-5 items-stretch">
           <ServiceQueue key={view} mode={view} onCounts={setCounts} />
-          <div className="xl:sticky xl:top-4">
+          <div className="[&>*]:h-full">
             <ManagerMessagesRail tenantId={tenantId} vehicles={railVehicles} />
           </div>
         </div>

@@ -1,4 +1,5 @@
 import { useParams } from "react-router-dom";
+import { formatSyncRunId } from "@/lib/approvedFields/syncRunId";
 import { ADMIN_CHILD_ROUTES, adminTabHref } from "@/lib/admin/sections";
 import { HEALTH_META, describeAge, needsAttention, type HealthTone } from "@/lib/admin/health";
 import { describeCron, JOB_CATALOG } from "@/lib/admin/integrations/jobs";
@@ -67,7 +68,12 @@ export default function JobDetailPage() {
       section="integrations"
       crumbs={crumbs}
       title={row.lastOutcome ? (succeeded ? "Invocation completed" : "Invocation failed") : row.verdict.headline}
-      subtitle={`${spec.label}, scheduled job detail${row.lastAttemptAt ? `. Last invocation ${formatAt(row.lastAttemptAt)}` : ""}`}
+      subtitle={
+        <>
+          {`${spec.label}, scheduled job detail${row.lastAttemptAt ? `. Last invocation ${formatAt(row.lastAttemptAt)}` : ""}`}
+          {row.lastRunId && <span className="ml-3 font-semibold text-adm-ink" title={row.lastRunId}>{formatSyncRunId(row.lastRunId).replace(/^Run /, "Run ID: ")}</span>}
+        </>
+      }
       actions={banner ? undefined : <LinkButton variant="primary" to={spec.drillIn}>{spec.drillInLabel}</LinkButton>}
     >
       <div className="grid gap-4 lg:grid-cols-3 items-stretch">
@@ -102,7 +108,7 @@ export default function JobDetailPage() {
             </Step>
           </ol>
         </Panel>
-        <Panel title="Outcome" titleSize="md" inset="sm" className="h-full">
+        <Panel title="Outcome" titleSize="md" inset="sm" className="self-start">
           <KeyValueList
             divided
             className="grid-cols-[minmax(96px,112px)_1fr]"
@@ -113,7 +119,7 @@ export default function JobDetailPage() {
               { label: "Retained data", value: row.verdict.inventoryPreserved === "unknown" ? "Unknown" : row.verdict.inventoryPreserved ? "Last good data kept" : "Not kept" },
             ]}
           />
-          <p className="mt-3 text-[13px] leading-[18px] text-adm-muted">{row.verdict.detail}</p>
+          {!banner && <p className="mt-3 text-[13px] leading-[18px] text-adm-muted">{row.verdict.detail}</p>}
         </Panel>
       </div>
       {banner && (

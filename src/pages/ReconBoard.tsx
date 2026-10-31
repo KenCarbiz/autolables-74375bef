@@ -26,9 +26,25 @@ export default function ReconBoard() {
   useEffect(() => {
     if (!tenant?.id || tenant.id === "house") return;
     // deno-lint-ignore no-explicit-any
-    void (supabase as any).rpc("list_tenant_members", { p_tenant_id: tenant.id }).then(({ data }: { data: Array<{ user_id?: string; email?: string }> | null }) => {
+    const sb = supabase as any;
+    void sb.rpc("list_tenant_members", { p_tenant_id: tenant.id }).then(async ({ data }: { data: Array<{ user_id?: string; email?: string; full_name?: string | null }> | null }) => {
       const map: Record<string, string> = {};
-      for (const m of data || []) if (m.user_id && m.email) map[m.user_id] = m.email.split("@")[0];
+      for (const m of data || []) {
+        if (!m.user_id) continue;
+        const full = m.full_name?.trim();
+        const local = m.email?.split("@")[0];
+        if (full || local) map[m.user_id] = full || (local as string);
+      }
+      const ids = Object.keys(map);
+      if (ids.length > 0) {
+        try {
+          const res = await sb.from("profiles").select("user_id, display_name").in("user_id", ids);
+          for (const p of (res?.data as Array<{ user_id: string; display_name: string | null }> | null) || []) {
+            const dn = p.display_name?.trim();
+            if (dn) map[p.user_id] = dn;
+          }
+        } catch { /* names stay as the email local part */ }
+      }
       setNames(map);
     });
   }, [tenant?.id]);

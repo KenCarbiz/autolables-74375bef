@@ -365,6 +365,7 @@ export default function ServiceVehicleWorkspace() {
             sold ? "Sold" : null,
             assignedMember ? memberName(assignedMember) : gr?.assigned_technician || "Unassigned",
           ].filter(Boolean).join(" | ")}
+          inlineMeta
           actions={veh.hero_image_url ? <img src={veh.hero_image_url} alt="" className="hidden sm:block h-[72px] w-[128px] rounded-[6px] border border-adm-border object-cover" /> : undefined}
         />
         <WorkspaceTabs findings={findings.length} repairs={failures.length} reinspections={reinspections} k208={newestActive || newestSigned ? 1 : 0} approvals={pendingRequests} />
