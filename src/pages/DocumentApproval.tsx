@@ -246,9 +246,11 @@ const DocumentApproval = () => {
             <ul className="divide-y divide-adm-border">
               {requirements.map((r) => (
                 <li key={r.label} className="flex items-start gap-3 py-2 text-[14px] leading-[20px]">
-                  {r.ok
-                    ? <Check className="mt-0.5 h-5 w-5 shrink-0 text-adm-success" aria-label="Met" />
-                    : <X className="mt-0.5 h-5 w-5 shrink-0 text-adm-warning" aria-label="Not met" />}
+                  <span className={`mt-px grid h-6 w-6 shrink-0 place-items-center rounded-full text-white ${r.ok ? "bg-adm-success" : "bg-adm-warning"}`}>
+                    {r.ok
+                      ? <Check className="h-4 w-4" strokeWidth={3} aria-label="Met" />
+                      : <X className="h-4 w-4" strokeWidth={3} aria-label="Not met" />}
+                  </span>
                   <span className="min-w-0">
                     <span className="block text-adm-ink">{r.label}</span>
                     <span className="block text-[13px] leading-[18px] text-adm-muted">{r.note}</span>

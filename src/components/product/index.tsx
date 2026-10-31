@@ -56,21 +56,21 @@ export const StatusText = ({ tone = "neutral", children, className }: { tone?: T
   </StatusChip>
 );
 
-const TAG_BORDER: Record<Tone, string> = {
-  neutral: "border-adm-border",
-  success: "border-adm-success/40",
-  warning: "border-adm-warning/40",
-  danger: "border-adm-danger/40",
-  info: "border-adm-primary/40",
+const HERO_TONE: Record<Tone, string> = {
+  neutral: "bg-adm-workspace",
+  success: "bg-adm-success-bg",
+  warning: "bg-adm-warning-bg",
+  danger: "bg-adm-danger-bg",
+  info: "bg-adm-selected",
 };
 
 const TAG_ICON = { neutral: Info, success: CheckCircle2, warning: AlertTriangle, danger: XCircle, info: Info } as const;
 
-/** Vehicle hero status tag: bordered, 4px radius, 16px leading icon. Not for table rows. */
+/** Vehicle hero status tag: flat tinted rectangle, 2px radius, no border, 16px leading icon. Not for table rows. */
 export const HeroStatusTag = ({ tone = "neutral", children, className }: { tone?: Tone; children: ReactNode; className?: string }) => {
   const Icon = TAG_ICON[tone];
   return (
-    <StatusChip tone={tone} className={cn("rounded-[4px] border font-medium", TAG_BORDER[tone], className)}>
+    <StatusChip tone={tone} className={cn("rounded-[2px] font-medium", HERO_TONE[tone], className)}>
       <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
       {children}
     </StatusChip>

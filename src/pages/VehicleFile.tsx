@@ -303,7 +303,7 @@ const VehicleFile = () => {
               <ul aria-label="Vehicle status" className="flex flex-wrap items-center gap-x-2 gap-y-1.5 pt-1">
                 {summary.map((f) => (
                   <li key={f.label} title={f.detail}>
-                    <HeroStatusTag tone={f.tone} className="px-2.5 py-1 text-[13px] leading-[20px]">
+                    <HeroStatusTag tone={f.tone} className="px-3.5 py-1.5 text-[14px] leading-[20px]">
                       {f.value === "Unknown" ? <><span className="font-medium opacity-80">{f.label}</span> {f.value}</> : f.value}
                     </HeroStatusTag>
                   </li>
@@ -340,7 +340,7 @@ const VehicleFile = () => {
       {!subPage && tab === "overview" && (
         <FactStrip
           label="Vehicle summary"
-          className="lg:grid-cols-[repeat(5,auto)_minmax(0,1fr)]"
+          className="lg:grid-cols-[repeat(5,minmax(0,1fr))_minmax(0,1.6fr)] lg:gap-x-0 lg:[&>div]:px-4 lg:[&>div+div]:border-l lg:[&>div+div]:border-adm-border lg:[&>div:first-child]:pl-0"
           facts={[
             { label: "Owner", value: lc.owner },
             { label: "Condition", value: <span className="capitalize">{vehicle.condition || "Unknown"}</span> },
