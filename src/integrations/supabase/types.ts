@@ -2118,6 +2118,7 @@ export type Database = {
           display_name: string
           feed_import_paused: boolean
           feed_price_updates_listing: boolean
+          feed_semantics: string
           group_id: string
           id: string
           inventory_feed_enabled: boolean
@@ -2125,8 +2126,10 @@ export type Database = {
           is_primary_inventory_store: boolean
           legal_name: string | null
           listing_sync_enabled: boolean
+          max_count_drop_pct: number | null
           max_invalid_rows: number
           max_snapshot_shrink_pct: number
+          min_absent_vehicles: number | null
           missing_snapshot_threshold: number
           phone: string | null
           provider_ids: Json
@@ -2150,6 +2153,7 @@ export type Database = {
           display_name: string
           feed_import_paused?: boolean
           feed_price_updates_listing?: boolean
+          feed_semantics?: string
           group_id: string
           id?: string
           inventory_feed_enabled?: boolean
@@ -2157,8 +2161,10 @@ export type Database = {
           is_primary_inventory_store?: boolean
           legal_name?: string | null
           listing_sync_enabled?: boolean
+          max_count_drop_pct?: number | null
           max_invalid_rows?: number
           max_snapshot_shrink_pct?: number
+          min_absent_vehicles?: number | null
           missing_snapshot_threshold?: number
           phone?: string | null
           provider_ids?: Json
@@ -2182,6 +2188,7 @@ export type Database = {
           display_name?: string
           feed_import_paused?: boolean
           feed_price_updates_listing?: boolean
+          feed_semantics?: string
           group_id?: string
           id?: string
           inventory_feed_enabled?: boolean
@@ -2189,8 +2196,10 @@ export type Database = {
           is_primary_inventory_store?: boolean
           legal_name?: string | null
           listing_sync_enabled?: boolean
+          max_count_drop_pct?: number | null
           max_invalid_rows?: number
           max_snapshot_shrink_pct?: number
+          min_absent_vehicles?: number | null
           missing_snapshot_threshold?: number
           phone?: string | null
           provider_ids?: Json
@@ -6608,6 +6617,9 @@ export type Database = {
           last_failure_at: string | null
           last_failure_reason: string | null
           last_run_id: string | null
+          last_trusted_at: string | null
+          last_trusted_snapshot_id: string | null
+          last_trusted_valid_count: number | null
           store_id: string
           updated_at: string
         }
@@ -6619,6 +6631,9 @@ export type Database = {
           last_failure_at?: string | null
           last_failure_reason?: string | null
           last_run_id?: string | null
+          last_trusted_at?: string | null
+          last_trusted_snapshot_id?: string | null
+          last_trusted_valid_count?: number | null
           store_id: string
           updated_at?: string
         }
@@ -6630,6 +6645,9 @@ export type Database = {
           last_failure_at?: string | null
           last_failure_reason?: string | null
           last_run_id?: string | null
+          last_trusted_at?: string | null
+          last_trusted_snapshot_id?: string | null
+          last_trusted_valid_count?: number | null
           store_id?: string
           updated_at?: string
         }
@@ -14993,6 +15011,10 @@ export type Database = {
         Args: { p_action: string; p_conflict_id: string; p_note?: string }
         Returns: undefined
       }
+      inv_admin_resolve_held_snapshot: {
+        Args: { p_action: string; p_reason: string; p_snapshot_id: string }
+        Returns: Json
+      }
       inv_admin_retry_job: { Args: { p_job_id: string }; Returns: Json }
       inv_admin_review_retirement: {
         Args: { p_action: string; p_inventory_id: string }
@@ -15027,6 +15049,10 @@ export type Database = {
           p_reason: string
           p_reconcile_enabled: boolean
         }
+        Returns: undefined
+      }
+      inv_admin_set_feed_completeness: {
+        Args: { p: Json; p_reason: string; p_store_id: string }
         Returns: undefined
       }
       inv_admin_set_shrink_guard: {
@@ -15134,6 +15160,10 @@ export type Database = {
       }
       inventory_apply_store_snapshot: {
         Args: { p_snapshot_id: string }
+        Returns: Json
+      }
+      inventory_apply_store_snapshot_mode: {
+        Args: { p_mode: string; p_snapshot_id: string }
         Returns: Json
       }
       inventory_feed_claim_job: {
