@@ -43,3 +43,4 @@ deno.lock
 
 # Parity harness working captures; the evidence folder keeps the reviewed ones.
 scripts/admin-parity/out/
+scripts/platform-console/evidence/
