@@ -5,7 +5,8 @@ import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/product";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { type CustomerEntry } from "./customerBook";
+import { useQueryClient } from "@tanstack/react-query";
+import { identityKey, type CustomerEntry } from "./customerBook";
 
 // Tasks are dealer_work_items rows and logged contacts are audit_log rows,
 // both keyed to the customer id. They are the same tables the Work Queue and
@@ -37,6 +38,7 @@ export const useCustomerFollowUp = (customer: CustomerEntry | null) => {
   const tenantId = tenant?.id && tenant.id !== "house" ? tenant.id : null;
   const [tasks, setTasks] = useState<FollowUpTask[]>([]);
   const [contacts, setContacts] = useState<LoggedContact[]>([]);
+  const queryClient = useQueryClient();
 
   const load = useCallback(async () => {
     if (!tenantId || !customer) return;
@@ -117,7 +119,18 @@ export const useCustomerFollowUp = (customer: CustomerEntry | null) => {
     return true;
   };
 
-  return { tenantId, tasks, contacts, addTask, toggleTask, logContact };
+  const updateContact = async (input: { name: string; phone: string; email: string }): Promise<string | false> => {
+    if (!customer || customer.leads.length === 0) return false;
+    const { error } = await sb().from("leads")
+      .update({ name: input.name, phone: input.phone, email: input.email })
+      .in("id", customer.leads.map((l) => l.id));
+    if (error) { toast.error("The contact details could not be saved"); return false; }
+    toast.success("Contact details saved");
+    await queryClient.invalidateQueries({ queryKey: ["customer-book"] });
+    return identityKey(input.email || null, input.name || null, customer.leads[0].vehicle_vin) ?? customer.id;
+  };
+
+  return { tenantId, tasks, contacts, addTask, toggleTask, logContact, updateContact };
 };
 
 const FIELD = "h-9 w-full rounded-[6px] border border-adm-border bg-adm-surface px-3 text-[14px] text-adm-ink";
@@ -190,6 +203,57 @@ export const LogContactDialog = ({ open, onOpenChange, onSave }: { open: boolean
           <DialogFooter>
             <Button onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button type="submit" variant="primary" disabled={busy}>{busy ? "Saving" : "Log contact"}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export const EditContactDialog = ({ open, onOpenChange, initial, leadCount, onSave }: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  initial: { name: string; phone: string; email: string };
+  leadCount: number;
+  onSave: (input: { name: string; phone: string; email: string }) => Promise<boolean>;
+}) => {
+  const [name, setName] = useState(initial.name);
+  const [phone, setPhone] = useState(initial.phone);
+  const [email, setEmail] = useState(initial.email);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (open) { setName(initial.name); setPhone(initial.phone); setEmail(initial.email); }
+  }, [open, initial.name, initial.phone, initial.email]);
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || (!phone.trim() && !email.trim())) return;
+    setBusy(true);
+    const ok = await onSave({ name: name.trim(), phone: phone.trim(), email: email.trim() });
+    setBusy(false);
+    if (ok) onOpenChange(false);
+  };
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <form onSubmit={submit} className="flex flex-col gap-4">
+          <DialogHeader>
+            <DialogTitle>Edit customer</DialogTitle>
+            <DialogDescription>
+              Updates the contact fields on {leadCount === 1 ? "this customer's lead" : `this customer's ${leadCount} leads`}. Deals and document requests keep the name and email they were created with.
+            </DialogDescription>
+          </DialogHeader>
+          <label className="flex flex-col gap-1 text-[14px] text-adm-ink">Name
+            <input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} className={FIELD} autoFocus />
+          </label>
+          <label className="flex flex-col gap-1 text-[14px] text-adm-ink">Phone
+            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={40} className={FIELD} />
+          </label>
+          <label className="flex flex-col gap-1 text-[14px] text-adm-ink">Email
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={254} className={FIELD} />
+          </label>
+          <DialogFooter>
+            <Button onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" variant="primary" disabled={busy || !name.trim() || (!phone.trim() && !email.trim())}>{busy ? "Saving" : "Save changes"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

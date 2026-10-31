@@ -261,6 +261,8 @@ export interface DocRow {
   passportVisibility: { label: string; tone: Tone };
   printStatus: { label: string; tone: Tone };
   href?: string;
+  approvedAt?: string | null;
+  updatedAt?: string | null;
   /** The number the next copy wears — present exactly when Reprint is offered. */
   reprintCopy?: number;
   /** The service that can rebuild this row's missing file: generate-vehicle-forms
@@ -1703,7 +1705,7 @@ async function loadPrintCenter(r: SourceReader, tenantId: string, vehicleId: str
 
   const [allDocs, qrCodes, qrTokens, signedInspections, latestInspections] = await Promise.all([
     r.rows(sb().from("generated_documents")
-      .select("id, tenant_id, vehicle_id, template_id, document_type, document_status, version, pdf_url, png_url, online_url, print_count, printed_at, published_at, created_at")
+      .select("id, tenant_id, vehicle_id, template_id, document_type, document_status, version, pdf_url, png_url, online_url, print_count, printed_at, published_at, created_at, approved_at, updated_at")
       .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId)
       .order("version", { ascending: false }), "generated_documents"),
     r.rows(sb().from("qr_codes").select("*").eq("tenant_id", tenantId).eq("vehicle_id", vehicleId), "qr_codes"),
@@ -1793,6 +1795,8 @@ async function loadPrintCenter(r: SourceReader, tenantId: string, vehicleId: str
         passportVisibility: PASSPORT_VISIBILITY_PILL[visibility],
         printStatus: PRINT_STATE_PILL[printState],
         href: openHrefs.get(String(d.id)) || d.online_url || undefined,
+        approvedAt: (d.approved_at as string | null) ?? null,
+        updatedAt: ((d.updated_at || d.created_at) as string | null) ?? null,
         reprintCopy: reprintable(d) ? reprintCopyNumber(d) : undefined,
         generateKind: canGenerate ? (docType as "buyers_guide" | "k208" | "factory_sticker") : undefined,
         generateBlockedReason: printState === "no_file" && !canGenerate

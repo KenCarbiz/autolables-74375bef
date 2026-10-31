@@ -35,14 +35,15 @@ const BUNDLE_ICON = (label: string) => {
 
 const DOC_PAGE_W = 816;
 const DOC_PAGE_H = 1056;
-const THUMB_W = 180;
+const THUMB_W = 200;
+const fmtDay = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "2-digit" }) : "Not recorded");
 
 const DocThumb = ({ href, children }: { href?: string; children: React.ReactNode }) => {
   const remote = href && /^https:\/\//i.test(href) ? href : null;
   const isImage = remote ? /\.(png|jpe?g|webp|gif)(\?|$)/i.test(remote) : false;
   const scale = THUMB_W / DOC_PAGE_W;
   return (
-    <div className="relative mx-auto aspect-[8.5/11] w-full max-w-[180px] overflow-hidden rounded-[4px] border border-adm-border bg-white shadow-sm">
+    <div className="relative mx-auto aspect-[8.5/11] w-full max-w-[200px] overflow-hidden rounded-[4px] border border-adm-border bg-white shadow-sm">
       {remote && isImage ? (
         <img src={remote} alt="" className="h-full w-full object-cover object-top" />
       ) : remote ? (
@@ -321,7 +322,7 @@ export default function DocumentsPrintCenter() {
           ) : (
             <>
             <Panel flush>
-              <WorkTable className="[&_th]:px-2 [&_td]:px-2" caption="Documents for this vehicle" minWidth={700}>
+              <WorkTable className="[&_th]:px-1.5 [&_td]:px-1.5" caption="Documents for this vehicle" minWidth={760}>
                 <thead>
                   <tr>
                     <Th className="w-10">
@@ -335,9 +336,10 @@ export default function DocumentsPrintCenter() {
                     </Th>
                     <Th>Document</Th>
                     <Th>Version</Th>
-                    <Th className="whitespace-nowrap">Internal status</Th>
+                    <Th>Approved</Th>
                     <Th>Visibility</Th>
-                    <Th className="whitespace-nowrap">Print status</Th>
+                    <Th className="whitespace-nowrap">Last updated</Th>
+                    <Th className="whitespace-nowrap">Print</Th>
                     <Th align="right">Action</Th>
                   </tr>
                 </thead>
@@ -359,17 +361,19 @@ export default function DocumentsPrintCenter() {
                             className="h-4 w-4 accent-[#2457D6]"
                           />
                         </Td>
-                        <Td className="max-w-[190px]">
+                        <Td className="max-w-[200px]">
                           <span className="inline-flex max-w-full items-center gap-2">
-                            <span className="truncate text-[14px] font-semibold text-adm-ink">{d.label}</span>
+                            <span className="truncate text-[14px] font-semibold text-adm-ink" title={d.label}>{d.label}</span>
+                            <StatusText tone={productTone(d.internalStatus.tone)} className="shrink-0">{d.internalStatus.label}</StatusText>
                           </span>
                         </Td>
                         <Td className="whitespace-nowrap">
                           <span className="font-semibold">{d.version}</span>
                           {versionNote ? <span className="ml-1.5 text-[12px] text-adm-muted">{versionNote}</span> : null}
                         </Td>
-                        <Td><StatusText tone={productTone(d.internalStatus.tone)}>{d.internalStatus.label}</StatusText></Td>
+                        <Td className="text-adm-muted whitespace-nowrap">{d.approvedAt ? fmtDay(d.approvedAt) : "Pending"}</Td>
                         <Td className="text-adm-muted whitespace-nowrap">{d.passportVisibility.label}</Td>
+                        <Td className="text-adm-muted whitespace-nowrap">{fmtDay(d.updatedAt)}</Td>
                         <Td><StatusText tone={productTone(d.printStatus.tone)} className="!bg-transparent !px-0">{d.printStatus.label}</StatusText></Td>
                         <Td align="right">
                           <span className="inline-flex items-center justify-end gap-1">

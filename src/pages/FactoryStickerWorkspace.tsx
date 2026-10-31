@@ -409,6 +409,119 @@ const GEN_STATUS_TONE: Record<string, Tone> = {
   SUPERSEDED: "off", ARCHIVED: "off",
 };
 
+const SUMMARY_OPTION_LIMIT = 8;
+
+function BuildSummarySheet({ data, stockNo }: { data: FactoryStickerRenderData; stockNo: string | null }) {
+  const { pricing, epa, colors, mechanical } = data;
+  const items = [
+    ...data.packages.map((p) => ({ name: p.name, msrp: p.msrp, included: false })),
+    ...data.options.map((o) => ({ name: o.name, msrp: o.msrp, included: !!o.included })),
+  ];
+  const shown = items.slice(0, SUMMARY_OPTION_LIMIT);
+  const features = Object.values(data.keyFeatures).flat().filter(Boolean);
+  const featuresShown = features.slice(0, 10);
+  const priceRows: Array<[string, number | null | undefined, boolean?]> = [
+    ["Base MSRP", pricing.baseMsrp],
+    ["Options and packages", pricing.optionsTotal],
+    ["Destination", pricing.destinationCharge],
+    ["Total MSRP", pricing.totalMsrp, true],
+  ];
+  const identityRows: Array<[string, string]> = [
+    ["VIN", data.vin],
+    ["Stock number", stockNo || "Not recorded"],
+    ["Exterior", colors.exterior.name || "Not recorded"],
+    ["Interior", colors.interior.name || "Not recorded"],
+    ["Engine", mechanical?.engine || "Not recorded"],
+    ["Drivetrain", mechanical?.drivetrain || "Not recorded"],
+  ];
+  return (
+    <div data-product-surface="document" className="rounded-[6px] border border-adm-border bg-white text-adm-ink">
+      <div className="border-b border-adm-border px-5 py-4">
+        <p className="text-[20px] font-semibold leading-tight">
+          {data.identity.year} {data.identity.make} {data.identity.model}
+        </p>
+        {data.identity.trim && <p className="mt-0.5 text-[14px] text-adm-muted">{data.identity.trim}</p>}
+      </div>
+      <div className="grid grid-cols-1 gap-x-8 gap-y-6 px-5 py-4 md:grid-cols-2">
+        <div className="min-w-0 space-y-6">
+          <section>
+            <h3 className="mb-2 text-[13px] font-semibold">Vehicle</h3>
+            <dl className="divide-y divide-adm-border text-[13px]">
+              {identityRows.map(([k, v]) => (
+                <div key={k} className="flex items-baseline justify-between gap-4 py-1.5">
+                  <dt className="text-adm-muted">{k}</dt>
+                  <dd className="min-w-0 truncate text-right font-medium" title={v}>{v}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+          {epa && (epa.combined != null || epa.city != null || epa.highway != null) && (
+            <section>
+              <h3 className="mb-2 text-[13px] font-semibold">Fuel economy</h3>
+              <dl className="divide-y divide-adm-border text-[13px]">
+                {([
+                  ["Combined", epa.combined != null ? `${epa.combined} MPG` : null],
+                  ["City / highway", epa.city != null || epa.highway != null ? `${epa.city ?? "-"} / ${epa.highway ?? "-"} MPG` : null],
+                  ["Annual fuel cost", epa.annualFuelCost != null ? fmtMoney(epa.annualFuelCost) : null],
+                ] as Array<[string, string | null]>).filter(([, v]) => v).map(([k, v]) => (
+                  <div key={k} className="flex items-baseline justify-between gap-4 py-1.5">
+                    <dt className="text-adm-muted">{k}</dt>
+                    <dd className="font-medium">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          )}
+        </div>
+        <div className="min-w-0 space-y-6">
+          <section>
+            <h3 className="mb-2 text-[13px] font-semibold">MSRP</h3>
+            <dl className="divide-y divide-adm-border text-[13px]">
+              {priceRows.map(([k, v, strong]) => (
+                <div key={k} className="flex items-baseline justify-between gap-4 py-1.5">
+                  <dt className={strong ? "font-semibold" : "text-adm-muted"}>{k}</dt>
+                  <dd className={strong ? "text-[15px] font-semibold" : "font-medium"}>{v != null ? fmtMoney(v) : "Not recorded"}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+          <section>
+            <h3 className="mb-2 text-[13px] font-semibold">Options and packages</h3>
+            {shown.length === 0 ? (
+              <p className="text-[13px] text-adm-muted">None recorded.</p>
+            ) : (
+              <ul className="divide-y divide-adm-border text-[13px]">
+                {shown.map((it, i) => (
+                  <li key={`${it.name}-${i}`} className="flex items-baseline justify-between gap-4 py-1.5">
+                    <span className="min-w-0 truncate" title={it.name}>{it.name}</span>
+                    <span className="shrink-0 font-medium">{it.msrp != null && it.msrp > 0 ? fmtMoney(it.msrp) : it.included || it.msrp === 0 ? "Included" : "Not recorded"}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {items.length > shown.length && (
+              <p className="mt-1.5 text-[12px] text-adm-muted">{`${items.length - shown.length} more on the full sticker`}</p>
+            )}
+          </section>
+        </div>
+      </div>
+      {featuresShown.length > 0 && (
+        <div className="border-t border-adm-border px-5 py-4">
+          <h3 className="mb-2 text-[13px] font-semibold">Key equipment</h3>
+          <ul className="grid grid-cols-1 gap-x-8 gap-y-1 text-[13px] sm:grid-cols-2">
+            {featuresShown.map((f, i) => (
+              <li key={`${f}-${i}`} className="min-w-0 truncate" title={f}>{f}</li>
+            ))}
+          </ul>
+          {features.length > featuresShown.length && (
+            <p className="mt-1.5 text-[12px] text-adm-muted">{`${features.length - featuresShown.length} more on the full sticker`}</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function FactoryStickerWorkspace({
   fixture = false, vehicleId: vehicleIdProp, embedded = false,
 }: { fixture?: boolean; vehicleId?: string; embedded?: boolean }) {
@@ -435,6 +548,7 @@ export default function FactoryStickerWorkspace({
   const [scenario, setScenario] = useState<keyof typeof FIXTURE_SCENARIOS>("used");
   const [zoom, setZoom] = useState<"fit" | number>("fit");
   const [fullscreen, setFullscreen] = useState(false);
+  const [showFull, setShowFull] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [openingDoc, setOpeningDoc] = useState<string | null>(null);
 
@@ -765,7 +879,20 @@ export default function FactoryStickerWorkspace({
           <div className={fullscreen
             ? "fixed inset-0 z-50 bg-slate-900/95 p-6 overflow-auto"
             : "rounded-[6px] border border-adm-border bg-adm-surface p-4 space-y-3"}>
-            {pageSvg && (fullscreen || (model && model.pages.length > 1)) && <div className={`flex items-center justify-between gap-2 flex-wrap ${fullscreen ? "mb-3" : ""}`}>
+            {pageSvg && !fullscreen && (
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-[14px] font-semibold text-adm-ink">{showFull ? "Full factory sticker" : "Build summary"}</h2>
+                <button
+                  type="button"
+                  onClick={() => setShowFull((f) => !f)}
+                  className="h-8 px-3 rounded-[6px] border border-adm-border bg-adm-surface text-[13px] font-semibold text-adm-ink hover:bg-adm-workspace"
+                >
+                  {showFull ? "Back to summary" : "Open full sticker"}
+                </button>
+              </div>
+            )}
+            {pageSvg && !showFull && !fullscreen && data && <BuildSummarySheet data={data} stockNo={stockNo} />}
+            {pageSvg && (showFull || fullscreen) && (fullscreen || (model && model.pages.length > 1)) && <div className={`flex items-center justify-between gap-2 flex-wrap ${fullscreen ? "mb-3" : ""}`}>
               <div className="flex items-center gap-1.5 flex-wrap">
                 {([
                   ["Fit", "fit"],
@@ -834,7 +961,7 @@ export default function FactoryStickerWorkspace({
                 )}
               </div>
             </div>}
-            {pageSvg ? (
+            {pageSvg && !showFull && !fullscreen ? null : pageSvg ? (
               <div className={zoom === "fit" ? "" : fullscreen ? "overflow-auto" : "max-h-[640px] overflow-auto"}>
                 <div
                   data-product-surface="document"

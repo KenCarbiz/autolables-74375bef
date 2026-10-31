@@ -23,7 +23,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ShieldCheck, Camera, Check, X, AlertTriangle, Clock, CheckCircle2, ClipboardCheck, FileText, Image as ImageIcon, Upload, FileSignature, ArrowRight, Car, Wrench, ChevronLeft, Plus } from "lucide-react";
 import EmptyState from "@/components/ui/empty-state";
-import { LocalTabs, MetricStrip, PageBody, PageHeader, Button as ProductButton, Panel as ProductPanel, WorkTable, Th, Td, StatusText, type LocalTab } from "@/components/product";
+import { LocalTabs, MetricStrip, PageBody, PageHeader, Button as ProductButton, Panel as ProductPanel, WorkTable, Th, Td, StatusText, FilterSelect, DockedLayout, DockedPanel, type LocalTab } from "@/components/product";
+import { PREP_WORK_CATEGORIES, prepProofNeeded, prepWorkCategories, type PrepWorkCategory } from "@/lib/prepWorkCategory";
 import { uploadPhoto } from "@/lib/storage";
 
 const taskLabel = (accs: Array<{ product_name: string }>) =>
@@ -84,15 +85,6 @@ const PrepDueRow = ({ view, canEdit, timeZone, pending, onSave }: { view: PrepDu
   );
 };
 
-const NextActionCell = ({ row, dueAt }: { row: PrepSignOffRow; dueAt: string | null }) => {
-  const action = derivePrepNextAction(row, { dueAt });
-  return (
-    <p className={`line-clamp-2 break-words leading-[18px] ${action.overdue ? "font-semibold text-adm-danger" : action.key === "none" ? "text-adm-muted" : "text-adm-ink"}`} title={action.label}>
-      {action.label}
-    </p>
-  );
-};
-
 const PrepSignOff = () => {
   const { user, isAdmin } = useAuth();
   const { member } = useEntitlements();
@@ -145,13 +137,16 @@ const PrepSignOff = () => {
 
   // Hoisted above the view branches so the hook order never changes when the
   // ?view= param flips between list/new/detail/installs.
+  const catParam = searchParams.get("cat");
+  const category: "all" | PrepWorkCategory = PREP_WORK_CATEGORIES.some((c) => c.key === catParam) ? (catParam as PrepWorkCategory) : "all";
+  const categoryRows = useMemo(
+    () => (category === "all" ? signOffs : signOffs.filter((s) => prepWorkCategories(s.accessories_installed).includes(category))),
+    [signOffs, category],
+  );
   const filtered = useMemo(() => {
-    if (filter === "all") return signOffs;
-    if (filter === "pending") return signOffs.filter(s => s.status === "pending");
-    if (filter === "signed") return signOffs.filter(s => s.status === "signed");
-    if (filter === "rejected") return signOffs.filter(s => s.status === "rejected");
-    return signOffs;
-  }, [signOffs, filter]);
+    if (filter === "all") return categoryRows;
+    return categoryRows.filter((s) => s.status === filter);
+  }, [categoryRows, filter]);
 
   const signedToday = useMemo(() =>
     signOffs.filter(s => s.signed_at && new Date(s.signed_at).toDateString() === new Date().toDateString()).length,
@@ -231,95 +226,18 @@ const PrepSignOff = () => {
         setUploadingId(null);
       }
     };
-    return (
-      <PageBody width="wide">
-        <PageHeader
-          title="Prep & Vendors"
-          actions={<ProductButton variant="primary" onClick={() => setSearchParams({ view: "new" })}>Assign vendor</ProductButton>}
-        />
-
-        <LocalTabs
-          label="Prep views"
-          tabs={[
-            ...(["all", "pending", "signed", "rejected"] as const).map((f): LocalTab => ({
-              key: f,
-              label: f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1),
-              to: f === "all" ? "/prep" : `/prep?filter=${f}`,
-              active: filter === f,
-              count: loaded ? (f === "all" ? signOffs.length : signOffs.filter((x) => x.status === f).length) : null,
-            })),
-          ]}
-        />
-
-        <MetricStrip boxed numberFirst noBars
-          label="Prep sign-off summary"
-          metrics={[
-            { label: "Total prep items", value: loaded ? signOffs.length : null, hint: "Across all vehicles", loading: !loaded },
-            { label: "Awaiting proof", value: loaded ? pending.length : null, hint: "Need foreman sign-off", tone: "warning", loading: !loaded },
-            { label: "Signed off today", value: loaded ? signedToday : null, hint: "Completed today", tone: "success", loading: !loaded },
-            { label: "Rejected this week", value: loaded ? rejectedThisWeek : null, hint: "Sent back for rework", tone: "danger", loading: !loaded },
-          ]}
-        />
-
-        {!loaded ? (
-          <div role="status" aria-label="Loading" className="rounded-[6px] border border-adm-border bg-adm-surface p-6 text-[14px] text-adm-muted">Loading sign-offs…</div>
-        ) : filtered.length === 0 ? (
-          <EmptyState
-            icon={ClipboardCheck}
-            title={filter === "all" ? "No prep sign-offs yet" : `No ${filter} sign-offs`}
-            description={filter === "all"
-              ? "Request one when a vehicle is ready for final inspection. Sign-offs unlock publishing and attach an install audit to every addendum."
-              : `This filter shows ${filter} sign-offs only; ${signOffs.length} ${signOffs.length === 1 ? "request exists" : "requests exist"} in total.`}
-          />
-        ) : (
-          <div className="flex flex-col items-start gap-4 lg:flex-row">
-            <div className="min-w-0 w-full flex-1">
-            <WorkTable caption="Prep sign-offs" minWidth={0}>
-              <thead>
-                <tr>
-                  <Th className="!px-2">Vehicle</Th>
-                  <Th className="!px-2">Task</Th>
-                  {prepDue.available && <Th className="whitespace-nowrap !px-2">Due</Th>}
-                  <Th className="!px-2">Status</Th>
-                  <Th className="whitespace-nowrap !px-2">Next action</Th>
-                  <Th align="right" className="!px-2 whitespace-nowrap">Action</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(s => (
-                  <tr key={s.id} className={`h-12 cursor-pointer ${selected?.id === s.id ? "bg-adm-selected" : "hover:bg-adm-workspace"}`} onClick={() => select(s.id)}>
-                    <Td className="max-w-[170px] min-w-[140px] !px-2">
-                      <p className="truncate text-[13px] font-semibold text-adm-ink" title={`${s.ymm || s.vin}${s.stock_number ? ` - Stock ${s.stock_number}` : ""}`}>{s.ymm ? shortVehicle(s.ymm) : s.vin}</p>
-                    </Td>
-                    <Td className="min-w-[110px] max-w-[170px] !px-2">
-                      <p className="line-clamp-2 break-words leading-[18px]" title={taskLabel(s.accessories_installed)}>{taskLabel(s.accessories_installed)}</p>
-                    </Td>
-                    {prepDue.available && (
-                      <Td className="whitespace-nowrap !px-2">
-                        <DueCell view={prepDue.view(s)} timeZone={dealerSettings.dealer_timezone} />
-                      </Td>
-                    )}
-                    <Td className="!px-2">
-                      <StatusText tone={s.status === "pending" ? "warning" : s.status === "signed" ? "success" : s.status === "rejected" ? "danger" : "neutral"}>
-                        {s.status.charAt(0).toUpperCase() + s.status.slice(1)}
-                      </StatusText>
-                    </Td>
-                    <Td className="min-w-[130px] max-w-[190px] !px-2">
-                      <NextActionCell row={s} dueAt={prepDue.view(s)?.dueAt ?? null} />
-                    </Td>
-                    <Td align="right" className="!px-2">
-                      <button type="button" className="whitespace-nowrap text-[14px] font-medium text-adm-primary hover:underline" onClick={(e) => { e.stopPropagation(); select(s.id); }}>
-                        {s.status === "pending" ? "Review" : "View"}
-                      </button>
-                    </Td>
-                  </tr>
-                ))}
-              </tbody>
-            </WorkTable>
-            </div>
-            {selected && (
-              <>
-              <aside aria-label="Sign-off detail" className="flex w-full shrink-0 flex-col self-start rounded-[6px] border border-adm-border bg-adm-surface lg:sticky lg:top-4 lg:w-[340px]">
+    const catTo = (c: string) => {
+      const n = new URLSearchParams();
+      if (c !== "all") n.set("cat", c);
+      if (filter !== "all") n.set("filter", filter);
+      const q = n.toString();
+      return q ? `/prep?${q}` : "/prep";
+    };
+    const detailPanel = selected ? (
+      <DockedPanel
+        label="Sign-off detail"
+        header={
+          <>
                 <div className="flex items-start justify-between gap-3 border-b border-adm-border px-4 py-3">
                   <div className="min-w-0">
                     <p className="text-[17px] leading-[24px] font-semibold text-adm-ink truncate">Detail work</p>
@@ -327,6 +245,19 @@ const PrepSignOff = () => {
                   </div>
                   <button type="button" onClick={() => select(null)} aria-label="Close detail" className="w-9 h-9 grid place-items-center rounded-md text-adm-muted hover:bg-adm-workspace"><X className="w-5 h-5" /></button>
                 </div>
+          </>
+        }
+        footer={
+          <>
+                <div className="flex items-center justify-between gap-3 border-t border-adm-border px-4 py-3">
+                  <button type="button" className="text-[14px] font-semibold text-adm-primary hover:underline" onClick={() => navigate(`/prep/${selected.vin}`)}>Open mobile flow</button>
+                  <ProductButton variant="primary" onClick={() => setSearchParams({ view: "detail", id: selected.id })}>
+                    {selected.status === "pending" ? "Review and sign" : "Open sign-off"}
+                  </ProductButton>
+                </div>
+          </>
+        }
+      >
                 <div className="space-y-4 px-4 py-4 text-[14px] leading-[20px]">
                   <div className="flex items-center justify-between gap-3">
                     <p className="font-semibold text-adm-ink">Install photo</p>
@@ -399,17 +330,123 @@ const PrepSignOff = () => {
                   </div>
                   {selected.notes && <p className="text-adm-muted">{selected.notes}</p>}
                 </div>
-                <div className="flex items-center justify-between gap-3 border-t border-adm-border px-4 py-3">
-                  <button type="button" className="text-[14px] font-semibold text-adm-primary hover:underline" onClick={() => navigate(`/prep/${selected.vin}`)}>Open mobile flow</button>
-                  <ProductButton variant="primary" onClick={() => setSearchParams({ view: "detail", id: selected.id })}>
-                    {selected.status === "pending" ? "Review and sign" : "Open sign-off"}
-                  </ProductButton>
-                </div>
-              </aside>
-              </>
-            )}
-          </div>
+      </DockedPanel>
+    ) : null;
+    return (
+      <PageBody width="wide">
+        <PageHeader
+          title="Prep & Vendors"
+          actions={<ProductButton variant="primary" onClick={() => setSearchParams({ view: "new" })}>Assign vendor</ProductButton>}
+        />
+
+        <DockedLayout panel={selected && filtered.length > 0 ? detailPanel : null}>
+        <LocalTabs
+          label="Prep work categories"
+          tabs={[
+            { key: "all", label: "All", to: catTo("all"), active: category === "all", count: loaded ? signOffs.length : null },
+            ...PREP_WORK_CATEGORIES.map((c): LocalTab => ({
+              key: c.key,
+              label: c.label,
+              to: catTo(c.key),
+              active: category === c.key,
+              count: loaded ? signOffs.filter((x) => prepWorkCategories(x.accessories_installed).includes(c.key)).length : null,
+            })),
+          ]}
+        />
+
+        <MetricStrip boxed numberFirst noBars
+          label="Prep sign-off summary"
+          metrics={[
+            { label: "Total prep items", value: loaded ? signOffs.length : null, hint: "Across all vehicles", loading: !loaded },
+            { label: "Awaiting proof", value: loaded ? pending.length : null, hint: "Need foreman sign-off", tone: "warning", loading: !loaded },
+            { label: "Signed off today", value: loaded ? signedToday : null, hint: "Completed today", tone: "success", loading: !loaded },
+            { label: "Rejected this week", value: loaded ? rejectedThisWeek : null, hint: "Sent back for rework", tone: "danger", loading: !loaded },
+          ]}
+        />
+
+        <div className="flex items-center justify-between gap-3">
+          <FilterSelect
+            label="Filter by status"
+            value={filter}
+            onChange={(v) => { const n = new URLSearchParams(searchParams); if (v === "all") n.delete("filter"); else n.set("filter", v); n.delete("sel"); setSearchParams(n, { replace: true }); }}
+            options={[
+              { value: "all", label: `All statuses (${categoryRows.length})` },
+              ...(["pending", "signed", "rejected"] as const).map((f) => ({ value: f, label: `${f.charAt(0).toUpperCase()}${f.slice(1)} (${categoryRows.filter((x) => x.status === f).length})` })),
+            ]}
+          />
+        </div>
+
+        {!loaded ? (
+          <div role="status" aria-label="Loading" className="rounded-[6px] border border-adm-border bg-adm-surface p-6 text-[14px] text-adm-muted">Loading sign-offs…</div>
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            icon={ClipboardCheck}
+            title={filter === "all" ? "No prep sign-offs yet" : `No ${filter} sign-offs`}
+            description={filter === "all"
+              ? "Request one when a vehicle is ready for final inspection. Sign-offs unlock publishing and attach an install audit to every addendum."
+              : `This filter shows ${filter} sign-offs only; ${signOffs.length} ${signOffs.length === 1 ? "request exists" : "requests exist"} in total.`}
+          />
+        ) : (
+          <>
+            <div className="min-w-0 w-full">
+            <WorkTable caption="Prep sign-offs" minWidth={0} className="[&_table]:table-fixed [&_th]:whitespace-nowrap">
+              <colgroup>
+                <col className="w-[20%]" /><col className="w-[17%]" /><col className="w-[13%]" /><col className="w-[13%]" />
+                {prepDue.available && <col className="w-[8%]" />}
+                <col className="w-[11%]" /><col />
+              </colgroup>
+              <thead>
+                <tr>
+                  <Th className="!px-2">Vehicle</Th>
+                  <Th className="!px-2">Task</Th>
+                  <Th className="!px-2">Vendor</Th>
+                  <Th className="!px-2">Proof needed</Th>
+                  {prepDue.available && <Th className="whitespace-nowrap !px-2">Due</Th>}
+                  <Th className="!px-2">Status</Th>
+                  <Th className="whitespace-nowrap !px-2">Next action</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(s => {
+                  const vendor = vendorLabel(s.accessories_installed);
+                  const proof = prepProofNeeded(s);
+                  const next = derivePrepNextAction(s, { dueAt: prepDue.view(s)?.dueAt ?? null });
+                  return (
+                  <tr key={s.id} className={`h-12 cursor-pointer ${selected?.id === s.id ? "bg-adm-selected" : "hover:bg-adm-workspace"}`} onClick={() => select(s.id)}>
+                    <Td className="!px-2">
+                      <button type="button" className="block w-full truncate text-left text-[13px] font-semibold text-adm-ink hover:underline" onClick={(e) => { e.stopPropagation(); select(s.id); }} title={`${s.ymm || s.vin}${s.stock_number ? ` - Stock ${s.stock_number}` : ""}`}>{s.ymm ? shortVehicle(s.ymm) : s.vin}</button>
+                    </Td>
+                    <Td className="!px-2">
+                      <p className="truncate text-[13px]" title={s.accessories_installed.map((a) => a.product_name).join(", ") || "No work listed"}>{taskLabel(s.accessories_installed)}</p>
+                    </Td>
+                    <Td className="!px-2">
+                      <p className={`truncate text-[13px] ${vendor === "Unknown" ? "text-adm-muted" : ""}`} title={vendor === "Unknown" ? "Not recorded" : vendor}>{vendor === "Unknown" ? "Not recorded" : vendor}</p>
+                    </Td>
+                    <Td className="!px-2">
+                      <p className={`truncate text-[13px] ${proof === "None" ? "text-adm-muted" : ""}`} title={proof}>{proof}</p>
+                    </Td>
+                    {prepDue.available && (
+                      <Td className="whitespace-nowrap !px-2 text-[13px]">
+                        <DueCell view={prepDue.view(s)} timeZone={dealerSettings.dealer_timezone} />
+                      </Td>
+                    )}
+                    <Td className="!px-2">
+                      <StatusText tone={s.status === "pending" ? "warning" : s.status === "signed" ? "success" : s.status === "rejected" ? "danger" : "neutral"}>
+                        {s.status.charAt(0).toUpperCase() + s.status.slice(1)}
+                      </StatusText>
+                    </Td>
+                    <Td className="!px-2">
+                      <p className={`truncate text-[13px] ${next.overdue ? "font-semibold text-adm-danger" : next.key === "none" ? "text-adm-muted" : "text-adm-ink"}`} title={next.label}>{next.label}</p>
+                    </Td>
+                  </tr>
+                  );
+                })}
+              </tbody>
+            </WorkTable>
+            </div>
+          </>
         )}
+        </DockedLayout>
       </PageBody>
     );
   }

@@ -52,7 +52,7 @@ export function FindingsTable({ findings, selectedId, onSelect }: { findings: Fi
             </thead>
             <tbody>
               {shown.map((f) => (
-                <tr key={f.id} className={cn("cursor-pointer hover:bg-adm-workspace", selectedId === f.id && "bg-adm-selected")} onClick={() => onSelect(f.id)}>
+                <tr key={f.id} className={cn("cursor-pointer", selectedId === f.id ? (f.result === "failed" ? "bg-red-50 [&>td:first-child]:shadow-[inset_3px_0_0_#B42318]" : "bg-adm-selected [&>td:first-child]:shadow-[inset_3px_0_0_#2457D6]") : "hover:bg-adm-workspace")} onClick={() => onSelect(f.id)}>
                   <Td className="font-semibold max-w-[200px] truncate">{f.label}</Td>
                   <Td><StatusText tone={RESULT_TONE[f.result]}>{FINDING_RESULT_LABEL[f.result]}</StatusText></Td>
                   <Td className="max-w-[120px] truncate tabular-nums">{f.measurement || <span className="text-adm-muted">Not recorded</span>}</Td>
@@ -100,6 +100,7 @@ export function FindingDetail({
     );
   }
   return (
+    <div className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
     <Panel
       title={
         <span className="flex flex-wrap items-center gap-2">
@@ -110,39 +111,46 @@ export function FindingDetail({
       inset="sm"
       titleSize="md"
     >
-      <div className="flex flex-col gap-4 text-[14px] leading-[20px]">
+      <div className="flex flex-col gap-3 text-[14px] leading-[20px]">
         {inspectedLabel && <p className="text-[13px] leading-[18px] text-adm-muted">{inspectedLabel}</p>}
         <p className="text-adm-ink">{finding.notes || "No notes were recorded for this item."}</p>
-        {photos.length > 0 ? (
-          <div className="grid grid-cols-3 gap-2">
-            {photos.slice(0, 6).map((u) => (
-              <a key={u} href={u} target="_blank" rel="noreferrer">
-                <img src={u} alt="Inspection evidence" className="h-20 w-full rounded-[6px] border border-adm-border object-cover" />
-              </a>
-            ))}
-          </div>
-        ) : (
-          <p className="text-adm-muted">No evidence photos on file for this item.</p>
-        )}
-        {onAddPhotos && (
-          <div>
-            <input type="file" accept="image/*" multiple className="sr-only" id={`finding-photo-${finding.id}`} onChange={(e) => { onAddPhotos(e.target.files); e.target.value = ""; }} />
-            <label htmlFor={`finding-photo-${finding.id}`} className="inline-flex min-h-[36px] cursor-pointer items-center gap-2 rounded-[6px] border border-adm-border bg-adm-surface px-3 text-[14px] font-semibold text-adm-ink hover:bg-adm-workspace">
-              <Camera className="w-5 h-5" aria-hidden="true" /> Add evidence photo
-            </label>
-          </div>
-        )}
-        {approval}
         <div>
-          <p className="font-semibold text-adm-ink">Repair status</p>
-          <p className="text-adm-muted">{repairLabel ?? "No repair recorded for this item."}</p>
-          <Link to={vehicleFileHref} className="text-adm-primary font-semibold hover:underline">Open vehicle file</Link>
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <p className="font-semibold text-adm-ink">Evidence photos</p>
+            {onAddPhotos && (
+              <>
+                <input type="file" accept="image/*" multiple className="sr-only" id={`finding-photo-${finding.id}`} onChange={(e) => { onAddPhotos(e.target.files); e.target.value = ""; }} />
+                <label htmlFor={`finding-photo-${finding.id}`} className="inline-flex min-h-[32px] cursor-pointer items-center gap-1.5 rounded-[6px] border border-adm-border bg-adm-surface px-2.5 text-[13px] font-semibold text-adm-ink hover:bg-adm-workspace">
+                  <Camera className="w-5 h-5" aria-hidden="true" /> Add evidence photo
+                </label>
+              </>
+            )}
+          </div>
+          {photos.length > 0 ? (
+            <div className="grid grid-cols-3 gap-2">
+              {photos.slice(0, 3).map((u) => (
+                <a key={u} href={u} target="_blank" rel="noreferrer">
+                  <img src={u} alt="Inspection evidence" className="h-16 w-full rounded-[6px] border border-adm-border object-cover" />
+                </a>
+              ))}
+            </div>
+          ) : (
+            <p className="text-adm-muted">No evidence photos on file for this item.</p>
+          )}
+          {photos.length > 3 && <p className="mt-1 text-[12px] leading-[18px] text-adm-muted">{`${photos.length - 3} more on file`}</p>}
         </div>
-        <div className="rounded-[6px] border border-adm-border bg-adm-workspace px-3 py-3">
-          <p className="font-semibold text-adm-ink">Customer signature (restricted)</p>
-          <p className="text-adm-muted">Signature not available for internal service work.</p>
+        {approval}
+        <p className="text-[13px] leading-[18px]">
+          <span className="font-semibold text-adm-ink">Repair status</span>
+          <span className="text-adm-muted">{` ${repairLabel ?? "No repair recorded for this item."} · `}</span>
+          <Link to={vehicleFileHref} className="text-adm-primary font-semibold hover:underline">Open vehicle file</Link>
+        </p>
+        <div className="rounded-[6px] border border-adm-border bg-adm-workspace px-3 py-2">
+          <p className="text-[13px] leading-[18px] font-semibold text-adm-ink">Customer signature (restricted)</p>
+          <p className="text-[13px] leading-[18px] text-adm-muted">Signature not available for internal service work.</p>
         </div>
       </div>
     </Panel>
+    </div>
   );
 }

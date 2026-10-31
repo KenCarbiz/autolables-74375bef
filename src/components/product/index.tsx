@@ -364,6 +364,30 @@ export const QueryState = ({
   return <>{children}</>;
 };
 
+/**
+ * Two-column page grid for list screens with a docked detail panel: the left
+ * column holds the metric strip, tabs and table; the panel sits beside all of
+ * them, sticky and top-aligned with the first block. Not an overlay.
+ */
+export const DockedLayout = ({ children, panel, className }: { children: ReactNode; panel?: ReactNode; className?: string }) => (
+  <div className={cn("flex flex-col items-stretch gap-6 lg:flex-row lg:items-start", className)}>
+    <div className="flex min-w-0 w-full flex-1 flex-col gap-6">{children}</div>
+    {panel}
+  </div>
+);
+
+/** Docked detail panel: header and footer stay in view, the body scrolls. */
+export const DockedPanel = ({ label, header, footer, children, className }: { label: string; header: ReactNode; footer?: ReactNode; children: ReactNode; className?: string }) => (
+  <aside
+    aria-label={label}
+    className={cn("flex w-full shrink-0 flex-col overflow-hidden rounded-[6px] border border-adm-border bg-adm-surface lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:w-[360px]", className)}
+  >
+    <div className="shrink-0">{header}</div>
+    <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+    {footer ? <div className="shrink-0 border-t border-adm-border">{footer}</div> : null}
+  </aside>
+);
+
 /** Compact 36px filter dropdown on the shadcn Select. */
 export const FilterSelect = ({ value, onChange, options, label, className, disabled }: {
   disabled?: boolean;

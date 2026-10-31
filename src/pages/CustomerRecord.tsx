@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { ExternalLink, Mail, MessageSquare, Phone } from "lucide-react";
+import { ExternalLink, Mail, MessageSquare, MoreHorizontal, Pencil, Phone } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useNavigate, useParams } from "react-router-dom";
 import Seo from "@/components/Seo";
 import { Button, LinkButton, PageBody, PageHeader, Panel, QueryState } from "@/components/product";
@@ -19,7 +20,7 @@ import {
   dealStateTone,
 } from "@/components/customers/CustomerUi";
 import { mmss } from "@/lib/shopperActivity";
-import { AddTaskDialog, LogContactDialog, useCustomerFollowUp } from "@/components/customers/CustomerFollowUp";
+import { AddTaskDialog, EditContactDialog, LogContactDialog, useCustomerFollowUp } from "@/components/customers/CustomerFollowUp";
 import { fmtDay } from "@/components/detail/parts";
 
 // /customers/:id — one customer, assembled from every source that can honestly
@@ -42,6 +43,7 @@ const CustomerRecord = () => {
   const followUp = useCustomerFollowUp(customer);
   const [taskOpen, setTaskOpen] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [showAllTimeline, setShowAllTimeline] = useState(false);
 
   const sameVehicleShoppers = useMemo(() => {
@@ -100,8 +102,23 @@ const CustomerRecord = () => {
         description={`${customer.identified ? "Contact captured" : "No contact captured"} · Last activity ${relativeTime(customer.lastActivityAt)}`}
         actions={
           <>
+            {customer.leads.length > 0 && (
+              <Button onClick={() => setEditOpen(true)}><Pencil className="h-5 w-5" aria-hidden="true" /> Edit</Button>
+            )}
             <Button onClick={() => setTaskOpen(true)}>Add task</Button>
             <Button variant="primary" onClick={() => setContactOpen(true)}>Log contact</Button>
+            {primaryVehicle?.slug && (
+              <DropdownMenu>
+                <DropdownMenuTrigger aria-label="More actions" className="grid h-10 w-10 place-items-center rounded-[6px] border border-adm-border bg-adm-surface text-adm-ink hover:bg-adm-workspace">
+                  <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => window.open(`/v/${primaryVehicle.slug}`, "_blank", "noopener")}>
+                    <ExternalLink className="mr-2 h-5 w-5" aria-hidden="true" /> Open Passport
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </>
         }
       />
@@ -292,8 +309,7 @@ const CustomerRecord = () => {
               {customer.phone ? <LinkButton variant="secondary" className="w-full whitespace-nowrap px-2" to={`sms:${customer.phone.replace(/[^\d+]/g, "")}`}><MessageSquare className="h-5 w-5 text-adm-primary" aria-hidden="true" /> Send SMS</LinkButton> : null}
               {customer.email ? <LinkButton variant="secondary" className="w-full whitespace-nowrap px-2" to={`mailto:${customer.email}`}><Mail className="h-5 w-5 text-adm-primary" aria-hidden="true" /> Send email</LinkButton> : null}
               <Button className="w-full whitespace-nowrap px-2" onClick={() => setContactOpen(true)}>Log contact</Button>
-              {primaryVehicle?.slug ? <LinkButton variant="secondary" className="col-span-2 w-full whitespace-nowrap px-2" to={`/v/${primaryVehicle.slug}`}><ExternalLink className="h-5 w-5 shrink-0 text-adm-primary" aria-hidden="true" /> Open Passport</LinkButton> : null}
-              {!callHref && !customer.email && !primaryVehicle?.slug ? (
+              {!callHref && !customer.email ? (
                 <p className="text-[14px] leading-[20px] text-adm-muted">No contact method captured.</p>
               ) : null}
             </div>
@@ -301,6 +317,18 @@ const CustomerRecord = () => {
         </div>
       </div>
       <AddTaskDialog open={taskOpen} onOpenChange={setTaskOpen} onSave={followUp.addTask} />
+      <EditContactDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        initial={{ name: customer.name || "", phone: customer.phone || "", email: customer.email || "" }}
+        leadCount={customer.leads.length}
+        onSave={async (input) => {
+          const nextId = await followUp.updateContact(input);
+          if (nextId === false) return false;
+          if (nextId !== customer.id) navigate(`/customers/${encodeURIComponent(nextId)}`, { replace: true });
+          return true;
+        }}
+      />
       <LogContactDialog open={contactOpen} onOpenChange={setContactOpen} onSave={followUp.logContact} />
     </PageBody>
   );

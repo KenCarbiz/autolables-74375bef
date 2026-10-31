@@ -12,7 +12,7 @@ import { useOperatingMetrics } from "@/hooks/useOperatingMetrics";
 import {
   useDescriptionOperations, useDescriptionPermissions, type DescriptionCaseRow,
 } from "@/hooks/useDescriptionOps";
-import { PageBody, PageHeader, MetricStrip, Button, InlineNote, StatusText, FilterSelect, type Tone } from "@/components/product";
+import { PageBody, PageHeader, MetricStrip, Button, InlineNote, StatusText, FilterSelect, DockedLayout, DockedPanel, type Tone } from "@/components/product";
 import {
   VehicleDiagnosticPanel, type DiagnosticException,
 } from "@/components/description/VehicleDiagnosticPanel";
@@ -403,7 +403,10 @@ export default function DescriptionOperations() {
 
   const drawer = selectedRow ? (
     <>
-    <aside aria-label="Description record" className="flex w-full shrink-0 flex-col self-start rounded-[6px] border border-adm-border bg-adm-surface lg:w-[340px] lg:sticky lg:top-4">
+    <DockedPanel
+      label="Description record"
+      header={
+        <>
       <div className="flex items-start justify-between gap-3 px-4 pt-4">
         <div className="min-w-0">
           <p className="text-[17px] leading-[24px] font-semibold text-adm-ink truncate">{vehicleStockNumber(selectedRow.vehicle) || "No stock number"}</p>
@@ -413,6 +416,9 @@ export default function DescriptionOperations() {
           <X className="w-5 h-5" />
         </button>
       </div>
+      <div className="px-4 pt-3">
+        <Button variant="primary" className="w-full" onClick={() => navigate(`/description-intelligence/${selectedRow.vehicleId}`)}>{retryEligible ? "Review retry" : "Review description record"}</Button>
+      </div>
       <div role="tablist" aria-label="Record sections" className="mt-3 flex gap-6 border-b border-adm-border px-4">
         {([["overview", "Overview"], ["source", "Source details"]] as const).map(([key, label]) => (
           <button key={key} type="button" role="tab" aria-selected={drawerTab === key} onClick={() => setDrawerTab(key)}
@@ -421,6 +427,15 @@ export default function DescriptionOperations() {
           </button>
         ))}
       </div>
+        </>
+      }
+      footer={
+        <div className="flex gap-2 px-4 py-3">
+          <Button className="flex-1" onClick={() => navigate(`/description-studio?vehicle=${selectedRow.vehicleId}`)}>Open studio</Button>
+          <Button className="flex-1" onClick={() => navigate(`/vehicle-file/${selectedRow.vehicleId}`)}>Vehicle file</Button>
+        </div>
+      }
+    >
       <div className="space-y-4 px-4 py-4 text-[14px] leading-[20px]">
         {drawerTab === "overview" ? (
           <>
@@ -492,14 +507,7 @@ export default function DescriptionOperations() {
           </div>
         )}
       </div>
-      <div className="flex flex-col gap-2 border-t border-adm-border px-4 py-3">
-        <Button variant="primary" onClick={() => navigate(`/description-intelligence/${selectedRow.vehicleId}`)}>{retryEligible ? "Review retry" : "Review description record"}</Button>
-        <div className="flex gap-2">
-          <Button className="flex-1" onClick={() => navigate(`/description-studio?vehicle=${selectedRow.vehicleId}`)}>Open studio</Button>
-          <Button className="flex-1" onClick={() => navigate(`/vehicle-file/${selectedRow.vehicleId}`)}>Vehicle file</Button>
-        </div>
-      </div>
-    </aside>
+    </DockedPanel>
     </>
   ) : null;
 
@@ -517,6 +525,7 @@ export default function DescriptionOperations() {
         }
       />
 
+      <DockedLayout panel={drawer}>
       <MetricStrip numberFirst noBars label="Description coverage" metrics={metricList} />
 
       {metricsError && (
@@ -524,22 +533,22 @@ export default function DescriptionOperations() {
       )}
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[220px] max-w-[280px]">
+        <div className="relative flex-1 min-w-[150px] max-w-[170px]">
           <Search className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             value={query}
             onChange={(e) => { setQuery(e.target.value); setPage(0); }}
-            placeholder="Search stock #, VIN, vehicle"
+            placeholder="Search stock #, VIN"
             aria-label="Search vehicles"
             className="w-full h-9 pl-10 pr-3 rounded-[6px] border border-adm-border bg-adm-surface text-[14px] focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>
         <FilterSelect label="Filter by description state" value={stateFilter} onChange={(v) => { setStateFilter(v as "all" | OpsState); setPage(0); }}
-          options={[{ value: "all", label: "All description states" }, ...(Object.keys(STATE_META) as OpsState[]).map((k) => ({ value: k, label: STATE_META[k].label }))]} />
+          className="min-w-[110px]" options={[{ value: "all", label: "All states" }, ...(Object.keys(STATE_META) as OpsState[]).map((k) => ({ value: k, label: STATE_META[k].label }))]} />
         <FilterSelect label="Filter by condition" value={conditionFilter} onChange={(v) => { setConditionFilter(v); setPage(0); }}
-          options={[{ value: "all", label: "New and used" }, { value: "new", label: "New" }, { value: "used", label: "Used" }, { value: "cpo", label: "CPO" }]} />
+          className="min-w-[110px]" options={[{ value: "all", label: "New and used" }, { value: "new", label: "New" }, { value: "used", label: "Used" }, { value: "cpo", label: "CPO" }]} />
         <FilterSelect label="Filter by channel coverage" value={channelFilter} onChange={(v) => { setChannelFilter(v); setPage(0); }}
-          options={[{ value: "all", label: "Any channel coverage" }, { value: "complete", label: "Every channel covered" }, { value: "partial", label: "Some channels covered" }, { value: "none", label: "No channel copy" }]} />
+          className="min-w-[110px]" options={[{ value: "all", label: "Any coverage" }, { value: "complete", label: "Every channel covered" }, { value: "partial", label: "Some channels covered" }, { value: "none", label: "No channel copy" }]} />
         <button
           type="button"
           onClick={() => { setStateFilter("all"); setConditionFilter("all"); setChannelFilter("all"); setQuery(""); setPage(0); }}
@@ -549,8 +558,7 @@ export default function DescriptionOperations() {
         </button>
       </div>
 
-      <div className="flex flex-col items-start gap-4 lg:flex-row">
-      <div className="min-w-0 w-full flex-1 rounded-[6px] border border-adm-border bg-adm-surface overflow-hidden">
+      <div className="min-w-0 w-full rounded-[6px] border border-adm-border bg-adm-surface overflow-hidden">
         {error || exceptionError ? (
           <div className="p-8 text-center">
             <XCircle className="w-8 h-8 text-rose-500 mx-auto mb-2" />
@@ -582,9 +590,9 @@ export default function DescriptionOperations() {
           </div>
         ) : (
           <>
-            <table className="w-full table-fixed text-left border-collapse">
+            <table className="w-full table-fixed text-left border-collapse [&_th]:whitespace-nowrap">
               <colgroup>
-                <col className="w-[36px]" /><col className="w-[12%]" /><col className="w-[30%]" /><col className="w-[14%]" /><col className="w-[17%]" /><col className="w-[14%]" /><col className="w-[13%]" />
+                <col className="w-[36px]" /><col className="w-[11%]" /><col className="w-[23%]" /><col className="w-[14%]" /><col className="w-[20%]" /><col className="w-[13%]" /><col />
               </colgroup>
               <thead>
                 <tr className="text-[12px] leading-[18px] font-semibold text-adm-muted bg-adm-workspace border-b border-adm-border">
@@ -673,8 +681,7 @@ export default function DescriptionOperations() {
           </>
         )}
       </div>
-      {drawer}
-      </div>
+      </DockedLayout>
 
 
       <p className="text-[12px] leading-[18px] text-adm-muted">
