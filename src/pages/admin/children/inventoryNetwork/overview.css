@@ -1,0 +1,88 @@
+@font-face{font-family:AuditUI;src:url('../../../../assets/inventoryNetwork/Inter-400.woff2') format('woff2');font-weight:400}
+@font-face{font-family:AuditUI;src:url('../../../../assets/inventoryNetwork/Inter-700.woff2') format('woff2');font-weight:700}
+.invnet-ov-page{background:#f4f6f9;padding:22px 28px 16px}
+.invnet-ov,.invnet-ov *{box-sizing:border-box}
+.invnet-ov{font-family:AuditUI,sans-serif;font-size:13px;line-height:1.5;color:#142b43}
+.invnet-ov .icon{width:20px;height:20px;flex:none}
+.invnet-ov .breadcrumbs{color:#637c95;font-size:11px;margin-bottom:12px}
+.invnet-ov .breadcrumbs a{color:#075be8}
+.invnet-ov .page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:18px}
+.invnet-ov h1{font-size:28px;line-height:1.3;margin:0 0 7px;letter-spacing:-.5px}
+.invnet-ov p{margin:0;color:#5b7189;font-size:12px}
+.invnet-ov h2{font-size:15px;margin:0;font-weight:700;line-height:1.45}
+.invnet-ov h3{font-size:15px}
+.invnet-ov .scope-picker{border:1px solid #d0ddea;border-radius:6px;background:white;padding:9px 13px;min-width:225px;font-size:12px}
+.invnet-ov .scope-picker small{display:block;font-size:10px;color:#698098}
+.invnet-ov .tabs{display:flex;gap:27px;align-items:center;border-bottom:1px solid #d0ddea;height:41px;margin-bottom:18px;white-space:nowrap;font-size:12px}
+.invnet-ov .tabs span{height:41px;padding-top:10px;color:#5b7189}
+.invnet-ov .tabs .selected{color:#075be8;font-weight:700;border-bottom:2px solid #075be8}
+.invnet-ov .work{display:flex;flex-direction:column;gap:16px}
+.invnet-ov .card{border:1px solid #d3dfeb;background:white;border-radius:7px;padding:18px 20px;margin:0;min-width:0;height:100%}
+.invnet-ov .card-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:16px}
+.invnet-ov .card-head p{margin-top:4px;font-size:11px}
+.invnet-ov .banner{display:flex;gap:13px;align-items:center;border:1px solid #efd18c;border-radius:6px;background:#fff8e9;padding:13px 16px}
+.invnet-ov .banner .icon{width:23px;height:23px}
+.invnet-ov .banner strong{font-size:13px;color:#77500a}
+.invnet-ov .banner p{font-size:11px;margin-top:3px;color:#785c2e}
+.invnet-ov .banner.blue{background:#edf4ff;border-color:#c8dbfa}
+.invnet-ov .banner.blue strong,.invnet-ov .banner.blue p{color:#22518e}
+.invnet-ov .banner.red{background:#fff0f1;border-color:#f0bdc4}
+.invnet-ov .banner.red strong,.invnet-ov .banner.red p{color:#a6293a}
+.invnet-ov .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.invnet-ov .metric{border:1px solid #d3dfeb;border-radius:6px;background:white;padding:16px;position:relative}
+.invnet-ov .metric .icon{position:absolute;right:16px;top:17px}
+.invnet-ov .metric p{font-size:11px;max-width:85%}
+.invnet-ov .metric b{display:block;font-size:25px;margin:5px 0 4px;letter-spacing:-.6px}
+.invnet-ov .metric small{font-size:10px;color:#697e91}
+.invnet-ov .split{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(0,1fr);gap:16px}
+.invnet-ov .split>div{min-width:0}
+.invnet-ov .flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.invnet-ov .step{position:relative;border:1px solid #dbe4ee;padding:13px;border-radius:6px;background:#f9fbfe;display:flex;flex-direction:column;gap:8px}
+.invnet-ov .step strong{font-size:12px}
+.invnet-ov .step small{font-size:10px;color:#637a90}
+.invnet-ov .step-no{position:absolute;top:12px;right:10px;font-size:10px;color:#8aa0b4}
+.invnet-ov .chip{font-size:10px;line-height:1.4;padding:4px 7px;display:inline-block;border-radius:4px;background:#edf1f6;color:#526a82;white-space:normal;width:fit-content}
+.invnet-ov .chip.green{color:#12744e;background:#e8f6ef}
+.invnet-ov .chip.amber{color:#8c5d10;background:#fff1d0}
+.invnet-ov .chip.red{color:#aa2a3d;background:#ffe9ed}
+.invnet-ov .chip.blue{color:#1756b4;background:#eaf2ff}
+.invnet-ov .table-wrap{width:100%;overflow:hidden;border:1px solid #dce4ed;border-radius:5px}
+.invnet-ov table{width:100%;border-collapse:collapse;text-align:left;table-layout:fixed}
+.invnet-ov th{font-size:10px;font-weight:700;color:#627890;background:#f4f7fa;padding:11px 12px;border-bottom:1px solid #dce4ed}
+.invnet-ov td{font-size:11px;padding:14px 12px;border-bottom:1px solid #dce4ed;vertical-align:middle;overflow-wrap:anywhere}
+.invnet-ov tr:last-child td{border-bottom:0}
+.invnet-ov td:first-child{width:27%}
+.invnet-ov td small{display:block;color:#6d8298;font-size:9px;margin-top:3px}
+.invnet-ov a{color:#075be8;font-weight:700;text-decoration:none}
+.invnet-ov td a{font-size:10px}
+.invnet-ov .keyvals{margin:0}
+.invnet-ov .keyvals>div{display:flex;justify-content:space-between;gap:18px;padding:9px 0;border-bottom:1px solid #e7edf3;font-size:11px}
+.invnet-ov .keyvals>div:last-child{border:0}
+.invnet-ov .keyvals dt{color:#637b92;flex:1}
+.invnet-ov .keyvals dd{margin:0;text-align:right;font-weight:700;max-width:62%;overflow-wrap:anywhere}
+.invnet-ov .btn{border:1px solid #ccdae8;background:white;border-radius:5px;min-height:38px;padding:8px 13px;font-size:11px;font-weight:700;color:#25445f;display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap}
+.invnet-ov .btn.primary{background:#075be8;border-color:#075be8;color:white}
+.invnet-ov .btn.primary .icon{filter:brightness(0) invert(1)}
+.invnet-ov .btn .icon{width:16px;height:16px}
+.invnet-ov .btn:disabled{background:#dce5ef;border-color:#dce5ef;color:#677e93}
+.invnet-ov .savebar{display:flex;align-items:center;gap:12px;border-top:1px solid #d2deeb;background:white;padding:13px 16px;min-height:72px;border-radius:0 0 6px 6px}
+.invnet-ov .savebar strong{font-size:12px}
+.invnet-ov .savebar p{font-size:10px;margin-top:4px}
+.invnet-ov .push{margin-left:auto;display:flex;gap:8px}
+.invnet-ov .art{display:block;max-width:100%;height:94px;margin:18px auto 8px}
+.invnet-ov .tabs a{height:41px;padding-top:10px;color:#5b7189;font-weight:400;display:inline-block}
+.invnet-ov .tabs a[aria-current="page"]{color:#075be8;font-weight:700;border-bottom:2px solid #075be8}
+.invnet-ov .scope-picker{position:relative}
+.invnet-ov .scope-picker select{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.invnet-ov .scope-picker:focus-within{outline:2px solid #075be8;outline-offset:2px}
+.invnet-ov .scope-picker b{font-weight:700}
+.invnet-ov .unknown{color:#5b7189}
+@media (max-width:1023px){.invnet-ov .tabs{overflow-x:auto;scrollbar-width:none;height:42px}.invnet-ov .stats{grid-template-columns:1fr 1fr}.invnet-ov .split{grid-template-columns:1fr}.invnet-ov .flow{grid-template-columns:1fr 1fr}.invnet-ov .page-head{flex-wrap:wrap}}
+@media (max-width:639px){.invnet-ov-page{padding:16px 14px}.invnet-ov .stats,.invnet-ov .flow{grid-template-columns:1fr}.invnet-ov .scope-picker{min-width:0;width:100%}.invnet-ov .page-head{display:block}.invnet-ov .table-wrap{overflow:auto}.invnet-ov table{min-width:520px}.invnet-ov .savebar{flex-wrap:wrap}.invnet-ov .savebar .push{width:100%;margin:6px 0 0}}
+.invnet-ov .breadcrumbs a.crumb{color:#637c95;font-weight:400}
+.invnet-ov .tabs a:focus-visible,.invnet-ov .breadcrumbs a:focus-visible,.invnet-ov td a:focus-visible,.invnet-ov .btn:focus-visible{outline:2px solid #075be8;outline-offset:2px}
+.invnet-ov .tabs{text-decoration:none}
+.invnet-ov{font-feature-settings:normal;-webkit-font-smoothing:auto;-moz-osx-font-smoothing:auto}
+.invnet-ov h1,.invnet-ov h2{font-weight:700}
+.invnet-ov h1{font-size:28px;line-height:1.3;margin:0 0 7px;letter-spacing:-.5px}
+.invnet-ov strong,.invnet-ov b{font-weight:700}

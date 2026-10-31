@@ -6,10 +6,13 @@ import { useTenant } from "@/contexts/TenantContext";
 import { adminTabHref } from "@/lib/admin/sections";
 import { ChildPageFrame } from "@/components/admin/v2/AdminShell";
 import { Button, EmptyState, InlineNote, LocalTabs, Panel, SkeletonBlock, StatusText } from "@/components/product";
-import { getOverview, listGroups, explainError, type StoreDraft } from "@/lib/inventoryNetwork/api";
+import { getOverview, getPreviewInventory, listFeedBindings, listFeedJobs, listGroups, listSnapshots, explainError, type StoreDraft } from "@/lib/inventoryNetwork/api";
+import { useAdminNow, useViewFixture } from "@/lib/admin/dataSource";
 import { NetIcon, type NetIconName } from "@/components/inventoryNetwork/icons";
 import { NetProvider, SelectField, VIEW_PATH, type Notice, type View } from "./inventoryNetwork/shared";
-import OverviewSection from "./inventoryNetwork/OverviewSection";
+import OverviewDetail, { OverviewMain } from "./inventoryNetwork/OverviewSection";
+import OverviewFrame from "./inventoryNetwork/OverviewFrame";
+import { buildOverviewModel, type InventoryNetworkFixture } from "./inventoryNetwork/overviewModel";
 import StoresSection from "./inventoryNetwork/StoresSection";
 import SharingSection from "./inventoryNetwork/SharingSection";
 import MarketCheckSection from "./inventoryNetwork/MarketCheckSection";
@@ -43,14 +46,19 @@ const VIEWS: Array<{ key: View; label: string }> = [
 const crumbs = [{ label: "Administration", href: "/admin" }, { label: "Integrations", href: adminTabHref("inventory-feed") }, { label: "Inventory network" }];
 
 export default function InventoryNetworkPage() {
-  const { isAdmin, loading } = useAuth();
+  const auth = useAuth();
+  const fx = useViewFixture<InventoryNetworkFixture>("inventory-network");
+  const now = useAdminNow();
+  const isAdmin = fx ? true : auth.isAdmin;
+  const loading = fx ? false : auth.loading;
   const qc = useQueryClient();
   const [params, setParams] = useSearchParams();
   const { tenant } = useTenant();
   const [notice, setNotice] = useState<Notice | null>(null);
   const [newStoreDraft, setNewStoreDraft] = useState<Partial<StoreDraft> | null>(null);
 
-  const groups = useQuery({ queryKey: ["inv-net", "groups"], queryFn: listGroups, enabled: isAdmin });
+  const groupsQ = useQuery({ queryKey: ["inv-net", "groups"], queryFn: listGroups, enabled: isAdmin && !fx });
+  const groups = fx ? { data: fx.groups, isError: false, isLoading: false, isSuccess: true, error: null, refetch: groupsQ.refetch } : groupsQ;
   // The group follows the URL, then the account the header shows. The first
   // alphabetical group is only a last resort for a platform admin whose
   // active account has no group of its own.
@@ -59,7 +67,8 @@ export default function InventoryNetworkPage() {
     ?? groups.data?.find((g) => g.tenant_id === tenant?.id)?.id
     ?? groups.data?.[0]?.id
     ?? null;
-  const overview = useQuery({ queryKey: ["inv-net", "overview", groupId], queryFn: () => getOverview(groupId!), enabled: isAdmin && !!groupId });
+  const overviewQ = useQuery({ queryKey: ["inv-net", "overview", groupId], queryFn: () => getOverview(groupId!), enabled: isAdmin && !!groupId && !fx });
+  const overview = fx ? { data: fx.overview, isError: false, isLoading: false, isSuccess: true, error: null, refetch: overviewQ.refetch } : overviewQ;
 
   const view = (VIEWS.find((v) => v.key === params.get("view"))?.key ?? "overview") as View;
   const scope = useMemo<Record<string, string>>(() => (groupParam ? { group: groupParam } : ({} as Record<string, string>)), [groupParam]);
@@ -77,6 +86,24 @@ export default function InventoryNetworkPage() {
     [group, ov, notify, refresh, href, go, newStoreDraft, startNewStore, clearNewStoreDraft],
   );
 
+  const onOverview = view === "overview";
+  const ledgers = !fx && isAdmin && onOverview && !!ov;
+  const primaryId = (ov?.stores.find((s) => s.store.is_primary_inventory_store) ?? ov?.stores[0])?.store.id ?? null;
+  const jobsQ = useQuery({ queryKey: ["inv-net", "jobs"], queryFn: () => listFeedJobs(100), enabled: ledgers });
+  const snapsQ = useQuery({ queryKey: ["inv-net", "snapshots"], queryFn: () => listSnapshots(100), enabled: ledgers });
+  const bindingsQ = useQuery({ queryKey: ["inv-net", "bindings"], queryFn: listFeedBindings, enabled: ledgers });
+  const previewQ = useQuery({ queryKey: ["inv-net", "preview", primaryId, "customer_room"], queryFn: () => getPreviewInventory(primaryId!, "customer_room"), enabled: ledgers && !!primaryId });
+  const model = useMemo(() => (ov && onOverview ? buildOverviewModel({
+    now,
+    stores: ov.stores,
+    controls: ov.controls,
+    jobs: fx ? fx.jobs : jobsQ.data ?? null,
+    snapshots: fx ? fx.snapshots : snapsQ.data ?? null,
+    bindings: fx ? fx.bindings : bindingsQ.data ?? null,
+    preview: fx ? fx.preview : previewQ.data,
+    heartbeatAt: fx ? fx.heartbeatAt : null,
+  }) : null), [ov, onOverview, now, fx, jobsQ.data, snapsQ.data, bindingsQ.data, previewQ.data]);
+
   const title = "Inventory network";
   if (loading) return <ChildPageFrame section="integrations" crumbs={crumbs} title={title}><SkeletonBlock className="h-64 w-full" /></ChildPageFrame>;
   if (!isAdmin) {
@@ -92,6 +119,51 @@ export default function InventoryNetworkPage() {
     controls.emergency_stop ? <StatusText tone="danger">Emergency stop</StatusText> : controls.ingestion_paused ? <StatusText tone="warning">Ingestion paused</StatusText> : <StatusText tone="success">Ingestion running</StatusText>
   ) : undefined;
 
+  const tabsRow = groupId ? (
+    <LocalTabs label="Inventory network sections" tabs={VIEWS.map((v) => ({ key: v.key, label: <span className="inline-flex items-center gap-1.5"><NetIcon name={VIEW_ICON[v.key]} />{v.label}</span>, to: href(v.key), active: view === v.key }))} />
+  ) : null;
+
+  const notices = (
+    <>
+      {notice && <InlineNote tone={notice.tone} title={notice.text} action={<Button size="sm" variant="ghost" onClick={() => setNotice(null)}>Dismiss</Button>} />}
+      {groups.isError && <InlineNote tone="danger" title="Could not load dealer groups" action={<Button size="sm" onClick={() => groups.refetch()}>Retry</Button>}>{explainError(groups.error)}</InlineNote>}
+      {groups.isLoading && <SkeletonBlock className="h-64 w-full" />}
+      {groups.isSuccess && groups.data.length === 0 && <Panel><EmptyState title="No dealer groups yet" detail="Each dealership account gets a dealer group when the inventory network update is applied." compact /></Panel>}
+    </>
+  );
+  const loadStates = groupId && (
+    <>
+      {overview.isLoading && <SkeletonBlock className="h-64 w-full" />}
+      {overview.isError && <InlineNote tone="danger" title="Could not load this group" action={<Button size="sm" onClick={() => overview.refetch()}>Retry</Button>}>{explainError(overview.error)}</InlineNote>}
+      {overview.isSuccess && !ctx && <Panel><EmptyState title="Nothing came back for this group" detail="Reload the page. If it keeps happening the group may have been removed." compact /></Panel>}
+    </>
+  );
+
+  if (onOverview) {
+    const scopeStore = ov?.stores.find((s) => s.store.is_primary_inventory_store) ?? ov?.stores[0] ?? null;
+    return (
+      <OverviewFrame
+        scope={groups.data && groups.data.length > 0 && groupId ? {
+          groups: groups.data, groupId, groupName: group?.name ?? "", storeName: scopeStore?.store.display_name ?? null,
+          onChange: (v) => { setNewStoreDraft(null); setParams(new URLSearchParams({ view, group: v })); },
+        } : undefined}
+        main={ctx && model ? <NetProvider value={ctx}><OverviewMain model={model} /></NetProvider> : undefined}
+      >
+        <div className="mt-4 space-y-4">
+          {notices}
+          {loadStates}
+          {ctx && (
+            <NetProvider value={ctx}>
+              <h2 className="pt-2 text-[16px] font-semibold text-adm-ink">More inventory network views</h2>
+              {tabsRow}
+              <OverviewDetail />
+            </NetProvider>
+          )}
+        </div>
+      </OverviewFrame>
+    );
+  }
+
   return (
     <ChildPageFrame
       section="integrations"
@@ -104,20 +176,13 @@ export default function InventoryNetworkPage() {
       ) : undefined}
     >
       <div className="space-y-4">
-        {notice && <InlineNote tone={notice.tone} title={notice.text} action={<Button size="sm" variant="ghost" onClick={() => setNotice(null)}>Dismiss</Button>} />}
-        {groups.isError && <InlineNote tone="danger" title="Could not load dealer groups" action={<Button size="sm" onClick={() => groups.refetch()}>Retry</Button>}>{explainError(groups.error)}</InlineNote>}
-        {groups.isLoading && <SkeletonBlock className="h-64 w-full" />}
-        {groups.isSuccess && groups.data.length === 0 && <Panel><EmptyState title="No dealer groups yet" detail="Each dealership account gets a dealer group when the inventory network update is applied." compact /></Panel>}
-
+        {notices}
         {groupId && (
           <>
-            <LocalTabs label="Inventory network sections" tabs={VIEWS.map((v) => ({ key: v.key, label: <span className="inline-flex items-center gap-1.5"><NetIcon name={VIEW_ICON[v.key]} />{v.label}</span>, to: href(v.key), active: view === v.key }))} />
-            {overview.isLoading && <SkeletonBlock className="h-64 w-full" />}
-            {overview.isError && <InlineNote tone="danger" title="Could not load this group" action={<Button size="sm" onClick={() => overview.refetch()}>Retry</Button>}>{explainError(overview.error)}</InlineNote>}
-            {overview.isSuccess && !ctx && <Panel><EmptyState title="Nothing came back for this group" detail="Reload the page. If it keeps happening the group may have been removed." compact /></Panel>}
+            {tabsRow}
+            {loadStates}
             {ctx && (
               <NetProvider value={ctx}>
-                {view === "overview" && <OverviewSection />}
                 {view === "stores" && <StoresSection />}
                 {view === "sharing" && <SharingSection />}
                 {view === "marketcheck" && <MarketCheckSection />}

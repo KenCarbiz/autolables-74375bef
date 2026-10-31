@@ -4,6 +4,8 @@ import { Button, EmptyState, InlineNote, KeyValueList, Panel, StatusText, type T
 import { setControls, type InventoryFeedControls, type StoreOverview } from "@/lib/inventoryNetwork/api";
 import { NetIcon } from "@/components/inventoryNetwork/icons";
 import { inputClass, mcModeLabel, plural, storeAddress, useAct, useNet, when, humanize, STATUS_TONE } from "./shared";
+import type { OverviewModel, Chip } from "./overviewModel";
+import connectionStages from "@/assets/inventoryNetwork/connection-stages.svg";
 
 interface Change { title: string; detail: string; next: Pick<InventoryFeedControls, "ingestion_paused" | "emergency_stop" | "reconcile_enabled">; danger?: boolean; confirmLabel: string }
 
@@ -118,7 +120,7 @@ function StoreCard({ s }: { s: StoreOverview }) {
   );
 }
 
-export default function OverviewSection() {
+export default function OverviewDetail() {
   const { overview, stores, href, go } = useNet();
   const ex = overview.exceptions;
   const items: Array<{ label: string; n: number; to: string }> = [
@@ -156,6 +158,99 @@ export default function OverviewSection() {
         )}
       </section>
       <InlineNote tone="info" title="Showing a store's vehicles to a sibling store's customers never calls MarketCheck.">Only a store's own policy and caps allow paid lookups.</InlineNote>
+    </div>
+  );
+}
+
+const ICONS = {
+  warning: "M12 2L2 21h20zM12 8v6m0 3v1",
+  store: "M3 10v11h18V10M2 10l2-7h16l2 7M8 21v-7h8v7M2 10c2 3 4 3 5 0 2 3 4 3 5 0 2 3 4 3 5 0 1 3 3 3 5 0",
+  file: "M4 2h10l6 6v14H4zM14 2v6h6M7 12h10m-10 4h10",
+  car: "M3 11l3-7h12l3 7M2 11h20v8H2zM5 19v3m14-3v3M5 15h3m8 0h3",
+  history: "M3 10a9 9 0 1 1 1 8M3 3v7h7M12 7v5l4 2",
+  shield: "M12 2l9 4v6c0 5-9 10-9 10S3 17 3 12V6zM8 12l3 3 5-6",
+} as const;
+
+const Glyph = ({ name, className = "icon" }: { name: keyof typeof ICONS | "clock"; className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="#47617C" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    {name === "clock" ? <><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 3" /></> : <path d={ICONS[name]} />}
+  </svg>
+);
+
+const ChipView = ({ chip }: { chip: Chip }) => <span className={`chip ${chip.tone === "neutral" ? "" : chip.tone}`}>{chip.label}</span>;
+
+export function OverviewMain({ model }: { model: OverviewModel }) {
+  const { href } = useNet();
+  return (
+    <div className="work">
+      {model.banner && (
+        <div role="status" className="banner amber">
+          <Glyph name="warning" className="icon" />
+          <div><strong>{model.banner.title}</strong><p>{model.banner.detail}</p></div>
+        </div>
+      )}
+      <ul className="stats" aria-label="Pipeline counts" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+        {model.stats.map((s) => (
+          <li key={s.label} className="metric">
+            <Glyph name={s.icon} />
+            <p>{s.label}</p>
+            <b className={s.known ? undefined : "unknown"}>{s.value}</b>
+            <small>{s.sub}</small>
+          </li>
+        ))}
+      </ul>
+      <section className="card" aria-labelledby="inv-flow-h">
+        <div className="card-head"><div><h2 id="inv-flow-h">From file to customer</h2><p>Each stage has its own timestamp and outcome.</p></div></div>
+        <ol className="flow" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+          {model.flow.map((f) => (
+            <li key={f.no} className="step">
+              <span className="step-no">{f.no}</span>
+              <strong>{f.title}</strong>
+              <ChipView chip={f.chip} />
+              <small>{f.note}</small>
+            </li>
+          ))}
+        </ol>
+      </section>
+      <div className="split">
+        <div>
+          <div><section className="card" aria-labelledby="inv-act-h">
+            <div className="card-head"><div><h2 id="inv-act-h">Stores requiring action</h2></div></div>
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th scope="col">Store</th><th scope="col">Readiness</th><th scope="col">Next step</th></tr></thead>
+                <tbody>
+                  {model.actions.length === 0 && <tr><td colSpan={3}>No store needs action.</td></tr>}
+                  {model.actions.map((r) => (
+                    <tr key={r.key}>
+                      <td>{r.name}</td>
+                      <td><ChipView chip={r.chip} /></td>
+                      <td><Link to={href(r.to.view, r.to.params)}>{r.label} {"\u2192"}</Link></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section></div>
+        </div>
+        <div>
+          <div><section className="card" aria-labelledby="inv-ctl-h">
+            <div className="card-head"><div><h2 id="inv-ctl-h">Connection controls</h2><p>Permission to run is separate from proof of execution.</p></div></div>
+            <dl className="keyvals">
+              <div><dt>Ingestion permitted</dt><dd><ChipView chip={model.controls.ingestion} /></dd></div>
+              <div><dt>Worker heartbeat</dt><dd><ChipView chip={model.controls.heartbeat} /></dd></div>
+              <div><dt>Last completed import</dt><dd>{model.controls.lastImport}</dd></div>
+              <div><dt>MarketCheck store mode</dt><dd>{model.controls.marketCheckMode}</dd></div>
+            </dl>
+            <img className="art" src={connectionStages} alt="" />
+          </section></div>
+        </div>
+      </div>
+      <div className="savebar">
+        <Glyph name="shield" />
+        <div><strong>No settings changed</strong><p>Reading this page never imports inventory or calls a paid provider.</p></div>
+        <div className="push"><Link className="btn" to={href("runs")}><Glyph name="history" className="icon" />View runs</Link></div>
+      </div>
     </div>
   );
 }

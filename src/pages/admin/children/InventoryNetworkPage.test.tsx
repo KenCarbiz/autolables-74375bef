@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { renderAdmin } from "@/test/adminRender";
 import { functionCalls, resetSupabaseSpy, rpcCalls, spyCalls, spyResponses, writeCalls } from "@/test/mocks/supabaseSpy";
 import InventoryNetworkPage from "./InventoryNetworkPage";
@@ -40,7 +40,8 @@ describe("InventoryNetworkPage", () => {
     renderAdmin(<InventoryNetworkPage />, { route: "/admin/integrations/inventory-network" });
     expect(await screen.findByText("No stores in this group yet")).toBeInTheDocument();
     expect((screen.getByLabelText("Dealer group") as HTMLSelectElement).value).toBe("g1");
-    expect(screen.getByRole("link", { name: "Integrations" })).toHaveAttribute("href", "/admin?tab=inventory-feed");
+    expect(within(screen.getByRole("navigation", { name: "Breadcrumb" })).getByRole("link", { name: "Integrations" })).toHaveAttribute("href", "/admin?tab=inventory-feed");
+    expect(within(screen.getByRole("navigation", { name: "Administration sections" })).getByRole("link", { name: "Integrations" })).toHaveAttribute("aria-current", "page");
   });
 
   it("explains an empty database instead of inventing data", async () => {
@@ -54,7 +55,8 @@ describe("InventoryNetworkPage", () => {
     spyResponses.rpcs.inv_admin_overview = { data: emptyOverview };
     renderAdmin(<InventoryNetworkPage />, { route: "/admin/integrations/inventory-network" });
     expect(await screen.findByText("No stores in this group yet")).toBeInTheDocument();
-    expect(screen.getByText("Ingestion paused")).toBeInTheDocument();
+    expect(screen.getAllByText("Paused").length).toBeGreaterThan(0);
+    expect(screen.getByText("Worker heartbeat").nextSibling).toHaveTextContent("Not recorded");
     expect(screen.getByText("Nothing is waiting for review.")).toBeInTheDocument();
     await waitFor(() => expect(rpcCalls()).toEqual(["inv_admin_overview"]));
     expect(functionCalls()).toEqual([]);
@@ -87,9 +89,9 @@ describe("InventoryNetworkPage", () => {
     spyResponses.tables.dealer_groups = { data: [group] };
     spyResponses.rpcs.inv_admin_overview = { data: { ...emptyOverview, stores, exceptions: { ...emptyOverview.exceptions, pending_mappings: 2 } } };
     const { unmount } = renderAdmin(<InventoryNetworkPage />, { route: "/admin/integrations/inventory-network" });
-    expect(await screen.findByText("Harte Hyundai of Old Saybrook")).toBeInTheDocument();
+    expect((await screen.findAllByText("Harte Hyundai of Old Saybrook")).length).toBeGreaterThan(0);
     expect(screen.getByText("42")).toBeInTheDocument();
-    expect(screen.getByText("Feed only")).toBeInTheDocument();
+    expect(screen.getAllByText("Feed only").length).toBeGreaterThan(0);
     expect(screen.getByText("Last feed quarantined")).toBeInTheDocument();
     expect(screen.getByText("Pending mappings").previousSibling).toHaveTextContent("2");
     unmount();
@@ -138,5 +140,24 @@ describe("InventoryNetworkPage", () => {
     expect(functionCalls()).toEqual([]);
     expect(writeCalls().filter((c) => c.kind === "table")).toEqual([]);
     expect(new Set(rpcCalls())).toEqual(new Set(["inv_admin_overview", "inv_admin_provider_dashboard", "inv_admin_delivery_timeline"]));
+  });
+
+  it("shows the overdue banner for a past-due queued job, leaves heartbeat Not recorded, and writes nothing on load", async () => {
+    const store = { id: "st1", group_id: "g1", tenant_id: "t1", display_name: "Harte Example", status: "active", subscription_status: "subscribed", is_primary_inventory_store: true, inventory_feed_enabled: true, feed_import_paused: false };
+    const stores = [{ store, state: { last_applied_at: "2026-10-01T00:00:00Z" }, policy: null, counts: { present: 5, missing: 0, retirement_review: 0, retired: 0, price_unknown: 0, no_photos: 0 }, mappings: [{ id: "m1", source_dealer_id: "x", status: "approved", approved_at: null }], open_conflicts: 0, last_snapshot: null, sharing_out: 0, sharing_in: 0 }];
+    const job = (status: string, due: string) => ({ id: "j1", provider: "filescom", path: "/x.csv", kind: "import", trigger: "webhook", status, attempts: 0, max_attempts: 5, next_attempt_at: due, run_id: null, last_error: null, result: null, created_at: "2026-10-01T00:00:00Z", started_at: null, finished_at: null });
+    spyResponses.tables.dealer_groups = { data: [group] };
+    spyResponses.rpcs.inv_admin_overview = { data: { ...emptyOverview, stores } };
+    spyResponses.tables.inventory_feed_jobs = { data: [job("queued", "2026-10-01T00:00:00Z")] };
+    const first = renderAdmin(<InventoryNetworkPage />, { route: "/admin/integrations/inventory-network" });
+    expect(await screen.findByText("Latest arrival has not been processed")).toBeInTheDocument();
+    expect(screen.getByText("Worker heartbeat").nextSibling).toHaveTextContent("Not recorded");
+    expect(functionCalls()).toEqual([]);
+    expect(writeCalls().filter((c) => c.kind === "table")).toEqual([]);
+    first.unmount();
+    spyResponses.tables.inventory_feed_jobs = { data: [job("queued", "2999-01-01T00:00:00Z")] };
+    renderAdmin(<InventoryNetworkPage />, { route: "/admin/integrations/inventory-network" });
+    await waitFor(() => expect(screen.getByText("Awaiting worker").parentElement).toHaveTextContent(/Due in/));
+    expect(screen.queryByText("Latest arrival has not been processed")).not.toBeInTheDocument();
   });
 });
