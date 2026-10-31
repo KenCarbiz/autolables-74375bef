@@ -4,7 +4,7 @@ import { Button, type Tone } from "@/components/product";
 import { cn } from "@/lib/utils";
 import { explainError, type DealerGroup, type InvOverview, type StoreDraft, type StoreOverview } from "@/lib/inventoryNetwork/api";
 
-export type View = "overview" | "stores" | "sharing" | "marketcheck" | "mapping" | "runs" | "preview" | "pilot" | "catalog" | "deliveries";
+export type View = "overview" | "stores" | "sharing" | "marketcheck" | "mapping" | "runs" | "preview" | "pilot" | "catalog" | "deliveries" | "duplicates";
 export const VIEW_PATH = "/admin/integrations/inventory-network";
 
 export interface Notice { tone: Tone; text: string }
