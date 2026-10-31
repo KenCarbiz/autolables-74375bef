@@ -121,7 +121,7 @@ removes the account reservation from every caller.
   `shrink_guard_held` audit row. Confirm a genuine sell-down with
   `inv_admin_set_shrink_guard(store, pct, reason)`. Apply 0012 and redeploy
   files-inventory-worker before enabling ingestion automation.
-- Completeness hold (proposed, supabase/proposed/feed_completeness_hold.sql,
+- Completeness hold (drizzle/migrations/0016_feed_completeness_hold.sql,
   applies after 0014): a suspicious full snapshot is held whole (status
   `held`): no additions, price or listing changes, missing counters or
   baseline move. Rules: absent-vs-live (0012 percentage, floor from

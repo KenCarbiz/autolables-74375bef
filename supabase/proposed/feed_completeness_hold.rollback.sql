@@ -1,4 +1,4 @@
--- Rollback for feed_completeness_hold.sql. Restores the 0014 apply function
+-- Rollback for drizzle/migrations/0016_feed_completeness_hold.sql. Restores the 0014 apply function
 -- by re-running its definition; held snapshots become rejected first.
 UPDATE public.inventory_store_snapshots SET status = 'rejected', reason = 'hold_rolled_back' WHERE status = 'held';
 DROP FUNCTION IF EXISTS public.inv_admin_resolve_held_snapshot(uuid, text, text);

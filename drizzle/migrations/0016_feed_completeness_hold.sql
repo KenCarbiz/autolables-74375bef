@@ -1,4 +1,4 @@
--- -- Feed completeness hold (proposed; applies after 0014) ----------------------
+-- -- Feed completeness hold (applies after 0014) --------------------------------
 --
 -- Owner requirement 2026-10-31: a suspicious snapshot must not increment
 -- missing counters, retire vehicles, reprice listings or replace the trusted

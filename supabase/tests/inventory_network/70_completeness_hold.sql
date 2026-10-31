@@ -1,4 +1,4 @@
--- Behaviour tests for supabase/proposed/feed_completeness_hold.sql (after 0014).
+-- Behaviour tests for drizzle/migrations/0016_feed_completeness_hold.sql (after 0014).
 \set ON_ERROR_STOP 1
 CREATE OR REPLACE FUNCTION pg_temp.expect(cond boolean, label text) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN IF cond IS NOT TRUE THEN RAISE EXCEPTION 'FAILED: %', label; END IF; RAISE NOTICE 'ok  %', label; END $$;
