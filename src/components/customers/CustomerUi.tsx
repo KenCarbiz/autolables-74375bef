@@ -6,14 +6,14 @@ import { dwellLabel, money, relativeTime } from "./customerBook";
 export type Tone = "neutral" | "good" | "waiting" | "attention";
 
 const TONE_CLASS: Record<Tone, string> = {
-  neutral: "bg-adm-workspace text-adm-muted",
-  good: "bg-teal/10 text-teal",
-  waiting: "bg-gold/15 text-gold",
+  neutral: "bg-adm-workspace/70 text-adm-muted",
+  good: "bg-adm-selected/70 text-adm-primary",
+  waiting: "bg-gold/10 text-gold",
   attention: "bg-adm-danger-bg text-adm-danger",
 };
 
 export const Chip = ({ tone = "neutral", children, size = "sm" }: { tone?: Tone; children: ReactNode; size?: "sm" | "lg" }) => (
-  <span className={`inline-flex items-center gap-1.5 rounded-[2px] font-semibold ${size === "lg" ? "px-3 py-1.5 text-[14px] leading-[20px]" : "px-2 py-0.5 text-[12px] leading-[18px]"} ${TONE_CLASS[tone]}`}>
+  <span className={`inline-flex items-center gap-1.5 rounded-[2px] font-medium ${size === "lg" ? "px-3 py-1.5 text-[14px] leading-[20px]" : "px-2 py-0.5 text-[12px] leading-[18px]"} ${TONE_CLASS[tone]}`}>
     {children}
   </span>
 );

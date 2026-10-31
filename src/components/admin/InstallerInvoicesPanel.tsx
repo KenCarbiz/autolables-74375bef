@@ -210,7 +210,7 @@ export default function InstallerInvoicesPanel() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <StatusText tone={status === "paid" ? "success" : status === "invoiced" ? "info" : "warning"} icon>{status.charAt(0).toUpperCase() + status.slice(1)}</StatusText>
+                    <StatusText tone={status === "paid" ? "success" : status === "invoiced" ? "info" : "warning"}>{status.charAt(0).toUpperCase() + status.slice(1)}</StatusText>
                     <button onClick={() => printInvoice(printable, settings.dealer_name)} title="Print invoice" className="h-8 px-2.5 rounded-lg border border-adm-border text-[11px] font-semibold inline-flex items-center gap-1 hover:bg-adm-workspace">
                       <Printer className="w-3.5 h-3.5" /> Print
                     </button>

@@ -89,7 +89,7 @@ export const CountTile = ({
 
 /** State as icon plus text on a flat tint. Not a pill. */
 export const StateBadge = ({ tone, children }: { tone: Tone; children: ReactNode }) => (
-  <StatusText tone={TONE_CHIP[tone]} icon={tone !== "neutral"}>
+  <StatusText tone={TONE_CHIP[tone]}>
     {children}
   </StatusText>
 );

@@ -254,7 +254,7 @@ export default function InventoryIntelligence() {
             </thead>
             <tbody>
               {filtered?.map(({ vehicle, intel }) => (
-                <tr key={vehicle.id} className="hover:bg-adm-workspace">
+                <tr key={vehicle.id} className="h-12 hover:bg-adm-workspace">
                   <Td className="w-8">
                     <input
                       type="checkbox"
@@ -272,14 +272,14 @@ export default function InventoryIntelligence() {
                     const f = c.ids.map((id) => intel.families.find((x) => x.family === id)).find((x) => x && x.stage !== "Not Applicable") ?? intel.families.find((x) => x.family === c.ids[0]);
                     return <Td key={c.key}>{f ? <Stage stage={f.stage} /> : null}</Td>;
                   })}
-                  <Td className="max-w-[130px]">
+                  <Td className="max-w-[170px]">
                     {intel.blocker
-                      ? <span className="block truncate" title={intel.blocker}><StatusText tone="warning" className="max-w-full truncate">{intel.blocker}</StatusText></span>
+                      ? <span className="block truncate text-[13px] font-medium text-adm-warning" title={intel.blocker}>{intel.blocker}</span>
                       : <span className="text-[12px] text-adm-muted">None</span>}
                   </Td>
                   <Td align="right">
                     <div className="flex items-center justify-end gap-3 whitespace-nowrap text-[14px] font-semibold">
-                      <Link to={`/vehicle-file/${vehicle.id}`} className="inline-flex h-8 items-center rounded-[6px] border border-[#C9D6F5] bg-[#EEF3FD] px-3 text-adm-primary hover:bg-[#E2EBFB]">Review</Link>
+                      <Link to={`/vehicle-file/${vehicle.id}`} className="text-adm-primary hover:underline">Review</Link>
                     </div>
                   </Td>
                 </tr>

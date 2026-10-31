@@ -136,19 +136,6 @@ const Deals = () => {
     else toast.error(result.message);
   };
 
-  const view = (deal: DealEntry) => {
-    const url = signingUrl(deal);
-    if (url) {
-      window.open(url, "_blank", "noopener");
-      return;
-    }
-    if (deal.listingId) {
-      navigate(`/vehicle-file/${deal.listingId}`);
-      return;
-    }
-    toast.error("This deal has no signing link and no matching vehicle file yet");
-  };
-
   return (
     <PageBody width="wide">
       <Seo title="Deals" description="Every deal, its signature state, its price integrity, and what it needs next." path="/deals" />
@@ -167,6 +154,7 @@ const Deals = () => {
       />
       <MetricStrip boxed
         numberFirst
+        noBars
         label="Deal totals"
         action={
           <div className="flex flex-wrap items-center gap-2">
@@ -212,13 +200,13 @@ const Deals = () => {
               <thead className="bg-adm-workspace">
                 <tr className="text-[12px] leading-[18px] text-adm-muted">
                   <th className="font-semibold px-4 py-2.5 w-[8%]">Stock #</th>
-                  <th className="font-semibold py-2.5 w-[27%]">Vehicle</th>
+                  <th className="font-semibold py-2.5 w-[24%]">Vehicle</th>
                   <th className="font-semibold py-2.5 w-[11%]">Customer</th>
                   <th className="font-semibold py-2.5 w-[9%] text-right pr-4">Selling price</th>
                   <th className="font-semibold py-2.5 w-[13%]">Document state</th>
                   <th className="font-semibold py-2.5 w-[11%]">Price integrity</th>
                   <th className="font-semibold py-2.5 pl-3 w-[4%]">Age</th>
-                  <th className="font-semibold py-2.5 w-[14%]">Next action</th>
+                  <th className="font-semibold py-2.5 w-[17%]">Next action</th>
                   <th className="font-semibold py-2.5 pr-3 w-[3%]"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
@@ -244,7 +232,7 @@ const Deals = () => {
                         <Link to={`/deals/${encodeURIComponent(deal.id)}`} className="text-adm-primary hover:underline">{deal.nextAction.headline}</Link>
                       </td>
                       <td className="pr-3 text-right">
-                        <DealMenu deal={deal} customer={customer} onCopy={copyLink} onText={textLink} onView={view} onOpenVehicleFile={(id) => navigate(`/vehicle-file/${id}`)} onOpenCustomer={(id) => navigate(`/customers/${encodeURIComponent(id)}`)} />
+                        <DealMenu deal={deal} customer={customer} onCopy={copyLink} onText={textLink} />
                       </td>
                     </tr>
                   );
@@ -282,7 +270,7 @@ const Deals = () => {
                     >
                       Open
                     </Link>
-                    <DealMenu deal={deal} customer={customer} onCopy={copyLink} onText={textLink} onView={view} onOpenVehicleFile={(id) => navigate(`/vehicle-file/${id}`)} onOpenCustomer={(id) => navigate(`/customers/${encodeURIComponent(id)}`)} />
+                    <DealMenu deal={deal} customer={customer} onCopy={copyLink} onText={textLink} />
                   </div>
                 </article>
               );
@@ -299,19 +287,14 @@ const DealMenu = ({
   customer,
   onCopy,
   onText,
-  onView,
-  onOpenVehicleFile,
-  onOpenCustomer,
 }: {
   deal: DealEntry;
   customer: CustomerEntry | null;
   onCopy: (deal: DealEntry) => void;
   onText: (deal: DealEntry, phone: string) => void;
-  onView: (deal: DealEntry) => void;
-  onOpenVehicleFile: (listingId: string) => void;
-  onOpenCustomer: (customerId: string) => void;
 }) => {
   const phone = customer?.phone || null;
+  if (!deal.signingToken && !deal.slug) return null;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -321,16 +304,10 @@ const DealMenu = ({
         <MoreHorizontal className="w-5 h-5" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-60">
-        {deal.signingToken && <DropdownMenuItem onSelect={() => onView(deal)}>View signing page</DropdownMenuItem>}
         {deal.signingToken && <DropdownMenuItem onSelect={() => onCopy(deal)}>Copy signing link</DropdownMenuItem>}
         {deal.signingToken && phone && <DropdownMenuItem onSelect={() => onText(deal, phone)}>Text the signing link</DropdownMenuItem>}
-        {deal.listingId && <DropdownMenuItem onSelect={() => onOpenVehicleFile(deal.listingId as string)}>Open vehicle file</DropdownMenuItem>}
         {deal.slug && (
           <DropdownMenuItem onSelect={() => window.open(`/v/${deal.slug}`, "_blank", "noopener")}>Open vehicle passport</DropdownMenuItem>
-        )}
-        {customer && <DropdownMenuItem onSelect={() => onOpenCustomer(customer.id)}>Open customer record</DropdownMenuItem>}
-        {!deal.signingToken && !deal.listingId && !customer && (
-          <DropdownMenuItem disabled>No linked records on this deal</DropdownMenuItem>
         )}
       </DropdownMenuContent>
     </DropdownMenu>

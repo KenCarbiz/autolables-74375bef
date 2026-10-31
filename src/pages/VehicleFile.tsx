@@ -340,7 +340,7 @@ const VehicleFile = () => {
       {!subPage && tab === "overview" && (
         <FactStrip
           label="Vehicle summary"
-          className="lg:grid-cols-6"
+          className="lg:grid-cols-[repeat(5,auto)_minmax(0,1fr)]"
           facts={[
             { label: "Owner", value: lc.owner },
             { label: "Condition", value: <span className="capitalize">{vehicle.condition || "Unknown"}</span> },

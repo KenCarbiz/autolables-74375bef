@@ -156,12 +156,12 @@ const Customers = () => {
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch">
         <div className="min-w-0 flex-1">
-          <MetricStrip boxed
+          <MetricStrip boxed numberFirst noBars
             label="Customer totals"
             metrics={[
-              { label: BUCKET_LABEL[tab], value: loading && !book.customers.length ? null : rows.length, tone: "danger" },
+              { label: BUCKET_LABEL[tab], value: loading && !book.customers.length ? null : rows.length },
               { label: "Total active", value: loading && !book.customers.length ? null : searched.length },
-              { label: "Identified", value: loading && !book.customers.length ? null : identified, tone: "info" },
+              { label: "Identified", value: loading && !book.customers.length ? null : identified },
               { label: "Anonymous", value: loading && !book.customers.length ? null : anonymous },
             ]}
           />
@@ -227,11 +227,11 @@ const Customers = () => {
                         {c.identified ? c.name || c.email || "Unnamed customer" : "Online shopper"}
                       </Link>
                     </Td>
-                    <Td className="whitespace-nowrap text-adm-muted">{c.identified ? maskContact(c.email || c.phone) : "Not captured"}</Td>
-                    <Td className="max-w-[215px]"><span className="block truncate" title={c.vehicles[0]?.label}>{c.vehicles[0]?.label ?? "None attached"}</span></Td>
+                    <Td className="whitespace-nowrap text-[13px] text-adm-muted">{c.identified ? maskContact(c.email || c.phone) : "Not captured"}</Td>
+                    <Td className="max-w-[170px]"><span className="block truncate" title={c.vehicles[0]?.label}>{c.vehicles[0]?.label ?? "None attached"}</span></Td>
                     <Td className="whitespace-nowrap">{c.assignedEmployee?.name ?? <span className="text-adm-muted">Unassigned</span>}</Td>
                     <Td className="whitespace-nowrap">{lastIntent(c) ?? <span className="text-adm-muted">None linked</span>}</Td>
-                    <Td className="max-w-[130px]"><span className="block truncate text-[14px] font-semibold text-adm-primary" title={c.nextAction.headline}>{c.nextAction.headline}</span></Td>
+                    <Td className="max-w-[170px]"><span className="block truncate text-[14px] font-medium text-adm-primary" title={c.nextAction.headline}>{c.nextAction.headline}</span></Td>
                     <Td align="right" className="whitespace-nowrap text-adm-muted">{relativeTime(c.lastActivityAt)}</Td>
                     <Td align="right" className="w-10" >
                       <span onClick={(e) => e.stopPropagation()}>
@@ -315,21 +315,16 @@ const RowMenu = ({
   busyLead: string | null;
   onMarkContacted: (c: CustomerEntry) => void;
 }) => {
-  const tel = telHref(customer.phone);
   const lead = customer.leads.find((l) => !l.first_response_at) || customer.leads[0] || null;
   const showMark = !!lead && lead.status !== "contacted" && lead.status !== "converted";
-  const vehicle = customer.vehicles[0];
+  if (!showMark) return null;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger aria-label="More actions" className="rounded-[6px] p-1 text-adm-muted hover:bg-adm-workspace">
         <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {tel && <DropdownMenuItem asChild><a href={tel}>Call</a></DropdownMenuItem>}
-        {customer.email && <DropdownMenuItem asChild><a href={`mailto:${customer.email}`}>Email</a></DropdownMenuItem>}
-        {vehicle?.slug && <DropdownMenuItem asChild><Link to={`/v/${vehicle.slug}`}>Open passport</Link></DropdownMenuItem>}
-        {vehicle?.listingId && <DropdownMenuItem asChild><Link to={`/vehicle-file/${vehicle.listingId}`}>Open vehicle file</Link></DropdownMenuItem>}
-        {showMark && <DropdownMenuItem disabled={busyLead === lead?.id} onSelect={() => onMarkContacted(customer)}>Mark contacted</DropdownMenuItem>}
+        <DropdownMenuItem disabled={busyLead === lead?.id} onSelect={() => onMarkContacted(customer)}>Mark contacted</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

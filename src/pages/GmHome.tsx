@@ -411,12 +411,13 @@ const GmHome = () => {
 
       <MetricStrip
         allBars
+        numberFirst
         label="Today at a glance"
         action={canViewInventory ? <LinkButton to="#today-work" variant="primary">Review work</LinkButton> : undefined}
         metrics={[
           { label: "Needs decision", value: reading ? null : approvals.length, hint: "Awaiting authorization", loading: reading, tone: approvals.length > 0 ? "warning" : "neutral" },
           { label: "Vehicles at risk", value: reading ? null : stuck.length, hint: "Stuck in a stage", loading: reading, tone: stuck.length > 0 ? "warning" : "neutral" },
-          { label: "Customer opportunities", value: openLeads.length, hint: "Open leads" },
+          { label: "Customer opportunities", value: openLeads.length, hint: "Open leads", tone: "info" },
           { label: "System issues", value: metricsError ? null : systemIssues, hint: "Exceptions and blockers", loading: metricsLoading, tone: systemIssues > 0 ? "danger" : "neutral" },
         ]}
       />

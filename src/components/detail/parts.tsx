@@ -32,7 +32,7 @@ export const FactStrip = ({ facts, className, label }: { facts: Fact[]; classNam
     {facts.map((f, i) => (
       <div key={i} className="min-w-0">
         <dt className="text-[12px] leading-[18px] text-adm-muted">{f.label}</dt>
-        <dd className="text-[14px] leading-[20px] font-semibold text-adm-ink truncate">{f.value}</dd>
+        <dd className="text-[14px] leading-[20px] font-semibold text-adm-ink truncate" title={typeof f.value === "string" ? f.value : undefined}>{f.value}</dd>
       </div>
     ))}
   </dl>

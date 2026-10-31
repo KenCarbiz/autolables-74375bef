@@ -17,7 +17,7 @@ import { clearIntakeQueued, markIntakeQueued, persistStockNumber, runManualIntak
 import { toast } from "sonner";
 import {
   Plus, Search, Upload, Car, FileText, Printer, Signature, ScanLine,
-  X, CheckCircle2, AlertTriangle, RefreshCw, MoreVertical, Building2,
+  X, CheckCircle2, AlertTriangle, RefreshCw, MoreVertical, MoreHorizontal, Building2,
   ShieldCheck, ClipboardList, ExternalLink, Trash2, Wrench,
   ChevronLeft, ChevronRight, Eye, CircleDollarSign, FileSignature, Tag,
   AlertCircle, ShieldAlert, TrendingUp, Gauge, Rocket,
@@ -563,11 +563,12 @@ const InventoryModern = () => {
 
         <MetricStrip
           label="Inventory summary"
+          allBars
           metrics={[
-            { label: "Active", value: loading ? null : counts.total, loading },
+            { label: "Active", value: loading ? null : counts.total, loading, tone: "info" },
             { label: "Checklist complete", value: loading ? null : counts.checklistComplete, loading, tone: counts.checklistComplete > 0 ? "success" : "neutral" },
             { label: "Needs attention", value: loading ? null : counts.needsAttention, loading, tone: counts.needsAttention > 0 ? "warning" : "neutral" },
-            { label: "Published", value: loading ? null : counts.published, loading },
+            { label: "Published", value: loading ? null : counts.published, loading, tone: "info" },
           ]}
         />
 
@@ -927,7 +928,7 @@ const PortalChip = ({ status, row }: { status: VehicleRow["status"]; row: Recall
   if (status !== "published") return <StatusText tone="neutral">Not published</StatusText>;
   return (
     <div className="flex flex-col items-start gap-1">
-      <StatusText tone={v.riskSignalled ? "warning" : "success"} icon>Published</StatusText>
+      <StatusText tone={v.riskSignalled ? "warning" : "success"}>Published</StatusText>
       {v.riskSignalled && (
         <span className="text-[12px] leading-[18px] text-adm-danger">{v.doNotDrive ? "Do-not-drive recall reported" : "Recall reported"}</span>
       )}
@@ -937,7 +938,7 @@ const PortalChip = ({ status, row }: { status: VehicleRow["status"]; row: Recall
 
 // Simple status pill — clean dot + label, no oval background.
 const SimpleStatusPill = ({ status }: { status: VehicleRow["status"] }) =>
-  status === "published" ? <StatusText tone="success" icon>Published</StatusText>
+  status === "published" ? <StatusText tone="success">Published</StatusText>
     : status === "archived" ? <StatusText tone="neutral">Archived</StatusText>
     : <StatusText tone="warning">Draft</StatusText>;
 
@@ -1044,8 +1045,8 @@ const KebabMenu = ({ items }: { items: KebabItem[] }) => {
   }, [open]);
   return (
     <div className="relative" ref={ref}>
-      <button onClick={() => setOpen((v) => !v)} aria-label="More actions" className="w-9 h-9 rounded-xl border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground inline-flex items-center justify-center transition-colors">
-        <MoreVertical className="w-4 h-4" />
+      <button onClick={() => setOpen((v) => !v)} aria-label="More actions" className="w-9 h-9 rounded-[6px] text-adm-muted hover:bg-adm-workspace hover:text-adm-ink inline-flex items-center justify-center transition-colors">
+        <MoreVertical className="w-5 h-5" />
       </button>
       {open && (
         <div className="absolute right-0 top-full mt-1 w-52 rounded-xl border border-border bg-popover shadow-lg z-20 p-1">
@@ -1072,8 +1073,8 @@ const ActionsMenu = ({ items }: { items: KebabItem[] }) => {
   }, [open]);
   return (
     <div className="relative" ref={ref}>
-      <Button aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-        More actions <ChevronRight className="w-4 h-4 rotate-90" />
+      <Button aria-label="More actions" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)} className="w-10 px-0">
+        <MoreHorizontal className="w-5 h-5" />
       </Button>
       {open && (
         <div role="menu" className="absolute right-0 top-full mt-1 w-56 rounded-[6px] border border-adm-border bg-adm-surface z-20 p-1">

@@ -182,7 +182,7 @@ const PrepSignOff = () => {
           ]}
         />
 
-        <MetricStrip
+        <MetricStrip boxed numberFirst noBars
           label="Prep sign-off summary"
           metrics={[
             { label: "Total prep items", value: loaded ? signOffs.length : null, hint: "Across all vehicles", loading: !loaded },
@@ -218,13 +218,12 @@ const PrepSignOff = () => {
               </thead>
               <tbody>
                 {filtered.map(s => (
-                  <tr key={s.id} className={`h-11 cursor-pointer ${selected?.id === s.id ? "bg-adm-selected" : "hover:bg-adm-workspace"}`} onClick={() => select(s.id)}>
-                    <Td className="min-w-[150px] !px-2">
-                      <p className="text-[13px] font-semibold text-adm-ink" title={s.ymm || s.vin}>{s.ymm || s.vin}</p>
-                      <p className="truncate text-[12px] leading-[16px] text-adm-muted">{s.stock_number ? `Stock ${s.stock_number}` : s.vin}</p>
+                  <tr key={s.id} className={`h-12 cursor-pointer ${selected?.id === s.id ? "bg-adm-selected" : "hover:bg-adm-workspace"}`} onClick={() => select(s.id)}>
+                    <Td className="max-w-[260px] min-w-[220px] !px-2">
+                      <p className="truncate text-[13px] font-semibold text-adm-ink" title={`${s.ymm || s.vin}${s.stock_number ? ` - Stock ${s.stock_number}` : ""}`}>{s.ymm || s.vin}</p>
                     </Td>
-                    <Td className="min-w-[110px] !px-2">
-                      <p title={taskLabel(s.accessories_installed)}>{taskLabel(s.accessories_installed)}</p>
+                    <Td className="max-w-[120px] !px-2">
+                      <p className="truncate" title={taskLabel(s.accessories_installed)}>{taskLabel(s.accessories_installed)}</p>
                     </Td>
                     <Td className="whitespace-nowrap !px-2">{vendorLabel(s.accessories_installed)}</Td>
                     <Td className="whitespace-nowrap !px-2 text-adm-muted">{s.install_photos?.length ? `${s.install_photos.length} ${s.install_photos.length === 1 ? "photo" : "photos"}` : "Install photo"}</Td>
@@ -234,7 +233,7 @@ const PrepSignOff = () => {
                       </StatusText>
                     </Td>
                     <Td align="right" className="!px-2">
-                      <button type="button" className={`inline-flex h-8 items-center whitespace-nowrap rounded-[6px] px-3 text-[14px] font-medium ${s.status === "pending" ? "bg-adm-primary text-white hover:opacity-90" : "border border-adm-border bg-adm-surface text-adm-ink hover:bg-adm-workspace"}`} onClick={(e) => { e.stopPropagation(); select(s.id); }}>
+                      <button type="button" className="whitespace-nowrap text-[14px] font-medium text-adm-primary hover:underline" onClick={(e) => { e.stopPropagation(); select(s.id); }}>
                         {s.status === "pending" ? "Review" : "View"}
                       </button>
                     </Td>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
@@ -408,6 +408,7 @@ export default function ServiceWriterDesk() {
 
       <MetricStrip
         numberFirst
+        noBars
         label="Service pipeline summary"
         metrics={[
           { label: "Unassigned", value: counts.unassigned, hint: "Needs a writer", tone: counts.unassigned > 0 ? "warning" : "neutral" },
@@ -446,13 +447,13 @@ export default function ServiceWriterDesk() {
                     <input type="checkbox" aria-label={`Select ${r.ymm}`} className="h-4 w-4 accent-[#2457D6]" checked={picked.has(r.vehicleId)}
                       onChange={(e) => setPicked((prev) => { const n = new Set(prev); if (e.target.checked) n.add(r.vehicleId); else n.delete(r.vehicleId); return n; })} />
                   </Td>
-                  <Td className="max-w-[380px]">
+                  <Td className="max-w-[300px]">
                     <div className="flex items-center gap-3">
                       {r.photo
                         ? <img src={r.photo} alt="" className="h-10 w-14 shrink-0 rounded-[4px] border border-adm-border object-cover" />
                         : <span className="h-10 w-14 shrink-0 rounded-[4px] bg-adm-workspace" aria-hidden="true" />}
                       <div className="min-w-0">
-                        <p className="font-semibold text-adm-ink">{r.ymm}</p>
+                        <p className="truncate font-semibold text-adm-ink" title={r.ymm}>{r.ymm}</p>
                         <p className="truncate font-mono text-[12px] leading-[18px] text-adm-muted">{r.stockNumber ? `${r.stockNumber} / ` : ""}{r.vin}</p>
                       </div>
                     </div>
@@ -465,7 +466,7 @@ export default function ServiceWriterDesk() {
                   <Td className="text-adm-muted whitespace-nowrap">{formatCommandDate(r.deliveryTarget) ?? EM_DASH}</Td>
                   <Td className="whitespace-nowrap">{NEXT_ACTION[r.state as ServiceFloorState] || "Open file"}</Td>
                   <Td align="right">
-                    <LinkButton size="sm" variant={!r.assignedName && r.vehicleId === visible.find((x) => !x.assignedName)?.vehicleId ? "primary" : undefined} to={`/service/vehicle/${encodeURIComponent(r.vin)}`}>{r.assignedName ? "View" : "Assign"}</LinkButton>
+                    <Link className="text-[14px] font-medium text-adm-primary hover:underline" to={`/service/vehicle/${encodeURIComponent(r.vin)}`}>{r.assignedName ? "View" : "Assign"}</Link>
                   </Td>
                 </tr>
               ))}

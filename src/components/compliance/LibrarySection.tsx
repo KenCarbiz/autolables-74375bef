@@ -104,14 +104,14 @@ export const LibrarySection = () => {
                       className={`cursor-pointer ${on ? "bg-adm-selected" : "hover:bg-adm-workspace"}`}
                       aria-selected={on}
                     >
-                      <Td className="whitespace-nowrap px-2.5 py-2 text-adm-muted">{r.jurisdiction}</Td>
-                      <Td className="px-2.5 py-2 font-semibold text-[13px] leading-[18px]">
-                        <button type="button" onClick={() => setSelectedId(r.id)} className="line-clamp-2 text-left hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary">{r.requirement}</button>
+                      <Td className="whitespace-nowrap px-2.5 py-2 text-[13px] text-adm-muted">{r.jurisdiction}</Td>
+                      <Td className="max-w-[200px] px-2.5 py-2 font-semibold text-[13px] leading-[18px]">
+                        <button type="button" title={r.requirement} onClick={() => setSelectedId(r.id)} className="block max-w-full truncate text-left hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary">{r.requirement}</button>
                       </Td>
-                      <Td className="whitespace-nowrap px-2.5 py-2 text-adm-muted">{r.type}</Td>
-                      <Td className="px-2.5 py-2 text-[13px] leading-[18px] text-adm-muted"><span className="line-clamp-2">{r.source}</span></Td>
-                      <Td className="whitespace-nowrap px-2.5 py-2 text-adm-muted">{r.reviewed ?? "Unknown"}</Td>
-                      <Td className="px-2.5 py-2 text-[13px] leading-[18px] text-adm-muted"><span className="line-clamp-2">{r.workflow}</span></Td>
+                      <Td className="whitespace-nowrap px-2.5 py-2 text-[13px] text-adm-muted">{r.type}</Td>
+                      <Td className="max-w-[110px] px-2.5 py-2 text-[13px] leading-[18px] text-adm-muted"><span className="block truncate" title={r.source}>{r.source}</span></Td>
+                      <Td className="whitespace-nowrap px-2.5 py-2 text-[13px] text-adm-muted">{r.reviewed ?? "Unknown"}</Td>
+                      <Td className="max-w-[96px] px-2.5 py-2 text-[13px] leading-[18px] text-adm-muted"><span className="block truncate" title={r.workflow}>{r.workflow}</span></Td>
                     </tr>
                   );
                 })}

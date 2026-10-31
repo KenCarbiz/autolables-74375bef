@@ -31,7 +31,6 @@ export {
   AdminTable as WorkTable,
   Th,
   Td,
-  StatusChip as StatusText,
   InlineNote,
   KeyValueList,
   EmptyState,
@@ -40,6 +39,21 @@ export {
   ProductIcon,
 };
 export type { Tone, ProductIconName };
+
+const SOFT_TONE: Record<Tone, string> = {
+  neutral: "bg-adm-workspace/70",
+  success: "bg-adm-success-bg/70",
+  warning: "bg-adm-warning-bg/70",
+  danger: "bg-adm-danger-bg/70",
+  info: "bg-adm-selected/70",
+};
+
+/** Dealer status tag: 2px radius, 12px medium, soft tint, no border, no icon. */
+export const StatusText = ({ tone = "neutral", children, className }: { tone?: Tone; children: ReactNode; className?: string }) => (
+  <StatusChip tone={tone} className={cn("font-medium", SOFT_TONE[tone], className)}>
+    {children}
+  </StatusChip>
+);
 
 /** Page body: 24px desktop padding, 16px on phones, 24px between sections. */
 export const PageBody = ({ children, className, width = "full" }: { children: ReactNode; className?: string; width?: "full" | "wide" | "form" }) => (
@@ -176,7 +190,7 @@ export interface Metric {
 }
 
 /** Four or fewer primary metrics in one strip, each with its own denominator. */
-export const MetricStrip = ({ metrics, label, className, action, numberFirst = false, boxed = false, allBars = false }: { metrics: Metric[]; label: string; className?: string; action?: ReactNode; numberFirst?: boolean; boxed?: boolean; allBars?: boolean }) => {
+export const MetricStrip = ({ metrics, label, className, action, numberFirst = false, boxed = false, allBars = false, noBars = false }: { metrics: Metric[]; label: string; className?: string; action?: ReactNode; numberFirst?: boolean; boxed?: boolean; allBars?: boolean; noBars?: boolean }) => {
   const shown = metrics.slice(0, 6);
   return (
     <section aria-label={label} className={cn(boxed ? "overflow-hidden rounded-md border border-adm-border bg-white" : "border-y border-adm-border", className)}>
@@ -200,8 +214,8 @@ export const MetricStrip = ({ metrics, label, className, action, numberFirst = f
                 {m.hint && <dd className="truncate text-[12px] leading-[18px] text-adm-muted">{m.hint}</dd>}
               </>
             );
-            const barred = numberFirst || allBars ? !m.loading : !m.loading && m.value !== 0 && m.value !== "0" && (m.tone === "danger" || m.tone === "success" || m.tone === "warning");
-            const barColor = m.tone === "danger" ? "before:bg-adm-danger" : m.tone === "success" ? "before:bg-adm-success" : m.tone === "warning" ? "before:bg-[#B45309]" : "before:bg-adm-border";
+            const barred = noBars ? false : numberFirst || allBars ? !m.loading : !m.loading && m.value !== 0 && m.value !== "0" && (m.tone === "danger" || m.tone === "success" || m.tone === "warning");
+            const barColor = m.tone === "danger" ? "before:bg-adm-danger" : m.tone === "success" ? "before:bg-adm-success" : m.tone === "warning" ? "before:bg-[#B45309]" : m.tone === "info" ? "before:bg-adm-primary" : "before:bg-adm-border";
             const cell = cn(
               "relative block py-3 px-5 min-w-0",
               barred && "before:absolute before:left-0 before:top-3 before:bottom-3 before:w-[3px]",

@@ -70,12 +70,13 @@ export default function ReconBoard() {
 
       <MetricStrip boxed
         numberFirst
+        noBars
         label="Recon estimate totals"
         metrics={[
-          { label: isManager ? "Pending review" : "Awaiting approval", value: loading ? null : groups.needs.length, loading, tone: "warning" },
-          { label: "Pending amount", value: loading ? null : money(groups.needs.reduce((s, e) => s + (e.subtotal || 0), 0)), loading, tone: "neutral" },
-          { label: "In recon", value: loading ? null : groups.inRecon.length, loading, tone: "info" },
-          { label: "Approved amount", value: loading ? null : money(groups.inRecon.reduce((s, e) => s + (e.approved_total || 0), 0)), loading, tone: "success" },
+          { label: isManager ? "Pending review" : "Awaiting approval", value: loading ? null : groups.needs.length, loading },
+          { label: "Pending amount", value: loading ? null : money(groups.needs.reduce((s, e) => s + (e.subtotal || 0), 0)), loading },
+          { label: "In recon", value: loading ? null : groups.inRecon.length, loading },
+          { label: "Approved amount", value: loading ? null : money(groups.inRecon.reduce((s, e) => s + (e.approved_total || 0), 0)), loading },
         ]}
       />
 

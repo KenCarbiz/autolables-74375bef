@@ -101,7 +101,7 @@ const DocumentReview = () => {
                 return (
                   <tr key={f.id}>
                     <Td>
-                      <StatusText tone={m.tone} icon>{m.label}</StatusText>
+                      <StatusText tone={m.tone}>{m.label}</StatusText>
                       {f.changed_field && <p className="mt-1 font-mono text-[12px] text-adm-muted">{f.changed_field}</p>}
                     </Td>
                     <Td>{f.reason}</Td>

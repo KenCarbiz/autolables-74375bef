@@ -242,6 +242,7 @@ export default function ManagerIntake() {
 
       <MetricStrip
         numberFirst
+        noBars
         boxed
         label="Intake queue summary"
         metrics={[
@@ -314,7 +315,7 @@ export default function ManagerIntake() {
                       <StatusText tone={(STATE_PILL[r.state] ?? { tone: "neutral" as Tone }).tone}>{(STATE_PILL[r.state] ?? { label: r.state }).label}</StatusText>
                     </Td>
                     <Td align="right">
-                      <button type="button" className="inline-flex h-8 items-center rounded-[6px] bg-adm-primary px-4 text-[14px] font-medium text-white hover:opacity-90" onClick={(e) => { e.stopPropagation(); setDrawer(r); setReason(""); }} aria-label={`Review ${r.ymm}`}>Review</button>
+                      <button type="button" className="text-[14px] font-medium text-adm-primary hover:underline" onClick={(e) => { e.stopPropagation(); setDrawer(r); setReason(""); }} aria-label={`Review ${r.ymm}`}>Review</button>
                     </Td>
                   </tr>
                 );

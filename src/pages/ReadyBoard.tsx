@@ -335,6 +335,7 @@ export default function ReadyBoard() {
 
       <MetricStrip
         numberFirst
+        noBars
         label="Ready Board summary"
         metrics={[
           { label: "Waiting for acceptance", value: ready ? bucketCounts.acceptance : null, hint: total != null ? `of ${total.toLocaleString()} on the board` : undefined, loading, href: "/ready-board?view=acceptance" },
@@ -442,8 +443,8 @@ export default function ReadyBoard() {
                         : <StatusText tone="neutral">Unknown</StatusText>}
                     </Td>
                     <Td align="right">
-                      <span className="inline-flex items-center gap-1">
-                      <button type="button" className="inline-flex h-8 items-center rounded-[6px] border border-[#C9D6F5] bg-[#EEF3FD] px-3 text-[14px] font-medium text-adm-primary hover:bg-[#E2EBFB]" onClick={() => navigate(`/vehicle-file/${r.id}`)}>View</button>
+                      <span className="inline-flex items-center gap-3">
+                      <button type="button" className="text-[14px] font-medium text-adm-primary hover:underline" onClick={() => navigate(`/vehicle-file/${r.id}`)}>View</button>
                       <DropdownMenu>
                         <DropdownMenuTrigger aria-label={`More actions for ${r.ymm || r.vin}`} className="rounded-[6px] p-1 text-adm-muted hover:bg-adm-workspace">
                           <MoreHorizontal className="h-5 w-5" aria-hidden="true" />

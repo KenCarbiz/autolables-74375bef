@@ -254,10 +254,10 @@ const InstallerInvoices = () => {
                     </Td>
                     <Td className="whitespace-nowrap" title={fmtDay(e.date)}>{fmtDay(e.date).replace(/,\s*\d{4}$/, "")}</Td>
                     <Td className="whitespace-nowrap">{e.derived.roNumber || "Unknown"}</Td>
-                    <Td className="max-w-[190px]"><span className="block truncate font-medium" title={e.derived.ymm || undefined}>{e.derived.ymm || "Vehicle"}</span></Td>
+                    <Td className="max-w-[200px]"><span className="block truncate font-medium" title={e.derived.ymm || undefined}>{e.derived.ymm || "Vehicle"}</span></Td>
                     <Td className="whitespace-nowrap font-mono text-[11px]">{e.derived.vin}</Td>
                     <Td className="whitespace-nowrap">{installerOf(e.lines)}</Td>
-                    <Td className="max-w-[90px]"><span className="block truncate" title={workSummary(e.lines)}>{workSummary(e.lines)}</span></Td>
+                    <Td className="max-w-[80px]"><span className="block truncate" title={workSummary(e.lines)}>{workSummary(e.lines)}</span></Td>
                     <Td align="right" className="whitespace-nowrap">{money(e.total)}</Td>
                     <Td className="whitespace-nowrap">
                       <StatusText tone={e.tab === "paid" ? "success" : e.tab === "invoiced" ? "info" : "warning"}>{TAB_LABEL[e.tab]}</StatusText>

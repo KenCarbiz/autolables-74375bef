@@ -48,10 +48,10 @@ export const OverviewSection = ({
         numberFirst
         label="Compliance summary"
         metrics={[
-          { label: "Critical", value: n(overview.critical), hint: scope, tone: overview.critical > 0 ? "danger" : "neutral", loading },
-          { label: "Needs review", value: n(overview.needsReview), hint: "Last certification not ready", tone: overview.needsReview > 0 ? "warning" : "neutral", loading },
-          { label: "Missing evidence", value: n(overview.missingEvidence), hint: "Title or MCO incomplete", tone: overview.missingEvidence > 0 ? "warning" : "neutral", loading },
-          { label: "Audit ready", value: n(overview.auditReady), hint: scope, tone: overview.auditReady > 0 ? "success" : "neutral", loading },
+          { label: "Critical", value: n(overview.critical), hint: scope, tone: "danger", loading },
+          { label: "Needs review", value: n(overview.needsReview), hint: "Last certification not ready", tone: "warning", loading },
+          { label: "Missing evidence", value: n(overview.missingEvidence), hint: "Title or MCO incomplete", tone: "warning", loading },
+          { label: "Audit ready", value: n(overview.auditReady), hint: scope, tone: "success", loading },
         ]}
       />
 

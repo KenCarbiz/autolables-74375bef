@@ -516,7 +516,7 @@ export default function DescriptionOperations() {
         }
       />
 
-      <MetricStrip label="Description coverage" metrics={metricList} />
+      <MetricStrip numberFirst noBars label="Description coverage" metrics={metricList} />
 
       {metricsError && (
         <InlineNote tone="warning" title="Inventory counts unavailable">{metricsError}</InlineNote>
