@@ -5,11 +5,11 @@
   "fonts": "\"Roboto Condensed\", \"Arial Narrow\", \"Helvetica Neue\", Arial, sans-serif | \"Roboto Condensed\", \"Arial Narrow\", Arial, sans-serif | \"Roboto Condensed\", \"Arial Narrow\", Arial, sans-serif",
   "primitivesByKind": {
     "barcode": 1,
-    "path": 38,
+    "path": 37,
     "qr": 2,
     "rect": 28,
     "rule": 15,
-    "text": 194
+    "text": 195
   },
   "fills": [
     "#0d0d0d",
@@ -70,8 +70,8 @@
   ],
   "regions": {
     "barcode": "21,517.5 227.15x23",
-    "qr": "755.5,198.4 17",
-    "qr2": "594,279.9 96",
+    "qr": "755.5,202.9 17",
+    "qr2": "594,284.4 96",
     "totalMsrp": "481,585 @18"
   },
   "headings": [
@@ -102,7 +102,7 @@
   ],
   "totalBand": "$109,335.00",
   "svgDigest": [
-    "bca0d05f",
-    "4d52fea2"
+    "81678910",
+    "b8276e5c"
   ]
 }
