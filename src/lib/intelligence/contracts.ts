@@ -174,6 +174,8 @@ export interface IdentitySummary {
    * but does not verify the factory build.
    */
   factoryVerified: boolean;
+  /** record_source came from the zero-call re-promotion cache, not a live decode. */
+  recordSourceCached?: boolean;
   decodeSource: DecodeSource;
   /** Where the decoded record came from, per the provider. */
   decodeAuthority: DecodeAuthority;

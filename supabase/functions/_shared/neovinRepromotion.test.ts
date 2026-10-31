@@ -42,7 +42,7 @@ describe("NeoVIN re-promotion from saved responses", () => {
     const sheet = next.build_sheet as Record<string, unknown>;
     expect(sheet.decoded_at).toBe("2026-08-01T10:00:05.000Z");
     expect(sheet.request_tier).toBe("neovin_strict");
-    expect(sheet.repromoted_from).toEqual({ snapshot_id: "s1", payload_hash: "h1", parser_version: NEOVIN_REPROMOTION_VERSION });
+    expect(sheet.repromoted_from).toMatchObject({ snapshot_id: "s1", payload_hash: "h1", parser_version: NEOVIN_REPROMOTION_VERSION });
   });
 
   it("dates a sheet it creates from the snapshot, not from the backfill run", () => {
@@ -129,5 +129,20 @@ describe("NeoVIN re-promotion from saved responses", () => {
   it("summarizes outcomes for the dry-run report", () => {
     const s = summarize([planRepromotion(listing({}), [snap()]), planRepromotion(listing({}), [])]);
     expect(s.outcomes).toEqual({ would_update: 1, no_snapshot: 1 });
+  });
+});
+
+describe("re-promotion never creates a factory verification claim", () => {
+  it("records which keys came from the cache", () => {
+    const plan = planRepromotion(listing({ build_sheet: legacySheet() }), [snap()]);
+    const rp = (plan.next!.build_sheet as Record<string, unknown>).repromoted_from as Record<string, unknown>;
+    expect(rp.added_keys).toEqual(expect.arrayContaining(["build_sheet.taxonomy", "taxonomy"]));
+    expect(rp.added_keys).not.toContain("build_sheet.repromoted_from");
+  });
+
+  it("keeps an undocumented partial_build_* source exactly as sent", () => {
+    const plan = planRepromotion(listing({}), [snap({ payload: payload({ record_source: "partial_build_specs" }) })]);
+    expect((plan.next!.taxonomy as Record<string, unknown>).record_source).toBe("partial_build_specs");
+    expect(((plan.next!.build_sheet as Record<string, unknown>).taxonomy as Record<string, unknown>).record_source).toBe("partial_build_specs");
   });
 });

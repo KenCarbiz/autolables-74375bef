@@ -18,9 +18,11 @@
 //     disagrees with the snapshot's.
 //   * decoded_at is the snapshot's fetched_at, not the time of the backfill,
 //     and repromoted_from names the snapshot, its hash and this parser.
-//   * Nothing here marks a vehicle factory verified. Whether a record counts
-//     as factory build data is decided downstream from record_source and the
-//     request tier, which are copied as the provider sent them.
+//   * Nothing here marks a vehicle factory verified. record_source is copied
+//     exactly as the provider sent it (including undocumented values such as
+//     partial_build_specs), and repromoted_from.added_keys tells readers which
+//     keys came from the cache; a record_source that arrived that way never
+//     makes a vehicle factory verified until a live decode confirms it.
 
 import { structuredSheet } from "./neovinSheet.ts";
 
@@ -175,6 +177,12 @@ export function planRepromotion(listing: ListingRow, snapshots: SnapshotRow[]): 
   if (!present(mc.specs_source) && tier !== "basic_decoder") { next.specs_source = "neovin"; added.push("specs_source"); }
 
   if (!added.length) return { ...base, outcome: "already_current", snapshotId: snapshot.id };
+  // Record exactly which keys came from the cache, so a reader can tell a
+  // re-promoted record_source from one written by a live decode.
+  const sheetOut = next.build_sheet as Bag;
+  if (bag(sheetOut.repromoted_from).snapshot_id === snapshot.id) {
+    sheetOut.repromoted_from = { ...bag(sheetOut.repromoted_from), added_keys: added.filter((k) => k !== "build_sheet.repromoted_from") };
+  }
   return { listingId: listing.id, outcome: "would_update", snapshotId: snapshot.id, addedKeys: added, next };
 }
 

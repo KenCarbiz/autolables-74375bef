@@ -447,3 +447,33 @@ describe("record_source values observed in production snapshots (2026-10-31)", (
     expect(decodeAuthorityOf(null)).toBe("unknown");
   });
 });
+
+describe("factory verification and the re-promotion cache", () => {
+  const sheet = (extra: Record<string, unknown>) => ({
+    packages: [], options: [{ name: "Sensory Package" }], key_features: {}, standard: {}, generic: false,
+    source: "neovin", request_tier: "neovin_strict", decoded_at: "2026-10-01T00:00:00.000Z",
+    taxonomy: { record_source: "build_specs" }, ...extra,
+  });
+  const row = (bs: Record<string, unknown>) => ({ ...usedRow(), mc_attributes: { ...(usedRow().mc_attributes as Record<string, unknown>), build_sheet: bs } }) as ListingRowLike;
+
+  it("a record_source lifted from the cache is preserved but does not verify the factory build", () => {
+    const id = identityFromRow(row(sheet({ repromoted_from: { snapshot_id: "s1", added_keys: ["build_sheet.taxonomy", "taxonomy"] } })), NOW);
+    expect(id.recordSource).toBe("build_specs");
+    expect(id.decodeAuthority).toBe("factory_build");
+    expect(id.recordSourceCached).toBe(true);
+    expect(id.factoryVerified).toBe(false);
+  });
+
+  it("a live decode that later gained cached extras keeps its own verification", () => {
+    const id = identityFromRow(row(sheet({ repromoted_from: { snapshot_id: "s1", added_keys: ["factory_warranty"] } })), NOW);
+    expect(id.recordSourceCached).toBe(false);
+    expect(id.factoryVerified).toBe(id.matchLevel === "EXACT_VIN");
+  });
+
+  it("partial_build_* stays unknown and its raw value is kept", () => {
+    const id = identityFromRow(row(sheet({ taxonomy: { record_source: "partial_build_specs" } })), NOW);
+    expect(id.recordSource).toBe("partial_build_specs");
+    expect(id.decodeAuthority).toBe("unknown");
+    expect(id.factoryVerified).toBe(false);
+  });
+});

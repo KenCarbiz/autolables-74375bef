@@ -3,8 +3,15 @@
 // Reads two JSON exports produced by plain SELECTs (no provider call, no
 // write) and plans the additive lift for every listing:
 //
-//   listings.json   SELECT id, vin, mc_attributes FROM vehicle_listings
-//                   WHERE vin IS NOT NULL AND id IN (SELECT vehicle_id FROM neovin_snapshots);
+//   listings.json   SELECT v.id, v.vin, v.status, v.mc_attributes,
+//                          EXISTS (SELECT 1 FROM store_inventory si WHERE si.listing_id = v.id AND si.presence = 'present') AS in_feed
+//                   FROM vehicle_listings v
+//                   WHERE v.vin IS NOT NULL AND v.id IN (SELECT vehicle_id FROM neovin_snapshots);
+//
+// Only canonical records are planned: a published listing. Archived listings,
+// drafts and anything a duplicate review has not settled are reported as
+// out_of_scope and get no SQL. Pass --require-feed to also require a live
+// feed record (the strictest scope).
 //   snapshots.json  SELECT id, vehicle_id, vin, endpoint, payload, payload_hash,
 //                          http_status, fetched_at FROM neovin_snapshots;
 //
@@ -19,13 +26,19 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { planRepromotion, summarize, type ListingRow, type SnapshotRow } from "../supabase/functions/_shared/neovinRepromotion.ts";
 
-const [, , listingsPath, snapshotsPath, outDir] = process.argv;
+const args = process.argv.slice(2);
+const requireFeed = args.includes("--require-feed");
+const [listingsPath, snapshotsPath, outDir] = args.filter((a) => !a.startsWith("--"));
 if (!listingsPath || !snapshotsPath || !outDir) {
   console.error("usage: bun run scripts/neovin-repromote.ts <listings.json> <snapshots.json> <outDir>");
   process.exit(1);
 }
 
-const listings = JSON.parse(readFileSync(listingsPath, "utf8")) as ListingRow[];
+type ScopedListing = ListingRow & { status?: string | null; in_feed?: boolean | null };
+const allListings = JSON.parse(readFileSync(listingsPath, "utf8")) as ScopedListing[];
+const inScope = (l: ScopedListing) => l.status === "published" && (!requireFeed || l.in_feed === true);
+const listings = allListings.filter(inScope);
+const outOfScope = allListings.filter((l) => !inScope(l)).map((l) => ({ listingId: l.id, outcome: "out_of_scope", status: l.status ?? null, in_feed: l.in_feed ?? null }));
 const snapshots = JSON.parse(readFileSync(snapshotsPath, "utf8")) as (SnapshotRow & { vehicle_id: string | null })[];
 const byVehicle = new Map<string, SnapshotRow[]>();
 for (const s of snapshots) {
@@ -85,9 +98,12 @@ rollback.push("COMMIT;");
 mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, "report.json"), JSON.stringify({
   generatedAt: new Date().toISOString(),
+  scope: requireFeed ? "published_and_in_feed" : "published",
   ...summarize(plans),
+  outOfScope: outOfScope.length,
   listings: plans.map(({ next: _n, ...rest }) => rest),
+  excluded: outOfScope,
 }, null, 2));
 writeFileSync(join(outDir, "apply.sql"), apply.join("\n\n") + "\n");
 writeFileSync(join(outDir, "rollback.sql"), rollback.join("\n\n") + "\n");
-console.log(JSON.stringify(summarize(plans), null, 2));
+console.log(JSON.stringify({ scope: requireFeed ? "published_and_in_feed" : "published", ...summarize(plans), outOfScope: outOfScope.length }, null, 2));
