@@ -416,9 +416,6 @@ export default function DescriptionOperations() {
           <X className="w-5 h-5" />
         </button>
       </div>
-      <div className="px-4 pt-3">
-        <Button variant="primary" className="w-full" onClick={() => navigate(`/description-intelligence/${selectedRow.vehicleId}`)}>{retryEligible ? "Review retry" : "Review description record"}</Button>
-      </div>
       <div role="tablist" aria-label="Record sections" className="mt-3 flex gap-6 border-b border-adm-border px-4">
         {([["overview", "Overview"], ["source", "Source details"]] as const).map(([key, label]) => (
           <button key={key} type="button" role="tab" aria-selected={drawerTab === key} onClick={() => setDrawerTab(key)}
@@ -430,7 +427,8 @@ export default function DescriptionOperations() {
         </>
       }
       footer={
-        <div className="flex gap-2 px-4 py-3">
+        <div className="flex flex-wrap gap-2 px-4 py-3">
+          <Button variant="primary" className="w-full" onClick={() => navigate(`/description-intelligence/${selectedRow.vehicleId}`)}>{retryEligible ? "Review retry" : "Review description record"}</Button>
           <Button className="flex-1" onClick={() => navigate(`/description-studio?vehicle=${selectedRow.vehicleId}`)}>Open studio</Button>
           <Button className="flex-1" onClick={() => navigate(`/vehicle-file/${selectedRow.vehicleId}`)}>Vehicle file</Button>
         </div>

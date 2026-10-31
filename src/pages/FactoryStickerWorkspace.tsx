@@ -548,7 +548,7 @@ export default function FactoryStickerWorkspace({
   const [scenario, setScenario] = useState<keyof typeof FIXTURE_SCENARIOS>("used");
   const [zoom, setZoom] = useState<"fit" | number>("fit");
   const [fullscreen, setFullscreen] = useState(false);
-  const [showFull, setShowFull] = useState(false);
+  const [showFull, setShowFull] = useState(true);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [openingDoc, setOpeningDoc] = useState<string | null>(null);
 
@@ -887,7 +887,7 @@ export default function FactoryStickerWorkspace({
                   onClick={() => setShowFull((f) => !f)}
                   className="h-8 px-3 rounded-[6px] border border-adm-border bg-adm-surface text-[13px] font-semibold text-adm-ink hover:bg-adm-workspace"
                 >
-                  {showFull ? "Back to summary" : "Open full sticker"}
+                  {showFull ? "Show build summary" : "Open full sticker"}
                 </button>
               </div>
             )}
