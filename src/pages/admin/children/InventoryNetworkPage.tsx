@@ -17,10 +17,11 @@ import PreviewSection from "./inventoryNetwork/PreviewSection";
 import PilotSection from "./inventoryNetwork/PilotSection";
 import CatalogSection from "./inventoryNetwork/CatalogSection";
 import DeliveriesSection from "./inventoryNetwork/DeliveriesSection";
+import DuplicatesSection from "./inventoryNetwork/DuplicatesSection";
 
 const VIEW_ICON: Record<View, NetIconName> = {
   overview: "health", stores: "store", sharing: "sharing", marketcheck: "marketcheck", mapping: "mapping", runs: "audit", preview: "homeStore",
-  pilot: "budget", catalog: "spend", deliveries: "schedule",
+  pilot: "budget", catalog: "spend", deliveries: "schedule", duplicates: "conflict",
 };
 
 const VIEWS: Array<{ key: View; label: string }> = [
@@ -30,6 +31,7 @@ const VIEWS: Array<{ key: View; label: string }> = [
   { key: "marketcheck", label: "MarketCheck" },
   { key: "mapping", label: "Feed mapping" },
   { key: "runs", label: "Runs and exceptions" },
+  { key: "duplicates", label: "Duplicate handling" },
   { key: "preview", label: "Customer preview" },
   { key: "pilot", label: "MarketCheck pilot" },
   { key: "catalog", label: "Provider catalog" },
@@ -115,6 +117,7 @@ export default function InventoryNetworkPage() {
                 {view === "pilot" && <PilotSection />}
                 {view === "catalog" && <CatalogSection />}
                 {view === "deliveries" && <DeliveriesSection />}
+                {view === "duplicates" && <DuplicatesSection />}
               </NetProvider>
             )}
           </>
