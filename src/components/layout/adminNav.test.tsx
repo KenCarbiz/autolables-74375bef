@@ -218,7 +218,7 @@ describe("rail groups", () => {
     expect(activeGroups("/queue")).toEqual(["vehicles"]);
     expect(activeGroups("/print-queue")).toEqual(["merchandising"]);
     expect(activeGroups("/recon")).toEqual(["getready"]);
-    expect(activeGroups("/admin", "?tab=invoices")).toEqual(["customers"]);
+    expect(activeGroups("/admin", "?tab=invoices")).toEqual(["getready"]);
     expect(activeGroups("/admin", "?tab=team")).toEqual(["administration"]);
     expect(activeGroups("/platform-admin")).toEqual(["platform"]);
     expect(activeGroups("/nowhere")).toEqual([]);
@@ -253,7 +253,9 @@ describe("rail groups", () => {
     expect(litAt("/get-ready-command")).toEqual(["getready"]);
     expect(litAt("/prep")).toEqual(["getready"]);
     expect(litAt("/recon")).toEqual(["getready"]);
-    expect(litAt("/invoices")).toEqual(["customers"]);
+    expect(litAt("/invoices")).toEqual(["getready"]);
+    expect(litAt("/window-sticker-studio")).toEqual(["vehicles"]);
+    expect(litAt("/description-operations")).toEqual(["vehicles"]);
     expect(litAt("/leads")).toEqual(["customers"]);
   });
 

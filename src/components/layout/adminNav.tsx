@@ -78,6 +78,9 @@ export interface AdminNavItem {
    * item matches its own path exactly, including any `?tab=` query on `path`.
    */
   match?: (pathname: string, search: string) => boolean;
+  /** Section key the rail lights while this item is the current page, when
+   *  that is not the section the item is listed under. */
+  litSection?: string;
   badge?: number;
   featureKey?: string;
   requireManager?: boolean;
@@ -231,6 +234,8 @@ export function buildAdminNavSections({ badges, anyAdminTab, role }: BuildNavOpt
             p === "/add-inventory" ||
             (p.startsWith("/vehicle-file/") && !/[?&]tab=(getready|compliance)\b/.test(s)) ||
             underSegment("/vin-command")(p) ||
+            underSegment("/window-sticker-studio")(p) ||
+            underSegment("/description-operations")(p) ||
             /^\/(print-center|factory-sticker)\/[^/]+/.test(p),
         },
         {
@@ -314,7 +319,9 @@ export function buildAdminNavSections({ badges, anyAdminTab, role }: BuildNavOpt
         // Billing paperwork is the deal's paperwork, so it sits with the deals,
         // and only for the roles that hold it. Same feature switch as the Admin
         // V2 invoices tab, or the row would open the fallback tab while lit.
-        { label: "Invoices", assetIcon: "106AC", path: "/invoices", icon: ScrollText, capability: "can_manage_invoices", featureKey: "feature_invoicing", match: (p, s) => underSegment("/invoices")(p) || (p === "/admin" && s === "?tab=invoices") },
+        // Its screens are installer invoices paid out of reconditioning, so the
+        // rail lights Get Ready while the row stays where the role can open it.
+        { label: "Invoices", assetIcon: "106AC", path: "/invoices", icon: ScrollText, capability: "can_manage_invoices", featureKey: "feature_invoicing", litSection: "getready", match: (p, s) => underSegment("/invoices")(p) || (p === "/admin" && s === "?tab=invoices") },
       ],
     },
     {
@@ -438,7 +445,9 @@ export function groupHref(section: AdminNavSection): string | undefined {
 
 /** A group is active exactly when one of its leaves is the active page. */
 export function isGroupActive(section: AdminNavSection, active: AdminNavItem | undefined): boolean {
-  return !!active && section.items.includes(active);
+  if (!active) return false;
+  if (active.litSection) return section.key === active.litSection;
+  return section.items.includes(active);
 }
 
 /** A group lists its leaves only while active, and only when it has more than one. */

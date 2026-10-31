@@ -6,7 +6,7 @@ import { useAdminPlatform } from "@/hooks/useAdminPlatform";
 import { ASSIGNABLE_ROLE_GROUPS, getDealerCapabilities, roleDisplayName, type DealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import { Breadcrumbs } from "@/components/admin/v2/AdminShell";
 import { Button, EmptyState, KeyValueList, LinkButton, LocalTabs, PageBody, PageHeader, Panel, SkeletonBlock, StatusText, Td, Th, ValueOrUnknown, WorkTable, type Tone } from "@/components/product";
-import { formatDate, memberLabel, memberStatus, planLabel } from "@/pages/PlatformTenantDetail";
+import { formatDate, memberDisplayName, memberLabel, memberStatus, planLabel } from "@/pages/PlatformTenantDetail";
 
 // A member's effective access, derived per tenant from the seat's role and the
 // tenant's AutoLabels entitlement. The matrix is read-only; the only change
@@ -59,7 +59,7 @@ const PlatformMemberDetail = () => {
   const tabParam = searchParams.get("tab");
   const tab = tabParam === "tenants" ? "tenants" : tabParam === "overview" ? "overview" : "entitlements";
   const base = `/platform-admin/members/${memberId}`;
-  const crumbs = [{ label: "Platform Console", href: "/platform-admin?tab=members" }, { label: "Members", href: "/platform-admin?tab=members" }, { label: member ? memberLabel(member) ?? "Pending seat" : "Member" }];
+  const crumbs = [{ label: "Platform Console", href: "/platform-admin?tab=members" }, { label: "Members", href: "/platform-admin?tab=members" }, { label: member ? memberDisplayName(member) ?? memberLabel(member) ?? "Pending seat" : "Member" }];
 
   if (members.isLoading || tenants.isLoading) {
     return (
@@ -124,11 +124,11 @@ const PlatformMemberDetail = () => {
             className="mt-2"
             title={
               <span className="inline-flex items-center gap-3 flex-wrap">
-                {memberLabel(member) ?? "Pending seat"}
+                {memberDisplayName(member) ?? memberLabel(member) ?? "Pending seat"}
                 <StatusText tone={status.tone}>{roleDisplayName(member.role)}</StatusText>
               </span>
             }
-            description={<>{tenantName(member.tenant_id)} · {status.label} · {member.accepted_at ? `Accepted ${formatDate(member.accepted_at)}` : `Invited ${formatDate(member.invited_at)}`}</>}
+            description={<>{memberDisplayName(member) && memberLabel(member) ? <>{memberLabel(member)} · </> : null}{tenantName(member.tenant_id)} · {status.label} · {member.accepted_at ? `Accepted ${formatDate(member.accepted_at)}` : `Invited ${formatDate(member.invited_at)}`}</>}
             actions={<Button variant="primary" onClick={() => setDrafting(true)} disabled={drafting}>Review access change</Button>}
           />
         </div>

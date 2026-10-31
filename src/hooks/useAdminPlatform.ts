@@ -34,6 +34,7 @@ export interface MemberRow {
   role: string;
   accepted_at: string | null;
   invited_at: string;
+  full_name?: string | null;
 }
 
 export interface EntitlementRow {

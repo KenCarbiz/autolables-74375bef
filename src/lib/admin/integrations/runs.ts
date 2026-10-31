@@ -166,11 +166,23 @@ export interface RunTimelineEvent {
   tone: HealthTone;
 }
 
+const SOURCE_TOKEN_LABEL: Record<string, string> = { dms_feed: "DMS feed" };
+
+export function sourceLabel(token: string): string {
+  const key = token.trim();
+  if (SOURCE_TOKEN_LABEL[key]) return SOURCE_TOKEN_LABEL[key];
+  if (/^[a-z0-9]+(?:_[a-z0-9]+)+$/.test(key)) {
+    const words = key.replace(/_/g, " ");
+    return words.charAt(0).toUpperCase() + words.slice(1);
+  }
+  return key;
+}
+
 export function sourceHost(run: SyncRunRow | null, configSource: string | null | undefined): string | null {
   const raw = run?.source || (run?.raw && typeof run.raw === "object" ? String((run.raw as { source?: unknown }).source ?? "") : "") || configSource || "";
   const trimmed = raw.trim();
   if (!trimmed) return null;
-  return trimmed.replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
+  return sourceLabel(trimmed.replace(/^https?:\/\//i, "").replace(/\/.*$/, ""));
 }
 
 /** Events a run row can vouch for. Timestamps are the row's own; nothing is invented between them. */

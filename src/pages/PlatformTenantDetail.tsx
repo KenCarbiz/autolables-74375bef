@@ -24,6 +24,7 @@ const ENTITLEMENT_TONE: Record<EntitlementRow["status"], Tone> = { active: "succ
 const ENTITLEMENT_LABEL: Record<EntitlementRow["status"], string> = { active: "Active", trial: "Trial", paused: "Paused", past_due: "Past due", canceled: "Canceled" };
 
 export const memberLabel = (m: MemberRow) => m.invited_email || null;
+export const memberDisplayName = (m: MemberRow) => m.full_name?.trim() || null;
 export const memberStatus = (m: MemberRow): { tone: Tone; label: string } => (m.accepted_at ? { tone: "success", label: "Active" } : { tone: "warning", label: "Invited" });
 
 type TabId = "overview" | "entitlements" | "members" | "integrations";

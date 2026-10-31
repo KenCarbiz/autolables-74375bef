@@ -85,9 +85,11 @@ export interface FeedSettingsCardProps {
   outcome: RunOutcome | null;
   now: number;
   onChanged: () => void;
+  embedded?: boolean;
 }
 
-export default function FeedSettingsCard({ tenantId, config, configLoadFailed, activeVehicles, viewer, outcome, now, onChanged }: FeedSettingsCardProps) {
+export default function FeedSettingsCard({ tenantId, config, configLoadFailed, activeVehicles, viewer, outcome, now, onChanged, embedded = false }: FeedSettingsCardProps) {
+  const Shell = embedded ? EmbeddedShell : AdminCard;
   const original = useMemo(() => toDraft(config), [config]);
   const [state, dispatch] = useReducer(reducer, original, (o: FeedConfigDraft) => initialReviewApply(o));
   const [manual, setManual] = useState<{ step: "idle" | "confirm" | "running" | "done"; message?: string; ok?: boolean }>({ step: "idle" });
@@ -141,9 +143,9 @@ export default function FeedSettingsCard({ tenantId, config, configLoadFailed, a
 
   if (notGranted) {
     return (
-      <AdminCard title="Feed settings" description="Schedule, source and cap for the inventory pull.">
+      <Shell title="Feed settings" description="Schedule, source and cap for the inventory pull.">
         <InlineNote tone="neutral" title="Not granted on this plan">The inventory feed is enabled by AutoLabels support. Nothing here can be changed until it is granted.</InlineNote>
-      </AdminCard>
+      </Shell>
     );
   }
 
@@ -157,7 +159,7 @@ export default function FeedSettingsCard({ tenantId, config, configLoadFailed, a
   ];
 
   return (
-    <AdminCard title="Feed settings" description="Schedule, source and cap for the inventory pull. Changes are reviewed before they are applied.">
+    <Shell title="Feed settings" description="Schedule, source and cap for the inventory pull. Changes are reviewed before they are applied.">
       <div className="space-y-4">
         {configLoadFailed && <InlineNote tone="warning" title="Settings could not be read">Nothing can be changed until the configuration loads.</InlineNote>}
         {readOnly ? (
@@ -249,9 +251,16 @@ export default function FeedSettingsCard({ tenantId, config, configLoadFailed, a
           )}
         </div>
       </div>
-    </AdminCard>
+    </Shell>
   );
 }
+
+const EmbeddedShell = ({ description, children }: { title?: string; description?: string; children: React.ReactNode }) => (
+  <div className="space-y-3">
+    {description && <p className="text-[13px] leading-[18px] text-adm-muted">{description}</p>}
+    {children}
+  </div>
+);
 
 const INPUT = "w-full h-9 rounded-md border border-adm-border bg-adm-surface px-3 text-[14px] text-adm-ink focus-visible:outline-2 focus-visible:outline-adm-primary";
 

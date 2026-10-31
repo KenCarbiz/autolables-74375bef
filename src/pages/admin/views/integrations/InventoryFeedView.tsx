@@ -8,6 +8,7 @@ import { countDisplay, HEALTH_META, needsAttention, RUN_OUTCOME_META, type Healt
 import { deriveFeedSnapshot, isProviderErrorOutcome, pageSlice, pageWindow, type FeedConfigRow } from "@/lib/admin/integrations/feed";
 import { detailsLabel, httpLabel, inventoryChangesLabel, outcomeForRun, type SyncRunRow } from "@/lib/admin/integrations/runs";
 import { clearFeedScope, loadFeedConfig, loadInventoryCounts, loadLedgerHeads, loadRunsPage, type InventoryCounts } from "@/lib/admin/integrations/queries";
+import { Disclosure } from "@/components/product";
 import { AdminButton, AdminCard, AdminLinkButton, AdminTable, InlineNote, KeyValueList, SkeletonBlock, StatusChip, Td, Th } from "@/components/admin/v2/primitives";
 import { cn } from "@/lib/utils";
 import FeedSettingsCard from "./FeedSettingsCard";
@@ -117,6 +118,14 @@ export default function InventoryFeedView() {
   const identityChipTone = source.identity === "verified" ? "success" : source.identity === "needs_review" ? "warning" : source.identity === "unknown" ? "neutral" : "info";
   const banner = needsAttention(snapshot.health.state) ? snapshot.health : null;
 
+  const feedSettingsSummary = configLoadFailed
+    ? "Settings could not be read"
+    : config?.allowed === false
+      ? "Not granted on this plan"
+      : config
+        ? [config.enabled ? "Scheduled pull on" : "Scheduled pull off", config.source].filter(Boolean).join(", ")
+        : "Not configured";
+
   return (
     <div className="space-y-4">
       {banner && (
@@ -217,17 +226,20 @@ export default function InventoryFeedView() {
         </AdminCard>
       </div>
 
-      <FeedSettingsCard
-        key={config ? `${config.updated_at ?? ""}:${config.source ?? ""}:${config.enabled}:${config.frequency}:${config.run_hour}:${config.max_vehicles}` : "none"}
-        tenantId={tenantId}
-        config={config}
-        configLoadFailed={configLoadFailed}
-        activeVehicles={counts.active}
-        viewer={viewer}
-        outcome={snapshot.outcome}
-        now={now}
-        onChanged={refetch}
-      />
+      <Disclosure title="Feed settings" summary={feedSettingsSummary} defaultOpen={configLoadFailed || config?.allowed === false} keepMounted>
+        <FeedSettingsCard
+          embedded
+          key={config ? `${config.updated_at ?? ""}:${config.source ?? ""}:${config.enabled}:${config.frequency}:${config.run_hour}:${config.max_vehicles}` : "none"}
+          tenantId={tenantId}
+          config={config}
+          configLoadFailed={configLoadFailed}
+          activeVehicles={counts.active}
+          viewer={viewer}
+          outcome={snapshot.outcome}
+          now={now}
+          onChanged={refetch}
+        />
+      </Disclosure>
     </div>
   );
 }

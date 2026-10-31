@@ -122,7 +122,7 @@ export default function ProviderDetailPage() {
                 rows={[
                   ...(tab === "data" ? [{ label: "Affects", value: spec.affectedOutput }] : []),
                   ...(tab === "overview" ? [{ label: "Output", value: spec.affectedOutput }] : []),
-                  ...(tab !== "data" && spec.registryKeys.length ? [{ label: "Registry keys", value: <span className="font-mono text-[13px]">{spec.registryKeys.join(", ")}</span> }] : []),
+                  ...(tab !== "data" && spec.registryKeys.length ? [{ label: "Capabilities", value: spec.registryKeys.map((k) => { const w = k.replace(/_/g, " "); return w.charAt(0).toUpperCase() + w.slice(1); }).join(", ") }] : []),
                   ...(tab !== "data" ? [{ label: "Mode", value: spec.manual ? "Manual, on request" : "Automatic" }] : []),
                   { label: "Last attempt", value: card.lastAttemptAt ? formatAt(card.lastAttemptAt) : <span className="text-adm-muted">None recorded</span> },
                   { label: "Last success", value: card.lastSuccessAt ? formatAt(card.lastSuccessAt) : <span className="text-adm-muted">None recorded</span> },

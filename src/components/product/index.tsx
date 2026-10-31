@@ -1,5 +1,6 @@
-import { useEffect, useRef, type ReactNode } from "react";
-import { AlertTriangle, CheckCircle2, Info, XCircle } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { AlertTriangle, CheckCircle2, ChevronDown, Info, XCircle } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -158,6 +159,23 @@ export const PageHeader = ({
     )}
   </header>
 );
+
+/** One-line disclosure row: title, short status summary, chevron; expands in place. `defaultOpen` follows live state until the viewer toggles it. */
+export const Disclosure = ({ title, summary, defaultOpen = false, children, className, keepMounted = false }: { title: ReactNode; summary?: ReactNode; defaultOpen?: boolean; children: ReactNode; className?: string; keepMounted?: boolean }) => {
+  const [chosen, setChosen] = useState<boolean | null>(null);
+  const open = chosen ?? defaultOpen;
+  return (
+    <Collapsible open={open} onOpenChange={setChosen} className={cn("rounded-[6px] border border-adm-border bg-adm-surface", className)}>
+      <CollapsibleTrigger className="flex min-h-[48px] w-full items-center gap-3 px-4 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary">
+        <span className="text-[15px] leading-[22px] font-semibold text-adm-ink">{title}</span>
+        {summary && <span className="min-w-0 flex-1 truncate text-[13px] leading-[18px] text-adm-muted">{summary}</span>}
+        {!summary && <span className="flex-1" />}
+        <ChevronDown className={cn("h-5 w-5 shrink-0 text-adm-muted transition-transform", open && "rotate-180")} aria-hidden="true" />
+      </CollapsibleTrigger>
+      <CollapsibleContent forceMount={keepMounted ? true : undefined} className="border-t border-adm-border p-4 data-[state=closed]:hidden">{children}</CollapsibleContent>
+    </Collapsible>
+  );
+};
 
 /** Section heading inside a page: 17/24 semibold. */
 export const SectionHeading = ({ title, description, action, as: Tag = "h2", id }: { title: ReactNode; description?: ReactNode; action?: ReactNode; as?: "h2" | "h3"; id?: string }) => (

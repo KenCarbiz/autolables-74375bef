@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { MoreVertical } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { PageHeader } from "@/components/product";
+import { Disclosure, PageHeader } from "@/components/product";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
@@ -910,17 +910,21 @@ export default function FactoryStickerWorkspace({
             </div>}
 
             {(record?.review_reason || record?.last_error || data?.generic) && (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 space-y-1.5">
-                <h2 className="text-[14px] leading-[20px] font-semibold text-amber-800">Data warnings</h2>
-                {data?.generic && (
-                  <p className="text-[11px] text-amber-800">
-                    Generic decode — this is a typical factory configuration for the trim, not a VIN-exact build. The
-                    document labels itself accordingly.
-                  </p>
-                )}
-                {record?.review_reason && <p className="text-[11px] text-amber-800">Review: {record.review_reason}</p>}
-                {record?.last_error && <p className="text-[11px] text-rose-700">Last error: {record.last_error}</p>}
-              </div>
+              <Disclosure
+                title={`Data warnings (${[data?.generic, record?.review_reason, record?.last_error].filter(Boolean).length})`}
+                defaultOpen={!!(record?.review_reason || record?.last_error)}
+              >
+                <div className="space-y-1.5">
+                  {data?.generic && (
+                    <p className="text-[13px] leading-[18px] text-amber-800">
+                      Generic decode — this is a typical factory configuration for the trim, not a VIN-exact build. The
+                      document labels itself accordingly.
+                    </p>
+                  )}
+                  {record?.review_reason && <p className="text-[13px] leading-[18px] text-amber-800">Review: {record.review_reason}</p>}
+                  {record?.last_error && <p className="text-[13px] leading-[18px] text-rose-700">Last error: {record.last_error}</p>}
+                </div>
+              </Disclosure>
             )}
           </div>
 

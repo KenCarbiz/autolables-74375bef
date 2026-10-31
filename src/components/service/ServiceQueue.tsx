@@ -7,7 +7,6 @@ import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
-import { useVinScan } from "@/contexts/VinScanContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { deriveServiceStatus } from "@/lib/service/serviceStatus";
 import { deriveServicePriority, compareServicePriority, type ServicePriority } from "@/lib/service/priority";
@@ -20,7 +19,7 @@ import {
 } from "@/components/command/CommandPrimitives";
 import {
   ClipboardList, ShieldCheck, AlertTriangle, CheckCircle2, Clock, XCircle,
-  Search, QrCode, ChevronRight, CircleDot, Circle, Wrench, ArrowUp, ArrowDown, Minus, FileText, X,
+  Search, ChevronRight, CircleDot, Circle, Wrench, ArrowUp, ArrowDown, Minus, FileText, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MetricStrip, FilterSelect, StatusText, Th, Td, WorkTable, type Tone } from "@/components/product";
@@ -132,7 +131,6 @@ export default function ServiceQueue({ mode = "desk", onCounts }: { mode?: "my_w
   const { tenant } = useTenant();
   const { user, isAdmin } = useAuth();
   const { member } = useEntitlements();
-  const { openScan } = useVinScan();
   const { settings } = useDealerSettings();
   const navigate = useNavigate();
   const [rows, setRows] = useState<Row[]>([]);
@@ -467,9 +465,6 @@ export default function ServiceQueue({ mode = "desk", onCounts }: { mode?: "my_w
             options={[{ value: "any", label: "Delivery: any" }, { value: "today", label: "Delivery today" }, { value: "scheduled", label: "Delivery scheduled" }, { value: "unscheduled", label: "No delivery scheduled" }]} />
         </>
       )}
-      <button onClick={openScan} className="inline-flex h-10 items-center gap-2 rounded-[6px] border border-adm-border bg-adm-surface px-3 text-[14px] font-semibold hover:bg-adm-workspace">
-        <QrCode className="h-5 w-5" aria-hidden="true" /> Scan Service QR
-      </button>
     </div>
   );
 

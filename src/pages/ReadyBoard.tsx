@@ -14,7 +14,7 @@ import { clearanceReasonLabel } from "@/lib/service/workspaceStatus";
 import { toast } from "sonner";
 import { Loader2, MoreHorizontal, X, Printer } from "lucide-react";
 import { Button, LocalTabs, MetricStrip, PageBody, PageHeader, QueryState, StatusText, Td, Th, WorkTable, type LocalTab } from "@/components/product";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 // /ready-board — the used-car manager's daily cockpit. Every car and where it
 // stands across the get-ready stations (Service K-208, Detail, Prep/install,
@@ -312,6 +312,21 @@ export default function ReadyBoard() {
     <PageBody width="wide">
       <PageHeader
         title="Ready Board"
+        actions={
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              aria-label="More Ready Board options"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-[6px] border border-adm-border bg-adm-surface text-adm-ink hover:bg-adm-workspace focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary"
+            >
+              <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuCheckboxItem checked={todayOnly} onCheckedChange={(v) => setTodayOnly(v === true)} className="min-h-[36px] text-[14px]">
+                Today's intake only
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        }
       />
 
       <LocalTabs
@@ -326,9 +341,6 @@ export default function ReadyBoard() {
               aria-label="Search the board"
               className="h-8 w-[220px] rounded-[6px] border border-adm-border bg-adm-surface px-3 text-[13px]"
             />
-            <button type="button" onClick={() => setTodayOnly((v) => !v)} aria-pressed={todayOnly} className="whitespace-nowrap text-[13px] font-semibold text-adm-primary hover:underline">
-              {todayOnly ? "Showing today's intake" : "Today's intake only"}
-            </button>
           </>
         }
       />

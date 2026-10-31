@@ -79,7 +79,7 @@ interface GrRow {
   get_ready_start_date: string | null; delivery_target: string | null; assigned_technician: string | null;
   ro_number: string | null;
 }
-interface MemberRow { id: string; user_id: string | null; email: string | null; role: string; accepted_at: string | null; }
+interface MemberRow { id: string; user_id: string | null; email: string | null; role: string; accepted_at: string | null; full_name?: string | null; }
 interface AuditRow { id: string; action: string; created_at: string; details: Record<string, unknown> | null; }
 interface Clearance { state: string; reason_codes: string[]; computed_at?: string | null; }
 
@@ -100,8 +100,12 @@ const REPAIR_STATE_LABELS: Record<RepairState, string> = {
   passed_on_reinspection: "Passed on reinspection",
 };
 
-const memberName = (m: MemberRow | undefined | null): string =>
-  m?.email ? m.email.split("@")[0] : "Unknown member";
+const memberName = (m: MemberRow | undefined | null): string => {
+  const full = m?.full_name?.trim();
+  if (full) return full;
+  const local = m?.email ? m.email.split("@")[0] : "";
+  return local ? local.charAt(0).toUpperCase() + local.slice(1) : "Unknown member";
+};
 
 const itemLabel = (itemId: string): string =>
   K208_ITEMS.find((i) => i.id === itemId)?.label || itemId;
@@ -363,7 +367,7 @@ export default function ServiceVehicleWorkspace() {
             daysInStock != null ? `${daysInStock} ${daysInStock === 1 ? "day" : "days"} in stock` : null,
             veh.mileage != null ? `${Number(veh.mileage).toLocaleString("en-US")} mi` : null,
             sold ? "Sold" : null,
-            assignedMember ? memberName(assignedMember) : gr?.assigned_technician || "Unassigned",
+            assignedMember ? `Inspector ${memberName(assignedMember)}` : gr?.assigned_technician ? `Inspector ${gr.assigned_technician}` : "Unassigned",
           ].filter(Boolean).join(" | ")}
           inlineMeta
           actions={veh.hero_image_url ? <img src={veh.hero_image_url} alt="" className="hidden sm:block h-[72px] w-[128px] rounded-[6px] border border-adm-border object-cover" /> : undefined}

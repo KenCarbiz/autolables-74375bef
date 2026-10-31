@@ -33,9 +33,9 @@ export const RepairApprovalControl = ({
   const idBase = useId();
   const decided = record.approval !== "pending" && record.decidedBy ? `${nameOf(record.decidedBy)}, ${formatAt(record.decidedAt)}` : null;
   return (
-    <div className="rounded-lg border border-adm-border bg-adm-surface px-3 py-2">
+    <div>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-[12px] leading-[18px] font-bold uppercase tracking-wide text-adm-muted">Repair approval</span>
+        <h3 className="text-[14px] leading-[20px] font-semibold text-adm-ink">Repair approval</h3>
         <span className="inline-flex min-w-0 items-center gap-2">
           {decided && <span className="min-w-0 truncate text-[12px] leading-[18px] text-adm-muted" title={decided}>{decided}</span>}
           <StatusText tone={TONE[record.approval]}>{repairApprovalLabel(record.approval)}</StatusText>

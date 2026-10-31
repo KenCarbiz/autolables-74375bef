@@ -6,8 +6,9 @@ import { useEntitlements } from "@/hooks/useEntitlements";
 import { hasWindowStickerPermission } from "@/lib/permissions/windowStickerPermissions";
 import { toast } from "sonner";
 import {
-  AlertTriangle, Download, ExternalLink, FileText, History, Loader2, RefreshCw, ShieldCheck,
+  AlertTriangle, Download, ExternalLink, History, Loader2, RefreshCw, ShieldCheck,
 } from "lucide-react";
+import { Disclosure } from "@/components/product";
 import RegenerateStickerDrawer from "./RegenerateStickerDrawer";
 import StickerVersionHistory from "./StickerVersionHistory";
 import { useWindowSticker } from "@/hooks/useWindowSticker";
@@ -237,19 +238,20 @@ export default function FactoryStickerCard({
   const reconTone: keyof typeof PILL_TONE =
     recon === "MATCHED" ? "emerald" : recon === "MINOR_VARIANCE" ? "amber" : recon === "REVIEW_REQUIRED" ? "rose" : "slate";
   const docPublished = doc?.document_status === "published";
+  const summary = loading ? "Loading" : loadError ? "Could not load" : !record ? "No record yet" : [status?.label, doc ? `v${doc.version}` : null, record.review_required ? "needs review" : null].filter(Boolean).join(", ");
   const failed = record?.generation_status === "FAILED_RETRYABLE" || record?.generation_status === "FAILED_PERMANENT";
 
   return (
-    <div className="rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)] p-5 space-y-3">
+    <Disclosure
+      title="Factory Build Record"
+      summary={summary}
+      defaultOpen={failed || !!record?.review_required}
+    >
+    <div className="space-y-3">
       <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div className="min-w-0">
-          <h3 className="text-sm font-bold text-foreground inline-flex items-center gap-1.5">
-            <FileText className="w-4 h-4 text-blue-600" /> Factory Build Record
-          </h3>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
-            Generated automatically from the saved factory build data for this VIN. Review and publishing live in Admin.
-          </p>
-        </div>
+        <p className="min-w-0 text-[12px] text-muted-foreground">
+          Generated automatically from the saved factory build data for this VIN. Review and publishing live in Admin.
+        </p>
         <div className="flex items-center gap-2">
           <Link
             to={`/factory-sticker/${vehicleId}`}
@@ -438,5 +440,6 @@ export default function FactoryStickerCard({
         </div>
       )}
     </div>
+    </Disclosure>
   );
 }

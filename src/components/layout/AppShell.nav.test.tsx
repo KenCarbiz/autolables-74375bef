@@ -163,7 +163,7 @@ describe("AppShell rail rendering", () => {
     ["/ready-board", "Get Ready"],
     ["/service-desk", "Get Ready"],
     ["/signed", "Customers & Deals"],
-    ["/invoices", "Customers & Deals"],
+    ["/invoices", "Get Ready"],
     ["/leads", "Customers & Deals"],
   ])("lights only the %s parent section: %s", (path, section) => {
     renderShell(path);

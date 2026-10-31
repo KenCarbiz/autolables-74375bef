@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { Card, DeepLink, EmptyNote, Section, btn, fmtWhen } from "./primitives";
 import { VehicleSubHeader } from "./SubPageHeader";
-import { Button } from "@/components/product";
+import { Button, Disclosure } from "@/components/product";
 import {
   OFF_RAIL, RAIL, stageStates, type LifecycleResult, type StageState,
 } from "./lifecycle";
@@ -340,10 +340,12 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready, strip }: { vehicle: Veh
         </>
       )}
 
-      <Card title="Publishing gate">
-        <div className={`rounded-xl border p-4 flex items-start gap-3 ${
-          unlocked ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"
-        }`}>
+      <Disclosure
+        title="Publishing gate"
+        summary={unlocked ? "Publishing unlocked" : "Publishing locked, prep sign-off required"}
+        defaultOpen={!unlocked}
+      >
+        <div className="flex items-start gap-3">
           {unlocked ? <Unlock className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" /> : <Lock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />}
           <div className="min-w-0">
             <p className={`text-al-card ${unlocked ? "text-emerald-900" : "text-amber-900"}`}>
@@ -356,7 +358,7 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready, strip }: { vehicle: Veh
             </p>
           </div>
         </div>
-      </Card>
+      </Disclosure>
 
       <Card title="Prep & install records">
         {historyLoading ? (

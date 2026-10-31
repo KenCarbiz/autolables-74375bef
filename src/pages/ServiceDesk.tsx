@@ -5,7 +5,9 @@ import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
-import { LocalTabs, PageBody, PageHeader } from "@/components/product";
+import { QrCode } from "lucide-react";
+import { useVinScan } from "@/contexts/VinScanContext";
+import { Button, LocalTabs, PageBody, PageHeader } from "@/components/product";
 import ServiceQueue from "@/components/service/ServiceQueue";
 import { ManagerMessagesRail } from "@/components/service/ServiceMessages";
 import { CommandCapabilityProvider } from "@/components/command/CommandPrimitives";
@@ -26,6 +28,7 @@ export default function ServiceDesk() {
   const { tenant } = useTenant();
   const { isAdmin, user } = useAuth();
   const { member } = useEntitlements();
+  const { openScan } = useVinScan();
   const tenantId = tenant?.id && tenant.id !== "house" ? tenant.id : null;
   // Writers/managers (anyone who can assign work) default to the full desk;
   // technicians default to My Work.
@@ -75,6 +78,10 @@ export default function ServiceDesk() {
           actions={
             <>
               <span className="text-[13px] leading-[18px] text-adm-muted">{today}</span>
+              <Button variant="outline" onClick={openScan}>
+                <QrCode className="h-5 w-5" aria-hidden="true" />
+                Scan Service QR
+              </Button>
             </>
           }
         />

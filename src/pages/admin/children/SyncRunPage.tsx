@@ -339,7 +339,7 @@ export default function SyncRunPage() {
               <div className={INSET_RULE} aria-hidden="true" />
               <div className="pl-[18px] pr-[22px] pt-[14px] pb-[19px]">
                 <div className={cn("grid grid-cols-1 gap-3", !nothingToRetry && "sm:grid-cols-2")}>
-                  <AdminLinkButton to={feedHref} variant={meta.retryable ? "outline" : "primary"} className="min-h-[44px] sm:min-h-[44px] text-[15px] font-medium gap-3">
+                  <AdminLinkButton to={feedHref} variant="outline" className="min-h-[44px] sm:min-h-[44px] text-[15px] font-medium gap-3">
                     <ArrowLeft className="w-5 h-5" aria-hidden="true" />
                     Back to feed
                   </AdminLinkButton>
