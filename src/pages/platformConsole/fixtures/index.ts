@@ -6,6 +6,8 @@ import { USAGE_FIXTURE, USAGE_PHONE_FIXTURE } from "./usage";
 import { BILLING_FIXTURE } from "./billing";
 import { ACCESS_FIXTURE } from "./access";
 import { TEMPLATES_FIXTURE } from "./templates";
+import { AUDIT_FIXTURE } from "./audit";
+import { MONITORING_FIXTURE, MONITORING_UNINSTRUMENTED_FIXTURE, RELIABILITY_FIXTURE } from "./reliability";
 // end builder B
 
 // Reference screen id -> the console path it renders and the synthetic data it
@@ -34,5 +36,10 @@ export const CONSOLE_FIXTURES: Record<string, ConsoleFixtureEntry> = {
   "D19-billing": { path: "/platform-console/usage/billing", frame: "desktop", fixture: base("D19-billing", { billing: BILLING_FIXTURE }) },
   "D12-access": { path: "/platform-console/access", frame: "desktop", fixture: base("D12-access", { access: ACCESS_FIXTURE }) },
   "D13-templates": { path: "/platform-console/templates", frame: "desktop", fixture: base("D13-templates", { templates: TEMPLATES_FIXTURE }) },
+  "D14-audit": { path: "/platform-console/audit", frame: "desktop", fixture: base("D14-audit", { audit: AUDIT_FIXTURE }) },
+  "D15-reliability": { path: "/platform-console/reliability", frame: "desktop", fixture: base("D15-reliability", { reliability: RELIABILITY_FIXTURE }) },
+  "D20-monitoring": { path: "/platform-console/reliability/monitoring", frame: "desktop", fixture: base("D20-monitoring", { monitoring: MONITORING_FIXTURE }) },
+  "S02-uninstrumented": { path: "/platform-console/reliability/monitoring", frame: "desktop", fixture: base("S02-uninstrumented", { monitoring: MONITORING_UNINSTRUMENTED_FIXTURE }) },
+  "S01-disconnected": { path: "/platform-console/reliability/monitoring", frame: "desktop", fixture: base("S01-disconnected", { monitoring: MONITORING_FIXTURE }, { connection: "disconnected" }) },
   // end builder B
 };

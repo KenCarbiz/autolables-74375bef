@@ -18,6 +18,9 @@ export const CONSOLE_ROUTES: { pattern: string; view: View }[] = [
   { pattern: `${CONSOLE_BASE}/usage/billing`, view: lazy(() => import("./views/BillingView")) },
   { pattern: `${CONSOLE_BASE}/access`, view: lazy(() => import("./views/AccessView")) },
   { pattern: `${CONSOLE_BASE}/templates`, view: lazy(() => import("./views/TemplatesView")) },
+  { pattern: `${CONSOLE_BASE}/audit`, view: lazy(() => import("./views/AuditView")) },
+  { pattern: `${CONSOLE_BASE}/reliability`, view: lazy(() => import("./views/ReliabilityView")) },
+  { pattern: `${CONSOLE_BASE}/reliability/monitoring`, view: lazy(() => import("./views/MonitoringView")) },
   // end builder B
 ];
 
