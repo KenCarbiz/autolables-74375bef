@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  availabilityFromRow, dealerOfferFromRow, identityFromRow, incentivesFromRow, listingFacts, LISTING_FACTS_VERSION,
+  availabilityFromRow, decodeAuthorityOf, dealerOfferFromRow, identityFromRow, incentivesFromRow, listingFacts, LISTING_FACTS_VERSION,
   marketContextFromRow, mediaFromRow, msrpFromRow, parseYmm, priceIntegrityFromRow, providerStamp, READ_MODEL_TTL_DAYS,
   recallSummaryFromRow, stateFromFreshness, warrantyFromRow, type ListingRowLike,
 } from "./listingFacts";
@@ -63,6 +63,16 @@ describe("identity", () => {
     const unknownSource = identityFromRow(withAttrs({ build_sheet: { ...exactSheet(), taxonomy: undefined } }), NOW);
     expect(unknownSource.decodeAuthority).toBe("unknown");
     expect(unknownSource.factoryVerified).toBe(false);
+  });
+
+  it("high decoder confidence alone never makes a listing-sourced record factory verified", () => {
+    const id = identityFromRow(withAttrs({
+      build_sheet: { ...exactSheet(), taxonomy: { record_source: "combined_mc_listing" } },
+      neovin_confidence: { record_confidence: 100 },
+    }), NOW);
+    expect(id.providerConfidence).toBe(1);
+    expect(id.decodeAuthority).toBe("listing_derived");
+    expect(id.factoryVerified).toBe(false);
   });
 
   it("a basic decoder answer is a trim-line match, never an exact VIN build", () => {
@@ -425,5 +435,45 @@ describe("the bundle", () => {
     expect(facts.version).toBe(LISTING_FACTS_VERSION);
     expect(containsForbiddenKey(facts)).toBeNull();
     expect(JSON.stringify(facts)).not.toContain("mc_raw");
+  });
+});
+
+describe("record_source values observed in production snapshots (2026-10-31)", () => {
+  it("does not treat a partial build record as factory build data", () => {
+    expect(decodeAuthorityOf("partial_build_specs")).toBe("unknown");
+    expect(decodeAuthorityOf("partial_build_oem")).toBe("unknown");
+    expect(decodeAuthorityOf("build_specs")).toBe("factory_build");
+    expect(decodeAuthorityOf("combined_mc_listing")).toBe("listing_derived");
+    expect(decodeAuthorityOf(null)).toBe("unknown");
+  });
+});
+
+describe("factory verification and the re-promotion cache", () => {
+  const sheet = (extra: Record<string, unknown>) => ({
+    packages: [], options: [{ name: "Sensory Package" }], key_features: {}, standard: {}, generic: false,
+    source: "neovin", request_tier: "neovin_strict", decoded_at: "2026-10-01T00:00:00.000Z",
+    taxonomy: { record_source: "build_specs" }, ...extra,
+  });
+  const row = (bs: Record<string, unknown>) => ({ ...usedRow(), mc_attributes: { ...(usedRow().mc_attributes as Record<string, unknown>), build_sheet: bs } }) as ListingRowLike;
+
+  it("a record_source lifted from the cache is preserved but does not verify the factory build", () => {
+    const id = identityFromRow(row(sheet({ repromoted_from: { snapshot_id: "s1", added_keys: ["build_sheet.taxonomy", "taxonomy"] } })), NOW);
+    expect(id.recordSource).toBe("build_specs");
+    expect(id.decodeAuthority).toBe("factory_build");
+    expect(id.recordSourceCached).toBe(true);
+    expect(id.factoryVerified).toBe(false);
+  });
+
+  it("a live decode that later gained cached extras keeps its own verification", () => {
+    const id = identityFromRow(row(sheet({ repromoted_from: { snapshot_id: "s1", added_keys: ["factory_warranty"] } })), NOW);
+    expect(id.recordSourceCached).toBe(false);
+    expect(id.factoryVerified).toBe(id.matchLevel === "EXACT_VIN");
+  });
+
+  it("partial_build_* stays unknown and its raw value is kept", () => {
+    const id = identityFromRow(row(sheet({ taxonomy: { record_source: "partial_build_specs" } })), NOW);
+    expect(id.recordSource).toBe("partial_build_specs");
+    expect(id.decodeAuthority).toBe("unknown");
+    expect(id.factoryVerified).toBe(false);
   });
 });

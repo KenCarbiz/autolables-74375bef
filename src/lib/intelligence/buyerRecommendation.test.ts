@@ -23,6 +23,7 @@ const score = (n: number | null, applicable = true): VehicleScoreResult => ({
   publication: !applicable ? "not_applicable" : n == null ? "insufficient_evidence" : "eligible",
   assessedWeightPct: n == null ? 0 : 100,
   missingDomains: [],
+  evidenceFreshness: { title_odometer: "current", condition: "current", recall: "current" },
   policyVersion: "public-score-policy-v1",
   reasons: [],
 });

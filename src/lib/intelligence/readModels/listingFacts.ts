@@ -187,6 +187,21 @@ export function decodeConfidenceOf(mc: Bag, sheet: Bag): Pick<IdentitySummary, "
 const recordSourceOf = (mc: Bag, sheet: Bag): string | null =>
   str(bag(sheet.taxonomy).record_source) ?? str(bag(mc.taxonomy).record_source);
 
+/**
+ * True when the record_source a reader would use was written by the zero-call
+ * NeoVIN re-promotion rather than by a live decode. A cached lift preserves
+ * the provider's evidence but is not a new factory verification.
+ */
+export function recordSourceFromCache(sheet: Bag): boolean {
+  const rp = bag(sheet.repromoted_from);
+  if (!Object.keys(rp).length) return false;
+  const added = Array.isArray(rp.added_keys) ? rp.added_keys.map(String) : null;
+  // A re-promotion record without the key list predates added_keys: assume cached.
+  if (added == null) return true;
+  return added.includes("build_sheet") || added.includes("build_sheet.taxonomy")
+    || (added.includes("taxonomy") && !str(bag(sheet.taxonomy).record_source));
+}
+
 /** build_oem / build_specs are factory build data; *_mc_listing records are assembled from listings. */
 export function decodeAuthorityOf(recordSource: string | null): DecodeAuthority {
   const v = (recordSource ?? "").toLowerCase();
@@ -217,6 +232,7 @@ export function identityFromRow(row: ListingRowLike, nowMs: number): IdentitySum
   }
 
   const recordSource = sheet ? recordSourceOf(mc, sheet) : null;
+  const recordSourceCached = sheet != null && recordSourceFromCache(sheet);
   const decodeAuthority: DecodeAuthority = sheet && !isBasicDecode(sheet) ? decodeAuthorityOf(recordSource) : "unknown";
   const exact = sheet != null && mayClaim("exact_trim_version_identity", matchLevel);
   const colors: Bag = exact ? bag(sheet.colors) : {};
@@ -234,7 +250,8 @@ export function identityFromRow(row: ListingRowLike, nowMs: number): IdentitySum
     interiorColor: colorName(colors.interior) ?? str(mc.interior_color) ?? str(mc.base_int_color),
     mileage: num(row.mileage),
     matchLevel,
-    factoryVerified: isExactIdentity(matchLevel) && decodeAuthority === "factory_build",
+    factoryVerified: isExactIdentity(matchLevel) && decodeAuthority === "factory_build" && !recordSourceCached,
+    recordSourceCached,
     decodeSource,
     decodeAuthority,
     recordSource,

@@ -145,8 +145,9 @@ export async function recordProviderCall(
 // The account-wide coordinator (migration 0007): one atomic reservation per
 // request across every key on the account, with the protected reserve,
 // priority floors, dollar cap, rate limit, deduplication and the
-// billing-uncertain hold. Tolerates only the coordinator not existing yet;
-// any other failure refuses the call.
+// billing-uncertain hold. Fails closed: a missing coordinator refuses the
+// call like any other failure, so no request can bypass the protected reserve
+// by running against a database where the coordinator was never installed.
 export async function reserveAccountQuota(admin: RpcClient, a: AdmitArgs, eventId: number | null): Promise<{ reserved: boolean; requestId?: string; reason?: string }> {
   try {
     const dedupe = await requestDedupeKey(a.url, a.vin);
@@ -171,7 +172,7 @@ export async function reserveAccountQuota(admin: RpcClient, a: AdmitArgs, eventI
     });
     if (error) {
       const code = String((error as { code?: string }).code ?? "");
-      if (code === "PGRST202" || code === "42883") return { reserved: true, reason: "coordinator_not_installed" };
+      if (code === "PGRST202" || code === "42883") return { reserved: false, reason: "coordinator_not_installed" };
       return { reserved: false, reason: "coordinator_unavailable" };
     }
     const d = (data ?? {}) as { reserved?: unknown; request_id?: unknown; reason?: unknown };

@@ -27,3 +27,4 @@ $P -d "$DB" -f supabase/tests/inventory_network/60_dedupe_stub.sql
 $P -d "$DB" -f supabase/tests/inventory_network/61_dedupe.sql
 $P -d "$DB" -f drizzle/migrations/0016_feed_completeness_hold.sql
 $P -d "$DB" -f supabase/tests/inventory_network/70_completeness_hold.sql
+$P -d "$DB" -f supabase/tests/inventory_network/55_feed_completeness.sql
