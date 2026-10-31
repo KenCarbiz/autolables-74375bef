@@ -51,7 +51,7 @@ function FilesComBody({ m }: { m: FilesComModel }) {
           <div className="-ml-1 mt-[21px]"><Timeline items={m.journey.steps} label="Latest file journey" /></div>
           <LinkButton to={importHref} variant="primary" className="-mx-1 mt-[10px] w-[calc(100%+8px)]">Open import</LinkButton>
         </Panel>
-        <FootNote className="mt-[22px] text-[12px]">Secrets hidden · no paid calls on refresh</FootNote>
+        <FootNote className="mt-[8px] text-[12px]">Secrets hidden · no paid calls on refresh</FootNote>
         <StickyBarSpacer />
         <StickyActionBar><LinkButton to={importHref} className="w-[174px]">View details</LinkButton></StickyActionBar>
       </div>

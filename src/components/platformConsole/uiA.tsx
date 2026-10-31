@@ -98,7 +98,7 @@ export const FilterSelect = ({ label, value, options, onChange, className }: { l
 /** Phone: fixed bar with a reassurance line and the screen's one action. */
 export const StickyActionBar = ({ children, note = "Read-only monitoring by default" }: { children?: ReactNode; note?: string }) => (
   <div className="fixed inset-x-0 bottom-0 z-20 flex h-[80px] items-start justify-between border-t border-[#D7E1ED] bg-white px-4 md:hidden">
-    <p className="pt-[22px] text-[11px] leading-[16px] text-[#52677C]">{note}</p>
+    <p className="pt-[17px] text-[11px] leading-[16px] text-[#52677C]">{note}</p>
     <div className="mt-[36px]">{children}</div>
   </div>
 );
@@ -107,10 +107,10 @@ export const StickyActionBar = ({ children, note = "Read-only monitoring by defa
 export const StickyBarSpacer = () => <div aria-hidden="true" className="h-[72px] md:hidden" />;
 
 /** Plain text lines inside a panel, e.g. "Store B: view inventory only". */
-export const PanelLines = ({ lines, className }: { lines: { text: string; strong?: boolean }[]; className?: string }) => (
+export const PanelLines = ({ lines, className, small }: { lines: { text: string; strong?: boolean }[]; className?: string; small?: boolean }) => (
   <ul className={cn("flex flex-col", className)}>
     {lines.map((l) => (
-      <li key={l.text} className={cn("text-[#132A42]", l.strong ? "text-[15px] font-bold leading-[20px]" : "text-[14px] leading-[20px]")}>{l.text}</li>
+      <li key={l.text} className={cn("leading-[20px] text-[#132A42]", l.strong ? (small ? "text-[14px] font-bold" : "text-[15px] font-bold") : small ? "text-[13px]" : "text-[14px]")}>{l.text}</li>
     ))}
   </ul>
 );
