@@ -801,8 +801,11 @@ ${structured
 export function buildChannelPromptV3(
   master: string, policy: ChannelPolicy, packet: DescriptionPacket,
 ): string {
-  const body = master.length > CHANNEL_PROMPT_BUDGET
-    ? master.slice(0, CHANNEL_PROMPT_BUDGET).replace(/\s+\S*$/, "") + "…"
+  // An exact-length export drafts a pool longer than the usual channel, so it
+  // has to see the whole master rather than its first 2,600 characters.
+  const budget = policy.exactTotal ? Math.max(CHANNEL_PROMPT_BUDGET, 5000) : CHANNEL_PROMPT_BUDGET;
+  const body = master.length > budget
+    ? master.slice(0, budget).replace(/\s+\S*$/, "") + "…"
     : master;
   const override = packet.voice.channelOverrides?.[policy.key];
   const cta = override?.ctaTemplate || packet.voice.ctaTemplate
@@ -811,7 +814,9 @@ export function buildChannelPromptV3(
   const rules = [
     `- ${policy.instruction}`,
     override?.instruction ? `- ${override.instruction}` : "",
-    policy.recommendedMin > 0
+    policy.exactTotal
+      ? `- Length: write ${policy.recommendedMin}-${policy.recommendedMax} characters of narrative. The application selects whole sentences and appends the approved call to action and disclosure to reach the exact export length, so every sentence must stand on its own. Never add filler to reach a number.`
+      : policy.recommendedMin > 0
       ? `- Length: ${policy.recommendedMin}-${policy.recommendedMax} characters. Hard maximum ${policy.characterLimit}.`
       // A destination with no floor gets a ceiling only. Printing "0-3879"
       // would read as a range and invite padding toward the top of it.
@@ -820,6 +825,8 @@ export function buildChannelPromptV3(
     `- Feature budget: name at most ${policy.featureBudget} pieces of equipment, chosen from the highest-priority ones in the master. Group the rest or leave them out.`,
     policy.markdownAllowed ? "" : "- Plain text only. No markdown, no headings, no bullet characters.",
     policy.htmlAllowed ? "" : "- No HTML.",
+    policy.asciiOnly ? "- Plain ASCII characters only: straight quotes and hyphens, no em dashes, no trademark or registered symbols." : "",
+    policy.exactTotal ? "- Do not write a call to action, a closing invitation or any legal disclosure; they are appended by the application." : "",
     policy.emojiAllowed ? "" : "- No emoji.",
     policy.linksAllowed ? "" : "- No URLs.",
     policy.phoneAllowed ? "" : "- No phone numbers in the body.",

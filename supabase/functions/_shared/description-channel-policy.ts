@@ -27,6 +27,14 @@ export interface ChannelPolicy {
   characterLimit: number;
   /** False when the cap is an administrative default we have not confirmed. */
   limitVerified: boolean;
+  /**
+   * Exact final serialized total, disclosure and CTA included. Null for every
+   * destination without an exact-length contract. Not tenant-overridable.
+   */
+  exactTotal?: number | null;
+  /** Wire contract: flatten to one line / require ASCII before counting. */
+  singleLine?: boolean;
+  asciiOnly?: boolean;
 
   /** Structure */
   paragraphMin: number;
@@ -63,6 +71,13 @@ export interface ChannelPolicy {
 const REVIEWED = "2026-07-27";
 const OWNER = "autolabels_platform";
 
+// DriveSignal kit (2026-10-31): phrases no destination may carry. Merged into
+// every policy, so a tenant can add to the list but never remove from it.
+export const GLOBAL_PROHIBITED_PHRASES = [
+  "guaranteed approval", "guaranteed lowest price", "accident free", "fully autonomous",
+  "crash-proof", "hurry before", "won't last", "best deal anywhere", "flawless", "perfect condition",
+];
+
 // A tenant may narrow any of these; the shipped values are the floor.
 export const DEFAULT_CHANNEL_POLICIES: ChannelPolicy[] = [
   {
@@ -78,7 +93,11 @@ export const DEFAULT_CHANNEL_POLICIES: ChannelPolicy[] = [
   },
   {
     key: "dealer_website", label: "Dealer Website", active: true,
-    recommendedMin: 1000, recommendedMax: 2200, characterLimit: 2400, limitVerified: true,
+    // DriveSignal kit (2026-10-31): the website description is the PRIMARY
+    // output. 300-550 words (about 1,800-3,300 characters) only when the
+    // evidence supports it, and 6,500 as a local guardrail. Neither number is
+    // a Google requirement; there is no minimum padding.
+    recommendedMin: 1800, recommendedMax: 3300, characterLimit: 6500, limitVerified: false,
     paragraphMin: 3, paragraphMax: 6, listsAllowed: true, htmlAllowed: false,
     markdownAllowed: false, emojiAllowed: false, linksAllowed: true, phoneAllowed: true,
     pricingPolicy: "if_dealer_permits", keywordPolicy: "natural", ctaPolicy: "direct",
@@ -87,7 +106,7 @@ export const DEFAULT_CHANNEL_POLICIES: ChannelPolicy[] = [
     // site has no connector, so this stays export-only rather than claiming a
     // delivery we never perform.
     deliveryMode: "export_only", connectorStatus: "export_only",
-    policyVersion: "cp_website_1", lastReviewed: REVIEWED, owner: OWNER,
+    policyVersion: "cp_website_2", lastReviewed: REVIEWED, owner: OWNER,
     instruction: "The richest merchandising version. Clear paragraphs, meaningful vehicle detail, genuine local relevance, a strong approved call to action. Avoid repetitive dealership boilerplate and never keyword-stuff.",
   },
   {
@@ -158,29 +177,30 @@ export const DEFAULT_CHANNEL_POLICIES: ChannelPolicy[] = [
     // destination-specific formatting and no pricing, because vAuto is where
     // pricing is managed.
     key: "vauto", label: "vAuto", active: true,
-    // Owner decision: vAuto targets 3,221-3,879 characters, where 3,879 is the
-    // goal to write toward and 3,221 is a floor.
+    // Owner decision (2026-10-31, DriveSignal kit): the final exported field is
+    // EXACTLY 3,921 characters including spaces, punctuation, the approved CTA,
+    // separators and the approved disclosure. The account-reported field
+    // maximum is 4,000. The writer drafts a slightly longer narrative and the
+    // deterministic fitter (description-exact-fit.ts) keeps whole sentences
+    // until the total lands exactly; it never pads or truncates. When no
+    // combination lands, the variant is held for review.
     //
-    // The floor is a TARGET, not a quota. Channel variants are derived by
-    // trimming an approved master, and nothing in this system expands one, so
-    // a master with fewer verified facts than 3,221 characters can support
-    // produces a short vAuto version that is FLAGGED for review rather than
-    // padded to reach the number. The writing standard forbids padding
-    // outright, and a floor enforced by inventing content would breach it.
-    recommendedMin: 3221, recommendedMax: 3879, characterLimit: 3879, limitVerified: false,
-    paragraphMin: 4, paragraphMax: 8, listsAllowed: false, htmlAllowed: false,
+    // recommendedMin/Max size the DRAFT narrative pool only.
+    recommendedMin: 3500, recommendedMax: 4300, characterLimit: 4000, limitVerified: false,
+    exactTotal: 3921, singleLine: true, asciiOnly: true,
+    paragraphMin: 1, paragraphMax: 8, listsAllowed: false, htmlAllowed: false,
     markdownAllowed: false, emojiAllowed: false, linksAllowed: false, phoneAllowed: false,
+    // The CTA is the dealer's approved template, appended deterministically by
+    // the fitter, never written by the model.
     pricingPolicy: "never", keywordPolicy: "natural", ctaPolicy: "none",
     seoFields: false,
-    // 3221-3879 characters cannot be written from 10 features. This policy
-    // asked for a long variant and supplied a short variant's material.
+    // A ~3,900-character variant cannot be written from 10 features.
     featureBudget: 35,
     prohibitedPhrases: [], requiredDisclosures: [],
-    // Export-only until a dealer actually configures a vAuto connector. This
-    // is the honest state, not a placeholder: AutoLabels can produce a
-    // vAuto-compatible export and nothing more.
+    // Export-only until a dealer actually configures a vAuto connector and a
+    // round trip proves the field's counting. AutoLabels produces the export.
     deliveryMode: "export_only", connectorStatus: "export_only",
-    policyVersion: "cp_vauto_1", lastReviewed: REVIEWED, owner: OWNER,
+    policyVersion: "cp_vauto_2", lastReviewed: "2026-10-31", owner: OWNER,
     instruction: "Neutral, portable merchandising copy intended to be syndicated onward by the dealer's inventory workflow. Complete equipment coverage in readable prose, no destination-specific formatting, no price or payment language, no marketplace call to action.",
   },
 ];
@@ -214,7 +234,7 @@ export const CHANNEL_PROVENANCE: ChannelProvenance[] = [
     sourceNote: "AutoLabels owns this surface end to end." },
   { channel: "dealer_website", lengthLimit: "autolabels_best_practice", formatting: "autolabels_best_practice",
     pricing: "tenant_required", prohibitedPhrases: "tenant_required",
-    sourceNote: "Website providers vary; these are AutoLabels defaults, not a provider mandate." },
+    sourceNote: "Primary output. 300-550 words and the 6,500-character cap are local editorial guardrails, not Google limits; Google publishes no description length requirement." },
   { channel: "autotrader", lengthLimit: "awaiting_confirmation", formatting: "autolabels_best_practice",
     pricing: "autolabels_best_practice", prohibitedPhrases: "autolabels_best_practice",
     sourceNote: "Length cap is an AutoLabels default. Confirm against the dealer's current AutoTrader feed spec before treating it as a provider requirement." },
@@ -230,16 +250,18 @@ export const CHANNEL_PROVENANCE: ChannelProvenance[] = [
   { channel: "google_seo", lengthLimit: "seo_recommendation", formatting: "seo_recommendation",
     pricing: "autolabels_best_practice", prohibitedPhrases: "autolabels_best_practice",
     sourceNote: "Meta-description length is an SEO recommendation. Nothing here is published to Google by AutoLabels." },
-  { channel: "vauto", lengthLimit: "awaiting_confirmation", formatting: "autolabels_best_practice",
+  { channel: "vauto", lengthLimit: "tenant_required", formatting: "autolabels_best_practice",
     pricing: "autolabels_best_practice", prohibitedPhrases: "autolabels_best_practice",
-    sourceNote: "vAuto field mapping and limits are not confirmed. Treat this policy as an AutoLabels export default until a dealer's vAuto configuration is supplied." },
+    sourceNote: "Exactly 3,921 total characters is the owner's requirement (confirmed 2026-10-31); the 4,000 maximum is account-reported, not publicly verified. A round trip through the dealer's actual vAuto adapter, including any vendor-appended footer, is still required." },
 ];
 
 export const provenanceFor = (channel: string) =>
   CHANNEL_PROVENANCE.find((p) => p.channel === channel);
 
-export const policyByKey = (k: string): ChannelPolicy | undefined =>
-  DEFAULT_CHANNEL_POLICIES.find((p) => p.key === k);
+export const policyByKey = (k: string): ChannelPolicy | undefined => {
+  const p = DEFAULT_CHANNEL_POLICIES.find((x) => x.key === k);
+  return p ? { ...p, prohibitedPhrases: dedupe([...p.prohibitedPhrases, ...GLOBAL_PROHIBITED_PHRASES]) } : undefined;
+};
 
 /** Fields a tenant is permitted to narrow. Delivery truth is not one of them. */
 const TENANT_OVERRIDABLE = new Set([
@@ -297,6 +319,7 @@ export async function computeChannelPolicyVersion(p: ChannelPolicy): Promise<str
     JSON.stringify([...p.prohibitedPhrases].sort()),
     JSON.stringify([...p.requiredDisclosures].sort()),
     p.instruction, p.policyVersion,
+    p.exactTotal ?? "", p.singleLine ?? "", p.asciiOnly ?? "",
   ].map((x) => String(x ?? "")).join("|");
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(material));
   return `${p.policyVersion}.` + Array.from(new Uint8Array(digest)).slice(0, 6)
@@ -315,12 +338,23 @@ export function checkChannelPolicy(content: string, p: ChannelPolicy): PolicyFin
   const text = content || "";
   const lc = text.toLowerCase();
 
+  if (p.exactTotal) {
+    const n = [...text].length;
+    if (n !== p.exactTotal) {
+      out.push({ code: "EXACT_LENGTH_MISMATCH", severity: "blocking",
+        message: `${p.label} requires exactly ${p.exactTotal} characters including the disclosure; this variant has ${n}.` });
+    }
+    if (p.asciiOnly && /[^\x20-\x7E]/.test(text)) {
+      out.push({ code: "NON_ASCII_REVIEW", severity: "blocking",
+        message: `${p.label} export is counted as single-line ASCII; review non-ASCII characters.` });
+    }
+  } else if (text.length < p.recommendedMin && text.length <= p.characterLimit) {
+    out.push({ code: "LENGTH_BELOW_MINIMUM", severity: "warning",
+      message: `Only ${text.length} characters; ${p.label} reads best from ${p.recommendedMin}.` });
+  }
   if (text.length > p.characterLimit) {
     out.push({ code: "CHANNEL_LENGTH_EXCEEDED", severity: "warning",
       message: `${p.label} limit exceeded by ${text.length - p.characterLimit} characters (${text.length}/${p.characterLimit}).` });
-  } else if (text.length < p.recommendedMin) {
-    out.push({ code: "LENGTH_BELOW_MINIMUM", severity: "warning",
-      message: `Only ${text.length} characters; ${p.label} reads best from ${p.recommendedMin}.` });
   }
 
   if (!p.markdownAllowed && /(^|\n)\s*[#>*-]\s|\*\*|__/.test(text)) {

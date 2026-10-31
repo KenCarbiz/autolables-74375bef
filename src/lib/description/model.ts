@@ -48,14 +48,14 @@ export interface ChannelMeta {
 // the row the server wrote, never from this table, because a stored version
 // keeps the policy it was generated under even after the registry moves on.
 export const CHANNEL_META: ChannelMeta[] = [
-  { key: "dealer_website",   label: "Dealer Website",       characterLimit: 2400, deliveryMode: "export_only",         connectorStatus: "export_only" },
+  { key: "dealer_website",   label: "Dealer Website",       characterLimit: 6500, deliveryMode: "export_only",         connectorStatus: "export_only" },
   { key: "vehicle_passport", label: "Vehicle Passport",     characterLimit: 2400, deliveryMode: "internal_projection", connectorStatus: "available" },
   { key: "autotrader",       label: "AutoTrader",           characterLimit: 1500, deliveryMode: "export_only",         connectorStatus: "export_only" },
   { key: "cars_com",         label: "Cars.com",             characterLimit: 1500, deliveryMode: "connector",           connectorStatus: "not_configured" },
   { key: "cargurus",         label: "CarGurus",             characterLimit: 1200, deliveryMode: "export_only",         connectorStatus: "export_only" },
   { key: "facebook",         label: "Facebook Marketplace", characterLimit: 900,  deliveryMode: "export_only",         connectorStatus: "export_only" },
   { key: "google_seo",       label: "Google SEO",           characterLimit: 900,  deliveryMode: "export_only",         connectorStatus: "export_only" },
-  { key: "vauto",            label: "vAuto",                characterLimit: 1500, deliveryMode: "export_only",         connectorStatus: "export_only" },
+  { key: "vauto",            label: "vAuto",                characterLimit: 3921, deliveryMode: "export_only",         connectorStatus: "export_only" },
 ];
 
 /**

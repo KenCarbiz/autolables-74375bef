@@ -131,13 +131,17 @@ describe("the vAuto band", () => {
   const packet = buildDescriptionPacket(snap, SETTINGS, voiceOf(AREAS));
   const master = "An approved master description of moderate length.";
 
-  it("targets the owner's vAuto band", () => {
+  it("targets the owner's exact vAuto total", () => {
+    // Owner decision 2026-10-31: exactly 3,921 including CTA and disclosure,
+    // under an account-reported 4,000 cap. The prompt asks for a draft pool;
+    // the application fits the exact length.
     const vauto = policyForChannel("vauto")!;
-    expect(vauto.recommendedMin).toBe(3221);
-    expect(vauto.recommendedMax).toBe(3879);
-    expect(vauto.characterLimit).toBe(3879);
-    expect(buildChannelPromptV3(master, vauto, packet))
-      .toMatch(/Length: 3221-3879 characters/);
+    expect(vauto.exactTotal).toBe(3921);
+    expect(vauto.characterLimit).toBe(4000);
+    const prompt = buildChannelPromptV3(master, vauto, packet);
+    expect(prompt).toMatch(/The application selects whole sentences/);
+    expect(prompt).toMatch(/Never add filler to reach a number/);
+    expect(prompt).toMatch(/Plain ASCII characters only/);
   });
 
   it("still forbids padding to reach that floor", () => {
@@ -149,7 +153,7 @@ describe("the vAuto band", () => {
     expect(core).toMatch(/Never pad, repeat a feature, restate a fact in different words/);
     const policy = readFileSync(join(__dirname,
       "../../../supabase/functions/_shared/description-channel-policy.ts"), "utf8");
-    expect(policy).toMatch(/floor is a TARGET, not a quota/);
+    expect(policy).toMatch(/it never pads or truncates/);
   });
 
   it("keeps a short channel version a warning, never a block", () => {

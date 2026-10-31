@@ -2126,6 +2126,7 @@ export type Database = {
           legal_name: string | null
           listing_sync_enabled: boolean
           max_invalid_rows: number
+          max_snapshot_shrink_pct: number
           missing_snapshot_threshold: number
           phone: string | null
           provider_ids: Json
@@ -2157,6 +2158,7 @@ export type Database = {
           legal_name?: string | null
           listing_sync_enabled?: boolean
           max_invalid_rows?: number
+          max_snapshot_shrink_pct?: number
           missing_snapshot_threshold?: number
           phone?: string | null
           provider_ids?: Json
@@ -2188,6 +2190,7 @@ export type Database = {
           legal_name?: string | null
           listing_sync_enabled?: boolean
           max_invalid_rows?: number
+          max_snapshot_shrink_pct?: number
           missing_snapshot_threshold?: number
           phone?: string | null
           provider_ids?: Json
@@ -5330,6 +5333,431 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: []
+      }
+      inventory_dedupe_batch_items: {
+        Row: {
+          batch_id: string
+          error: string | null
+          finished_at: string | null
+          operation_id: string | null
+          position: number
+          preview_id: string
+          status: string
+        }
+        Insert: {
+          batch_id: string
+          error?: string | null
+          finished_at?: string | null
+          operation_id?: string | null
+          position: number
+          preview_id: string
+          status?: string
+        }
+        Update: {
+          batch_id?: string
+          error?: string | null
+          finished_at?: string | null
+          operation_id?: string | null
+          position?: number
+          preview_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_dedupe_batch_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_dedupe_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_dedupe_batch_items_preview_id_fkey"
+            columns: ["preview_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_dedupe_previews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_dedupe_batches: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          group_id: string
+          id: string
+          status: string
+          stop_reason: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          group_id: string
+          id?: string
+          status?: string
+          stop_reason?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          group_id?: string
+          id?: string
+          status?: string
+          stop_reason?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      inventory_dedupe_candidates: {
+        Row: {
+          disposition: string
+          first_seen_at: string
+          group_id: string
+          id: string
+          kind: string
+          last_checked_at: string
+          reasons: string[]
+          resolved_at: string | null
+          status: string
+          store_id: string | null
+          summary: Json
+          tenant_id: string
+          vin: string
+        }
+        Insert: {
+          disposition: string
+          first_seen_at?: string
+          group_id: string
+          id?: string
+          kind: string
+          last_checked_at?: string
+          reasons?: string[]
+          resolved_at?: string | null
+          status?: string
+          store_id?: string | null
+          summary?: Json
+          tenant_id: string
+          vin: string
+        }
+        Update: {
+          disposition?: string
+          first_seen_at?: string
+          group_id?: string
+          id?: string
+          kind?: string
+          last_checked_at?: string
+          reasons?: string[]
+          resolved_at?: string | null
+          status?: string
+          store_id?: string | null
+          summary?: Json
+          tenant_id?: string
+          vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_dedupe_candidates_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "dealer_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_dedupe_candidates_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "dealer_stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_dedupe_controls: {
+        Row: {
+          approval_ttl_minutes: number
+          auto_reconcile_enabled: boolean
+          detection_enabled: boolean
+          emergency_stop: boolean
+          id: number
+          limits_approved_at: string | null
+          limits_approved_by: string | null
+          max_failures: number
+          max_sets_per_run: number
+          max_store_share_pct: number
+          max_unresolved_conflicts: number
+          preview_ttl_minutes: number
+          purge_enabled: boolean
+          reason: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          approval_ttl_minutes?: number
+          auto_reconcile_enabled?: boolean
+          detection_enabled?: boolean
+          emergency_stop?: boolean
+          id?: number
+          limits_approved_at?: string | null
+          limits_approved_by?: string | null
+          max_failures?: number
+          max_sets_per_run?: number
+          max_store_share_pct?: number
+          max_unresolved_conflicts?: number
+          preview_ttl_minutes?: number
+          purge_enabled?: boolean
+          reason?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          approval_ttl_minutes?: number
+          auto_reconcile_enabled?: boolean
+          detection_enabled?: boolean
+          emergency_stop?: boolean
+          id?: number
+          limits_approved_at?: string | null
+          limits_approved_by?: string | null
+          max_failures?: number
+          max_sets_per_run?: number
+          max_store_share_pct?: number
+          max_unresolved_conflicts?: number
+          preview_ttl_minutes?: number
+          purge_enabled?: boolean
+          reason?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      inventory_dedupe_dependency_registry: {
+        Row: {
+          class: string
+          column_name: string
+          filter_sql: string | null
+          key_kind: string
+          label: string
+          table_name: string
+        }
+        Insert: {
+          class: string
+          column_name: string
+          filter_sql?: string | null
+          key_kind: string
+          label: string
+          table_name: string
+        }
+        Update: {
+          class?: string
+          column_name?: string
+          filter_sql?: string | null
+          key_kind?: string
+          label?: string
+          table_name?: string
+        }
+        Relationships: []
+      }
+      inventory_dedupe_operations: {
+        Row: {
+          action: string | null
+          actor: string | null
+          after_state: Json | null
+          batch_id: string | null
+          before_state: Json | null
+          created_at: string
+          group_id: string | null
+          id: string
+          idempotency_key: string
+          kind: string
+          policy_version: string | null
+          preview_id: string | null
+          reason: string | null
+          result: Json
+          status: string
+          store_id: string | null
+          tenant_id: string | null
+          undo_of: string | null
+          vin: string | null
+        }
+        Insert: {
+          action?: string | null
+          actor?: string | null
+          after_state?: Json | null
+          batch_id?: string | null
+          before_state?: Json | null
+          created_at?: string
+          group_id?: string | null
+          id?: string
+          idempotency_key: string
+          kind: string
+          policy_version?: string | null
+          preview_id?: string | null
+          reason?: string | null
+          result?: Json
+          status: string
+          store_id?: string | null
+          tenant_id?: string | null
+          undo_of?: string | null
+          vin?: string | null
+        }
+        Update: {
+          action?: string | null
+          actor?: string | null
+          after_state?: Json | null
+          batch_id?: string | null
+          before_state?: Json | null
+          created_at?: string
+          group_id?: string | null
+          id?: string
+          idempotency_key?: string
+          kind?: string
+          policy_version?: string | null
+          preview_id?: string | null
+          reason?: string | null
+          result?: Json
+          status?: string
+          store_id?: string | null
+          tenant_id?: string | null
+          undo_of?: string | null
+          vin?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_dedupe_operations_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_dedupe_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_dedupe_operations_preview_id_fkey"
+            columns: ["preview_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_dedupe_previews"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_dedupe_operations_undo_of_fkey"
+            columns: ["undo_of"]
+            isOneToOne: false
+            referencedRelation: "inventory_dedupe_operations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_dedupe_previews: {
+        Row: {
+          action: string
+          applied_operation_id: string | null
+          approval_expires_at: string | null
+          approved_at: string | null
+          approved_by: string | null
+          candidate_id: string | null
+          created_at: string
+          created_by: string | null
+          disposition: string
+          expires_at: string
+          fingerprint: string
+          group_id: string
+          id: string
+          kind: string
+          plan: Json
+          plan_sha256: string
+          policy_version: string
+          status: string
+          status_reason: string | null
+          store_id: string | null
+          tenant_id: string
+          vin: string
+        }
+        Insert: {
+          action: string
+          applied_operation_id?: string | null
+          approval_expires_at?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          candidate_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          disposition: string
+          expires_at: string
+          fingerprint: string
+          group_id: string
+          id?: string
+          kind: string
+          plan: Json
+          plan_sha256: string
+          policy_version: string
+          status?: string
+          status_reason?: string | null
+          store_id?: string | null
+          tenant_id: string
+          vin: string
+        }
+        Update: {
+          action?: string
+          applied_operation_id?: string | null
+          approval_expires_at?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          candidate_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          disposition?: string
+          expires_at?: string
+          fingerprint?: string
+          group_id?: string
+          id?: string
+          kind?: string
+          plan?: Json
+          plan_sha256?: string
+          policy_version?: string
+          status?: string
+          status_reason?: string | null
+          store_id?: string | null
+          tenant_id?: string
+          vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_dedupe_previews_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_dedupe_candidates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_dedupe_store_controls: {
+        Row: {
+          paused: boolean
+          reason: string | null
+          store_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          paused?: boolean
+          reason?: string | null
+          store_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          paused?: boolean
+          reason?: string | null
+          store_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_dedupe_store_controls_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: true
+            referencedRelation: "dealer_stores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inventory_feed_bindings: {
         Row: {
@@ -12026,6 +12454,74 @@ export type Database = {
           },
         ]
       }
+      vehicle_listing_aliases: {
+        Row: {
+          alias_listing_id: string
+          alias_slug: string | null
+          canonical_listing_id: string
+          created_at: string
+          id: string
+          operation_id: string
+          retired_at: string | null
+          retired_operation_id: string | null
+          tenant_id: string
+          vin: string
+        }
+        Insert: {
+          alias_listing_id: string
+          alias_slug?: string | null
+          canonical_listing_id: string
+          created_at?: string
+          id?: string
+          operation_id: string
+          retired_at?: string | null
+          retired_operation_id?: string | null
+          tenant_id: string
+          vin: string
+        }
+        Update: {
+          alias_listing_id?: string
+          alias_slug?: string | null
+          canonical_listing_id?: string
+          created_at?: string
+          id?: string
+          operation_id?: string
+          retired_at?: string | null
+          retired_operation_id?: string | null
+          tenant_id?: string
+          vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_listing_aliases_alias_listing_id_fkey"
+            columns: ["alias_listing_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_listing_aliases_canonical_listing_id_fkey"
+            columns: ["canonical_listing_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_listing_aliases_operation_id_fkey"
+            columns: ["operation_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_dedupe_operations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_listing_aliases_retired_operation_id_fkey"
+            columns: ["retired_operation_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_dedupe_operations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vehicle_listings: {
         Row: {
           advertised_price_before_doc: number | null
@@ -12095,6 +12591,8 @@ export type Database = {
           recall_override_notes: string | null
           recall_payload: Json | null
           recall_status: string | null
+          reconciled_into_listing_id: string | null
+          reconciliation_operation_id: string | null
           retail_cash: number | null
           scrape_last_synced_at: string | null
           scrape_source_url: string | null
@@ -12187,6 +12685,8 @@ export type Database = {
           recall_override_notes?: string | null
           recall_payload?: Json | null
           recall_status?: string | null
+          reconciled_into_listing_id?: string | null
+          reconciliation_operation_id?: string | null
           retail_cash?: number | null
           scrape_last_synced_at?: string | null
           scrape_source_url?: string | null
@@ -12279,6 +12779,8 @@ export type Database = {
           recall_override_notes?: string | null
           recall_payload?: Json | null
           recall_status?: string | null
+          reconciled_into_listing_id?: string | null
+          reconciliation_operation_id?: string | null
           retail_cash?: number | null
           scrape_last_synced_at?: string | null
           scrape_source_url?: string | null
@@ -12316,6 +12818,13 @@ export type Database = {
             columns: ["owning_store_id"]
             isOneToOne: false
             referencedRelation: "dealer_stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_listings_reconciled_into_listing_id_fkey"
+            columns: ["reconciled_into_listing_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_listings"
             referencedColumns: ["id"]
           },
           {
@@ -14356,6 +14865,8 @@ export type Database = {
           recall_override_notes: string | null
           recall_payload: Json | null
           recall_status: string | null
+          reconciled_into_listing_id: string | null
+          reconciliation_operation_id: string | null
           retail_cash: number | null
           scrape_last_synced_at: string | null
           scrape_source_url: string | null
@@ -14518,11 +15029,94 @@ export type Database = {
         }
         Returns: undefined
       }
+      inv_admin_set_shrink_guard: {
+        Args: { p_max_shrink_pct: number; p_reason: string; p_store_id: string }
+        Returns: undefined
+      }
       inv_admin_usage: { Args: { p_store_id: string }; Returns: Json }
       inv_admin_vehicle_provider_history: {
         Args: { p_vin: string }
         Returns: Json
       }
+      inv_dedupe_apply: {
+        Args: { p_idempotency_key: string; p_preview_id: string }
+        Returns: Json
+      }
+      inv_dedupe_apply_internal: {
+        Args: {
+          p_actor: string
+          p_batch_id: string
+          p_idempotency_key: string
+          p_preview_id: string
+        }
+        Returns: Json
+      }
+      inv_dedupe_approve: {
+        Args: { p_plan_sha256: string; p_preview_id: string }
+        Returns: Json
+      }
+      inv_dedupe_batch_create: {
+        Args: { p_group_id: string; p_preview_ids: string[] }
+        Returns: string
+      }
+      inv_dedupe_batch_progress: { Args: { p_batch_id: string }; Returns: Json }
+      inv_dedupe_batch_resume: { Args: { p_batch_id: string }; Returns: Json }
+      inv_dedupe_batch_step: { Args: { p_batch_id: string }; Returns: Json }
+      inv_dedupe_build_plan: {
+        Args: {
+          p_group_id: string
+          p_kind: string
+          p_store_id?: string
+          p_vin: string
+        }
+        Returns: Json
+      }
+      inv_dedupe_create_preview: {
+        Args: { p_candidate_id: string }
+        Returns: Json
+      }
+      inv_dedupe_dependencies: { Args: { p_listing_id: string }; Returns: Json }
+      inv_dedupe_get_preview: { Args: { p_preview_id: string }; Returns: Json }
+      inv_dedupe_listing_view: { Args: { p_listing_id: string }; Returns: Json }
+      inv_dedupe_lock: {
+        Args: { p_tenant_id: string; p_vin: string }
+        Returns: undefined
+      }
+      inv_dedupe_norm_vin: { Args: { p: string }; Returns: string }
+      inv_dedupe_overview: { Args: { p_group_id: string }; Returns: Json }
+      inv_dedupe_policy_version: { Args: never; Returns: string }
+      inv_dedupe_purge_check: { Args: { p_listing_id: string }; Returns: Json }
+      inv_dedupe_recovery_plan: {
+        Args: { p_operation_id: string }
+        Returns: Json
+      }
+      inv_dedupe_resolve_listing: {
+        Args: { p_listing_id: string }
+        Returns: string
+      }
+      inv_dedupe_reveal_vin: {
+        Args: { p_candidate_id: string }
+        Returns: string
+      }
+      inv_dedupe_scan: { Args: { p_group_id: string }; Returns: Json }
+      inv_dedupe_set_controls: { Args: { p: Json }; Returns: undefined }
+      inv_dedupe_set_store_pause: {
+        Args: { p_paused: boolean; p_reason: string; p_store_id: string }
+        Returns: undefined
+      }
+      inv_dedupe_state: {
+        Args: { p_inventory_id: string; p_listing_ids: string[] }
+        Returns: Json
+      }
+      inv_dedupe_undo: {
+        Args: {
+          p_idempotency_key: string
+          p_operation_id: string
+          p_plan_sha256: string
+        }
+        Returns: Json
+      }
+      inv_dedupe_undo_plan: { Args: { p_operation_id: string }; Returns: Json }
       inv_dry_run_partition: {
         Args: { p_run_id: string; p_source_dealer_id: string }
         Returns: Json

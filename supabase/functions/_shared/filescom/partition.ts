@@ -223,9 +223,18 @@ export function decidePartition(p: Partition, mapping: MappingRef | null, bindin
   return { outcome: "ready", reasons: [], clean: p.droppedRows === 0 };
 }
 
-export type InventoryDiff = { compared: boolean; additions: number; updates: number; unchanged: number; absenceCandidates: number };
+export type ShrinkGuard = { held: boolean; live: number; absent: number; allowed: number };
+export type InventoryDiff = { compared: boolean; additions: number; updates: number; unchanged: number; absenceCandidates: number; shrinkGuard: ShrinkGuard };
 
-export function diffAgainstStore(p: Partition, existing: Array<{ vin: string; feed_price: number | null; mileage: number | null; presence: string }> | null): InventoryDiff | null {
+// Mirrors inventory_apply_store_snapshot (0012): absence counts only while the
+// store's live cars missing from the snapshot stay within max(5, pct of live).
+export const DEFAULT_MAX_SHRINK_PCT = 20;
+export function shrinkGuard(live: number, absent: number, maxShrinkPct = DEFAULT_MAX_SHRINK_PCT): ShrinkGuard {
+  const allowed = Math.max(5, Math.ceil((live * maxShrinkPct) / 100));
+  return { held: absent > allowed, live, absent, allowed };
+}
+
+export function diffAgainstStore(p: Partition, existing: Array<{ vin: string; feed_price: number | null; mileage: number | null; presence: string }> | null, maxShrinkPct = DEFAULT_MAX_SHRINK_PCT): InventoryDiff | null {
   if (!existing) return null;
   const cur = new Map(existing.filter((e) => e.presence !== "retired" && e.presence !== "transferred").map((e) => [e.vin, e] as const));
   let additions = 0, updates = 0, unchanged = 0;
@@ -237,6 +246,8 @@ export function diffAgainstStore(p: Partition, existing: Array<{ vin: string; fe
     else if (e.feed_price !== v.feed_price || e.mileage !== v.mileage) updates++;
     else unchanged++;
   }
-  const absence = p.droppedRows === 0 ? [...cur.keys()].filter((v) => !seen.has(v)).length : 0;
-  return { compared: true, additions, updates, unchanged, absenceCandidates: absence };
+  const absent = [...cur.keys()].filter((v) => !seen.has(v)).length;
+  const guard = shrinkGuard(cur.size, absent, maxShrinkPct);
+  const absence = p.droppedRows === 0 && !guard.held ? absent : 0;
+  return { compared: true, additions, updates, unchanged, absenceCandidates: absence, shrinkGuard: guard };
 }
