@@ -29,6 +29,7 @@ import {
   acquisitionLadder, acquisitionMeta, acquisitionParams, buildStoredSample, COMP_MIN_EXTERNAL,
   type AcquisitionSubject, type AcquisitionTier,
 } from "../_shared/factorySticker/lib/market/compAcquisition.ts";
+import { SOLD_MIN_SAMPLE, summarizeSoldPage } from "../_shared/factorySticker/lib/market/soldSample.ts";
 import {
   constantTimeEquals, WRITER_AUTH_ENV_NAME, WRITER_AUTH_HEADER,
 } from "../_shared/functionAuth.ts";
@@ -563,7 +564,7 @@ function normalizeState(raw: string | null | undefined): string | null {
   return USPS_BY_NAME[s] ?? null;
 }
 
-async function fetchSoldStats(ymm: string | null, condition: string, stateRaw: string | null) {
+async function fetchSoldStats(ymm: string | null, condition: string, stateRaw: string | null, subjectVin: string) {
   const state = normalizeState(stateRaw);
 
   try {
@@ -571,12 +572,11 @@ async function fetchSoldStats(ymm: string | null, condition: string, stateRaw: s
     const { year, make, model } = parseYmm(ymm);
     if (!canQueryMakeModel({ year, make, model })) return null;
     const carType = condition === "new" ? "new" : "used";
-    const median = (xs: number[]) => {
-      const s = [...xs].sort((a, z) => a - z);
-      return s.length ? s[Math.floor(s.length / 2)] : null;
-    };
-    const finish = (r: { count: number; price_median: number | null; dom_median: number | null; miles_median: number | null }, scope: string) => ({
+    const finish = (r: { count: number; price_median: number | null; dom_median: number | null; miles_median: number | null; sample_size?: number | null; truncated?: boolean | null; sample_version?: string }, scope: string) => ({
       count: r.count,
+      sample_size: r.sample_size ?? null,
+      truncated: r.truncated ?? null,
+      ...(r.sample_version ? { sample_version: r.sample_version } : {}),
       price_median: r.price_median,
       dom_median: r.dom_median,
       miles_median: r.miles_median,
@@ -607,16 +607,14 @@ async function fetchSoldStats(ymm: string | null, condition: string, stateRaw: s
       const b: any = await res.json().catch(() => ({}));
       // deno-lint-ignore no-explicit-any
       const rows: any[] = Array.isArray(b?.listings) ? b.listings : [];
-      const count = num(b?.num_found) ?? rows.length;
-      const vals = (field: string) =>
-        // deno-lint-ignore no-explicit-any
-        rows.map((l: any) => num(l?.[field])).filter((n): n is number => n != null && n > 0);
-      return { count, price_median: median(vals("price")), dom_median: median(vals("dom")), miles_median: median(vals("miles")) };
+      // Medians come from the deduplicated page and are counted as such;
+      // num_found stays the cohort size (see src/lib/market/soldSample.ts).
+      return summarizeSoldPage(rows, num(b?.num_found), subjectVin);
     };
     const r1 = await run(true);
-    if (r1 && r1.count >= 5) return finish(r1, "model_year_state");
+    if (r1 && r1.sample_size >= SOLD_MIN_SAMPLE) return finish(r1, "model_year_state");
     const r2 = await run(false);
-    if (r2 && r2.count >= 5) return finish(r2, "model_state");
+    if (r2 && r2.sample_size >= SOLD_MIN_SAMPLE) return finish(r2, "model_state");
     // Still thin at model scope: one make-level /sales/car call. Use the
     // response's *_stats medians directly (this endpoint returns aggregates).
     const sp = new URLSearchParams({ api_key: MC_KEY, car_type: carType, make, state });
@@ -907,7 +905,7 @@ serve(async (req) => {
   // and each call is made only when the visit plan says it is due.
   const comps = buy("active_search") ? await fetchComps(ymm, condition, zip, price, vin, subjectTrim, dealerName, miles, subjectDrivetrain, likeRules) : null;
   const mds = buy("mds") && INCLUDE_MDS ? await fetchMds(ymm, condition, zip) : null;
-  const soldStats = buy("sales_stats") ? await fetchSoldStats(ymm, condition, dealerState) : null;
+  const soldStats = buy("sales_stats") ? await fetchSoldStats(ymm, condition, dealerState, vin) : null;
   const history = buy("vin_history") ? await fetchHistory(vin) : null;
   const recalls = wantMC ? await fetchRecalls(vin, { ymm, mc_attributes: row.mc_attributes, mc_raw: row.mc_raw }, buy("autorecalls")) : null;
   const blackbook = await blackbookP;

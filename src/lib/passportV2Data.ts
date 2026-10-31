@@ -263,6 +263,7 @@ export interface PassportData {
     // market_meta.sold_stats — recently-delisted medians from the enrich pass.
     soldCount: number | null; soldPriceMedian: number | null; soldDomMedian: number | null; soldMilesMedian: number | null;
     soldScope: string | null; soldState: string | null; soldCheckedAt: string | null;
+    soldSampleSize: number | null; soldTruncated: boolean | null;
     soldDisplayable: boolean;
   };
   comparables: { vin?: string | null; ymm?: string | null; trim?: string | null; miles?: number | null; price?: number | null; dist?: number | null; dealer?: string | null; dom?: number | null; image?: string | null }[];
@@ -491,6 +492,9 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     likeCount: n(mm.like_count), likeMedian: n(mm.like_median),
     soldCount, soldPriceMedian: n(ss.price_median), soldDomMedian: n(ss.dom_median), soldMilesMedian: n(ss.miles_median),
     soldScope, soldState: (ss.state as string) || null, soldCheckedAt,
+    // The medians' own sample (sold-sample-v1). Absent on rows written before
+    // it, which therefore never support a dollar claim.
+    soldSampleSize: n(ss.sample_size), soldTruncated: typeof ss.truncated === "boolean" ? ss.truncated : null,
     // Make-level scope is too loose for a customer claim, and stale sold data
     // must age out rather than keep asserting "last 90 days".
     soldDisplayable: soldScope != null && soldScope !== "make_state" && soldCount != null && soldCount >= 5
@@ -1166,13 +1170,16 @@ export const deriveSoldClaims = (d: PassportData, mileage: number | null, condit
   // transaction price. soldLanguage.test.ts scans this file for the wording.
   const velocity = `${m.soldCount.toLocaleString()} ${noun} inferred sold in ${m.soldState} in the last 90 days`;
   const aboveMarket = d.marketAvg != null && d.price != null && d.price > d.marketAvg;
-  const soldPrice = m.soldCount >= 10 && m.soldScope === "model_year_state" && m.soldPriceMedian != null
+  // A dollar figure needs its own sample: at least 10 listings, and the whole
+  // cohort rather than a page the provider chose.
+  const soldPrice = m.soldSampleSize != null && m.soldSampleSize >= 10 && m.soldTruncated === false
+    && m.soldScope === "model_year_state" && m.soldPriceMedian != null
     && d.price != null && d.price <= m.soldPriceMedian * 0.97
     && (mileage == null || m.soldMilesMedian == null || mileage <= m.soldMilesMedian * 1.25)
     && !aboveMarket
     ? {
         headline: `Priced ${fmt$(m.soldPriceMedian - d.price)} below the typical last advertised price before sale`,
-        sub: `Median last advertised price of ${m.soldCount.toLocaleString()} inferred sold listings in ${m.soldState}, last 90 days`,
+        sub: `Median last advertised price of ${m.soldSampleSize.toLocaleString()} inferred sold listings in ${m.soldState}, last 90 days`,
         amount: m.soldPriceMedian - d.price,
       }
     : null;
