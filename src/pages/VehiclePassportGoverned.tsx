@@ -552,7 +552,9 @@ export default function VehiclePassportGoverned() {
   const intelChips: Chip[] = [];
   if (d.belowMarket != null && d.belowMarket > 250) intelChips.push({ label: `${fmt$(d.belowMarket)} Below Market`, tone: "green", icon: TrendingUp });
   if (d.dealerVerified || (d.verifiedBy && d.verifiedBy.length > 0)) intelChips.push({ label: "Dealer Verified", tone: "blue", icon: ShieldCheck });
-  if (d.warrantyStr && !d.warrantyExpired) intelChips.push({ label: `Factory Warranty · ${d.warrantyStr}`, tone: "blue", icon: Award });
+  // A used car's coverage is only "active" from a recorded in-service date;
+  // without one the chip names the original terms, not live coverage.
+  if (d.warrantyStr && !d.warrantyExpired) intelChips.push({ label: d.warrantyCoverageKnown ? `Factory Warranty · ${d.warrantyStr}` : `Original factory terms · ${d.warrantyStr}`, tone: "blue", icon: Award });
   if (intelChips.length < 3 && d.ownerCount === 1) intelChips.push({ label: "1-Owner", tone: "blue", icon: BadgeCheck });
   if (intelChips.length < 3 && recallVerified) intelChips.push({ label: "No Open Recalls", tone: "green", icon: CheckCircle2 });
   if (intelChips.length < 3 && d.cleanTitle) intelChips.push({ label: "Clean Title", tone: "green", icon: CheckCircle2 });
@@ -713,7 +715,7 @@ export default function VehiclePassportGoverned() {
           d.ownerCount === 1 ? `One owner reported${d.historyReport ? ` (${historyReportName(d.historyReport.provider)})` : ""}` : d.ownerCount != null && d.ownerCount > 1 ? `${d.ownerCount} owners reported` : null,
           listing.mileage != null ? `${listing.mileage.toLocaleString()} reported miles` : null,
           listing.trim ? `${listing.trim} trim` : null,
-          recallVerified ? "No open recalls (NHTSA)" : null,
+          recallVerified ? "No open recalls returned for this VIN" : null,
           d.warrantyStr ? "Factory warranty terms found — remaining coverage requires confirmation" : null,
         ].filter(Boolean) as string[]);
 
@@ -737,8 +739,11 @@ export default function VehiclePassportGoverned() {
             monthsLeft = msLeft > 0 ? Math.round(msLeft / (1000 * 60 * 60 * 24 * 30.4)) : 0;
             timePct = Math.max(3, Math.min(100, (monthsLeft / months) * 100));
           }
-          const milesLeft = miles != null && miles > 0 && listing.mileage != null ? Math.max(0, miles - listing.mileage) : null;
-          const milesPct = miles != null && miles > 0 && listing.mileage != null ? Math.max(3, 100 - Math.min(100, (listing.mileage / miles) * 100)) : null;
+          // Remaining miles alone is not remaining coverage: without a recorded
+          // in-service date the time limit may already have passed.
+          const milesKnown = isNew || !!w.in_service_date;
+          const milesLeft = milesKnown && miles != null && miles > 0 && listing.mileage != null ? Math.max(0, miles - listing.mileage) : null;
+          const milesPct = milesKnown && miles != null && miles > 0 && listing.mileage != null ? Math.max(3, 100 - Math.min(100, (listing.mileage / miles) * 100)) : null;
           const vals = [timePct, milesPct].filter((x): x is number => x != null);
           const remainPct = vals.length ? Math.round(Math.min(...vals)) : null;
           const yrs = monthsLeft == null ? null : monthsLeft >= 12 ? `${Math.round(monthsLeft / 12)} yr` : `${monthsLeft} mo`;
@@ -1471,7 +1476,7 @@ export default function VehiclePassportGoverned() {
                           d.ownerCount === 1 ? `One owner reported${d.historyReport ? ` (${historyReportName(d.historyReport.provider)})` : ""}` : d.ownerCount != null && d.ownerCount > 1 ? `${d.ownerCount} owners reported` : null,
                           listing.mileage != null ? `${listing.mileage.toLocaleString()} reported miles` : null,
                           listing.trim ? `${listing.trim} trim` : null,
-                          recallVerified ? "No open recalls (NHTSA)" : null,
+                          recallVerified ? "No open recalls returned for this VIN" : null,
                           d.warrantyStr ? "Factory warranty terms found — remaining coverage requires confirmation" : null,
                         ].filter(Boolean) as string[];
                         return (strengths.length ? strengths : ["Details confirmed at the dealership"]).map((b, i) => (

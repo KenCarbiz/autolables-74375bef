@@ -261,6 +261,15 @@ export const PUBLIC_SCORE_POLICY = {
   minAssessedWeightPct: 85,
 } as const;
 
+/** Freshness of the evidence behind each required domain, as the inputs report it. */
+export function evidenceFreshness(input: VehicleScoreInput): Record<"title_odometer" | "condition" | "recall", "current" | "stale" | "unknown"> {
+  return {
+    title_odometer: input.titleOdometer.freshness?.state ?? "unknown",
+    condition: input.condition.freshness?.state ?? "unknown",
+    recall: input.recall.freshness?.state ?? "unknown",
+  };
+}
+
 function publicEligibility(domains: ScoreDomainResult[], input: VehicleScoreInput): { eligible: boolean; reasons: string[] } {
   const reasons: string[] = [];
   const by = Object.fromEntries(domains.map((d) => [d.key, d])) as Record<ScoreDomainKey, ScoreDomainResult>;
@@ -272,6 +281,11 @@ function publicEligibility(domains: ScoreDomainResult[], input: VehicleScoreInpu
     reasons.push("title_not_verified");
   }
   if (input.condition.state !== "verified") reasons.push(`condition_${input.condition.state}`);
+  // Evidence that has aged past its policy window cannot support a public
+  // label, even though it still informs the internal score.
+  for (const [key, f] of Object.entries(evidenceFreshness(input))) {
+    if (f === "stale") reasons.push(`evidence_stale:${key}`);
+  }
   const total = domains.reduce((a, d) => a + d.weight, 0);
   const assessed = domains.filter((d) => d.score != null).reduce((a, d) => a + d.weight, 0);
   const pct = total > 0 ? (assessed / total) * 100 : 0;
@@ -283,7 +297,7 @@ export function buildVehicleScore(input: VehicleScoreInput, options: VehicleScor
   const bands = { ...DEFAULT_SCORE_LABEL_BANDS, ...(options.labelBands ?? {}) };
   const weights: Record<ScoreDomainKey, number> = { ...SCORE_WEIGHTS, ...(options.weights ?? {}) };
 
-  const empty = { assessedWeightPct: 0, missingDomains: [] as ScoreDomainKey[], policyVersion: PUBLIC_SCORE_POLICY.version };
+  const empty = { assessedWeightPct: 0, missingDomains: [] as ScoreDomainKey[], evidenceFreshness: evidenceFreshness(input), policyVersion: PUBLIC_SCORE_POLICY.version };
   if (input.vehicleType === "new") {
     return { version: VEHICLE_SCORE_VERSION, score: null, label: null, domains: [], applicable: false, publication: "not_applicable", ...empty, reasons: ["vehicle_type_new_no_used_score"] };
   }
@@ -313,7 +327,7 @@ export function buildVehicleScore(input: VehicleScoreInput, options: VehicleScor
   if (!assessed.length) {
     return {
       version: VEHICLE_SCORE_VERSION, score: null, label: null, domains, applicable: true, publication: "insufficient_evidence",
-      assessedWeightPct, missingDomains, policyVersion: PUBLIC_SCORE_POLICY.version, reasons: ["no_assessable_evidence"],
+      assessedWeightPct, missingDomains, evidenceFreshness: evidenceFreshness(input), policyVersion: PUBLIC_SCORE_POLICY.version, reasons: ["no_assessable_evidence"],
     };
   }
   const weightSum = assessed.reduce((a, d) => a + d.weight, 0);
@@ -336,6 +350,6 @@ export function buildVehicleScore(input: VehicleScoreInput, options: VehicleScor
   return {
     version: VEHICLE_SCORE_VERSION, score, label: gate.eligible ? scoreLabel(score, bands) : null, domains, applicable: true,
     publication: gate.eligible ? "eligible" : "provisional",
-    assessedWeightPct, missingDomains, policyVersion: PUBLIC_SCORE_POLICY.version, reasons,
+    assessedWeightPct, missingDomains, evidenceFreshness: evidenceFreshness(input), policyVersion: PUBLIC_SCORE_POLICY.version, reasons,
   };
 }

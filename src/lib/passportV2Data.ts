@@ -303,6 +303,8 @@ export interface PassportData {
   warranty: NonNullable<VehicleListing["warranty_info"]>;
   warrantyStr: string | null;
   warrantyExpired: boolean;
+  /** True only when live coverage is supported: a new car, or a used car with a recorded in-service date. */
+  warrantyCoverageKnown: boolean;
   // Full OEM coverage breakdown for new/CPO cars (from the dealer's verified
   // Factory & CPO terms, attached by public-listing-view). Drives the
   // factory-warranty slide-out's full presentation.
@@ -683,6 +685,10 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     if (timeRemains == null && milesRemain == null) return false;
     return timeRemains === false || milesRemain === false;
   })();
+  // Coverage is known to be live only for a new car or a used car with a
+  // recorded in-service date. Terms alone say what the factory offered, not
+  // what is left.
+  const warrantyCoverageKnown = !!warrantyStr && !warrantyExpired && (isNew || !!warranty.in_service_date);
 
   // Falsifiable confidence score: start high and subtract LABELED deductions
   // for negative or unknown signals. The old formula had a 60-point floor and
@@ -795,7 +801,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   if (saveVsMsrp) whyBuy.push(`Priced ${fmt$(saveVsMsrp)} below MSRP`);
   else if (belowOriginalMsrp) whyBuy.push(`Priced ${fmt$(belowOriginalMsrp)} below original MSRP`);
   if (belowMarket && belowMarket > 0) whyBuy.push(`${fmt$(belowMarket)} below market average`);
-  if (warrantyStr && !warrantyExpired) whyBuy.push(isNew || warranty.in_service_date ? "Factory warranty remaining" : "Factory warranty terms on record");
+  if (warrantyStr && !warrantyExpired && warrantyCoverageKnown) whyBuy.push("Factory warranty remaining");
   if (recall.vin.clearClaimAllowed) whyBuy.push("No open recalls");
   if (dealerVerified) whyBuy.push("Dealer-verified listing");
   if (ownerCount === 1) whyBuy.push("One owner — personal use");
@@ -851,7 +857,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     marketMeta, comparables, blackbook, marketCheckedAt, history,
     viewCount: listing.view_count ?? null, dom: (mc.dom as number) ?? null,
     ownerCount, accidentCount, cleanTitle, titleStatus, titleVerifiedAt, titleVerifiedSource, titlePolicyAttested, titlePolicyAttestedBy, serviceCount, recall, recallClear, openRecalls, hasRecallCheck,
-    warranty, warrantyStr, warrantyExpired,
+    warranty, warrantyStr, warrantyExpired, warrantyCoverageKnown,
     oemWarranty: ((listing as unknown as { oem_warranty?: OemWarrantyView }).oem_warranty) || null,
     confScore, confLabel, confDeductions, confBlockedBy, verifiedBy, dealerVerified, verifyRows,
     highlights, specRows, keySpecs, epa, overview, whyBuy,
@@ -1060,7 +1066,7 @@ export const deriveRating = (listing: VehicleListing, d: PassportData): VehicleR
   const covInputs: { score: number; line: string }[] = [];
   const dealerCov = d.dealerCoverage.find((c) => c.mode === "included") || null;
   const factoryScore = (() => {
-    if (!d.warrantyStr || d.warrantyExpired) return null;
+    if (!d.warrantyStr || d.warrantyExpired || !d.warrantyCoverageKnown) return null;
     const w = d.warranty;
     if (w.in_service_date && w.factory_months) {
       const end = new Date(w.in_service_date);

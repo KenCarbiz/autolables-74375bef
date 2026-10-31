@@ -89,6 +89,7 @@ export function buildUsedPassportReadModel(input: UsedPassportInputs): UsedPassp
       publication: score.publication,
       assessedWeightPct: score.assessedWeightPct,
       missingDomains: [...score.missingDomains],
+      evidenceFreshness: { ...score.evidenceFreshness },
     },
     dataConfidence: {
       level: input.dataConfidence.level,

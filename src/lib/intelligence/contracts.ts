@@ -489,6 +489,8 @@ export interface VehicleScoreResult {
   /** Share of total domain weight that was actually assessed, 0-100. */
   assessedWeightPct: number;
   missingDomains: ScoreDomainKey[];
+  /** Freshness of the evidence behind the required domains; stale evidence blocks the public label. */
+  evidenceFreshness: Record<"title_odometer" | "condition" | "recall", "current" | "stale" | "unknown">;
   policyVersion: string;
   reasons: string[];
 }
@@ -583,6 +585,7 @@ export interface UsedPassportReadModel {
   vehicleScore: {
     score: number | null; label: ScoreLabel | null; version: string; domains: ScoreDomainView[];
     publication: ScorePublication; assessedWeightPct: number; missingDomains: ScoreDomainKey[];
+    evidenceFreshness: VehicleScoreResult["evidenceFreshness"];
   };
   dataConfidence: { level: DataConfidenceLevel; coveragePct?: number; reasons: string[] };
   titleOdometer: TitleOdometerSummary;
