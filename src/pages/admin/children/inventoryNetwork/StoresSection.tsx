@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useSearchParams } from "react-router-dom";
 import { Button, EmptyState, KeyValueList, Panel, StatusText, Td, Th, WorkTable } from "@/components/product";
 import { friendlyMessage, saveStore, type DealerStore, type StoreDraft, type StoreOverview, type SubscriptionStatus } from "@/lib/inventoryNetwork/api";
+import { NetIcon } from "@/components/inventoryNetwork/icons";
 import { CheckField, NumberField, SelectField, TextField, STATUS_TONE, humanize, storeAddress, useAct, useNet, when } from "./shared";
 
 interface Form {
@@ -86,7 +87,7 @@ function StoreForm({ store, initial, groupId, onSaved, savedAt }: { store: Store
 
   return (
     <Panel
-      title={isNew ? "Add store" : store.store.display_name}
+      title={<span className="inline-flex items-center gap-2"><NetIcon name="store" />{isNew ? "Add store" : store.store.display_name}</span>}
       description={isNew ? "Enter the rooftop's identity. Feed and sharing settings unlock after the store exists." : "Changes apply to this store only."}
       action={
         <div className="flex items-center gap-3">
