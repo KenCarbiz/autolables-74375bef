@@ -42,6 +42,7 @@ import {
 import { paletteSearchScope, searchPrompt } from "@/components/layout/searchScope";
 import { useNavDrawer } from "@/components/layout/useNavDrawer";
 import { AppRail } from "@/components/layout/AppRail";
+import { SectionTabs } from "@/components/layout/SectionTabs";
 import { AppHeader } from "@/components/layout/AppHeader";
 import {
   DropdownMenu,
@@ -653,6 +654,7 @@ const AppShell = ({ children }: AppShellProps) => {
           />
 
           <main ref={mainRef} id="app-scroll" tabIndex={-1} className="flex-1 overflow-y-auto pb-24 focus:outline-none lg:pb-0">
+            <SectionTabs sections={visibleSections} pathname={location.pathname} search={location.search} className="mx-6 mt-4" />
             {children}
           </main>
 

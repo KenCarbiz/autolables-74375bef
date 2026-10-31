@@ -126,22 +126,60 @@ describe("AppShell rail rendering", () => {
     expect(screen.getAllByRole("navigation", { name: "Primary" })).toHaveLength(1);
   });
 
-  it("marks exactly one rail leaf as aria-current for the active route", () => {
+  it("marks exactly one rail row as current for the active route", () => {
     renderShell("/inventory");
-    const current = primaryNav().querySelectorAll('[aria-current="page"]');
+    const current = primaryNav().querySelectorAll("[aria-current]");
     expect(current.length).toBe(1);
-    expect(current[0].textContent).toContain("Inventory");
-    // The Vehicles group is lit by its fill, not by a second current page.
-    const vehicles = within(primaryNav()).getByRole("link", { name: "Vehicles" });
-    expect(vehicles).toHaveAttribute("data-active", "true");
-    expect(vehicles).not.toHaveAttribute("aria-current");
+    expect(current[0]).toHaveAttribute("aria-current", "page");
+    expect(current[0].textContent).toContain("Vehicles");
+    expect(current[0]).toHaveAttribute("data-active", "true");
   });
 
-  it("lights the parent Inventory row on a nested vehicle-file route", () => {
+  it("lights the parent section on a nested vehicle-file route", () => {
     renderShell("/vehicle-file/abc-123");
-    const current = primaryNav().querySelectorAll('[aria-current="page"]');
+    const current = primaryNav().querySelectorAll("[aria-current]");
     expect(current.length).toBe(1);
-    expect(current[0].textContent).toContain("Inventory");
+    expect(current[0].textContent).toContain("Vehicles");
+  });
+
+  it.each([
+    ["/inventory-intelligence", "Vehicles"],
+    ["/queue", "Vehicles"],
+    ["/vehicle-file/abc-123", "Vehicles"],
+    ["/description-writer", "Merchandising"],
+    ["/print-queue", "Merchandising"],
+    ["/prep", "Get Ready"],
+    ["/recon", "Get Ready"],
+    ["/ready-board", "Get Ready"],
+    ["/service-desk", "Get Ready"],
+    ["/signed", "Customers & Deals"],
+    ["/invoices", "Customers & Deals"],
+    ["/leads", "Customers & Deals"],
+  ])("lights only the %s parent section: %s", (path, section) => {
+    renderShell(path);
+    const lit = Array.from(primaryNav().querySelectorAll('[data-active="true"]'));
+    expect(lit).toHaveLength(1);
+    expect(lit[0].textContent).toContain(section);
+    expect(lit[0]).toHaveAttribute("aria-current");
+  });
+
+  it.each([
+    ["/inventory", ["Inventory", "Inventory Intelligence", "Work Queue"]],
+    ["/queue", ["Inventory", "Inventory Intelligence", "Work Queue"]],
+    ["/window-sticker-studio", ["OEM Window Sticker Studio", "Description Operations", "Print Center"]],
+    ["/prep", ["Get Ready Command", "Service Writer Desk", "Service Desk", "Prep & Vendors", "Ready Board", "Recon Approvals"]],
+    ["/customers", ["Customers", "Deals", "Invoices"]],
+    ["/invoices", ["Customers", "Deals", "Invoices"]],
+  ])("links every former child of the section from the page at %s", (path, labels) => {
+    renderShell(path);
+    const tabs = screen.getByRole("navigation", { name: /pages$/ });
+    expect(Array.from(tabs.querySelectorAll("a")).map((a) => a.textContent?.replace(/\s*\([^)]*\)$/, ""))).toEqual(labels);
+    expect(within(primaryNav()).queryByRole("list", { name: /pages$/ })).toBeNull();
+  });
+
+  it("offers no section tabs on a single-screen section", () => {
+    renderShell("/compliance");
+    expect(screen.queryByRole("navigation", { name: /pages$/ })).toBeNull();
   });
 
   it("makes a single-leaf group its own current page", () => {
@@ -190,40 +228,35 @@ describe("AppShell rail rendering", () => {
     expect(within(primaryNav()).getByRole("link", { name: "Administration" })).toBeInTheDocument();
   });
 
-  it("shows a 99+ recon badge with an accessible count on the expanded leaf", () => {
+  it("shows a 99+ recon count on the section row and on the Recon Approvals tab", () => {
     renderShell("/recon");
     const rail = primaryNav();
     expect(within(rail).getByText("99+")).toBeInTheDocument();
-    expect(within(rail).getByText("150 recon approvals pending")).toHaveClass("sr-only");
-    expect(within(rail).getByRole("link", { name: /^Recon Approvals 150 recon approvals pending$/ })).toBeInTheDocument();
+    expect(within(rail).getByRole("link", { name: "Get Ready 150 pending in Get Ready" })).toHaveAttribute("href", "/get-ready-command");
+    expect(within(rail).queryByRole("link", { name: /Recon Approvals/ })).toBeNull();
+    expect(within(screen.getByRole("navigation", { name: "Get Ready pages" })).getByRole("link", { name: /^Recon Approvals/ })).toHaveAttribute("aria-current", "page");
   });
 
-  it("rolls a collapsed group's queue up onto the group row from the real count", () => {
+  it("rolls a section's queue up onto the section row from the real count", () => {
     renderShell("/dashboard");
     const rail = primaryNav();
-    expect(within(rail).queryByRole("link", { name: /Recon Approvals/ })).toBeNull();
     expect(within(rail).getByText("99+")).toBeInTheDocument();
     expect(within(rail).getByRole("link", { name: "Get Ready 150 pending in Get Ready" })).toHaveAttribute("href", "/get-ready-command");
   });
 
-  it("lists a group's leaves under it only while the group is active, without a false disclosure state", () => {
-    const first = renderShell("/dashboard");
-    let rail = primaryNav();
-    const collapsed = within(rail).getByRole("link", { name: /^Get Ready/ });
-    // Following the row opens its first page, so it is a link, not a toggle.
-    expect(collapsed).not.toHaveAttribute("aria-expanded");
-    expect(collapsed).not.toHaveAttribute("aria-controls");
-    expect(within(rail).queryByRole("link", { name: "Prep & Vendors" })).toBeNull();
-    for (const name of ["Today", "Compliance", "Reports", "Administration"]) {
-      expect(within(rail).getByRole("link", { name })).not.toHaveAttribute("aria-expanded");
+  it("never lists a section's pages in the rail, active or not, and carries no disclosure state", () => {
+    for (const path of ["/dashboard", "/prep"]) {
+      const view = renderShell(path);
+      const rail = primaryNav();
+      expect(within(rail).queryByRole("list", { name: /pages$/ })).toBeNull();
+      expect(within(rail).queryByRole("link", { name: "Prep & Vendors" })).toBeNull();
+      for (const name of ["Today", "Vehicles", "Get Ready", "Compliance", "Reports", "Administration"]) {
+        const link = within(rail).getByRole("link", { name: new RegExp(`^${name}`) });
+        expect(link).not.toHaveAttribute("aria-expanded");
+        expect(link).not.toHaveAttribute("aria-controls");
+      }
+      view.unmount();
     }
-    first.unmount();
-
-    renderShell("/prep");
-    rail = primaryNav();
-    const list = within(rail).getByRole("list", { name: "Get Ready pages" });
-    expect(hrefs(list)).toEqual(["/get-ready-command", "/service-desk", "/service", "/prep", "/ready-board", "/recon"]);
-    expect(within(list).getByRole("link", { name: "Prep & Vendors" })).toHaveAttribute("aria-current", "page");
   });
 
   it("names a one-leaf group after the page it opens", () => {
@@ -284,7 +317,7 @@ describe("AppShell rail rendering", () => {
     localStorage.setItem("sidebar_collapsed", "1");
     renderShell("/inventory");
     const rail = primaryNav();
-    expect(within(rail).getByText("Inventory")).toBeInTheDocument();
+    expect(within(rail).queryByText("Inventory")).toBeNull();
     expect(within(rail).getByText("Vehicles")).toBeInTheDocument();
   });
 

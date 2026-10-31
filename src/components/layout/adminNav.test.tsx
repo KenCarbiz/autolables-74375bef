@@ -241,6 +241,22 @@ describe("rail groups", () => {
     expect(narrow.filter((s) => isGroupExpanded(s, leaf))).toEqual([]);
   });
 
+  it("lights the owning section for every child route the rail no longer lists", () => {
+    const sections = filterNavSections(build(), allowAll);
+    const litAt = (pathname: string, search = "") => {
+      const leaf = findActiveNavItem(sections, pathname, search);
+      return sections.filter((s) => isGroupActive(s, leaf)).map((s) => s.key);
+    };
+    expect(litAt("/inventory-intelligence")).toEqual(["vehicles"]);
+    expect(litAt("/queue")).toEqual(["vehicles"]);
+    expect(litAt("/vehicle-file/abc")).toEqual(["vehicles"]);
+    expect(litAt("/get-ready-command")).toEqual(["getready"]);
+    expect(litAt("/prep")).toEqual(["getready"]);
+    expect(litAt("/recon")).toEqual(["getready"]);
+    expect(litAt("/invoices")).toEqual(["customers"]);
+    expect(litAt("/leads")).toEqual(["customers"]);
+  });
+
   it("rolls the real leaf counts up onto a group", () => {
     const getReady = build({ reconApprovals: 150 }).find((s) => s.key === "getready")!;
     expect(groupBadgeCount(getReady)).toBe(150);

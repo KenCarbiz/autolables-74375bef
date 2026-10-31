@@ -15,15 +15,14 @@ import {
   groupHref,
   groupLabel,
   isGroupActive,
-  isGroupExpanded,
   type AdminNavItem,
   type AdminNavSection,
 } from "@/components/layout/adminNav";
 
 // The global left rail, drawn to mock 01: a 229px navy column, the reverse
-// wordmark, one row per group and the Platform console pinned at the bottom.
+// wordmark, one row per section and the Platform console pinned at the bottom.
 // Presentational: it receives the already permission-filtered sections and the
-// current location, and decides only what is lit and what is expanded. The
+// current location, and decides only what is lit. The
 // mobile drawer is this same element translated off-canvas, so there is one
 // Primary navigation in the document at every width.
 
@@ -79,22 +78,6 @@ const CornerCount = ({ count }: { count: number | undefined }) => {
 const CountLabel = ({ count, label }: { count: number | undefined; label: string }) =>
   formatBadgeCount(count) ? <span className="sr-only">{` ${label}`}</span> : null;
 
-const LeafBadge = ({ count, label }: { count: number | undefined; label: string }) => {
-  const text = formatBadgeCount(count);
-  if (!text) return null;
-  return (
-    <>
-      <span
-        aria-hidden="true"
-        className="ml-auto hidden h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-white/15 px-1.5 text-[11px] font-semibold leading-none tabular-nums text-white"
-      >
-        {text}
-      </span>
-      <span className="sr-only">{` ${label}`}</span>
-    </>
-  );
-};
-
 const LeafGlyph = ({ item }: { item: AdminNavItem }) => {
   const Icon = item.icon;
   return item.assetIcon && ADMIN_ICON_PATHS[item.assetIcon]
@@ -146,22 +129,18 @@ export function AppRail({
     const tuning = GLYPH_TUNING[section.key] ?? {};
     const single = section.items.length === 1;
     const lit = isGroupActive(section, active);
-    const expanded = isGroupExpanded(section, active);
     const label = groupLabel(section);
-    // A collapsed group carries its leaves' real summed count so no queue is
-    // hidden; an expanded group shows each count on its own leaf instead.
-    const count = single ? section.items[0].badge : expanded ? undefined : groupBadgeCount(section);
+    const count = single ? section.items[0].badge : groupBadgeCount(section);
     const countLabel = single ? badgeAriaLabel(section.items[0].label, count ?? 0) : groupBadgeAriaLabel(section.title, count ?? 0);
     return (
       <div key={section.key} className="flex flex-col">
         <Link
           to={href}
           onClick={onNavigate}
-          // Only the matched leaf is the current page. A single-leaf group's
-          // row IS that leaf; a larger group shows its state by fill alone,
-          // and following it opens its first leaf, so it is a link and
-          // announces no expanded state.
-          aria-current={single && lit ? "page" : undefined}
+          // The rail lists sections only; child screens are reached from the
+          // section's own page. The row is current when the page is the one
+          // it opens, and otherwise marks the section the page belongs to.
+          aria-current={lit ? (active === section.items[0] ? "page" : "true") : undefined}
           data-active={lit ? "true" : undefined}
           className={cn(
             ROW,
@@ -177,30 +156,6 @@ export function AppRail({
           <span className="min-w-0 truncate">{label}</span>
           <CountLabel count={count} label={countLabel} />
         </Link>
-        {expanded && (
-          <ul id={`rail-group-${section.key}`} aria-label={`${section.title} pages`} className="flex flex-col gap-0.5 pb-1.5 pt-1">
-            {section.items.map((item) => {
-              const current = item === active;
-              return (
-                <li key={item.path}>
-                  <Link
-                    to={item.path}
-                    onClick={onNavigate}
-                    aria-current={current ? "page" : undefined}
-                    className={cn(
-                      ROW,
-                      "min-h-11 gap-2 py-1.5 pl-[61px] text-[12px] leading-4 lg:min-h-9",
-                      current ? "bg-white/[0.12] font-semibold" : "font-normal text-white/80 hover:bg-white/[0.06] hover:text-white",
-                    )}
-                  >
-                    <span className="min-w-0 break-words">{item.label}</span>
-                    <LeafBadge count={item.badge} label={badgeAriaLabel(item.label, item.badge ?? 0)} />
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
       </div>
     );
   };
