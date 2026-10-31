@@ -1,5 +1,8 @@
 import type { ConsoleFixture } from "@/lib/platformConsole/dataSource";
 import { OVERVIEW_FIXTURE } from "./overview";
+// builder B
+import { INCIDENT_FIXTURE, INCIDENT_PHONE_FIXTURE } from "./incident";
+// end builder B
 
 // Reference screen id -> the console path it renders and the synthetic data it
 // needs. Development-only: imported solely by ConsoleDesignFixture.
@@ -19,4 +22,8 @@ export const CONSOLE_FIXTURES: Record<string, ConsoleFixtureEntry> = {
   "D01-overview": { path: "/platform-console", frame: "desktop", fixture: base("D01-overview", { overview: OVERVIEW_FIXTURE }) },
   "T01-overview": { path: "/platform-console", frame: "tablet", fixture: base("T01-overview", { overview: OVERVIEW_FIXTURE }) },
   "M01-overview": { path: "/platform-console", frame: "phone", fixture: base("M01-overview", { overview: OVERVIEW_FIXTURE }) },
+  // builder B
+  "D16-incident": { path: "/platform-console/incidents/INC-028", frame: "desktop", fixture: base("D16-incident", { incident: INCIDENT_FIXTURE }) },
+  "M04-incident": { path: "/platform-console/incidents/INC-028", frame: "phone", fixture: base("M04-incident", { incident: INCIDENT_PHONE_FIXTURE }) },
+  // end builder B
 };
