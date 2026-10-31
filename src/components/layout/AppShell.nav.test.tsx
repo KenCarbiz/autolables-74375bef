@@ -66,6 +66,7 @@ vi.mock("@/integrations/supabase/client", () => {
 });
 
 import AppShell from "./AppShell";
+import { SectionLinksMenu } from "./SectionTabs";
 
 beforeAll(() => {
   // Radix and cmdk measure and scroll; jsdom does neither.
@@ -83,6 +84,15 @@ const renderShell = (route: string) =>
     <MemoryRouter initialEntries={[route]}>
       <AppShell>
         <div>content</div>
+      </AppShell>
+    </MemoryRouter>,
+  );
+
+const renderShellWithMenu = (route: string) =>
+  render(
+    <MemoryRouter initialEntries={[route]}>
+      <AppShell>
+        <SectionLinksMenu />
       </AppShell>
     </MemoryRouter>,
   );
@@ -168,16 +178,35 @@ describe("AppShell rail rendering", () => {
     ["/window-sticker-studio", ["Description Operations", "Print Center"]],
     ["/get-ready-command", ["Service Writer Desk", "Service Desk", "Prep & Vendors", "Ready Board", "Recon Approvals"]],
     ["/customers", ["Deals", "Invoices"]],
-  ])("links every other screen of the section from a text-link row on its landing page %s", (path, labels) => {
-    renderShell(path);
-    const tabs = screen.getByRole("navigation", { name: /pages$/ });
-    expect(Array.from(tabs.querySelectorAll("a")).map((a) => a.textContent?.replace(/\s*\([^)]*\)$/, ""))).toEqual(labels);
+  ])("links every other screen of the section from the header menu on its landing page %s", (path, labels) => {
+    renderShellWithMenu(path);
+    expect(screen.queryByRole("navigation", { name: /pages$/ })).toBeNull();
     expect(within(primaryNav()).queryByRole("list", { name: /pages$/ })).toBeNull();
+    const menu = openMenu(screen.getByRole("button", { name: "Related pages" }));
+    const items = within(menu).getAllByRole("menuitem");
+    expect(items.map((a) => a.textContent?.replace(/\s*\([^)]*\)$/, ""))).toEqual(labels);
+    items.forEach((a) => expect(a).toHaveAttribute("href"));
   });
 
-  it("offers no section tabs on a single-screen section", () => {
-    renderShell("/compliance");
-    expect(screen.queryByRole("navigation", { name: /pages$/ })).toBeNull();
+  it.each([
+    ["service_advisor", false, 5],
+    ["salesperson", false, 0],
+    ["detail", false, 0],
+  ])("lists only the section screens %s may open in the header menu", (role, isAdmin, count) => {
+    shellRole.value = role;
+    auth.isAdmin = isAdmin;
+    renderShellWithMenu("/get-ready-command");
+    const trigger = screen.queryByRole("button", { name: "Related pages" });
+    if (count === 0) {
+      expect(trigger).toBeNull();
+      return;
+    }
+    expect(within(openMenu(trigger!)).getAllByRole("menuitem")).toHaveLength(count);
+  });
+
+  it("offers no related-pages menu on a single-screen section", () => {
+    renderShellWithMenu("/compliance");
+    expect(screen.queryByRole("button", { name: "Related pages" })).toBeNull();
   });
 
   it("makes a single-leaf group its own current page", () => {

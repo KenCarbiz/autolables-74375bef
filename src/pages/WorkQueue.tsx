@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { format } from "date-fns";
+import { shortVehicle } from "@/lib/shortVehicle";
 import { useViewTransitionNavigate } from "@/lib/navigation";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -479,8 +480,8 @@ function HumanTaskRow({ item, currentUserId, previews, onOpen, onUpdate, selecte
         <input type="checkbox" aria-label={`Select ${item.title}`} checked={selected} disabled={external || item.status === "completed"} onChange={(e) => onSelect(e.target.checked)} className="h-4 w-4 accent-[#2457D6]" />
       </Td>
       <Td className="whitespace-nowrap text-adm-muted">{ageLabel(item.created_at)}</Td>
-      <Td className="max-w-[260px] truncate"><span title={vehicleLabel(item)}>{vehicleLabel(item)}</span></Td>
-      <Td className="max-w-[250px]">
+      <Td className="max-w-[200px] truncate whitespace-nowrap"><span title={vehicleLabel(item)}>{shortVehicle(vehicleLabel(item))}</span></Td>
+      <Td className="max-w-[380px]">
         <p className="truncate font-medium text-adm-ink" title={item.title}>
           {item.title}
           {urgent && item.priority && <StatusText tone="warning" className="ml-2">{item.priority.charAt(0).toUpperCase() + item.priority.slice(1)}</StatusText>}
@@ -523,8 +524,8 @@ function ExceptionRow({ item, onOpen, onDismiss }: {
     <tr className="h-12 hover:bg-adm-workspace" title={[copy.why, showDetail ? detail : ""].filter(Boolean).join(" ")}>
       <Td className="w-8"><input type="checkbox" aria-label="Exception rows are resolved from the vehicle" disabled className="h-4 w-4 accent-[#2457D6]" /></Td>
       <Td className="whitespace-nowrap text-adm-muted">{ageLabel(item.created_at)}</Td>
-      <Td className="max-w-[260px] truncate">{vehicleLabel(item)}{departed ? " (left the lot)" : ""}</Td>
-      <Td className="max-w-[250px]">
+      <Td className="max-w-[200px] truncate whitespace-nowrap" title={vehicleLabel(item)}>{shortVehicle(vehicleLabel(item))}{departed ? " (left the lot)" : ""}</Td>
+      <Td className="max-w-[380px]">
         <p className="truncate font-medium text-adm-ink" title={copy.label}>{copy.label}</p>
       </Td>
       <Td className="text-adm-muted">System</Td>

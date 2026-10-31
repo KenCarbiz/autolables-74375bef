@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { shortVehicle } from "@/lib/shortVehicle";
 import { MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import Seo from "@/components/Seo";
@@ -235,7 +236,7 @@ const InstallerInvoices = () => {
                 <Th>Vehicle</Th>
                 <Th>VIN</Th>
                 <Th className="whitespace-nowrap">Installer / Vendor</Th>
-                <Th>Work performed</Th>
+                <Th className="whitespace-nowrap">Work performed</Th>
                 <Th align="right">Amount</Th>
                 <Th>Status</Th>
                 <Th align="right">Actions</Th>
@@ -254,10 +255,10 @@ const InstallerInvoices = () => {
                     </Td>
                     <Td className="whitespace-nowrap" title={fmtDay(e.date)}>{fmtDay(e.date).replace(/,\s*\d{4}$/, "")}</Td>
                     <Td className="whitespace-nowrap">{e.derived.roNumber || "Unknown"}</Td>
-                    <Td className="max-w-[200px]"><span className="block truncate font-medium" title={e.derived.ymm || undefined}>{e.derived.ymm || "Vehicle"}</span></Td>
-                    <Td className="whitespace-nowrap font-mono text-[11px]">{e.derived.vin}</Td>
+                    <Td className="whitespace-nowrap"><span className="font-medium" title={e.derived.ymm || undefined}>{e.derived.ymm ? shortVehicle(e.derived.ymm) : "Vehicle"}</span></Td>
+                    <Td className="whitespace-nowrap font-mono text-[11px]" title={e.derived.vin || undefined}>{e.derived.vin ? `…${e.derived.vin.slice(-8)}` : ""}</Td>
                     <Td className="whitespace-nowrap">{installerOf(e.lines)}</Td>
-                    <Td className="max-w-[80px]"><span className="block truncate" title={workSummary(e.lines)}>{workSummary(e.lines)}</span></Td>
+                    <Td className="max-w-[200px]"><span className="block truncate" title={workSummary(e.lines)}>{workSummary(e.lines)}</span></Td>
                     <Td align="right" className="whitespace-nowrap">{money(e.total)}</Td>
                     <Td className="whitespace-nowrap">
                       <StatusText tone={e.tab === "paid" ? "success" : e.tab === "invoiced" ? "info" : "warning"}>{TAB_LABEL[e.tab]}</StatusText>

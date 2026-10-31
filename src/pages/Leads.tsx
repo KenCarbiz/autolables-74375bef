@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { shortVehicle } from "@/lib/shortVehicle";
+import { SectionLinksMenu } from "@/components/layout/SectionTabs";
 import { MoreHorizontal, Mail, Phone, Search, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -141,6 +143,7 @@ const Customers = () => {
 
       <PageHeader
         title="Customers"
+        actions={<SectionLinksMenu />}
       />
 
       {error && (
@@ -228,10 +231,10 @@ const Customers = () => {
                       </Link>
                     </Td>
                     <Td className="whitespace-nowrap text-[13px] text-adm-muted">{c.identified ? maskContact(c.email || c.phone) : "Not captured"}</Td>
-                    <Td className="max-w-[170px]"><span className="block truncate" title={c.vehicles[0]?.label}>{c.vehicles[0]?.label ?? "None attached"}</span></Td>
+                    <Td className="whitespace-nowrap"><span title={c.vehicles[0]?.label}>{c.vehicles[0]?.label ? shortVehicle(c.vehicles[0].label) : "None attached"}</span></Td>
                     <Td className="whitespace-nowrap">{c.assignedEmployee?.name ?? <span className="text-adm-muted">Unassigned</span>}</Td>
                     <Td className="whitespace-nowrap">{lastIntent(c) ?? <span className="text-adm-muted">None linked</span>}</Td>
-                    <Td className="max-w-[170px]"><span className="block truncate text-[14px] font-medium text-adm-primary" title={c.nextAction.headline}>{c.nextAction.headline}</span></Td>
+                    <Td className="max-w-[200px]"><span className="block truncate text-[14px] font-medium text-adm-primary" title={c.nextAction.headline}>{c.nextAction.headline}</span></Td>
                     <Td align="right" className="whitespace-nowrap text-adm-muted">{relativeTime(c.lastActivityAt)}</Td>
                     <Td align="right" className="w-10" >
                       <span onClick={(e) => e.stopPropagation()}>

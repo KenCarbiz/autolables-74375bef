@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { shortVehicle } from "@/lib/shortVehicle";
 import { MoreHorizontal, Search } from "lucide-react";
 import { toast } from "sonner";
 import Seo from "@/components/Seo";
@@ -204,15 +205,15 @@ const Deals = () => {
             <table className="w-full table-fixed text-left">
               <thead className="bg-adm-workspace">
                 <tr className="text-[12px] leading-[18px] text-adm-muted">
-                  <th className="font-semibold px-4 py-2.5 w-[7%]">Stock #</th>
+                  <th className="font-semibold px-3 py-2.5 w-[7%]">Stock #</th>
                   <th className="font-semibold py-2.5 w-[8%]">Deal #</th>
-                  <th className="font-semibold py-2.5 w-[20%]">Vehicle</th>
-                  <th className="font-semibold py-2.5 w-[11%]">Customer</th>
+                  <th className="font-semibold py-2.5 w-[17%]">Vehicle</th>
+                  <th className="font-semibold py-2.5 w-[12%]">Customer</th>
                   <th className="font-semibold py-2.5 w-[9%] text-right pr-4">Selling price</th>
-                  <th className="font-semibold py-2.5 w-[12%]">Document state</th>
+                  <th className="font-semibold py-2.5 w-[13%]">Document state</th>
                   <th className="font-semibold py-2.5 w-[11%]">Price integrity</th>
                   <th className="font-semibold py-2.5 pl-3 w-[4%]">Age</th>
-                  <th className="font-semibold py-2.5 w-[16%]">Next action</th>
+                  <th className="font-semibold py-2.5 w-[17%]">Next action</th>
                   <th className="font-semibold py-2.5 pr-3 w-[2%]"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
@@ -221,10 +222,10 @@ const Deals = () => {
                   const customer = deal.customerId ? customerById.get(deal.customerId) || null : null;
                   return (
                     <tr key={deal.id} className="h-14 border-t border-adm-border hover:bg-adm-workspace transition-colors">
-                      <td className="px-4 pr-3 text-[13px] text-adm-muted truncate">{deal.stock || "Unknown"}</td>
+                      <td className="px-3 pr-2 text-[13px] text-adm-muted truncate">{deal.stock || "Unknown"}</td>
                       <td className={`pr-3 text-[13px] truncate ${dealNumberOf(deal) === displayDealNumber(null) ? "text-adm-muted" : "text-adm-ink"}`} title={dealNumberOf(deal)}>{dealNumberOf(deal)}</td>
                       <td className="pr-3 text-[14px] truncate">
-                        <Link to={`/deals/${encodeURIComponent(deal.id)}`} className="font-medium text-adm-ink hover:text-adm-primary hover:underline">{deal.vehicleLabel}</Link>
+                        <Link to={`/deals/${encodeURIComponent(deal.id)}`} className="font-medium text-adm-ink hover:text-adm-primary hover:underline" title={deal.vehicleLabel}>{shortVehicle(deal.vehicleLabel)}</Link>
                       </td>
                       <td className="pr-3 text-[14px] text-adm-ink truncate">
                         {deal.customerName && deal.customerId

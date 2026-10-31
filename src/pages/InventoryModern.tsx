@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { deriveRecallView, recallScopeOfSource, type RecallRowInput } from "@/lib/vehicleTruth/recallView";
 import { useSearchParams } from "react-router-dom";
+import { useSectionLinks } from "@/components/layout/SectionTabs";
 import { useQueryClient } from "@tanstack/react-query";
 import { useViewTransitionNavigate } from "@/lib/navigation";
 import { useVinScan } from "@/contexts/VinScanContext";
@@ -516,6 +517,7 @@ const InventoryModern = () => {
     { key: "cpo", label: "CPO", to: "/inventory?condition=cpo", count: loading ? null : counts.cpoCount, active: condition === "cpo" },
   ];
 
+  const sectionLinks = useSectionLinks();
   const moreActions: KebabItem[] = [
     { label: showFilters ? "Hide filters and sort" : "Filter and sort", icon: Search, onClick: () => setShowFilters((v) => !v) },
     { label: "Scan VIN", icon: ScanLine, onClick: openScan },
@@ -525,6 +527,7 @@ const InventoryModern = () => {
     { label: "Check Market Prices", icon: CircleDollarSign, onClick: runMarketBatch, disabled: true, title: MARKET_BATCH_NOTICE },
     ...(settings.feature_price_verification ? [{ label: scraping ? "Verifying…" : "Verify Prices", icon: RefreshCw, onClick: runPriceScrape }] : []),
     { label: "CSV Import", icon: Upload, onClick: () => setShowImport(true) },
+    ...sectionLinks.map((l) => ({ label: l.count ? `${l.label} (${l.count})` : l.label, icon: ChevronRight, onClick: () => navigate(l.path) })),
   ];
 
   const below = counts.avgBelowMarket;

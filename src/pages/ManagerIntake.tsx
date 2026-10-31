@@ -1,5 +1,6 @@
 import { STATE_OWNER } from "@/lib/lifecycle/states";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { SectionLinksMenu } from "@/components/layout/SectionTabs";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -221,9 +222,12 @@ export default function ManagerIntake() {
       <PageHeader
         title="Manager Intake"
         actions={
-          <Button variant="primary" disabled={visible.length === 0} onClick={() => { setDrawer(visible.find((r) => picked.has(r.vehicleId)) ?? visible[0]); setReason(""); }}>
-            Review vehicle
-          </Button>
+          <>
+            <SectionLinksMenu />
+            <Button variant="primary" disabled={visible.length === 0} onClick={() => { setDrawer(visible.find((r) => picked.has(r.vehicleId)) ?? visible[0]); setReason(""); }}>
+              Review vehicle
+            </Button>
+          </>
         }
       />
 

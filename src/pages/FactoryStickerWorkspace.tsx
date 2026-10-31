@@ -433,7 +433,7 @@ export default function FactoryStickerWorkspace({
   const [rightTab, setRightTab] = useState<"details" | "technical">("details");
   const [showHistory, setShowHistory] = useState(false);
   const [scenario, setScenario] = useState<keyof typeof FIXTURE_SCENARIOS>("used");
-  const [zoom, setZoom] = useState<"fit" | number>(1);
+  const [zoom, setZoom] = useState<"fit" | number>("fit");
   const [fullscreen, setFullscreen] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [openingDoc, setOpeningDoc] = useState<string | null>(null);

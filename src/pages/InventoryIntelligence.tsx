@@ -264,14 +264,14 @@ export default function InventoryIntelligence() {
                     />
                   </Td>
                   <Td className="whitespace-nowrap font-mono text-[12px] text-adm-muted">{vehicleStockNumber(vehicle) ?? "Unknown"}</Td>
-                  <Td className="max-w-[200px] truncate whitespace-nowrap text-[13px] font-medium text-adm-ink" title={vehicle.ymm || undefined}>{vehicle.ymm || "Vehicle"}</Td>
-                  <Td className="whitespace-nowrap font-mono text-[11px] text-adm-muted">{vehicle.vin || "Unknown"}</Td>
+                  <Td className="max-w-[290px] truncate whitespace-nowrap text-[13px] font-medium text-adm-ink" title={vehicle.ymm || undefined}>{vehicle.ymm || "Vehicle"}</Td>
+                  <Td className="whitespace-nowrap font-mono text-[11px] text-adm-muted" title={vehicle.vin || undefined}>{vehicle.vin ? `…${vehicle.vin.slice(-8)}` : "Unknown"}</Td>
                   <Td><Stage stage={intel.sourceStage} /></Td>
                   {COLUMNS.map((c) => {
                     const f = c.ids.map((id) => intel.families.find((x) => x.family === id)).find((x) => x && x.stage !== "Not Applicable") ?? intel.families.find((x) => x.family === c.ids[0]);
                     return <Td key={c.key}>{f ? <Stage stage={f.stage} /> : null}</Td>;
                   })}
-                  <Td className="max-w-[170px]">
+                  <Td className="max-w-[140px]">
                     {intel.blocker
                       ? <span className="block truncate text-[13px] font-medium text-adm-warning" title={intel.blocker}>{intel.blocker}</span>
                       : <span className="text-[12px] text-adm-muted">None</span>}

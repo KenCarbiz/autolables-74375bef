@@ -215,12 +215,12 @@ export const PlatformTenants = () => {
           <AdminTable caption="Tenants" className="[&_table]:table-fixed [&_th]:!px-2 [&_td]:!px-2">
             <colgroup>
               <col />
-              <col className="w-[96px]" />
-              <col className="w-[96px]" />
-              <col className="w-[72px]" />
-              {isAdmin && <col className="w-[72px]" />}
+              <col className="w-[88px]" />
+              <col className="w-[78px]" />
+              <col className="w-[64px]" />
+              {isAdmin && <col className="w-[64px]" />}
               <col className="w-[112px]" />
-              <col className="w-[84px]" />
+              <col className="w-[72px]" />
               <col className="w-[48px]" />
             </colgroup>
             <thead>

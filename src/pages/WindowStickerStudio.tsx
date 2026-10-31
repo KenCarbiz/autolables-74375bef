@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { SectionLinksMenu } from "@/components/layout/SectionTabs";
 import { toast } from "sonner";
 import {
   AlertTriangle, ArrowRight, Check, ExternalLink, FileText, Loader2,
@@ -344,7 +345,7 @@ export default function WindowStickerStudio() {
       <PageHeader
         title="Window Sticker Studio"
         description="Create and publish factory window stickers for your inventory."
-        actions={tab === "history" ? <Button onClick={() => setTab("create")}>Back to studio</Button> : undefined}
+        actions={<>{tab === "history" && <Button onClick={() => setTab("create")}>Back to studio</Button>}<SectionLinksMenu /></>}
       />
 
       {tab === "create" && (
