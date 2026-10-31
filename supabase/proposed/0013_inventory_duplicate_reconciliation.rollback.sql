@@ -279,11 +279,11 @@ DROP FUNCTION IF EXISTS public.inv_dedupe_state(uuid[], uuid);
 DROP FUNCTION IF EXISTS public.inv_dedupe_dependencies(uuid);
 DROP FUNCTION IF EXISTS public.inv_dedupe_listing_view(uuid);
 
--- The wider conflict kind stays while archived_listing rows exist, so their
+-- The wider conflict kinds stay while archived_listing or reconciled_listing_unresolved rows exist, so their
 -- history remains valid.
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM public.inventory_vin_conflicts WHERE kind = 'archived_listing') THEN
+  IF NOT EXISTS (SELECT 1 FROM public.inventory_vin_conflicts WHERE kind IN ('archived_listing', 'reconciled_listing_unresolved')) THEN
     ALTER TABLE public.inventory_vin_conflicts DROP CONSTRAINT IF EXISTS inventory_vin_conflicts_kind_check;
     ALTER TABLE public.inventory_vin_conflicts ADD CONSTRAINT inventory_vin_conflicts_kind_check CHECK (kind IN ('other_store','legacy_listing','other_store_listing'));
   END IF;

@@ -185,6 +185,17 @@ SELECT pg_temp.expect((SELECT (j->>'listings_created')::int = 0 FROM k WHERE nam
 SELECT pg_temp.expect((SELECT status = 'archived' FROM vehicle_listings WHERE id = pg_temp.id('imp6')) AND (SELECT listing_id = pg_temp.id('est6') FROM store_inventory WHERE id = pg_temp.id('inv6')), 'the reimport keeps the duplicate archived and the link canonical');
 SELECT pg_temp.expect((SELECT count(*) FROM vehicle_listings WHERE vin = pg_temp.v(6)) = 2, 'no third listing appears for the VIN');
 
+-- B4b: a reconciled listing whose alias chain is broken is held, never recreated.
+SELECT pg_temp.listing('brk40', '00000000-0000-0000-0000-0000000000d1', pg_temp.v(40), 'archived', '00000000-0000-0000-0000-0000000005a1');
+SELECT set_config('app.inventory_writer', 'inventory_reconcile', false);
+UPDATE vehicle_listings SET reconciled_into_listing_id = pg_temp.id('est6'), archive_reason = 'duplicate_reconciled' WHERE id = pg_temp.id('brk40');
+SELECT set_config('app.inventory_writer', '', false);
+INSERT INTO k VALUES ('snapBrk', pg_temp.snap('00000000-0000-0000-0000-0000000005a1', '00000000-0000-0000-0000-0000000006a1', 'DD1_inventory', ARRAY[pg_temp.v(40)], 3), NULL);
+UPDATE k SET j = inventory_apply_store_snapshot(id) WHERE name = 'snapBrk';
+SELECT pg_temp.expect((SELECT (j->>'listings_created')::int = 0 AND (j->>'listings_updated')::int = 0 FROM k WHERE name = 'snapBrk'), 'a broken alias chain creates and updates no listing');
+SELECT pg_temp.expect(EXISTS (SELECT 1 FROM inventory_vin_conflicts WHERE vin = pg_temp.v(40) AND kind = 'reconciled_listing_unresolved' AND existing_listing_id = pg_temp.id('brk40') AND status = 'open'), 'a broken alias chain is recorded as an unresolved reconciled-listing conflict');
+SELECT pg_temp.expect((SELECT count(*) FROM vehicle_listings WHERE vin = pg_temp.v(40)) = 1 AND (SELECT status = 'archived' FROM vehicle_listings WHERE id = pg_temp.id('brk40')), 'the reconciled listing stays archived and no duplicate appears');
+
 -- B5: stale preview.
 SELECT pg_temp.listing('est7', '00000000-0000-0000-0000-0000000000d1', pg_temp.v(7), 'published', '00000000-0000-0000-0000-0000000005a1');
 SELECT pg_temp.listing('imp7', '00000000-0000-0000-0000-0000000000d1', pg_temp.v(7), 'draft', '00000000-0000-0000-0000-0000000005a1', jsonb_build_object('feed_source', 'filescom', 'created_at', now()));

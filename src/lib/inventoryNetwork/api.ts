@@ -56,7 +56,7 @@ export interface StoreInventoryRow {
 }
 
 export interface InventoryVinConflict {
-  id: string; group_id: string; vin: string; kind: "other_store" | "legacy_listing" | "other_store_listing";
+  id: string; group_id: string; vin: string; kind: "other_store" | "legacy_listing" | "other_store_listing" | "archived_listing" | "reconciled_listing_unresolved";
   claiming_store_id: string; existing_store_id: string | null; existing_inventory_id: string | null; existing_listing_id: string | null;
   snapshot_id: string | null; status: "open" | "transferred" | "adopted" | "dismissed";
   first_seen_at: string; last_seen_at: string; resolved_at: string | null; note: string | null;

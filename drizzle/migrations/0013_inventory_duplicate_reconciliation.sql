@@ -33,13 +33,17 @@ CREATE INDEX IF NOT EXISTS idx_vehicle_listings_reconciled_into ON public.vehicl
 
 ALTER TABLE public.inventory_vin_conflicts DROP CONSTRAINT IF EXISTS inventory_vin_conflicts_kind_check;
 ALTER TABLE public.inventory_vin_conflicts ADD CONSTRAINT inventory_vin_conflicts_kind_check
-  CHECK (kind IN ('other_store','legacy_listing','other_store_listing','archived_listing'));
+  CHECK (kind IN ('other_store','legacy_listing','other_store_listing','archived_listing','reconciled_listing_unresolved'));
 
 CREATE OR REPLACE FUNCTION public.inv_dedupe_norm_vin(p text) RETURNS text
 LANGUAGE sql IMMUTABLE AS $$ SELECT NULLIF(upper(trim(p)), '') $$;
 
 -- Shared by the feed apply and reconciliation so they never interleave on one
--- tenant + VIN.
+-- tenant + VIN. Lock order rule, to avoid deadlocks with the feed apply (which
+-- takes these locks in snapshot row_number order and holds them to commit):
+-- take this advisory lock BEFORE any row lock on vehicle_listings or
+-- store_inventory, and hold at most one VIN per transaction. A caller that
+-- ever needs several VINs in one transaction must lock them in sorted VIN order.
 CREATE OR REPLACE FUNCTION public.inv_dedupe_lock(p_tenant_id uuid, p_vin text) RETURNS void
 LANGUAGE sql VOLATILE AS $$ SELECT pg_advisory_xact_lock(hashtextextended('inv_listing:' || p_tenant_id::text || ':' || upper(trim(p_vin)), 0)) $$;
 
@@ -1177,6 +1181,7 @@ DECLARE
   v_photos jsonb;
   v_live integer := 0; v_absent integer := 0; v_allowed integer := 0; v_absence_counted boolean := false; v_shrink_held boolean := false;
   v_canonical uuid;
+  v_alias_id uuid;
 BEGIN
   SELECT * INTO s FROM inventory_store_snapshots WHERE id = p_snapshot_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'snapshot_not_found'; END IF;
@@ -1220,6 +1225,8 @@ BEGIN
 
   FOR v IN SELECT * FROM inventory_snapshot_vehicles WHERE snapshot_id = s.id ORDER BY row_number LOOP
     v_photos := COALESCE(v.photos, '[]'::jsonb);
+    -- Before any row lock for this VIN (see inv_dedupe_lock).
+    PERFORM inv_dedupe_lock(st.tenant_id, v.vin);
     SELECT * INTO cur FROM store_inventory WHERE store_id = st.id AND vin = v.vin FOR UPDATE;
     IF cur.id IS NULL OR cur.presence IN ('retired','transferred') THEN
       SELECT * INTO other FROM store_inventory WHERE group_id = st.group_id AND vin = v.vin AND store_id <> st.id AND presence NOT IN ('retired','transferred');
@@ -1269,7 +1276,7 @@ BEGIN
 
     -- Optional: the store's own AutoLabels working listing (subscribed stores).
     IF st.listing_sync_enabled THEN
-      PERFORM inv_dedupe_lock(st.tenant_id, v.vin);
+      v_alias_id := NULL;
       v_ymm := NULLIF(trim(concat_ws(' ', v.year::text, v.make, v.model)), '');
       SELECT id, owning_store_id, inventory_record_id, status, reconciled_into_listing_id INTO lst FROM vehicle_listings
        WHERE tenant_id = st.tenant_id AND upper(trim(vin)) = v.vin
@@ -1277,11 +1284,20 @@ BEGIN
       -- A reconciled duplicate resolves to its canonical listing, so a reimport
       -- or delayed job never revives or recreates it.
       IF lst.id IS NOT NULL AND lst.reconciled_into_listing_id IS NOT NULL THEN
+        v_alias_id := lst.id;
         v_canonical := inv_dedupe_resolve_listing(lst.id);
         lst := NULL;
         SELECT id, owning_store_id, inventory_record_id, status, reconciled_into_listing_id INTO lst FROM vehicle_listings WHERE id = v_canonical FOR UPDATE;
       END IF;
-      IF lst.id IS NULL THEN
+      IF v_alias_id IS NOT NULL AND (lst.id IS NULL OR lst.reconciled_into_listing_id IS NOT NULL) THEN
+        -- The alias chain is broken, too long or points at a missing listing.
+        -- Creating a listing here would recreate the duplicate, so skip the
+        -- listing step and leave it for a person.
+        INSERT INTO inventory_vin_conflicts (group_id, vin, kind, claiming_store_id, existing_store_id, existing_listing_id, existing_inventory_id, snapshot_id)
+        VALUES (st.group_id, v.vin, 'reconciled_listing_unresolved', st.id, NULL, v_alias_id, v_inv_id, s.id)
+        ON CONFLICT (group_id, vin, claiming_store_id, kind) WHERE status = 'open' DO UPDATE SET last_seen_at = now(), snapshot_id = EXCLUDED.snapshot_id;
+        v_conflicts := v_conflicts + 1;
+      ELSIF lst.id IS NULL THEN
         INSERT INTO vehicle_listings (tenant_id, store_id, owning_store_id, inventory_record_id, vin, slug, ymm, trim, mileage, condition, price,
           status, sticker_snapshot, feed_source, photos, photo_count, hero_image_url, features)
         VALUES (st.tenant_id, st.tenant_id::text, st.id, v_inv_id, v.vin, lower(v.vin) || '-' || substr(md5(random()::text || clock_timestamp()::text), 1, 6),
