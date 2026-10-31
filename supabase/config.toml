@@ -87,3 +87,8 @@ verify_jwt = true
 # src/lib/market/... guards and supabase/functions/_shared/functionAuth.ts.
 [functions.market-valuation-write]
 verify_jwt = false
+
+# files-inventory-notify receives Files.com folder webhooks, which carry no
+# Supabase JWT. Authentication is the X-Files-Signature-V2 HMAC in the handler.
+[functions.files-inventory-notify]
+verify_jwt = false
