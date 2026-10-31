@@ -22,6 +22,19 @@ export const CONSOLE_ROUTES: { pattern: string; view: View }[] = [
   { pattern: `${CONSOLE_BASE}/reliability`, view: lazy(() => import("./views/ReliabilityView")) },
   { pattern: `${CONSOLE_BASE}/reliability/monitoring`, view: lazy(() => import("./views/MonitoringView")) },
   // end builder B
+  // builder A
+  { pattern: `${CONSOLE_BASE}/stores`, view: lazy(() => import("./views/StoresView")) },
+  { pattern: `${CONSOLE_BASE}/stores/:storeId`, view: lazy(() => import("./views/StoreView")) },
+  { pattern: `${CONSOLE_BASE}/connections`, view: lazy(() => import("./views/ConnectionsView")) },
+  { pattern: `${CONSOLE_BASE}/connections/files-com`, view: lazy(() => import("./views/FilesComView")) },
+  { pattern: `${CONSOLE_BASE}/connections/mapping`, view: lazy(() => import("./views/MappingView")) },
+  { pattern: `${CONSOLE_BASE}/actions/:actionId`, view: lazy(() => import("./views/ActionView")) },
+  { pattern: `${CONSOLE_BASE}/data`, view: lazy(() => import("./views/FeedsView")) },
+  { pattern: `${CONSOLE_BASE}/data/imports/:importId`, view: lazy(() => import("./views/ImportView")) },
+  { pattern: `${CONSOLE_BASE}/data/quality`, view: lazy(() => import("./views/QualityView")) },
+  { pattern: `${CONSOLE_BASE}/data/vehicles/:vehicleId`, view: lazy(() => import("./views/LineageView")) },
+  { pattern: `${CONSOLE_BASE}/data/ratings`, view: lazy(() => import("./views/RatingsView")) },
+  // end builder A
 ];
 
 export function matchConsoleRoute(path: string) {

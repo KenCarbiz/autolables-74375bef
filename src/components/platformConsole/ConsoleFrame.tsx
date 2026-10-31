@@ -41,13 +41,13 @@ function SectionNav() {
 }
 
 /** Phone/tablet: labelled section selector instead of a squeezed tab row. */
-function SectionSelect({ scope }: { scope: string }) {
+function SectionSelect({ scope, compact }: { scope: string; compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const pathname = useConsolePath();
   const active = sectionForPath(pathname);
   const listId = useId();
   return (
-    <div className="mt-[14px] md:hidden">
+    <div className={cn("mt-[14px]", !compact && "md:hidden")}>
       <button
         type="button"
         aria-expanded={open}
@@ -89,24 +89,26 @@ export interface ConsoleFrameProps {
   scope?: string;
   /** Breadcrumb trail for detail pages. */
   breadcrumbs?: { label: string; to: string }[];
+  /** Use the phone layout above the md breakpoint too (tablet references drawn as stacked cards). */
+  compact?: boolean;
 }
 
-export function ConsoleFrame({ title, subtitle, children, onRefresh, refreshing, scope = "Production · All authorized stores", breadcrumbs }: ConsoleFrameProps) {
+export function ConsoleFrame({ title, subtitle, children, onRefresh, refreshing, scope = "Production · All authorized stores", breadcrumbs, compact }: ConsoleFrameProps) {
   const fixture = useConsoleFixture();
   return (
-    <div data-platform-console className="min-h-full bg-[#F4F6F9] px-4 pb-10 pt-[18px] text-[#132A42] md:px-8 md:pt-[14px]">
+    <div data-platform-console className={cn("min-h-full bg-[#F4F6F9] px-4 pb-10 pt-[18px] text-[#132A42]", !compact && "md:px-8 md:pt-[14px]")}>
       {breadcrumbs && breadcrumbs.length > 0 && (
         <nav aria-label="Breadcrumb" className="sr-only">
           <ol>{breadcrumbs.map((b) => <li key={b.to}><Link to={b.to}>{b.label}</Link></li>)}</ol>
         </nav>
       )}
-      <p className="text-[11px] font-bold uppercase tracking-[0.04em] text-[#52677C] md:hidden">Platform console{fixture ? " · Design fixture" : ""}</p>
+      <p className={cn("text-[11px] font-bold uppercase tracking-[0.04em] text-[#52677C]", !compact && "md:hidden")}>Platform console{fixture ? " · Design fixture" : ""}</p>
       <header className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="mt-[6px] text-[26px] font-bold leading-[34px] md:mt-[4px] md:text-[28px] md:leading-[40px]">{title}</h1>
-          <p className="mt-[3px] hidden text-[13px] leading-[18px] text-[#52677C] md:block">{subtitle}</p>
+          <h1 className={cn("mt-[6px] text-[26px] font-bold leading-[34px]", !compact && "md:mt-[4px] md:text-[28px] md:leading-[40px]")}>{title}</h1>
+          <p className={cn("mt-[3px] hidden text-[13px] leading-[18px] text-[#52677C]", !compact && "md:block")}>{subtitle}</p>
         </div>
-        <div className="hidden shrink-0 items-start gap-[12px] md:flex">
+        <div className={cn("hidden shrink-0 items-start gap-[12px]", !compact && "md:flex")}>
           <span className="mt-[7px] inline-flex h-[26px] items-center rounded-[4px] bg-[#F4F6F9] px-[10px] text-[12px] font-bold text-[#075BE8]">{fixture?.environment ?? ENVIRONMENT_LABEL}</span>
           <button
             type="button"
@@ -120,10 +122,10 @@ export function ConsoleFrame({ title, subtitle, children, onRefresh, refreshing,
           </button>
         </div>
       </header>
-      <SectionSelect scope={scope} />
-      <SectionNav />
-      {fixture && <div className="hidden md:block"><FixtureBanner /></div>}
-      <div className="mt-4 flex flex-col gap-[22px] md:mt-5">{children}</div>
+      <SectionSelect scope={scope} compact={compact} />
+      {!compact && <SectionNav />}
+      {fixture && !compact && <div className="hidden md:block"><FixtureBanner /></div>}
+      <div className={cn("mt-4 flex flex-col gap-[22px]", !compact && "md:mt-5")}>{children}</div>
     </div>
   );
 }
