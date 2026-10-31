@@ -30,7 +30,7 @@ export const IdentityStrip = ({ vehicle, facts, tag }: { vehicle: VehicleRow; fa
           </p>
         </div>
       </div>
-      <dl className="grid min-w-0 flex-1 grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4 lg:grid-cols-[repeat(3,auto)_minmax(0,1fr)] lg:border-l lg:border-adm-border lg:pl-6">
+      <dl className="grid min-w-0 flex-1 grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4 lg:grid-flow-col lg:auto-cols-fr lg:border-l lg:border-adm-border lg:pl-6">
         {facts.map((f) => (
           <div key={f.label} className="min-w-0">
             <dt className="text-[12px] leading-[18px] text-adm-muted">{f.label}</dt>

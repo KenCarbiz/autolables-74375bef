@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { MoreVertical } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { PageHeader } from "@/components/product";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -207,9 +209,9 @@ const qaTone = (s: string | null | undefined): Tone => (s === "PASS" ? "pass" : 
 const qaLabel = (s: string | null | undefined): string => (s === "PASS" ? "Passed" : s === "FAIL" ? "Failed" : "Not run");
 
 const StatusRow = ({ label, value, tone }: { label: string; value: React.ReactNode; tone?: Tone }) => (
-  <div className="flex items-center justify-between gap-2 py-1.5 border-b border-border/60 last:border-0">
+  <div className="grid grid-cols-[132px_minmax(0,1fr)] items-center gap-3 py-1.5 border-b border-border/60 last:border-0">
     <span className="text-[13px] leading-[18px] text-adm-muted">{label}</span>
-    {tone ? <Badge tone={tone}>{value}</Badge> : <span className="text-[13px] leading-[18px] font-semibold text-adm-ink text-right">{value}</span>}
+    {tone ? <span className="justify-self-start"><Badge tone={tone}>{value}</Badge></span> : <span className="text-[13px] leading-[18px] font-semibold text-adm-ink">{value}</span>}
   </div>
 );
 
@@ -728,6 +730,18 @@ export default function FactoryStickerWorkspace({
             <span className="inline-flex items-center gap-2">
               <Badge tone={genStatus ? GEN_STATUS_TONE[genStatus] || "off" : "off"}>{genStatus ? humanize(genStatus) : "Not generated"}</Badge>
               {currentDoc ? <span>{`v${currentDoc.version}`}</span> : null}
+              {vehicle && !embedded && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger className="inline-flex h-8 w-8 items-center justify-center rounded-[6px] text-adm-ink hover:bg-adm-workspace" aria-label="More actions">
+                    <MoreVertical className="w-5 h-5" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52">
+                    <DropdownMenuItem asChild><Link to={`/vehicle-file/${vehicle.id}`}>Open vehicle file</Link></DropdownMenuItem>
+                    {record?.passport_slug && <DropdownMenuItem asChild><a href={`/v/${record.passport_slug}`} target="_blank" rel="noreferrer">View on Passport</a></DropdownMenuItem>}
+                    {pdfUrl && <DropdownMenuItem asChild><a href={pdfUrl} download target="_blank" rel="noreferrer">Download PDF</a></DropdownMenuItem>}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </span>
           ) : undefined}
           actions={

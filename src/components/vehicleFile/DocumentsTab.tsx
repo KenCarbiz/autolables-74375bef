@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronRight, FilePlus2, Printer } from "lucide-react";
+import { ChevronRight, FilePlus2, MoreHorizontal, Printer } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { resolveOperatingState } from "@/lib/dealerState";
@@ -191,9 +192,25 @@ export const DocumentsTab = ({ vehicle, onReload }: { vehicle: VehicleRow; onRel
         title="Vehicle documents"
         description={`Manage documents for ${vehicle.ymm || vehicle.vin}${vehicleStockNumber(vehicle) ? ` (Stock # ${vehicleStockNumber(vehicle)})` : ""}`}
         actions={
-          <Button variant="primary" onClick={() => setPicker((v) => !v)} aria-expanded={picker}>
-            <FilePlus2 className="w-5 h-5" /> Generate document
-          </Button>
+          <>
+            <Button variant="primary" onClick={() => setPicker((v) => !v)} aria-expanded={picker}>
+              <FilePlus2 className="w-5 h-5" /> Generate document
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className="inline-flex h-10 w-10 items-center justify-center rounded-[6px] border border-adm-border bg-adm-surface text-adm-ink hover:bg-adm-workspace transition-colors"
+                aria-label="More document actions"
+              >
+                <MoreHorizontal className="w-5 h-5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-60">
+                <DropdownMenuItem onSelect={() => scrollTo(SECTION_IDS.oem)}>Factory build record</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => scrollTo(SECTION_IDS.forms)}>Deal forms</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => scrollTo(SECTION_IDS.uploads)}>Uploaded documents</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => scrollTo(SECTION_IDS.generated)}>Versions and print history</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
         }
       />
 

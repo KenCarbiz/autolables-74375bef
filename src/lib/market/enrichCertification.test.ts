@@ -113,10 +113,14 @@ describe("the single-writer boundary survives the change", () => {
   it("keeps every other enrichment field assigned exactly as before", () => {
     for (const field of [
       "patch.comparables", "patch.group_similar", "patch.market_meta",
-      "patch.history_payload", "patch.in_service_date", "patch.blackbook",
+      "patch.history_payload", "patch.blackbook",
     ]) {
       expect(code, field).toContain(field);
     }
+  });
+
+  it("never writes a listing-history date as the in-service date", () => {
+    expect(code).not.toContain("patch.in_service_date");
   });
 });
 

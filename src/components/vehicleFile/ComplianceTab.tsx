@@ -2,7 +2,8 @@ import { useState } from "react";
 import { deriveRecallView } from "@/lib/vehicleTruth/recallView";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { AlertTriangle, CheckCircle2, CircleAlert, FolderCheck, ShieldCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, CircleAlert, FolderCheck, MoreHorizontal, ShieldCheck } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { InstallProofList } from "@/components/admin/InstallProofList";
 import DeliverySignoffs from "@/components/vehicle/DeliverySignoffs";
 import TitleMcoPanel from "@/components/vehicle/TitleMcoPanel";
@@ -108,6 +109,7 @@ export const ComplianceTab = ({ vehicle, ready, recall, lifecycle, onReload }: {
   recall: ReturnType<typeof useRecallTask>;
   onReload: () => void;
 }) => {
+  const navigate = useNavigate();
   const { tier } = useEntitlements();
   const titleVerifyEnabled = tier("autolabels") === "compliance_pro";
   const signatures = useVehicleSignatures(vehicle.vin);
@@ -240,9 +242,23 @@ export const ComplianceTab = ({ vehicle, ready, recall, lifecycle, onReload }: {
         description="Review compliance status and resolve any blockers."
         strip={strip}
         actions={
-          <Button variant="primary" onClick={() => document.getElementById("vf-compliance-blockers")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
-            Review blocker
-          </Button>
+          <>
+            <Button variant="primary" onClick={() => document.getElementById("vf-compliance-blockers")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+              Review blocker
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className="inline-flex h-10 w-10 items-center justify-center rounded-[6px] border border-adm-border bg-adm-surface text-adm-ink hover:bg-adm-workspace transition-colors"
+                aria-label="More compliance actions"
+              >
+                <MoreHorizontal className="w-5 h-5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-60">
+                <DropdownMenuItem disabled={building || events.length === 0} onSelect={() => void buildPacket()}>Build VIN defense packet</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => navigate(`/vehicle-file/${vehicle.id}?tab=documents`)}>Open vehicle documents</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
         }
       />
 

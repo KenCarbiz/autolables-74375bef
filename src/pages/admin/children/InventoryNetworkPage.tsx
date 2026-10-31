@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ChildPageFrame } from "@/components/admin/v2/AdminShell";
 import { Button, EmptyState, InlineNote, LocalTabs, Panel, SkeletonBlock, StatusText } from "@/components/product";
 import { getOverview, listGroups, explainError, type StoreDraft } from "@/lib/inventoryNetwork/api";
+import { NetIcon, type NetIconName } from "@/components/inventoryNetwork/icons";
 import { NetProvider, SelectField, VIEW_PATH, type Notice, type View } from "./inventoryNetwork/shared";
 import OverviewSection from "./inventoryNetwork/OverviewSection";
 import StoresSection from "./inventoryNetwork/StoresSection";
@@ -16,6 +17,11 @@ import PreviewSection from "./inventoryNetwork/PreviewSection";
 import PilotSection from "./inventoryNetwork/PilotSection";
 import CatalogSection from "./inventoryNetwork/CatalogSection";
 import DeliveriesSection from "./inventoryNetwork/DeliveriesSection";
+
+const VIEW_ICON: Record<View, NetIconName> = {
+  overview: "health", stores: "store", sharing: "sharing", marketcheck: "marketcheck", mapping: "mapping", runs: "audit", preview: "homeStore",
+  pilot: "budget", catalog: "spend", deliveries: "schedule",
+};
 
 const VIEWS: Array<{ key: View; label: string }> = [
   { key: "overview", label: "Group overview" },
@@ -93,7 +99,7 @@ export default function InventoryNetworkPage() {
 
         {groupId && (
           <>
-            <LocalTabs label="Inventory network sections" tabs={VIEWS.map((v) => ({ key: v.key, label: v.label, to: href(v.key), active: view === v.key }))} />
+            <LocalTabs label="Inventory network sections" tabs={VIEWS.map((v) => ({ key: v.key, label: <span className="inline-flex items-center gap-1.5"><NetIcon name={VIEW_ICON[v.key]} />{v.label}</span>, to: href(v.key), active: view === v.key }))} />
             {overview.isLoading && <SkeletonBlock className="h-64 w-full" />}
             {overview.isError && <InlineNote tone="danger" title="Could not load this group" action={<Button size="sm" onClick={() => overview.refetch()}>Retry</Button>}>{explainError(overview.error)}</InlineNote>}
             {overview.isSuccess && !ctx && <Panel><EmptyState title="Nothing came back for this group" detail="Reload the page. If it keeps happening the group may have been removed." compact /></Panel>}

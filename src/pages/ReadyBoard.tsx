@@ -444,7 +444,7 @@ export default function ReadyBoard() {
                     </Td>
                     <Td align="right">
                       <span className="inline-flex items-center gap-3">
-                      <button type="button" className="text-[14px] font-medium text-adm-primary hover:underline" onClick={() => navigate(`/vehicle-file/${r.id}`)}>View</button>
+                      <Button size="sm" onClick={() => navigate(`/vehicle-file/${r.id}`)}>View</Button>
                       <DropdownMenu>
                         <DropdownMenuTrigger aria-label={`More actions for ${r.ymm || r.vin}`} className="rounded-[6px] p-1 text-adm-muted hover:bg-adm-workspace">
                           <MoreHorizontal className="h-5 w-5" aria-hidden="true" />

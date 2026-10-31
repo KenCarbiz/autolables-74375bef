@@ -139,11 +139,15 @@ export function buildBuyerRecommendation(
     };
   }
 
-  const score = input.vehicleScore?.applicable ? input.vehicleScore.score : null;
+  // Only a score that meets the public evidence minimum can carry a
+  // recommendation; a provisional partial-file score is internal.
+  const vs = input.vehicleScore;
+  const score = vs?.applicable && vs.publication === "eligible" ? vs.score : null;
   const confidence = input.dataConfidence?.level ?? null;
   if (score == null || confidence == null || confidence === "limited") {
     const r: string[] = [];
-    if (score == null) r.push("The Vehicle Score could not be assessed from verified evidence");
+    if (score == null && vs?.applicable && vs.publication === "provisional") r.push("The Vehicle Score is provisional: required evidence is missing");
+    else if (score == null) r.push("The Vehicle Score could not be assessed from verified evidence");
     if (confidence == null) r.push("Data Confidence has not been assessed");
     else if (confidence === "limited") r.push("Data Confidence is limited");
     for (const reason of input.dataConfidence?.reasons ?? []) r.push(reason);

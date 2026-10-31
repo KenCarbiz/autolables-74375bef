@@ -55,6 +55,19 @@ const clientIp = (req: Request) =>
   req.headers.get("x-real-ip") ||
   "unknown";
 
+// Dates the listing history can produce. A stored in-service date equal to
+// one of them was inferred from advertising, not recorded at delivery.
+function verifiedInServiceDate(stored: unknown, history: unknown): string | null {
+  const day = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 10) : null);
+  const date = day(stored);
+  if (!date) return null;
+  const h = (history && typeof history === "object" ? history : {}) as Record<string, unknown>;
+  const proxies = new Set<string>();
+  for (const v of [h.inServiceDate, h.firstSeen, h.firstNewListingSeen]) { const d = day(v); if (d) proxies.add(d); }
+  for (const e of Array.isArray(h.entries) ? h.entries as Record<string, unknown>[] : []) { const d = day(e?.first_seen); if (d) proxies.add(d); }
+  return proxies.has(date) ? null : date;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json(405, { error: "method not allowed" });
@@ -324,9 +337,9 @@ serve(async (req) => {
         // and, when the listing itself carries no warranty_info, synthesize it
         // so the passport shows the factory coverage. New cars have no prior
         // in-service date — the clock starts at delivery, so today stands in.
-        // Used/CPO must use the vehicle's REAL in-service date (vehicle-enrich
-        // derives it from listing history); when none exists the date is
-        // omitted so the client never counts down from a fabricated start.
+        // Used/CPO must use a recorded in-service date; a date inferred from
+        // listing history is not one. When none exists the date is omitted so
+        // the client never counts down from a fabricated start.
         // Only VERIFIED terms are used.
         const ymm = String((row.ymm as string) || "").toUpperCase();
         const cond = String((row.condition as string) || "").toLowerCase();
@@ -339,8 +352,9 @@ serve(async (req) => {
             return b.length > 1 && x?.verified === true && ymm.includes(b);
           });
           if (w) {
-            const realInService = ((row.history_payload as { inServiceDate?: string | null } | null)?.inServiceDate as string | null)
-              || ((row.in_service_date as string) || null);
+            // Only a stored in-service date that is not a listing-history
+            // proxy (first advertised / first seen) can start a used clock.
+            const realInService = verifiedInServiceDate(row.in_service_date, row.history_payload);
             const start = cond === "new" ? new Date().toISOString() : realInService;
             // Unlimited (sentinel -1) or unset miles → omit the cap so the
             // passport renders a time-only term and never does negative-mile math.
@@ -879,7 +893,7 @@ serve(async (req) => {
             last_seen: e.last_seen ?? null,
           })),
           owners: hp.owners ?? null,
-          inServiceDate: hp.inServiceDate ?? null,
+          inServiceDate: null,
           firstSeen: hp.firstSeen ?? null,
           checked_at: hp.checked_at ?? null,
           source: hp.source ?? null,

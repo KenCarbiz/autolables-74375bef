@@ -36,9 +36,14 @@ export interface InventoryStoreState {
 export interface InventorySourceMapping {
   id: string; provider: "vauto"; source_dealer_id: string; group_id: string; store_id: string;
   status: "pending" | "approved" | "revoked" | "rejected";
-  observed_identity: Partial<SourceIdentity> | null; evidence: { verdict?: string; fields?: Record<string, string> } | null;
+  observed_identity: Partial<SourceIdentity> | null; evidence: MappingEvidence | null;
   identity_acknowledged: boolean; note: string | null;
   proposed_at: string; approved_at: string | null; revoked_at: string | null; created_at: string; updated_at: string;
+}
+
+export interface MappingEvidence {
+  verdict?: string; computed_by?: string; run_id?: string; path?: string; content_sha256?: string | null; remote_mtime?: string | null;
+  store_updated_at?: string; counts?: Partial<PartitionCounts>; comparison?: MappingComparison; fields?: Record<string, string>;
 }
 
 export interface StoreInventoryRow {
@@ -109,7 +114,7 @@ export interface InventoryNetworkAudit {
 
 export interface FeedFile {
   id: string; path: string; status: string; quarantine_reason: string | null; remote_size: number | null; remote_mtime: string | null;
-  latest_event_at: string | null; discovered_at: string | null; last_run_id: string | null;
+  latest_event_at: string | null; discovered_at: string | null; last_run_id: string | null; last_content_sha256?: string | null;
 }
 export interface FeedBinding { id: string; path: string; tenant_id: string | null; status: "pending" | "approved" | "disabled"; approved_at: string | null }
 export interface FeedEvent { id: string; action: string; path: string; received_at: string }
@@ -120,7 +125,7 @@ export type Verdict = "match" | "mismatch" | "incomplete";
 export interface IdentityComparison { verdict: Verdict; fields: { name: FieldVerdict; address: FieldVerdict; city: FieldVerdict; postal: FieldVerdict; region: FieldVerdict } }
 export interface RowIssue { row: number; vin?: string; code: string; detail?: string }
 export type PartitionOutcome = "ready" | "unmapped" | "mapping_pending" | "conflict" | "rejected";
-export interface PartitionCounts { rows: number; valid: number; invalid: number; duplicateIdentical: number; duplicateConflicts: number; priceMissing: number; priceZero: number; photoMissing: number }
+export interface PartitionCounts { rows: number; valid: number; invalid: number; duplicateIdentical: number; duplicateConflicts: number; priceMissing: number; priceZero: number; photoMissing: number; new?: number; used?: number; cpo?: number }
 export interface PartitionReportItem {
   sourceDealerId: string; identity: SourceIdentity; identityVariants: number;
   mapping: { id: string; status: "pending" | "approved"; storeId: string; storeName: string } | null;
@@ -136,6 +141,7 @@ export interface PartitionDryRunReport {
 export interface FeedRun {
   id: string; path: string; kind: "dry_run" | "import"; status: string; failure_reason: string | null;
   started_at: string; finished_at: string | null; affected_store_ids: string[]; job_id: string | null; report: PartitionDryRunReport | Record<string, unknown> | null;
+  content_sha256?: string | null; remote_mtime?: string | null;
 }
 
 export interface StoreOverview {
@@ -208,7 +214,21 @@ export interface ImportNowResult { jobId: string; status: string; result: { part
 const RULES: Array<[RegExp, string]> = [
   [/platform_admin_required|permission denied|row-level security|42501/i, "Only platform administrators can do this. Sign in with a platform administrator account."],
   [/could not find the function|schema cache|function public\.\S+ does not exist|relation "?\S+"? does not exist|42883|42P01/i, "The inventory network database update has not been applied to this project yet."],
-  [/identity_not_confirmed/, "This source identity does not clearly match the store. Tick the confirmation box to approve it anyway."],
+  [/identity_not_confirmed/, "The address matches but the dealer name differs. Tick the name acknowledgement to approve."],
+  [/identity_mismatch/, "The street, city, state or ZIP in the file does not match this store. A mismatch can never be approved. Fix the store identity or map a different store."],
+  [/identity_incomplete/, "A field is missing on the file or the store, so the identity cannot be confirmed. Complete the store identity and review again."],
+  [/store_identity_changed_since_review/, "The store identity was edited after this proposal was reviewed. Reject it and propose again."],
+  [/file_changed_since_review/, "The feed file changed after this proposal was reviewed. Run a new dry run and propose again."],
+  [/proposal_predates_server_review/, "This proposal was made before server-checked review. Reject it and propose again from a dry run."],
+  [/dry_run_required/, "Run a partition dry run first. A mapping is only proposed from a stored dry run."],
+  [/dry_run_not_found/, "That dry run no longer exists. Run a new dry run."],
+  [/not_a_partition_dry_run/, "That run is not a partition dry run. Run a dry run from Feed mapping."],
+  [/dry_run_not_passed/, "That dry run did not pass, so it cannot support a mapping. Fix the feed and run it again."],
+  [/test_file_cannot_be_mapped/, "Test files are never mapped to a store."],
+  [/dealer_not_in_dry_run/, "That DealerId is not in this dry run. Run a new dry run."],
+  [/partition_identity_inconsistent/, "This DealerId appears with more than one dealer identity in the file. Ask the feed provider to fix it before mapping."],
+  [/file_admitted_to_another_group/, "This file is bound to a different dealer group. Map it to a store in that group, or change the file binding first."],
+  [/mapping_already_open/, "This DealerId already has a pending or approved mapping. Reject or revoke it first."],
   [/store_changed_since_loaded/, "This store was changed by someone else after you opened it. Reload it, re-apply your edits and save again."],
   [/sharing_across_groups_forbidden/, "Stores can only share inventory with other stores in the same dealer group."],
   [/sharing_rule_not_active/, "That sharing rule was already revoked or changed. Reload the page."],
@@ -331,11 +351,13 @@ export const listSharingRules = (groupId: string) => rows<InventorySharingRule>(
 export const listEnrichmentPolicies = () => rows<StoreEnrichmentPolicy>(db.from("store_enrichment_policies").select("*"));
 export const listProviderUsage = (storeId: string) => rows<StoreProviderUsage>(db.from("store_provider_usage").select("*").eq("store_id", storeId).order("at", { ascending: false }).limit(100));
 export const listAudit = (groupId: string) => rows<InventoryNetworkAudit>(db.from("inventory_network_audit").select("id,at,actor,group_id,store_id,entity,entity_id,action").eq("group_id", groupId).order("at", { ascending: false }).limit(100));
-export const listFeedFiles = () => rows<FeedFile>(db.from("inventory_feed_files").select("id,path,status,quarantine_reason,remote_size,remote_mtime,latest_event_at,discovered_at,last_run_id").order("path"));
+export const listFeedFiles = () => rows<FeedFile>(db.from("inventory_feed_files").select("id,path,status,quarantine_reason,remote_size,remote_mtime,latest_event_at,discovered_at,last_run_id,last_content_sha256").order("path"));
+export const listAllStores = () => rows<DealerStore>(db.from("dealer_stores").select("*").order("display_name"));
+export const listOpenMappings = () => rows<InventorySourceMapping>(db.from("inventory_source_mappings").select("*").in("status", ["pending", "approved"]).order("created_at", { ascending: false }).limit(500));
 export const listFeedBindings = () => rows<FeedBinding>(db.from("inventory_feed_bindings").select("id,path,tenant_id,status,approved_at").order("path"));
 export const listFeedEvents = (limit = 100) => rows<FeedEvent>(db.from("inventory_feed_events").select("id,action,path,received_at").order("received_at", { ascending: false }).limit(limit));
 export const listFeedRuns = (opts: { limit?: number; withReport?: boolean } = {}) =>
-  rows<FeedRun>(db.from("inventory_feed_runs").select(`id,path,kind,status,failure_reason,started_at,finished_at,affected_store_ids,job_id${opts.withReport ? ",report" : ""}`).order("started_at", { ascending: false }).limit(opts.limit ?? 100));
+  rows<FeedRun>(db.from("inventory_feed_runs").select(`id,path,kind,status,failure_reason,started_at,finished_at,affected_store_ids,job_id,content_sha256,remote_mtime${opts.withReport ? ",report" : ""}`).order("started_at", { ascending: false }).limit(opts.limit ?? 100));
 
 export const getOverview = (groupId: string) => rpc<InvOverview | null>("inv_admin_overview", { p_group_id: groupId });
 export const getUsage = (storeId: string) => rpc<InvUsage | null>("inv_admin_usage", { p_store_id: storeId });
@@ -346,8 +368,10 @@ export const getPreviewInventory = (storeId: string, channel: Channel, filters: 
 export const saveStore = (draft: StoreDraft) => rpc<string>("inv_admin_save_store", { p: draft });
 export const setControls = (c: { ingestion_paused: boolean; emergency_stop: boolean; reconcile_enabled: boolean }, reason: string) =>
   rpc<void>("inv_admin_set_controls", { p_ingestion_paused: c.ingestion_paused, p_emergency_stop: c.emergency_stop, p_reconcile_enabled: c.reconcile_enabled, p_reason: reason });
-export const proposeMapping = (a: { sourceDealerId: string; storeId: string; observedIdentity: SourceIdentity; evidence: IdentityComparison | { verdict: "incomplete" }; note?: string }) =>
-  rpc<string>("inv_admin_propose_mapping", { p_source_dealer_id: a.sourceDealerId, p_store_id: a.storeId, p_observed_identity: a.observedIdentity, p_evidence: a.evidence, p_note: a.note ?? null });
+export const proposeMapping = (a: { sourceDealerId: string; storeId: string; runId: string; note?: string }) =>
+  rpc<string>("inv_admin_propose_mapping", { p_source_dealer_id: a.sourceDealerId, p_store_id: a.storeId, p_observed_identity: {}, p_evidence: { run_id: a.runId }, p_note: a.note ?? null });
+export const previewMapping = (sourceDealerId: string, storeId: string, runId: string) =>
+  rpc<MappingPreview | null>("inv_admin_preview_mapping", { p_source_dealer_id: sourceDealerId, p_store_id: storeId, p_run_id: runId });
 export const decideMapping = (mappingId: string, decision: "approve" | "reject" | "revoke", acknowledgeIdentity = false) =>
   rpc<void>("inv_admin_decide_mapping", { p_mapping_id: mappingId, p_decision: decision, p_acknowledge_identity: acknowledgeIdentity, p_note: null });
 export const saveSharingRule = (draft: SharingRuleDraft) => rpc<string>("inv_admin_save_sharing_rule", { p: draft });
@@ -492,3 +516,19 @@ export const listBulkContracts = () => rows<BulkContract>(db.from("bulk_feed_con
 export const saveTiming = (draft: TimingDraft) => rpc<void>("inv_admin_save_timing", { p: draft });
 export const saveBulkContract = (draft: BulkContractDraft) => rpc<void>("inv_admin_save_bulk_contract", { p: draft });
 export const resolveBulkException = (id: number, resolution: string) => rpc<void>("inv_admin_resolve_bulk_exception", { p_id: id, p_resolution: resolution });
+
+export type MappingVerdict = "match" | "name_review" | "incomplete" | "mismatch";
+export interface MappingComparison {
+  verdict: MappingVerdict;
+  fields: { street?: FieldVerdict; city?: FieldVerdict; state?: FieldVerdict; zip?: FieldVerdict; name?: "match" | "differs" | "unknown" };
+  observed?: { name: string | null; street: string | null; city: string | null; state: string | null; zip: string | null };
+  store?: { name: string | null; legal_name: string | null; street: string | null; city: string | null; state: string | null; zip: string | null };
+  store_updated_at?: string;
+  reason?: string;
+}
+export interface MappingPreview {
+  partition: PartitionReportItem; run_id: string; path: string; content_sha256: string | null; remote_mtime: string | null; finished_at: string | null; comparison: MappingComparison;
+}
+
+export const isTestPath = (path: string) => /webhooktest/i.test(path);
+export const isSetupError = (e: unknown) => explainError(e) === friendlyMessage("42883");

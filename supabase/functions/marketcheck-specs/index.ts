@@ -218,7 +218,14 @@ Deno.serve(async (req) => {
   // shallow and it returned null.
   // deno-lint-ignore no-explicit-any
   const build = (payload.build || payload) as any;
-  const sheet = structuredSheet(build) ?? structuredSheet(payload);
+  const parsedSheet = structuredSheet(build) ?? structuredSheet(payload);
+  // Which request produced this record, so a reader never takes a basic
+  // decoder answer or an include_generic fallback for a strict NeoVIN decode.
+  const requestTier = !endpoint.includes("/neovin/") ? "basic_decoder"
+    : endpoint.includes("include_generic=true") ? "neovin_include_generic" : "neovin_strict";
+  const sheet = parsedSheet
+    ? { ...parsedSheet, request_tier: requestTier, ...(requestTier === "basic_decoder" ? { source: "basic_decode" } : {}) }
+    : null;
 
   // Shape drift alarm. We have always captured the raw response and never
   // examined it, so the day NeoVIN changed shape we found out from a dealer
