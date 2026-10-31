@@ -1,7 +1,14 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CheckCircle2, ExternalLink, Search } from "lucide-react";
 import UsedVehicleDocsButton from "@/components/inventory/UsedVehicleDocsButton";
+import { useAuth } from "@/contexts/AuthContext";
+import { useComplianceIssueOwners } from "@/hooks/useApprovedFields";
+import { useEntitlements } from "@/hooks/useEntitlements";
+import { useTenantMemberDirectory } from "@/hooks/useTenantMemberDirectory";
+import { vehicleIssueKey } from "@/lib/approvedFields/complianceIssueKey";
+import { canAssignComplianceOwners, complianceOwnerLabel } from "@/lib/approvedFields/complianceOwners";
+import ComplianceOwnerDetail from "./ComplianceOwnerDetail";
 import { EmptyState, Panel, SectionHeading, StateBadge, TableShell, formatDateTime } from "./primitives";
 import { ISSUE_CATEGORY_LABEL, type IssueCategory, type IssueRow } from "./complianceData";
 
@@ -28,6 +35,14 @@ export const IssuesSection = ({ rows, loading }: { rows: IssueRow[]; loading: bo
   const navigate = useNavigate();
   const [filter, setFilter] = useState<Filter>("open");
   const [q, setQ] = useState("");
+  const [openOwner, setOpenOwner] = useState<string | null>(null);
+  const { isAdmin } = useAuth();
+  const { member } = useEntitlements();
+  const { owners } = useComplianceIssueOwners();
+  const { nameOf } = useTenantMemberDirectory();
+  const canAssign = canAssignComplianceOwners(member?.role ?? "", isAdmin);
+  const ownerFor = (vehicleId: string) =>
+    owners?.status === "available" ? owners.data.get(vehicleIssueKey(vehicleId)) ?? null : null;
 
   const counts = useMemo(() => {
     const out = {} as Record<Filter, number>;
@@ -99,9 +114,10 @@ export const IssuesSection = ({ rows, loading }: { rows: IssueRow[]; loading: bo
             }
           />
         ) : (
-          <TableShell headers={["Vehicle", "Stock / VIN", "Open issues", "Certification", "Last checked", "Action"]}>
+          <TableShell headers={["Vehicle", "Stock / VIN", "Open issues", "Owner", "Certification", "Last checked", "Action"]}>
             {filtered.map((r) => (
-              <tr key={r.vehicleId} className="align-top hover:bg-adm-workspace">
+              <Fragment key={r.vehicleId}>
+              <tr className="align-top hover:bg-adm-workspace">
                 <td className="px-4 py-3">
                   <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{r.title}</p>
                   <p className="mt-0.5 text-[12px] leading-[18px] text-adm-muted">
@@ -128,6 +144,22 @@ export const IssuesSection = ({ rows, loading }: { rows: IssueRow[]; loading: bo
                     ))}
                   </ul>
                 </td>
+                <td className="max-w-[180px] px-4 py-3">
+                  {(() => {
+                    const label = complianceOwnerLabel(ownerFor(r.vehicleId), nameOf);
+                    return (
+                      <button
+                        type="button"
+                        aria-expanded={openOwner === r.vehicleId}
+                        onClick={() => setOpenOwner(openOwner === r.vehicleId ? null : r.vehicleId)}
+                        title={label}
+                        className="block w-full truncate text-left text-[14px] leading-[20px] text-adm-ink hover:underline"
+                      >
+                        {label}
+                      </button>
+                    );
+                  })()}
+                </td>
                 <td className="px-4 py-3">
                   {r.certificationReady === null ? (
                     <StateBadge tone="neutral">Never run</StateBadge>
@@ -152,6 +184,14 @@ export const IssuesSection = ({ rows, loading }: { rows: IssueRow[]; loading: bo
                   </div>
                 </td>
               </tr>
+              {openOwner === r.vehicleId && (
+                <tr className="bg-adm-workspace/60">
+                  <td colSpan={7}>
+                    <ComplianceOwnerDetail issueKey={vehicleIssueKey(r.vehicleId)} canAssign={canAssign} />
+                  </td>
+                </tr>
+              )}
+              </Fragment>
             ))}
           </TableShell>
         )}

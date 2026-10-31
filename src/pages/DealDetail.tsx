@@ -16,6 +16,10 @@ import {
   type LocalTab,
   type Tone,
 } from "@/components/product";
+import { useAuth } from "@/contexts/AuthContext";
+import { useEntitlements } from "@/hooks/useEntitlements";
+import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
+import DealNumberField from "@/components/customers/DealNumberField";
 import { money, type DealEntry } from "@/components/customers/customerBook";
 import { useCustomerBook } from "@/components/customers/useCustomerBook";
 import { useVehicleDocuments } from "@/lib/stickerStudio/useVehicleDocuments";
@@ -95,6 +99,9 @@ const DealDetail = () => {
   const dealId = decodeURIComponent(id);
   const [searchParams] = useSearchParams();
   const { book, loading, error, refetch } = useCustomerBook();
+  const { isAdmin } = useAuth();
+  const { member } = useEntitlements();
+  const canEditDealNumber = hasDealerCapability(member?.role, "can_create_documents", isAdmin);
   const deal = useMemo(() => book.deals.find((d) => d.id === dealId) || null, [book.deals, dealId]);
   const docsState = useVehicleDocuments(deal?.listingId ?? null);
 
@@ -205,6 +212,7 @@ const DealDetail = () => {
     <Panel title="Deal snapshot" titleSize="sm" inset="sm">
       <SummaryList
         rows={[
+          { label: "Deal #", value: <DealNumberField addendumId={deal.id} canEdit={canEditDealNumber} /> },
           { label: "Selling price", value: money(deal.sellingPrice) },
           { label: "Add-on options total", value: money(deal.amount) },
           {

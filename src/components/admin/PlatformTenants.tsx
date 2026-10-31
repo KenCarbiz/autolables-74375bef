@@ -1,5 +1,8 @@
 import { useMemo, useState, useEffect } from "react";
 import { useAdminPlatform, type TenantSummary } from "@/hooks/useAdminPlatform";
+import { useAuth } from "@/contexts/AuthContext";
+import { usePlatformVehicleCounts } from "@/hooks/useApprovedFields";
+import { vehicleCountLabel } from "@/lib/approvedFields/platformVehicleCounts";
 import type { PlanTier } from "@/data/planTiers";
 import { planTierOptions } from "@/data/planTiers";
 
@@ -25,6 +28,8 @@ const formatDate = (s: string | null) => {
 
 export const PlatformTenants = () => {
   const { tenants, createTenant, marketcheck, setTenantTier, saveMarketcheckConfig, clearSyncedInventory, runMarketcheckNow, entitlements } = useAdminPlatform();
+  const { isAdmin } = useAuth();
+  const vehicleCounts = usePlatformVehicleCounts(isAdmin).data;
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
   const [searchParams] = useSearchParams();
@@ -214,6 +219,7 @@ export const PlatformTenants = () => {
                 {sortTh("Plan", "plan")}
                 {sortTh("Status", "status")}
                 {sortTh("Members", "member_count", "right")}
+                {isAdmin && <Th align="right" className="whitespace-nowrap">Vehicles</Th>}
                 {sortTh("Last activity", "last_activity")}
                 <Th className="whitespace-nowrap">Last sync</Th>
                 <Th align="right"><span className="sr-only">Actions</span></Th>
@@ -242,6 +248,7 @@ export const PlatformTenants = () => {
                     </Td>
                     <Td><StatusText tone={t.is_active ? "success" : "neutral"}>{t.is_active ? "Active" : "Suspended"}</StatusText></Td>
                     <Td align="right">{t.member_count}</Td>
+                    {isAdmin && <Td align="right" className="whitespace-nowrap tabular-nums text-adm-muted">{vehicleCountLabel(vehicleCounts, t.id)}</Td>}
                     <Td className="whitespace-nowrap text-adm-muted">{formatDate(t.last_activity)}</Td>
                     <Td className="whitespace-nowrap text-adm-muted">{mc?.last_run_at ? formatDate(mc.last_run_at) : "No sync"}</Td>
                     <Td align="right">

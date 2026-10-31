@@ -1,3 +1,4 @@
+import { formatSyncRunId } from "@/lib/approvedFields/syncRunId";
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -161,7 +162,7 @@ export default function SyncRunPage() {
           {BADGE_LABEL[outcome] ?? meta.label}
         </StatusChip>
       }
-      subtitle={<>{formatAt(run.started_at, { withYear: true, withZone: true })} · Run {run.id.slice(0, 8)}</>}
+      subtitle={<>{formatAt(run.started_at, { withYear: true, withZone: true })} · <span title={run.id}>{formatSyncRunId(run.id)}</span></>}
     >
       <div>
         <AdminCard id="run-summary" flush>

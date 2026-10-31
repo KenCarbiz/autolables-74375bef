@@ -4,8 +4,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useAudit } from "@/contexts/AuditContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
-import { usePrepSignOff, type InstallPhoto, type InstalledAccessory } from "@/hooks/usePrepSignOff";
+import { usePrepSignOff, type PrepSignOff as PrepSignOffRow, type InstallPhoto, type InstalledAccessory } from "@/hooks/usePrepSignOff";
 import { useGetReady, type GetReadyRecord } from "@/hooks/useGetReady";
+import { useEntitlements } from "@/hooks/useEntitlements";
+import { usePrepDueDates, type PrepDueView } from "@/hooks/useApprovedFields";
+import { NO_DUE_DATE_LABEL, canSetPrepDue } from "@/lib/approvedFields/prepDue";
+import { derivePrepNextAction } from "@/lib/approvedFields/prepNextAction";
+import { PrepDueEditor } from "@/components/admin/PrepDueEditor";
 import { useEmailDistribution } from "@/hooks/useEmailDistribution";
 import { AccessoryInstallPanel } from "@/components/admin/AccessoryInstallPanel";
 import { EmailDistributionPanel } from "@/components/admin/EmailDistributionPanel";
@@ -28,8 +33,29 @@ const vendorLabel = (accs: Array<{ installed_by?: string }>) => {
   return names.length === 0 ? "Unknown" : names.length === 1 ? names[0] : `${names[0]} +${names.length - 1}`;
 };
 
+const DueCell = ({ view }: { view: PrepDueView | null }) => {
+  if (!view || view.source === "none") return <span className="text-adm-muted">{NO_DUE_DATE_LABEL}</span>;
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className={view.state === "overdue" ? "font-semibold text-adm-danger" : "text-adm-ink"} title={view.label}>{view.label}</span>
+      {view.state === "overdue" && <StatusText tone="danger">Overdue</StatusText>}
+    </span>
+  );
+};
+
+const NextActionCell = ({ row, dueAt }: { row: PrepSignOffRow; dueAt: string | null }) => {
+  const action = derivePrepNextAction(row, { dueAt });
+  return (
+    <p className={`truncate ${action.overdue ? "font-semibold text-adm-danger" : action.key === "none" ? "text-adm-muted" : "text-adm-ink"}`} title={action.label}>
+      {action.label}
+    </p>
+  );
+};
+
 const PrepSignOff = () => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
+  const { member } = useEntitlements();
+  const { settings: dealerSettings } = useDealerSettings();
   const { currentStore, tenant } = useTenant();
   const { log } = useAudit();
   const navigate = useNavigate();
@@ -43,6 +69,8 @@ const PrepSignOff = () => {
   const { signOffs, pending, ready, loading: signOffsLoading, load: reloadSignOffs, createSignOff, signOff, reject, override, isListingAllowed } = usePrepSignOff(storeId);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const { records: getReadyRecords } = useGetReady(storeId);
+  const prepDue = usePrepDueDates(signOffs, dealerSettings.dealer_timezone);
+  const canEditDue = canSetPrepDue(member?.role ?? "", isAdmin);
 
   const filterParam = searchParams.get("filter");
   const filter: "all" | "pending" | "signed" | "rejected" =
@@ -212,8 +240,10 @@ const PrepSignOff = () => {
                   <Th className="!px-2">Task</Th>
                   <Th className="!px-2">Vendor</Th>
                   <Th className="whitespace-nowrap !px-2">Proof</Th>
+                  {prepDue.available && <Th className="whitespace-nowrap !px-2">Due</Th>}
                   <Th className="!px-2">Status</Th>
-                  <Th align="right" className="!px-2 whitespace-nowrap">Next action</Th>
+                  <Th className="whitespace-nowrap !px-2">Next action</Th>
+                  <Th align="right" className="!px-2 whitespace-nowrap">Action</Th>
                 </tr>
               </thead>
               <tbody>
@@ -227,10 +257,18 @@ const PrepSignOff = () => {
                     </Td>
                     <Td className="whitespace-nowrap !px-2">{vendorLabel(s.accessories_installed)}</Td>
                     <Td className="whitespace-nowrap !px-2 text-adm-muted">{s.install_photos?.length ? `${s.install_photos.length} ${s.install_photos.length === 1 ? "photo" : "photos"}` : "Install photo"}</Td>
+                    {prepDue.available && (
+                      <Td className="whitespace-nowrap !px-2">
+                        <DueCell view={prepDue.view(s)} />
+                      </Td>
+                    )}
                     <Td className="!px-2">
                       <StatusText tone={s.status === "pending" ? "warning" : s.status === "signed" ? "success" : s.status === "rejected" ? "danger" : "neutral"}>
                         {s.status.charAt(0).toUpperCase() + s.status.slice(1)}
                       </StatusText>
+                    </Td>
+                    <Td className="max-w-[200px] !px-2">
+                      <NextActionCell row={s} dueAt={prepDue.view(s)?.dueAt ?? null} />
                     </Td>
                     <Td align="right" className="!px-2">
                       <button type="button" className="whitespace-nowrap text-[14px] font-medium text-adm-primary hover:underline" onClick={(e) => { e.stopPropagation(); select(s.id); }}>
@@ -279,7 +317,26 @@ const PrepSignOff = () => {
                     ].map(([k, v]) => (
                       <div key={k} className="flex justify-between gap-3"><dt className="text-adm-muted">{k}</dt><dd className="text-adm-ink text-right">{v}</dd></div>
                     ))}
+                    {prepDue.available && (
+                      <div className="flex justify-between gap-3"><dt className="text-adm-muted">Due</dt><dd className="text-right"><DueCell view={prepDue.view(selected)} /></dd></div>
+                    )}
                   </dl>
+                  {prepDue.available && canEditDue && (
+                    <PrepDueEditor
+                      dueAt={prepDue.view(selected)?.source === "set" ? prepDue.view(selected)?.dueAt ?? null : null}
+                      timeZone={dealerSettings.dealer_timezone}
+                      pending={prepDue.setDue.isPending}
+                      onSave={(dueAt) =>
+                        prepDue.setDue.mutate(
+                          { prepId: selected.id, dueAt },
+                          {
+                            onSuccess: () => toast.success(dueAt ? "Due date set" : "Due date cleared"),
+                            onError: (e) => toast.error(e instanceof Error ? e.message : "Due date could not be saved"),
+                          },
+                        )
+                      }
+                    />
+                  )}
                   <div>
                     <p className="font-semibold text-adm-ink mb-1">Installed accessories</p>
                     {selected.accessories_installed.length === 0 ? (

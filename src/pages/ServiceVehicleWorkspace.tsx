@@ -12,6 +12,8 @@ import { useAudit } from "@/contexts/AuditContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
+import { useRepairApprovals } from "@/hooks/useApprovedFields";
+import { RepairApprovalControl, notifyRepairApprovalError } from "@/components/service/RepairApprovalControl";
 import { deriveWorkspaceStatus, clearanceReasonLabel, type WorkspaceStatus, type WorkspaceActionKey } from "@/lib/service/workspaceStatus";
 import { k208SignerAllowedClient, K208_SIGNER_DENIAL } from "@/lib/service/signerAuthority";
 import { isExecutedSignoff, isFailedInspection } from "@/lib/commandCenter/inspectionState";
@@ -439,6 +441,7 @@ export default function ServiceVehicleWorkspace() {
                     members={members}
                     canReinspect={canReinspect}
                     canConduct={canConduct}
+                    canApprove={canApprove}
                     onChanged={() => void load()}
                     logAudit={log}
                   />
@@ -459,6 +462,7 @@ export default function ServiceVehicleWorkspace() {
                     members={members}
                     canReinspect={canReinspect}
                     canConduct={canConduct}
+                    canApprove={canApprove}
                     onChanged={() => void load()}
                     logAudit={log}
                   />
@@ -1254,14 +1258,16 @@ async function notifyMembers(
 
 /* ─────────────────────── failed-item workflow ───────────────────── */
 
-function FailedItemsPanel({ tenantId, vin, newestSigned, failures, members, canReinspect, canConduct, onChanged, logAudit }: {
+function FailedItemsPanel({ tenantId, vin, newestSigned, failures, members, canReinspect, canConduct, canApprove, onChanged, logAudit }: {
   tenantId: string; vin: string; newestSigned: InspRow | null; failures: FailureRow[];
-  members: MemberRow[]; canReinspect: boolean; canConduct: boolean;
+  members: MemberRow[]; canReinspect: boolean; canConduct: boolean; canApprove: boolean;
   onChanged: () => void; logAudit: ReturnType<typeof useAudit>["log"];
 }) {
   const { user } = useAuth();
   const { settings } = useDealerSettings();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const { approvals, decide } = useRepairApprovals(failures.map((f) => f.id));
+  const approvalsAvailable = approvals?.status === "available";
   const open = failures.filter((f) => !isFailureResolved(f.repair_state));
   // The no-rows recovery is judged against the NEWEST SIGNED inspection only:
   // a fresh signed FAIL whose per-item filing errored must offer "File failed
@@ -1374,6 +1380,16 @@ function FailedItemsPanel({ tenantId, vin, newestSigned, failures, members, canR
                     </a>
                   ))}
                 </div>
+              )}
+              {approvalsAvailable && (
+                <RepairApprovalControl
+                  record={approvals.data.get(f.id) ?? { approval: "pending", decidedBy: null, decidedAt: null }}
+                  canSet={canApprove}
+                  busy={decide.isPending}
+                  nameOf={(id) => memberName(members.find((m) => m.user_id === id))}
+                  formatAt={(iso) => formatCommandDateTime(iso) ?? ""}
+                  onDecide={(decision) => decide.mutate({ failureId: f.id, decision }, { onError: notifyRepairApprovalError })}
+                />
               )}
               {!resolved && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
