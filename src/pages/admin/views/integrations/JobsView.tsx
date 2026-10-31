@@ -43,10 +43,14 @@ export function useJobsData() {
   const rows = useMemo(() => {
     if (!data) return [];
     return JOB_CATALOG.map((spec) => {
-      const ledger = data.status.serverLedger[spec.cronName] ?? (spec.ledger ? data.ledgers[spec.ledger] ?? null : null);
-      const ledgerLoadFailed = spec.ledger ? data.ledgers[spec.ledger] === null && !data.status.serverLedger[spec.cronName] : false;
+      // A scheduler "succeeded" only proves the cron request was delivered, not
+      // that the work ran, so a job with its own work ledger is judged by that
+      // ledger alone. Scheduler run history speaks only for jobs with no ledger.
+      const ledger = spec.ledger ? data.ledgers[spec.ledger] ?? null : null;
+      const ledgerLoadFailed = spec.ledger ? data.ledgers[spec.ledger] === null : false;
+      const schedulerLastSuccessAt = data.status.serverLedger[spec.cronName]?.lastSuccessAt ?? null;
       const cron = spec.cronName in data.status.cron ? data.status.cron[spec.cronName] : "unavailable";
-      return deriveJobRow({ spec, cron, ledger, ledgerLoadFailed, now });
+      return deriveJobRow({ spec, cron, ledger, ledgerLoadFailed, schedulerLastSuccessAt, now });
     });
   }, [data, now]);
 

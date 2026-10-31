@@ -46,6 +46,12 @@ export interface EstimatorSource {
   tenantId: string | null;
   storeId: string | null;
   storeName: string | null;
+  /**
+   * True when the selected "store" is the account's synthesized default (its
+   * id is the tenant id). Listings carry that id as their store key, so the
+   * settings reach every vehicle in the account, not one rooftop.
+   */
+  accountWide: boolean;
   otherStores: Array<{ id: string; name: string }>;
   published: PublishedEstimator;
   vehicles: PreviewVehicle[];
@@ -69,6 +75,7 @@ export type ApplyOutcome =
 export interface EstimatorFixture {
   storeName: string;
   storeId?: string;
+  accountWide?: boolean;
   otherStores?: Array<{ id: string; name: string }>;
   published?: { config: unknown; version: number; updatedAt?: string | null };
   vehicles?: PreviewVehicle[];
@@ -183,7 +190,7 @@ export function useEstimatorSource(): EstimatorSource {
       : EMPTY_PUBLISHED;
     return {
       state: fixture.state ?? "ready", error: fixture.state === "error" ? "The settings could not be loaded." : null,
-      tenantId: null, storeId, storeName: fixture.storeName, otherStores: fixture.otherStores ?? [],
+      tenantId: null, storeId, storeName: fixture.storeName, accountWide: !!fixture.accountWide, otherStores: fixture.otherStores ?? [],
       published, vehicles: fixture.vehicles ?? [], vehiclesState: "ready", vehiclesCheckedAt: Date.parse("2026-10-31T14:00:00Z"),
       priceContext, canManage, isFixture: true, reload, apply,
     };
@@ -197,6 +204,7 @@ export function useEstimatorSource(): EstimatorSource {
     state: settingsState,
     error: settingsQ.isError && !isMissingTable(settingsQ.error as never) ? "The payment settings could not be loaded." : null,
     tenantId, storeId, storeName: currentStore?.name ?? null,
+    accountWide: !!tenantId && storeId === tenantId,
     otherStores: (stores ?? []).filter((s) => s.id !== storeId).map((s) => ({ id: s.id, name: s.name })),
     published: settingsQ.data ?? EMPTY_PUBLISHED,
     vehicles: vehiclesQ.data?.vehicles ?? [],

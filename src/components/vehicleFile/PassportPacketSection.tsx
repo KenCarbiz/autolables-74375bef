@@ -22,7 +22,7 @@ export const PassportPacketSection = ({ vehicle, onReload }: { vehicle: VehicleR
   const [accessories, setAccessories] = useState<AvailableAccessory[]>(vehicle.available_accessories || []);
   const [packetModules, setPacketModules] = useState<Record<string, boolean>>(vehicle.packet_modules || {});
   const [suppressedPrograms, setSuppressedPrograms] = useState<string[]>(vehicle.suppressed_programs || []);
-  const [passportVersion, setPassportVersion] = useState<"inherit" | "current" | "v3" | "experiment">(vehicle.passport_version || "inherit");
+  const [passportVersion] = useState<"inherit" | "current" | "v3" | "experiment">(vehicle.passport_version || "inherit");
   const [saving, setSaving] = useState(false);
   const { settings: dealerSettings } = useDealerSettings();
   const storeDefaults = dealerSettings.packet_module_defaults || {};
@@ -94,23 +94,6 @@ export const PassportPacketSection = ({ vehicle, onReload }: { vehicle: VehicleR
           What appears on the public vehicle passport, scanned at <span className="font-mono text-foreground">/v/{(vehicle.vin || vehicle.slug || "").toUpperCase()}</span>.
         </p>
 
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-border bg-muted/30 p-4">
-          <div className="min-w-0">
-            <p className="text-al-card text-foreground">Passport version</p>
-            <p className="text-al-meta text-muted-foreground">Which shopper experience this vehicle serves. Leave on the store default unless this specific vehicle should be pinned.</p>
-          </div>
-          <select
-            value={passportVersion}
-            onChange={(e) => setPassportVersion(e.target.value as "inherit" | "current" | "v3" | "experiment")}
-            aria-label="Passport version"
-            className="h-9 px-3 rounded-lg border border-border bg-background text-al-body text-foreground shrink-0"
-          >
-            <option value="inherit">Inherit store default</option>
-            <option value="current">Current passport</option>
-            <option value="v3">Passport V3</option>
-            <option value="experiment">Controlled experiment</option>
-          </select>
-        </div>
 
         <div>
           <p className="text-al-card text-foreground">Packet modules</p>

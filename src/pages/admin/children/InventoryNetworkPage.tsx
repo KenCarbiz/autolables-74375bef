@@ -2,6 +2,8 @@ import { useCallback, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
+import { adminTabHref } from "@/lib/admin/sections";
 import { ChildPageFrame } from "@/components/admin/v2/AdminShell";
 import { Button, EmptyState, InlineNote, LocalTabs, Panel, SkeletonBlock, StatusText } from "@/components/product";
 import { getOverview, listGroups, explainError, type StoreDraft } from "@/lib/inventoryNetwork/api";
@@ -38,26 +40,34 @@ const VIEWS: Array<{ key: View; label: string }> = [
   { key: "deliveries", label: "Deliveries" },
 ];
 
-const crumbs = [{ label: "Administration", href: "/admin" }, { label: "Integrations", href: "/admin?tab=integrations" }, { label: "Inventory network" }];
+const crumbs = [{ label: "Administration", href: "/admin" }, { label: "Integrations", href: adminTabHref("inventory-feed") }, { label: "Inventory network" }];
 
 export default function InventoryNetworkPage() {
   const { isAdmin, loading } = useAuth();
   const qc = useQueryClient();
   const [params, setParams] = useSearchParams();
-  const [groupChoice, setGroupChoice] = useState<string | null>(null);
+  const { tenant } = useTenant();
   const [notice, setNotice] = useState<Notice | null>(null);
   const [newStoreDraft, setNewStoreDraft] = useState<Partial<StoreDraft> | null>(null);
 
   const groups = useQuery({ queryKey: ["inv-net", "groups"], queryFn: listGroups, enabled: isAdmin });
-  const groupId = groupChoice ?? groups.data?.[0]?.id ?? null;
+  // The group follows the URL, then the account the header shows. The first
+  // alphabetical group is only a last resort for a platform admin whose
+  // active account has no group of its own.
+  const groupParam = params.get("group");
+  const groupId = (groupParam && groups.data?.some((g) => g.id === groupParam) ? groupParam : null)
+    ?? groups.data?.find((g) => g.tenant_id === tenant?.id)?.id
+    ?? groups.data?.[0]?.id
+    ?? null;
   const overview = useQuery({ queryKey: ["inv-net", "overview", groupId], queryFn: () => getOverview(groupId!), enabled: isAdmin && !!groupId });
 
   const view = (VIEWS.find((v) => v.key === params.get("view"))?.key ?? "overview") as View;
-  const href = useCallback((v: View, extra: Record<string, string> = {}) => `${VIEW_PATH}?${new URLSearchParams({ view: v, ...extra }).toString()}`, []);
-  const go = useCallback((v: View, extra: Record<string, string> = {}) => setParams(new URLSearchParams({ view: v, ...extra })), [setParams]);
+  const scope = useMemo<Record<string, string>>(() => (groupParam ? { group: groupParam } : ({} as Record<string, string>)), [groupParam]);
+  const href = useCallback((v: View, extra: Record<string, string> = {}) => `${VIEW_PATH}?${new URLSearchParams({ view: v, ...scope, ...extra }).toString()}`, [scope]);
+  const go = useCallback((v: View, extra: Record<string, string> = {}) => setParams(new URLSearchParams({ view: v, ...scope, ...extra })), [setParams, scope]);
   const notify = useCallback((tone: Notice["tone"], text: string) => setNotice({ tone, text }), []);
   const refresh = useCallback(() => { qc.invalidateQueries({ queryKey: ["inv-net"] }); }, [qc]);
-  const startNewStore = useCallback((prefill: Partial<StoreDraft>) => { setNewStoreDraft(prefill); setParams(new URLSearchParams({ view: "stores", store: "new" })); }, [setParams]);
+  const startNewStore = useCallback((prefill: Partial<StoreDraft>) => { setNewStoreDraft(prefill); setParams(new URLSearchParams({ view: "stores", ...scope, store: "new" })); }, [setParams, scope]);
   const clearNewStoreDraft = useCallback(() => setNewStoreDraft(null), []);
 
   const group = groups.data?.find((g) => g.id === groupId) ?? null;
@@ -90,7 +100,7 @@ export default function InventoryNetworkPage() {
       badge={badge}
       subtitle="Stores, vehicles, sharing and MarketCheck limits for a dealer group. Reading this page never changes inventory or makes a paid lookup."
       actions={groups.data && groups.data.length > 0 ? (
-        <SelectField id="inv-group" label="Dealer group" value={groupId ?? ""} onChange={(v) => { setGroupChoice(v); setNewStoreDraft(null); }} options={groups.data.map((g) => ({ value: g.id, label: g.name }))} />
+        <SelectField id="inv-group" label="Dealer group" value={groupId ?? ""} onChange={(v) => { setNewStoreDraft(null); setParams(new URLSearchParams({ view, group: v })); }} options={groups.data.map((g) => ({ value: g.id, label: g.name }))} />
       ) : undefined}
     >
       <div className="space-y-4">

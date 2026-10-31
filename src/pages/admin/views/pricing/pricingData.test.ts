@@ -10,9 +10,9 @@ import { applyFeeChange, FALLBACK_APPLY_WARNING, feeReviewHref, isMissingFunctio
 
 const draft = { enabled: true, amount: 925, stateCode: "CT" };
 const rows = [
-  { vin: "EXAMPLEVIN0000001", year: 2024, make: "Example", model: "Crossover", trim: "Base", archived_at: null, advertised_price_before_doc: 30_000, doc_fee: 895, website_sale_price: 30_895, price_parse_status: "ok", stock: "EX-1" },
-  { vin: "EXAMPLEVIN0000002", year: 2023, make: "Example", model: "Sedan", trim: "Sport", archived_at: null, advertised_price_before_doc: 24_500, doc_fee: 925, website_sale_price: 25_425, price_parse_status: "ok", stock: "EX-2" },
-  { vin: "EXAMPLEVIN0000003", year: 2022, make: "Example", model: "Hatch", trim: "Base", archived_at: "2026-09-01T00:00:00Z", advertised_price_before_doc: 18_900, doc_fee: 895, website_sale_price: 19_795, price_parse_status: "ok", stock: "EX-3" },
+  { vin: "EXAMPLEVIN0000001", ymm: "2024 Example Crossover", mc_year: null, mc_make: null, mc_model: null, trim: "Base", archived_at: null, advertised_price_before_doc: 30_000, doc_fee: 895, website_sale_price: 30_895, price_parse_status: "ok", stock: "EX-1" },
+  { vin: "EXAMPLEVIN0000002", ymm: "2023 Example Sedan", mc_year: null, mc_make: null, mc_model: null, trim: "Sport", archived_at: null, advertised_price_before_doc: 24_500, doc_fee: 925, website_sale_price: 25_425, price_parse_status: "ok", stock: "EX-2" },
+  { vin: "EXAMPLEVIN0000003", ymm: "2022 Example Hatch", mc_year: null, mc_make: null, mc_model: null, trim: "Base", archived_at: "2026-09-01T00:00:00Z", advertised_price_before_doc: 18_900, doc_fee: 895, website_sale_price: 19_795, price_parse_status: "ok", stock: "EX-3" },
 ];
 
 beforeEach(() => resetSupabaseSpy());

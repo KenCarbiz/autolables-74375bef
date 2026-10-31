@@ -20,7 +20,7 @@ import PaymentEstimatorPage from "./PaymentEstimatorPage";
 const published = (config: unknown, version: number) => ({ config: normalizeEstimatorConfig(config), version, updatedAt: "2026-10-28T15:42:00Z", updatedBy: null });
 
 const makeSource = (over: Partial<EstimatorSource> = {}): EstimatorSource => ({
-  state: "ready", error: null, tenantId: "tenant-a", storeId: "store-north", storeName: "Example Motors North",
+  state: "ready", error: null, tenantId: "tenant-a", storeId: "store-north", storeName: "Example Motors North", accountWide: false,
   otherStores: [{ id: "store-south", name: "Example Motors South" }],
   published: published(PE_PUBLISHED, 3), vehicles: PE_VEHICLES, vehiclesState: "ready", vehiclesCheckedAt: 0,
   priceContext: { price_display_mode: "website_sale_price", advertised_excludes_doc_fee: null },

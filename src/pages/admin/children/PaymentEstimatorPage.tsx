@@ -169,7 +169,7 @@ export default function PaymentEstimatorPage() {
         <EstimatorIcon name="store" size={24} className="flex-shrink-0 text-adm-muted" />
         <div className="min-w-0">
           <p className="text-[14px] font-semibold text-adm-ink">Editing payment settings for {storeName}</p>
-          <p className="text-[12px] text-adm-muted">Changes apply to this rooftop only, never the whole group.</p>
+          <p className="text-[12px] text-adm-muted">{src.accountWide ? "Account-wide: these settings reach every vehicle in this account until stores are set up separately." : "Changes apply to this rooftop only, never the whole group."}</p>
         </div>
       </div>
     </div>

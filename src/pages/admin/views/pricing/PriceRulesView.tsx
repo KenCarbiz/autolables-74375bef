@@ -601,12 +601,10 @@ export default function PriceRulesView() {
               </div>
             );
           })()}
-          <Field label="Passport experience version" htmlFor="passport-version" hint="Store-wide default. A vehicle can override this per VIN.">
-            <AdminSelect id="passport-version" value={settings.passport_version === "v3" ? "v3" : "current"} onChange={(e) => updateSettings({ passport_version: e.target.value as "current" | "v3" })}>
-              <option value="current">Current Passport</option>
-              <option value="v3">Passport V3</option>
-            </AdminSelect>
-          </Field>
+          <div className="rounded-md border border-adm-border px-3 py-2.5">
+            <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">Passport experience</p>
+            <p className="text-[12px] leading-[18px] text-adm-muted">Every vehicle serves the current Vehicle Passport. Earlier versions are retired, so there is no store or per-vehicle version to choose.</p>
+          </div>
           <div className="flex items-start justify-between gap-4 rounded-md border border-adm-border px-3 py-2.5">
             <div className="min-w-0">
               <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">We do not retail branded-title vehicles</p>

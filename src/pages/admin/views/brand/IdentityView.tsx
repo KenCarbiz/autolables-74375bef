@@ -6,6 +6,7 @@ import { AdminCard, ICON } from "@/components/admin/v2/primitives";
 import { adminTabHref } from "@/lib/admin/sections";
 import { IDENTITY_KEYS, US_STATES, US_TIME_ZONES, contactReadiness, headerPreview, validateIdentity } from "./brandModel";
 import { useBrandForm } from "./useBrandForm";
+import { normalizeStateCode } from "@/lib/dealerState";
 import { BrandSaveBar } from "./BrandSaveBar";
 import { ReadOnlyValue, RowField, SelectControl, TextField, controlClass } from "./fields";
 import { AppearanceCard, CARD_HEADER, CardDescription, CardTitle, ContactReadinessCard, HeaderPreviewCard, LogoField } from "./cards";
@@ -77,7 +78,7 @@ export default function IdentityView() {
                   <input id="brand-city" value={draft.dealer_city} onChange={(e) => set("dealer_city", e.target.value)} className={controlClass} autoComplete="address-level2" />
                 </RowField>
                 <RowField label="State" htmlFor="brand-state">
-                  <SelectControl id="brand-state" value={(draft.dealer_state || "").toUpperCase()} options={STATE_OPTIONS} onChange={(v) => set("dealer_state", v)} aria-invalid={stateError ? true : undefined} />
+                  <SelectControl id="brand-state" value={normalizeStateCode(draft.dealer_state) || (draft.dealer_state || "").toUpperCase()} options={STATE_OPTIONS} onChange={(v) => set("dealer_state", v)} aria-invalid={stateError ? true : undefined} />
                   {stateError && <p className="mt-1 text-[12px] text-adm-danger">{stateError}</p>}
                 </RowField>
                 <RowField label="Time zone" htmlFor="brand-timezone">

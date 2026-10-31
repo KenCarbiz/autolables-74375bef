@@ -4,13 +4,13 @@ import { renderAdmin } from "@/test/adminRender";
 import { functionCalls, resetSupabaseSpy, rpcCalls, spyCalls, spyResponses, writeCalls } from "@/test/mocks/supabaseSpy";
 import InventoryNetworkPage from "./InventoryNetworkPage";
 
-const mocks = vi.hoisted(() => ({ auth: { user: { id: "u1" }, isAdmin: true, loading: false } }));
+const mocks = vi.hoisted(() => ({ auth: { user: { id: "u1" }, isAdmin: true, loading: false }, tenant: null as { id: string } | null }));
 vi.mock("@/integrations/supabase/client", async () => {
   const m = await import("@/test/mocks/supabaseSpy");
   return { supabase: m.supabaseSpy };
 });
 vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => mocks.auth }));
-vi.mock("@/contexts/TenantContext", () => ({ useTenant: () => ({ tenant: null, currentStore: null }) }));
+vi.mock("@/contexts/TenantContext", () => ({ useTenant: () => ({ tenant: mocks.tenant, currentStore: null }) }));
 vi.mock("@/hooks/useEntitlements", () => ({ useEntitlements: () => ({ member: { role: "admin" }, loading: false }) }));
 vi.mock("@/contexts/DealerSettingsContext", () => ({ useDealerSettings: () => ({ settings: { dealer_timezone: "UTC" }, loading: false }) }));
 
@@ -21,6 +21,7 @@ const emptyOverview = { group, controls, stores: [], exceptions: { open_conflict
 beforeEach(() => {
   resetSupabaseSpy();
   mocks.auth.isAdmin = true;
+  mocks.tenant = null;
 });
 
 describe("InventoryNetworkPage", () => {
@@ -29,6 +30,17 @@ describe("InventoryNetworkPage", () => {
     renderAdmin(<InventoryNetworkPage />, { route: "/admin/integrations/inventory-network" });
     expect(screen.getByText("Platform administrators only")).toBeInTheDocument();
     expect(spyCalls).toEqual([]);
+  });
+
+  it("opens the active account's group, not the first alphabetical one", async () => {
+    const other = { ...group, id: "g0", tenant_id: "t0", name: "AutoLabels.io" };
+    mocks.tenant = { id: "t1" };
+    spyResponses.tables.dealer_groups = { data: [other, group] };
+    spyResponses.rpcs.inv_admin_overview = { data: emptyOverview };
+    renderAdmin(<InventoryNetworkPage />, { route: "/admin/integrations/inventory-network" });
+    expect(await screen.findByText("No stores in this group yet")).toBeInTheDocument();
+    expect((screen.getByLabelText("Dealer group") as HTMLSelectElement).value).toBe("g1");
+    expect(screen.getByRole("link", { name: "Integrations" })).toHaveAttribute("href", "/admin?tab=inventory-feed");
   });
 
   it("explains an empty database instead of inventing data", async () => {

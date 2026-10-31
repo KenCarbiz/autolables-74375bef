@@ -60,6 +60,8 @@ export interface JobInput {
   cron: CronLookup;
   ledger: LedgerFacts | null;
   ledgerLoadFailed?: boolean;
+  /** Newest scheduler run that succeeded. Request delivery only; never a rooftop outcome. */
+  schedulerLastSuccessAt?: string | null;
   now: number;
 }
 
@@ -85,7 +87,7 @@ export function deriveJobRow(i: JobInput): JobRow {
   const cron = i.cron === "unavailable" ? null : i.cron;
   const cronKnown = i.cron !== "unavailable";
   const ledger = i.ledger;
-  const schedulerSucceeded = cron?.last_status?.toLowerCase() === "succeeded" ? cron.last_start : null;
+  const schedulerSucceeded = i.schedulerLastSuccessAt ?? (cron?.last_status?.toLowerCase() === "succeeded" ? cron.last_start : null);
   const lastSuccessAt = ledger?.lastSuccessAt ?? (i.spec.ledger === null ? schedulerSucceeded : null);
   const evidence: JobRow["evidence"] = ledger?.lastSuccessAt ? "rooftop_ledger" : lastSuccessAt ? "scheduler" : "none";
   const verdict = deriveJobHealth({

@@ -9,6 +9,7 @@ import { describeFeeBasis, type FeeBasis } from "@/lib/admin/pricing/feeBasis";
 import { assessConsistency, type ConsistencyAssessment, type ConsistencyListing, type WebsiteObservation } from "@/lib/admin/pricing/priceConsistency";
 import type { SampleVehicle } from "@/lib/admin/pricing/productApplicability";
 import type { PriceDisplayMode } from "@/lib/priceModel";
+import { identityFromListing } from "@/lib/factorySticker/vehicleIdentity";
 
 // Reads and the two writers Pricing & Products may call. Every function here
 // is tenant-scoped, bounded, and answers a failed read with a thrown error so
@@ -67,9 +68,10 @@ const num = (v: unknown): number | null => (v == null || v === "" ? null : Numbe
 interface ListingRow {
   id: string;
   vin: string;
-  year: string | number | null;
-  make: string | null;
-  model: string | null;
+  ymm: string | null;
+  mc_year: string | null;
+  mc_make: string | null;
+  mc_model: string | null;
   trim: string | null;
   condition: string | null;
   mileage: number | null;
@@ -85,19 +87,28 @@ interface ListingRow {
   stock: string | null;
 }
 
-const LISTING_COLUMNS =
-  "id, vin, year, make, model, trim, condition, mileage, price, advertised_price_before_doc, doc_fee, website_sale_price, price_parse_status, price_last_verified_at, archived_at, hero_image_url, vehicle_file_id, stock:mc_attributes->>stock_no";
+// vehicle_listings has no year/make/model columns; identity comes from the
+// provider keys in mc_attributes, then the ymm display string.
+const IDENTITY_COLUMNS = "ymm, mc_year:mc_attributes->>year, mc_make:mc_attributes->>make, mc_model:mc_attributes->>model";
 
-const FEE_COLUMNS = "vin, year, make, model, trim, archived_at, price, advertised_price_before_doc, doc_fee, website_sale_price, price_parse_status, stock:mc_attributes->>stock_no";
+const LISTING_COLUMNS =
+  `id, vin, ${IDENTITY_COLUMNS}, trim, condition, mileage, price, advertised_price_before_doc, doc_fee, website_sale_price, price_parse_status, price_last_verified_at, archived_at, hero_image_url, vehicle_file_id, stock:mc_attributes->>stock_no`;
+
+const FEE_COLUMNS = `vin, ${IDENTITY_COLUMNS}, trim, archived_at, price, advertised_price_before_doc, doc_fee, website_sale_price, price_parse_status, stock:mc_attributes->>stock_no`;
+
+type IdentityRow = Pick<ListingRow, "ymm" | "mc_year" | "mc_make" | "mc_model">;
+
+export const listingIdentity = (r: IdentityRow): { year: string | null; make: string | null; model: string | null } => {
+  const id = identityFromListing({ ymm: r.ymm, mc_attributes: { year: r.mc_year, make: r.mc_make, model: r.mc_model } });
+  return { year: id.year || null, make: id.make || null, model: id.model || null };
+};
 
 export const FEE_ROW_LIMIT = 1000;
 export const CONSISTENCY_LIMIT = 200;
 
 const toFeeRow = (r: ListingRow): FeeImpactRow => ({
   vin: r.vin,
-  year: r.year,
-  make: r.make,
-  model: r.model,
+  ...listingIdentity(r),
   trim: r.trim,
   stock: r.stock ?? null,
   archived: !!r.archived_at,
@@ -111,9 +122,7 @@ const toFeeRow = (r: ListingRow): FeeImpactRow => ({
 const toConsistencyListing = (r: ListingRow): ConsistencyListing => ({
   id: r.id,
   vin: r.vin,
-  year: r.year,
-  make: r.make,
-  model: r.model,
+  ...listingIdentity(r),
   trim: r.trim,
   stock: r.stock ?? null,
   condition: r.condition,
@@ -396,17 +405,15 @@ export async function loadProduct(productId: string): Promise<AdminProduct | nul
 export async function loadSampleVehicles(tenantId: string, limit: number): Promise<SampleVehicle[]> {
   const { data, error } = await db()
     .from("vehicle_listings")
-    .select("vin, year, make, model, trim, condition, mileage")
+    .select(`vin, ${IDENTITY_COLUMNS}, trim, condition, mileage`)
     .eq("tenant_id", tenantId)
     .is("archived_at", null)
     .order("vin")
     .limit(limit);
   if (error) throw readError(error, "Could not read inventory.");
-  return ((data ?? []) as Array<Pick<ListingRow, "vin" | "year" | "make" | "model" | "trim" | "condition" | "mileage">>).map((r) => ({
+  return ((data ?? []) as Array<Pick<ListingRow, "vin" | "ymm" | "mc_year" | "mc_make" | "mc_model" | "trim" | "condition" | "mileage">>).map((r) => ({
     vin: r.vin,
-    year: r.year,
-    make: r.make,
-    model: r.model,
+    ...listingIdentity(r),
     trim: r.trim,
     condition: r.condition,
     mileage: num(r.mileage),

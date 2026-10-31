@@ -152,7 +152,7 @@ const ScopeBadge = ({ count }: { count: number }) => (
     <span className="text-[13px] leading-[18px] text-adm-muted">Scope</span>
     <span className="inline-flex items-center gap-[11px] h-[42px] min-w-[191px] pl-[11px] pr-4 rounded-[6px] border border-adm-border bg-adm-surface text-[13px] leading-[18px] text-adm-ink">
       <Building className="w-[22px] h-[22px] text-adm-muted flex-shrink-0" aria-hidden="true" />
-      {count > 1 ? `All rooftops (${count})` : "This rooftop"}
+      {count > 1 ? `Whole account (${count} rooftops)` : "Whole account"}
     </span>
   </div>
 );

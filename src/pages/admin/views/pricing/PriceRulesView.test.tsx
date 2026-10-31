@@ -235,7 +235,7 @@ describe("PriceRulesView against live data", () => {
   it("builds the consistency table from inventory and website observations without writing", async () => {
     spyResponses.tables.vehicle_listings = {
       data: [
-        { id: "l1", vin: "EXAMPLEVIN0000001", year: 2024, make: "Example", model: "Crossover", trim: "Base", condition: "used", mileage: 12, price: 30000, advertised_price_before_doc: 30000, doc_fee: 895, website_sale_price: 30895, price_parse_status: "ok", price_last_verified_at: "2026-10-20T00:00:00Z", archived_at: null, hero_image_url: null, vehicle_file_id: "f1", stock: "EX-1" },
+        { id: "l1", vin: "EXAMPLEVIN0000001", ymm: "2024 Example Crossover", mc_year: null, mc_make: null, mc_model: null, trim: "Base", condition: "used", mileage: 12, price: 30000, advertised_price_before_doc: 30000, doc_fee: 895, website_sale_price: 30895, price_parse_status: "ok", price_last_verified_at: "2026-10-20T00:00:00Z", archived_at: null, hero_image_url: null, vehicle_file_id: "f1", stock: "EX-1" },
       ],
       count: 1,
       error: null,

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { adminTabHref } from "@/lib/admin/sections";
 import { ChildPageFrame } from "@/components/admin/v2/AdminShell";
 import { MappingReviewBoard } from "@/components/inventoryNetwork/MappingReviewBoard";
 import { NetIcon } from "@/components/inventoryNetwork/icons";
@@ -84,7 +85,7 @@ export default function FilesComFeedPage() {
     onError: (e: Error) => setNotice({ tone: "danger", text: e.message }),
   });
 
-  const crumbs = [{ label: "Administration", href: "/admin" }, { label: "Integrations", href: "/admin?tab=integrations" }, { label: "Files.com inventory" }];
+  const crumbs = [{ label: "Administration", href: "/admin" }, { label: "Integrations", href: adminTabHref("inventory-feed") }, { label: "Files.com inventory" }];
   if (loading) return <ChildPageFrame section="integrations" crumbs={crumbs} title="Files.com inventory"><SkeletonBlock className="h-64 w-full" /></ChildPageFrame>;
   if (!isAdmin) {
     return (

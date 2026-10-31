@@ -75,15 +75,23 @@ export const useVehicleFiles = (storeId: string) => {
       // supabase-js RESOLVES on a query error; returning [] here turned an RLS
       // denial or a dropped connection into a confident "no vehicle files".
       if (error) throw error;
-      const all = (data as VehicleFile[]) || [];
-      return storeId ? all.filter((f) => f.store_id === storeId) : all;
+      return (data as VehicleFile[]) || [];
     },
     // Keep the data fresh for a minute. Mutations below invalidate
     // explicitly, so this only affects background refetch cadence.
     staleTime: 60_000,
   });
 
-  const files = q.data ?? [];
+  const tenantFiles = useMemo(() => q.data ?? [], [q.data]);
+  // Records with no store_id are legacy tenant files that were never
+  // associated with a store. An exact-store filter hid all of them, which
+  // read as "no vehicle files" and invited duplicate creation. They stay
+  // visible under every store and are counted separately as unassigned
+  // until a reviewed association assigns them.
+  const files = useMemo(
+    () => (storeId ? tenantFiles.filter((f) => !f.store_id || f.store_id === storeId) : tenantFiles),
+    [tenantFiles, storeId],
+  );
 
   // An empty list and a failed load look identical downstream, so name it.
   useEffect(() => {
@@ -467,12 +475,15 @@ export const useVehicleFiles = (storeId: string) => {
   );
 
   const stats = useMemo(() => ({
+    tenantTotal: tenantFiles.length,
+    storeAssigned: storeId ? tenantFiles.filter((f) => f.store_id === storeId).length : tenantFiles.filter((f) => !!f.store_id).length,
+    unassigned: tenantFiles.filter((f) => !f.store_id).length,
     totalFiles: files.length,
     totalStickers: files.reduce((sum, f) => sum + f.stickers.length, 0),
     pendingSign: files.filter((f) => f.deal_status === "pending_sign").length,
     signed: files.filter((f) => f.deal_status === "signed").length,
     delivered: files.filter((f) => f.deal_status === "delivered").length,
-  }), [files]);
+  }), [files, tenantFiles, storeId]);
 
   return {
     files,

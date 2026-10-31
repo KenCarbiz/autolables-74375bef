@@ -179,7 +179,7 @@ const Admin = ({ embedded = false, legacyTab }: { embedded?: boolean; legacyTab?
   const { leads } = useLeads(currentStore?.id || "");
 
   // Vehicle files for compliance tracking
-  const { files: vehicleFiles, stats: fileStats, findByVin } = useVehicleFiles(currentStore?.id || "");
+  const { files: vehicleFiles, stats: fileStats, findByVin, isError: vehicleFilesFailed, loading: vehicleFilesLoading } = useVehicleFiles(currentStore?.id || "");
   const [fileSearch, setFileSearch] = useState("");
 
   // Get-Ready pending count for the home KPI. The service catalog and prep
@@ -964,10 +964,31 @@ const Admin = ({ embedded = false, legacyTab }: { embedded?: boolean; legacyTab?
               <StatMini icon={FileText} label="Delivered" value={fileStats.delivered} color="text-blue-600" />
             </div>
 
+            <dl className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm" aria-label="Vehicle file ownership">
+              <div className="rounded-lg border border-border bg-card px-4 py-3">
+                <dt className="text-xs text-muted-foreground">Account total</dt>
+                <dd className="text-lg font-semibold text-foreground">{vehicleFilesFailed ? "Unavailable" : fileStats.tenantTotal}</dd>
+              </div>
+              <div className="rounded-lg border border-border bg-card px-4 py-3">
+                <dt className="text-xs text-muted-foreground">Assigned to {currentStore?.name || "this store"}</dt>
+                <dd className="text-lg font-semibold text-foreground">{vehicleFilesFailed ? "Unavailable" : fileStats.storeAssigned}</dd>
+              </div>
+              <div className="rounded-lg border border-border bg-card px-4 py-3">
+                <dt className="text-xs text-muted-foreground">Not assigned to a store</dt>
+                <dd className="text-lg font-semibold text-foreground">{vehicleFilesFailed ? "Unavailable" : fileStats.unassigned}</dd>
+              </div>
+            </dl>
+            {!vehicleFilesFailed && fileStats.unassigned > 0 && (
+              <p role="note" className="text-xs text-muted-foreground">
+                {fileStats.unassigned} older {fileStats.unassigned === 1 ? "file has" : "files have"} no store yet. {fileStats.unassigned === 1 ? "It is" : "They are"} listed below under every store until a reviewed association assigns {fileStats.unassigned === 1 ? "it" : "them"}. Signed documents, tracking codes and QR links are unchanged.
+              </p>
+            )}
+
             {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
+                aria-label="Search vehicle files"
                 value={fileSearch}
                 onChange={(e) => setFileSearch(e.target.value)}
                 placeholder="Search by VIN, stock #, customer name, or vehicle..."
@@ -977,7 +998,14 @@ const Admin = ({ embedded = false, legacyTab }: { embedded?: boolean; legacyTab?
 
             {/* Vehicle file list */}
             <div className="bg-card rounded-xl border border-border shadow-premium overflow-hidden">
-              {vehicleFiles.length === 0 ? (
+              {vehicleFilesFailed ? (
+                <div role="alert" className="px-5 py-12 text-center">
+                  <p className="text-sm font-medium text-foreground">Vehicle files could not be read</p>
+                  <p className="text-xs text-muted-foreground mt-1">This is a read failure, not an empty file cabinet. Reload to try again.</p>
+                </div>
+              ) : vehicleFilesLoading ? (
+                <div role="status" className="px-5 py-12 text-center text-sm text-muted-foreground">Loading vehicle files...</div>
+              ) : vehicleFiles.length === 0 ? (
                 <div className="px-5 py-12 text-center">
                   <Car className="w-8 h-8 text-muted-foreground/30 mx-auto mb-3" />
                   <p className="text-sm font-medium text-foreground">No vehicle files yet</p>

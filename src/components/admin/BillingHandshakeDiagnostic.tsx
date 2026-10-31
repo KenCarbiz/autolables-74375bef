@@ -56,10 +56,10 @@ const BillingHandshakeDiagnostic = () => {
   const [tenantId, setTenantId] = useState("");
   const [entitlements, setEntitlements] = useState<Entitlement[]>([]);
   const [loading, setLoading] = useState(false);
-  const [reengageSchedule, setReengageSchedule] = useState<{ schedule: string | null; active: boolean } | null>(null);
+  const [reengageSchedule, setReengageSchedule] = useState<{ schedule: string | null; active: boolean; unreadable?: boolean } | null>(null);
   // Wave 24 — surface the advertised-price crawl schedule
   // alongside the reengage one. Same pattern, different RPC.
-  const [crawlSchedule, setCrawlSchedule] = useState<{ schedule: string | null; active: boolean; last_run: string | null } | null>(null);
+  const [crawlSchedule, setCrawlSchedule] = useState<{ schedule: string | null; active: boolean; last_run: string | null; unreadable?: boolean } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -87,9 +87,11 @@ const BillingHandshakeDiagnostic = () => {
     setAudit((auditRes.data as AuditEntry[]) || []);
     setTenants((tenantsRes.data as { id: string; name: string }[]) || []);
     const schedRow = Array.isArray(schedRes.data) ? schedRes.data[0] : schedRes.data;
-    setReengageSchedule(schedRow ? { schedule: schedRow.schedule, active: !!schedRow.active } : { schedule: null, active: false });
+    setReengageSchedule(schedRes.error ? { schedule: null, active: false, unreadable: true } : schedRow ? { schedule: schedRow.schedule, active: !!schedRow.active } : { schedule: null, active: false });
     const crawlRow = Array.isArray(crawlRes.data) ? crawlRes.data[0] : crawlRes.data;
-    setCrawlSchedule(crawlRow ? {
+    // A failed read is not an absent schedule, and a paused job is not a
+    // missing one; each is rendered as itself.
+    setCrawlSchedule(crawlRes.error ? { schedule: null, active: false, last_run: null, unreadable: true } : crawlRow ? {
       schedule: crawlRow.cron_expression,
       active: !!crawlRow.active,
       last_run: crawlRow.last_run ?? null,
@@ -169,6 +171,8 @@ const BillingHandshakeDiagnostic = () => {
           <span className="font-semibold">Abandoned-signing re-engagement: </span>
           {reengageSchedule === null ? (
             <span className="text-muted-foreground">checking\u2026</span>
+          ) : reengageSchedule.unreadable ? (
+            <span className="text-muted-foreground">schedule could not be read. This is unknown, not unscheduled.</span>
           ) : reengageSchedule.schedule ? (
             <>
               scheduled (<span className="font-mono">{reengageSchedule.schedule}</span>) &middot; {reengageSchedule.active ? "active" : "paused"}
@@ -188,16 +192,25 @@ const BillingHandshakeDiagnostic = () => {
           <span className="font-semibold">Advertised-price crawl: </span>
           {crawlSchedule === null ? (
             <span className="text-muted-foreground">checking…</span>
+          ) : crawlSchedule.unreadable ? (
+            <span className="text-muted-foreground">schedule could not be read. This is unknown, not unscheduled.</span>
+          ) : crawlSchedule.schedule && !crawlSchedule.active ? (
+            <>
+              paused (<span className="font-mono">{crawlSchedule.schedule}</span>). The pause is intentional; resuming it is a separate owner decision.
+              {crawlSchedule.last_run && (
+                <> &middot; last run {new Date(crawlSchedule.last_run).toLocaleString()}</>
+              )}
+            </>
           ) : crawlSchedule.schedule ? (
             <>
-              scheduled (<span className="font-mono">{crawlSchedule.schedule}</span>) &middot; {crawlSchedule.active ? "active" : "paused"}
+              scheduled (<span className="font-mono">{crawlSchedule.schedule}</span>) &middot; active
               {crawlSchedule.last_run && (
                 <> &middot; last run {new Date(crawlSchedule.last_run).toLocaleString()}</>
               )}
             </>
           ) : (
             <>
-              not scheduled. Call <span className="font-mono">SELECT public.schedule_crawl_advertised_prices();</span> from psql to enable nightly drift detection.
+              no schedule found.
             </>
           )}
         </div>

@@ -45,4 +45,19 @@ describe("JobsView", () => {
     expect(screen.getAllByText(/Not scheduled/).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "Open feed" })).toHaveAttribute("href", "/admin?tab=inventory-feed");
   });
+
+  it("never lets a delivered scheduler request stand in for the rooftop's own work ledger", () => {
+    // The scheduler delivered today's request, but the actual pull failed (429)
+    // and the rooftop's last real success was 29 days ago.
+    const fixture: JobsViewFixture = {
+      status: {
+        cron: Object.fromEntries(cronNames.map((n) => [n, n === "marketcheck-sync" ? { jobname: n, schedule: "7 * * * *", active: true, last_status: "succeeded", last_message: null, last_start: hoursAgo(1), last_end: null } : null])),
+        serverLedger: { "marketcheck-sync": { lastAttemptAt: hoursAgo(1), lastSuccessAt: hoursAgo(1), lastOutcome: "succeeded" } },
+        source: "admin_job_status",
+      },
+      ledgers: { inventory_sync: { lastAttemptAt: hoursAgo(1), lastSuccessAt: hoursAgo(24 * 29), lastOutcome: "failed" } },
+    };
+    renderInFixture(<JobsView />, { jobs: fixture });
+    expect(screen.queryByText("Healthy")).not.toBeInTheDocument();
+  });
 });
