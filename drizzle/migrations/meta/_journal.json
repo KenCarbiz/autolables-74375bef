@@ -92,6 +92,13 @@
       "when": 1793476000000,
       "tag": "0012_snapshot_shrink_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793479495926,
+      "tag": "0013_apply_snapshot_shrink_guard",
+      "breakpoints": true
     }
   ]
 }

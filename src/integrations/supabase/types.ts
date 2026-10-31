@@ -2126,6 +2126,7 @@ export type Database = {
           legal_name: string | null
           listing_sync_enabled: boolean
           max_invalid_rows: number
+          max_snapshot_shrink_pct: number
           missing_snapshot_threshold: number
           phone: string | null
           provider_ids: Json
@@ -2157,6 +2158,7 @@ export type Database = {
           legal_name?: string | null
           listing_sync_enabled?: boolean
           max_invalid_rows?: number
+          max_snapshot_shrink_pct?: number
           missing_snapshot_threshold?: number
           phone?: string | null
           provider_ids?: Json
@@ -2188,6 +2190,7 @@ export type Database = {
           legal_name?: string | null
           listing_sync_enabled?: boolean
           max_invalid_rows?: number
+          max_snapshot_shrink_pct?: number
           missing_snapshot_threshold?: number
           phone?: string | null
           provider_ids?: Json
@@ -14516,6 +14519,10 @@ export type Database = {
           p_reason: string
           p_reconcile_enabled: boolean
         }
+        Returns: undefined
+      }
+      inv_admin_set_shrink_guard: {
+        Args: { p_max_shrink_pct: number; p_reason: string; p_store_id: string }
         Returns: undefined
       }
       inv_admin_usage: { Args: { p_store_id: string }; Returns: Json }
