@@ -71,6 +71,13 @@
       "when": 1793466616978,
       "tag": "0009_passport_payment_estimator",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793470000000,
+      "tag": "0010_store_mapping_review",
+      "breakpoints": true
     }
   ]
 }
