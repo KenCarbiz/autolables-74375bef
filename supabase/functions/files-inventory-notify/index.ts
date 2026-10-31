@@ -8,7 +8,18 @@ import { MAX_NOTIFY_BYTES, parseNotifyBody, sha256Hex, verifySignatureV2 } from 
 const reply = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
+const authLog = (rid: string, outcome: string, req: Request) => {
+  const v2 = req.headers.get("x-files-signature-v2");
+  console.log(JSON.stringify({
+    fn: "files-inventory-notify", rid, outcome,
+    has_v2: v2 !== null, v2_format_valid: v2 !== null && /^[0-9a-f]{64}$/.test(v2),
+    has_legacy: req.headers.has("x-files-signature"), has_exavault: req.headers.has("x-exavault-signature"),
+  }));
+};
+
 Deno.serve(async (req) => {
+  const rid = crypto.randomUUID();
+  authLog(rid, "entry", req);
   if (req.method !== "POST") return reply(405, { error: "method_not_allowed" });
   const declared = Number(req.headers.get("content-length") ?? "0");
   if (declared > MAX_NOTIFY_BYTES) return reply(413, { error: "body_too_large" });
@@ -16,8 +27,15 @@ Deno.serve(async (req) => {
   if (raw.byteLength > MAX_NOTIFY_BYTES) return reply(413, { error: "body_too_large" });
 
   const secret = Deno.env.get("FILESCOM_WEBHOOK_SECRET");
-  if (!secret) return reply(503, { error: "receiver_not_configured" });
-  if (!(await verifySignatureV2(secret, raw, req.headers.get("x-files-signature-v2")))) return reply(401, { error: "invalid_signature" });
+  if (!secret) {
+    authLog(rid, "receiver_not_configured", req);
+    return reply(503, { error: "receiver_not_configured" });
+  }
+  if (!(await verifySignatureV2(secret, raw, req.headers.get("x-files-signature-v2")))) {
+    authLog(rid, "invalid_signature", req);
+    return reply(401, { error: "invalid_signature" });
+  }
+  authLog(rid, "signature_ok", req);
 
   const parsed = parseNotifyBody(raw);
   if (!parsed.ok) return reply(422, { error: parsed.reason });
