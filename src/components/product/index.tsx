@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { AlertTriangle, CheckCircle2, Info, XCircle } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -54,6 +55,57 @@ export const StatusText = ({ tone = "neutral", children, className }: { tone?: T
     {children}
   </StatusChip>
 );
+
+const TAG_BORDER: Record<Tone, string> = {
+  neutral: "border-adm-border",
+  success: "border-adm-success/40",
+  warning: "border-adm-warning/40",
+  danger: "border-adm-danger/40",
+  info: "border-adm-primary/40",
+};
+
+const TAG_ICON = { neutral: Info, success: CheckCircle2, warning: AlertTriangle, danger: XCircle, info: Info } as const;
+
+/** Vehicle hero status tag: bordered, 4px radius, 16px leading icon. Not for table rows. */
+export const HeroStatusTag = ({ tone = "neutral", children, className }: { tone?: Tone; children: ReactNode; className?: string }) => {
+  const Icon = TAG_ICON[tone];
+  return (
+    <StatusChip tone={tone} className={cn("rounded-[4px] border font-medium", TAG_BORDER[tone], className)}>
+      <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
+      {children}
+    </StatusChip>
+  );
+};
+
+/** Right-side record drawer under the 64px app header; overlays content so tables keep full width. */
+export const SideDrawer = ({ label, onClose, children }: { label: string; onClose: () => void; children: ReactNode }) => {
+  const ref = useRef<HTMLElement>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  useEffect(() => {
+    const prior = document.activeElement as HTMLElement | null;
+    ref.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeRef.current();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      if (prior && document.contains(prior)) prior.focus();
+    };
+  }, []);
+  return (
+    <aside
+      ref={ref}
+      role="dialog"
+      aria-label={label}
+      tabIndex={-1}
+      className="fixed bottom-0 right-0 top-16 z-30 flex w-full max-w-[380px] flex-col overflow-y-auto border-l border-adm-border bg-adm-surface shadow-[var(--al-floating-shadow)] outline-none"
+    >
+      {children}
+    </aside>
+  );
+};
 
 /** Page body: 24px desktop padding, 16px on phones, 24px between sections. */
 export const PageBody = ({ children, className, width = "full" }: { children: ReactNode; className?: string; width?: "full" | "wide" | "form" }) => (

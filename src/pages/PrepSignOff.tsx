@@ -22,7 +22,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ShieldCheck, Camera, Check, X, AlertTriangle, Clock, CheckCircle2, ClipboardCheck, FileText, Image as ImageIcon, Upload, FileSignature, ArrowRight, Car, Wrench, ChevronLeft, Plus } from "lucide-react";
 import EmptyState from "@/components/ui/empty-state";
-import { LocalTabs, MetricStrip, PageBody, PageHeader, Button as ProductButton, Panel as ProductPanel, WorkTable, Th, Td, StatusText, type LocalTab } from "@/components/product";
+import { LocalTabs, MetricStrip, PageBody, PageHeader, Button as ProductButton, Panel as ProductPanel, WorkTable, Th, Td, StatusText, SideDrawer, type LocalTab } from "@/components/product";
 import { uploadPhoto } from "@/lib/storage";
 
 const taskLabel = (accs: Array<{ product_name: string }>) =>
@@ -320,7 +320,7 @@ const PrepSignOff = () => {
             </div>
             {selected && (
               <>
-              <aside aria-label="Sign-off detail" className="flex w-full shrink-0 flex-col self-start rounded-[6px] border border-adm-border bg-adm-surface lg:sticky lg:top-4 lg:w-[340px]">
+              <SideDrawer label="Sign-off detail" onClose={() => select(null)}>
                 <div className="flex items-start justify-between gap-3 border-b border-adm-border px-4 py-3">
                   <div className="min-w-0">
                     <p className="text-[17px] leading-[24px] font-semibold text-adm-ink truncate">Detail work</p>
@@ -406,7 +406,7 @@ const PrepSignOff = () => {
                     {selected.status === "pending" ? "Review and sign" : "Open sign-off"}
                   </ProductButton>
                 </div>
-              </aside>
+              </SideDrawer>
               </>
             )}
           </div>

@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import {
   ArrowLeft, Car, ChevronRight, Copy, ExternalLink, Globe, MoreHorizontal, Pencil,
 } from "lucide-react";
-import { PageBody, LocalTabs, Button, LinkButton, StatusText, EmptyState, SkeletonBlock, type LocalTab } from "@/components/product";
+import { PageBody, LocalTabs, Button, LinkButton, HeroStatusTag, EmptyState, SkeletonBlock, type LocalTab } from "@/components/product";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { FactStrip } from "@/components/detail/parts";
 import { IdentityStrip, lifecycleFacts } from "@/components/vehicleFile/SubPageHeader";
@@ -303,9 +303,9 @@ const VehicleFile = () => {
               <ul aria-label="Vehicle status" className="flex flex-wrap items-center gap-x-2 gap-y-1.5 pt-1">
                 {summary.map((f) => (
                   <li key={f.label} title={f.detail}>
-                    <StatusText tone={f.tone} className="px-3 py-1.5 text-[14px] leading-[20px]">
+                    <HeroStatusTag tone={f.tone} className="px-2.5 py-1 text-[13px] leading-[20px]">
                       {f.value === "Unknown" ? <><span className="font-medium opacity-80">{f.label}</span> {f.value}</> : f.value}
-                    </StatusText>
+                    </HeroStatusTag>
                   </li>
                 ))}
               </ul>
