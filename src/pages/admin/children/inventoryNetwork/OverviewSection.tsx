@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button, EmptyState, InlineNote, KeyValueList, Panel, StatusText, type Tone } from "@/components/product";
 import { setControls, type InventoryFeedControls, type StoreOverview } from "@/lib/inventoryNetwork/api";
+import { NetIcon } from "@/components/inventoryNetwork/icons";
 import { inputClass, mcModeLabel, plural, storeAddress, useAct, useNet, when, humanize, STATUS_TONE } from "./shared";
 
 interface Change { title: string; detail: string; next: Pick<InventoryFeedControls, "ingestion_paused" | "emergency_stop" | "reconcile_enabled">; danger?: boolean; confirmLabel: string }
@@ -91,12 +92,12 @@ function StoreCard({ s }: { s: StoreOverview }) {
           <p className="truncate text-[13px] text-adm-muted">{storeAddress(st) || "No address on file"}</p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
-          {st.is_primary_inventory_store && <StatusText tone="info">Primary</StatusText>}
+          {st.is_primary_inventory_store && <span className="inline-flex items-center gap-1"><NetIcon name="homeStore" className="text-adm-muted" /><StatusText tone="info">Primary</StatusText></span>}
           {st.status === "inactive" && <StatusText tone="neutral">Inactive</StatusText>}
         </div>
       </div>
       <div className="flex flex-wrap gap-1.5">
-        <StatusText tone={health.tone}>{health.label}</StatusText>
+        <span className="inline-flex items-center gap-1"><NetIcon name={st.feed_import_paused ? "paused" : "health"} className="text-adm-muted" /><StatusText tone={health.tone}>{health.label}</StatusText></span>
         <StatusText tone={STATUS_TONE[st.subscription_status] ?? "neutral"}>{humanize(st.subscription_status)}</StatusText>
         <StatusText tone={mc.tone}>{mc.label}</StatusText>
       </div>
@@ -109,9 +110,9 @@ function StoreCard({ s }: { s: StoreOverview }) {
       {(s.counts.price_unknown > 0 || s.counts.no_photos > 0) && <p className="text-[12px] text-adm-muted">{s.counts.price_unknown} without a usable price, {s.counts.no_photos} without photos</p>}
       {failedSince && <p className="text-[12px] text-adm-danger">Last failure {when(s.state?.last_failure_at)}: {humanize(s.state?.last_failure_reason) || "unknown reason"}</p>}
       <div className="mt-auto flex flex-wrap gap-3 pt-1 text-[13px] font-semibold">
-        <Link className="text-adm-primary hover:underline" to={href("stores", { store: st.id })}>Configure</Link>
-        <Link className="text-adm-primary hover:underline" to={href("sharing", { store: st.id })}>Sharing</Link>
-        <Link className="text-adm-primary hover:underline" to={href("marketcheck", { store: st.id })}>MarketCheck</Link>
+        <Link className="inline-flex items-center gap-1 text-adm-primary hover:underline" to={href("stores", { store: st.id })}><NetIcon name="store" />Configure</Link>
+        <Link className="inline-flex items-center gap-1 text-adm-primary hover:underline" to={href("sharing", { store: st.id })}><NetIcon name="sharing" />Sharing</Link>
+        <Link className="inline-flex items-center gap-1 text-adm-primary hover:underline" to={href("marketcheck", { store: st.id })}><NetIcon name="budget" />MarketCheck</Link>
       </div>
     </li>
   );
