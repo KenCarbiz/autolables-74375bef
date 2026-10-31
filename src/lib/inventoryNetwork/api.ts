@@ -542,7 +542,7 @@ export interface MappingPreview {
 export const isTestPath = (path: string) => /webhooktest/i.test(path);
 export const isSetupError = (e: unknown) => explainError(e) === friendlyMessage("42883");
 
-// -- Duplicate reconciliation (migration 0013) ---------------------------------
+// -- Duplicate reconciliation (migration 0014) ---------------------------------
 
 export type DedupeKind = "duplicate_listings" | "unlinked_inventory" | "archived_episode" | "broken_link" | "cross_tenant" | "store_identity";
 export type DedupeDisposition = "eligible" | "needs_review" | "blocked";

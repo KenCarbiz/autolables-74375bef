@@ -117,7 +117,7 @@ CREATE TABLE public.inventory_dedupe_controls (
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT inventory_dedupe_auto_needs_limits CHECK (NOT auto_reconcile_enabled OR limits_approved_at IS NOT NULL)
 );
-INSERT INTO public.inventory_dedupe_controls (id, reason) VALUES (1, 'Initial state: detection on, automatic reconciliation off, purge off.')
+INSERT INTO public.inventory_dedupe_controls (id, emergency_stop, reason) VALUES (1, true, 'Initial rollout: detection only. Emergency stop on, automatic reconciliation off, purge off.')
 ON CONFLICT (id) DO NOTHING;
 
 CREATE TABLE public.inventory_dedupe_store_controls (

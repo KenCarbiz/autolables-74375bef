@@ -1,4 +1,4 @@
--- Rollback for 0013_inventory_duplicate_reconciliation. Non-destructive.
+-- Rollback for 0014_inventory_duplicate_reconciliation. Non-destructive.
 --
 -- Restores the 0012 feed apply and the 0006 feed guard and removes the
 -- reconciliation entry points. It does NOT drop any table or column and does
@@ -11,10 +11,10 @@
 -- To reverse an individual reconciliation, use inv_dedupe_undo BEFORE running
 -- this rollback (it is version-aware and refuses to overwrite later edits).
 --
--- Because the tables stay, 0013 cannot simply be re-run after this rollback
+-- Because the tables stay, 0014 cannot simply be re-run after this rollback
 -- (CREATE TABLE would fail on inventory_dedupe_controls). Re-enabling needs a
 -- forward migration that re-creates only the functions, the feed guard and
--- the 0013 inventory_apply_store_snapshot.
+-- the 0014 inventory_apply_store_snapshot.
 
 BEGIN;
 
@@ -289,6 +289,6 @@ BEGIN
   END IF;
 END $$;
 
-UPDATE public.inventory_dedupe_controls SET auto_reconcile_enabled = false, emergency_stop = true, reason = 'Rolled back 0013', updated_at = now() WHERE id = 1;
+UPDATE public.inventory_dedupe_controls SET auto_reconcile_enabled = false, emergency_stop = true, reason = 'Rolled back 0014', updated_at = now() WHERE id = 1;
 
 COMMIT;

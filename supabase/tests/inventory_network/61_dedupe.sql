@@ -1,4 +1,4 @@
--- Behaviour tests for 0013_inventory_duplicate_reconciliation, on synthetic
+-- Behaviour tests for 0014_inventory_duplicate_reconciliation, on synthetic
 -- data only. Phase A keeps the production unique index (one listing per tenant
 -- + VIN); phase B drops it to exercise the listing-archive path.
 \set ON_ERROR_STOP 1
@@ -85,6 +85,9 @@ CREATE TEMP TABLE baseline AS SELECT (SELECT count(*) FROM provider_requests) AS
   (SELECT count(*) FROM provider_call_events) AS call_events;
 
 -- ===================== Phase A: production index present =====================
+SELECT pg_temp.expect((SELECT emergency_stop AND NOT auto_reconcile_enabled AND NOT purge_enabled AND detection_enabled FROM inventory_dedupe_controls WHERE id = 1), 'the migration starts with the emergency stop on: detection only');
+SELECT pg_temp.expect((SELECT inv_dedupe_scan('00000000-0000-0000-0000-00000000dd01') IS NOT NULL), 'detection runs while the emergency stop is on');
+SELECT inv_dedupe_set_controls('{"emergency_stop": false, "reason": "test: release the initial stop"}');
 SELECT pg_temp.expect(EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'uq_vehicle_listings_tenant_vin'), 'phase A runs with the tenant + VIN unique index');
 SELECT pg_temp.listing('legacy2', '00000000-0000-0000-0000-0000000000d1', pg_temp.v(2), 'published', NULL);
 SELECT pg_temp.listing('sold3', '00000000-0000-0000-0000-0000000000d1', pg_temp.v(3), 'archived', '00000000-0000-0000-0000-0000000005a1', '{"price": 39999}');
