@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { cn } from "@/lib/utils";
 import { ChildPageFrame } from "@/components/admin/v2/AdminShell";
-import { AdminButton, AdminCard, AdminTable, EmptyState, ICON, InlineNote, KeyValueList, SkeletonBlock, StatusChip, Td, Th } from "@/components/admin/v2/primitives";
+import { AdminButton, AdminCard, AdminTable, ICON, InlineNote, KeyValueList, SkeletonBlock, StatusChip, Td, Th } from "@/components/admin/v2/primitives";
 import { adminTabHref } from "@/lib/admin/sections";
 import { useAdminNow, useViewFixture } from "@/lib/admin/dataSource";
 import {
@@ -179,9 +179,6 @@ const ActivityBody = ({ state, rows }: { state: "loading" | "failed" | "ready"; 
   if (state === "failed") {
     return <p role="status" className="px-4 pb-2 text-[13px] text-adm-muted">Delivery activity could not be read for this rooftop. It shows as Unavailable rather than zero.</p>;
   }
-  if (rows.length === 0) {
-    return <div className="px-4"><EmptyState compact title="No escalation notifications recorded." detail="Rows appear here after the escalation sweep attempts a notification." /></div>;
-  }
   return (
     <AdminTable inset caption="Escalation delivery activity" minWidth={640} className={ACTIVITY_TABLE_CLS}>
       <colgroup>{ACTIVITY_COLUMNS.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
@@ -196,6 +193,11 @@ const ActivityBody = ({ state, rows }: { state: "loading" | "failed" | "ready"; 
         </tr>
       </thead>
       <tbody>
+        {rows.length === 0 ? (
+          <tr>
+            <Td colSpan={6} className="!py-4 text-center text-adm-muted">No escalation notifications recorded. Rows appear here after the escalation sweep attempts a notification.</Td>
+          </tr>
+        ) : null}
         {rows.map((r) => {
           const meta = DELIVERY_RESULT_META[r.result];
           return (

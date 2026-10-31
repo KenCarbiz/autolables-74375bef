@@ -6,10 +6,9 @@ import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { compareServicePriority, deriveServicePriority, type ServicePriority } from "@/lib/service/priority";
 import { clearanceReasonLabel } from "@/lib/service/workspaceStatus";
 import {
-  EM_DASH, EmptyState, ErrorCard, LoadingCard,
+  EM_DASH, ErrorCard, LoadingCard, TableEmptyRow,
   formatCommandDate, type Tone,
 } from "@/components/command/CommandPrimitives";
-import { ClipboardList } from "lucide-react";
 import { LinkButton, LocalTabs, MetricStrip, PageBody, PageHeader, StatusText, Td, Th, WorkTable, type LocalTab, type Tone as ProductTone } from "@/components/product";
 import { cn } from "@/lib/utils";
 import { SERVICE_FLOOR_STATES, stateLabel, type ServiceFloorState } from "@/lib/lifecycle/states";
@@ -423,10 +422,7 @@ export default function ServiceWriterDesk() {
         ]}
       />
 
-      {visible.length === 0 ? (
-        <EmptyState Icon={ClipboardList} title={TAB_EMPTY[tab].title} detail={TAB_EMPTY[tab].detail} />
-      ) : (
-        <div>
+      <div>
           <div className="overflow-hidden rounded-md border border-adm-border bg-white">
           <WorkTable caption="Vehicles in the service pipeline, highest priority first" minWidth={960}>
             <thead>
@@ -446,6 +442,7 @@ export default function ServiceWriterDesk() {
               </tr>
             </thead>
             <tbody>
+              {visible.length === 0 ? <TableEmptyRow colSpan={8} title={TAB_EMPTY[tab].title} detail={TAB_EMPTY[tab].detail} /> : null}
               {visible.slice(0, 100).map((r) => (
                 <tr key={r.vehicleId} className="h-14 hover:bg-adm-workspace">
                   <Td className="w-8">
@@ -483,8 +480,7 @@ export default function ServiceWriterDesk() {
               Showing the 100 highest-priority of {visible.length}.
             </p>
           ) : null}
-        </div>
-      )}
+      </div>
     </PageBody>
   );
 }

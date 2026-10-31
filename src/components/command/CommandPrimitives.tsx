@@ -1177,6 +1177,18 @@ export function EmptyState({
   );
 }
 
+/** Empty state for a list that keeps its table header: one muted row, no icon halo. */
+export function TableEmptyRow({ colSpan, title, detail }: { colSpan: number; title: string; detail?: string }) {
+  return (
+    <tr>
+      <td colSpan={colSpan} className="px-3 py-6 text-center text-[14px] leading-[20px] text-adm-muted">
+        <span className="font-medium text-adm-ink">{title}</span>
+        {detail ? <span className="block text-[13px] leading-[18px]">{detail}</span> : null}
+      </td>
+    </tr>
+  );
+}
+
 /* ----------------------------------------------------------------- LoadingCard */
 
 export function LoadingCard({ rows = 3 }: { rows?: number }) {
