@@ -61,6 +61,37 @@ describe("the provider gate fails closed", () => {
   });
 });
 
+describe("the account coordinator fails closed", () => {
+  const admitted = { data: [{ admitted: true, event_id: 7, month_calls: 1, cap: 5000, reserve: 250, reason: "admitted" }], error: null };
+  const withCoordinator = (reserve: { data?: unknown; error?: unknown }) => ({
+    rpc: vi.fn(async (fn: string) =>
+      fn === "provider_call_admit" ? admitted
+        : fn === "provider_reserve" ? { data: reserve.data ?? null, error: reserve.error ?? null }
+          : { data: null, error: null }),
+  });
+
+  it("a coordinator that is not installed refuses the call instead of falling back to the legacy gate", async () => {
+    for (const code of ["PGRST202", "42883"]) {
+      const admin = withCoordinator({ error: { code, message: "function provider_reserve does not exist" } });
+      const r = await admitProviderCall(admin, { url: URL_WITH_KEY, caller: "t", essential: true });
+      expect(r).toMatchObject({ admitted: false, reason: "account_quota", accountReason: "coordinator_not_installed" });
+      expect(admin.rpc).toHaveBeenCalledWith("provider_call_record", expect.objectContaining({ p_event_id: 7, p_outcome: "budget_denied" }));
+    }
+  });
+
+  it("a coordinator refusal (reserve, floor or quota) refuses the call", async () => {
+    for (const reason of ["protected_reserve", "priority_floor", "quota_exhausted"]) {
+      const r = await admitProviderCall(withCoordinator({ data: { reserved: false, reason } }), { url: URL_WITH_KEY, caller: "t" });
+      expect(r).toMatchObject({ admitted: false, accountReason: reason });
+    }
+  });
+
+  it("only a reservation with a request id admits", async () => {
+    expect((await admitProviderCall(withCoordinator({ data: { reserved: true } }), { url: URL_WITH_KEY, caller: "t" })).admitted).toBe(false);
+    expect((await admitProviderCall(withCoordinator({ data: { reserved: true, request_id: "r9" } }), { url: URL_WITH_KEY, caller: "t" })).admitted).toBe(true);
+  });
+});
+
 describe("lane decisions", () => {
   const on = { enabled: true, monthlyCallCap: 10, monthlyUsdCap: null };
   it("missing or disabled lanes refuse", () => {
