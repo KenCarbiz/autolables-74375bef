@@ -1,5 +1,6 @@
 import type { ConsoleFixture } from "@/lib/platformConsole/dataSource";
 import { OVERVIEW_FIXTURE } from "./overview";
+import { STORES_FIXTURE, STORE_FIXTURE } from "./stores";
 
 // Reference screen id -> the console path it renders and the synthetic data it
 // needs. Development-only: imported solely by ConsoleDesignFixture.
@@ -19,4 +20,8 @@ export const CONSOLE_FIXTURES: Record<string, ConsoleFixtureEntry> = {
   "D01-overview": { path: "/platform-console", frame: "desktop", fixture: base("D01-overview", { overview: OVERVIEW_FIXTURE }) },
   "T01-overview": { path: "/platform-console", frame: "tablet", fixture: base("T01-overview", { overview: OVERVIEW_FIXTURE }) },
   "M01-overview": { path: "/platform-console", frame: "phone", fixture: base("M01-overview", { overview: OVERVIEW_FIXTURE }) },
+  // builder A
+  "D02-stores": { path: "/platform-console/stores", frame: "desktop", fixture: base("D02-stores", { stores: STORES_FIXTURE }) },
+  "D03-store": { path: "/platform-console/stores/store-a", frame: "desktop", fixture: base("D03-store", { store: STORE_FIXTURE }) },
+  // end builder A
 };

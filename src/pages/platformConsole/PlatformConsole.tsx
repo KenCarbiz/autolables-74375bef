@@ -12,6 +12,10 @@ type View = LazyExoticComponent<ComponentType>;
 
 export const CONSOLE_ROUTES: { pattern: string; view: View }[] = [
   { pattern: CONSOLE_BASE, view: lazy(() => import("./views/OverviewView")) },
+  // builder A
+  { pattern: `${CONSOLE_BASE}/stores`, view: lazy(() => import("./views/StoresView")) },
+  { pattern: `${CONSOLE_BASE}/stores/:storeId`, view: lazy(() => import("./views/StoreView")) },
+  // end builder A
 ];
 
 export function matchConsoleRoute(path: string) {
