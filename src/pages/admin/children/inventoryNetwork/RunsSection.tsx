@@ -74,6 +74,8 @@ function explain(c: InventoryVinConflict, stores: DealerStore[]) {
   const have = storeLabel(stores, c.existing_store_id);
   if (c.kind === "other_store") return `${claim}'s feed lists this VIN, but ${have} already holds it as live inventory. Transfer closes ${have}'s record so ${claim} can take it on the next import. Dismiss leaves it with ${have}.`;
   if (c.kind === "legacy_listing") return `A listing for this VIN existed before the network. Adopt links it to ${claim}'s feed record. Dismiss leaves the old listing unlinked.`;
+  if (c.kind === "archived_listing") return `${claim}'s feed lists this VIN again, but its listing is archived from an earlier stay or sale. It was not revived. Review it under Duplicate handling, then dismiss.`;
+  if (c.kind === "reconciled_listing_unresolved") return `This VIN's listing was archived as a duplicate, but the record it was merged into could not be found. No listing was created. Review it under Duplicate handling, then dismiss.`;
   return `This VIN has a listing linked to ${have}. Nothing can be adopted automatically. Dismiss it once you have checked.`;
 }
 
