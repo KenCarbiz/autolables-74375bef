@@ -46,7 +46,16 @@ export interface LegacyComparableRow {
   dist?: unknown;
   dealer?: unknown;
   dom?: unknown;
+  // Written only by comp-acquisition-v1. Older rows lack them and stay unknown.
+  listing_id?: unknown;
+  drivetrain?: unknown;
+  certified?: unknown;
+  dealer_id?: unknown;
+  dealer_type?: unknown;
+  last_seen_at?: unknown;
 }
+
+const optText = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
 
 /**
  * Map one stored comparable to an engine candidate.
@@ -83,20 +92,20 @@ export function legacyComparableToCandidate(
     distanceMiles: row.dist,
     daysOnMarket: row.dom,
     dealerName: row.dealer,
-    observedAt: opts?.observedAt ?? null,
+    observedAt: optText(row.last_seen_at) ?? opts?.observedAt ?? null,
+    listingId: optText(row.listing_id),
+    drivetrain: optText(row.drivetrain),
+    certified: typeof row.certified === "boolean" ? row.certified : null,
+    dealerId: row.dealer_id != null && row.dealer_id !== "" ? String(row.dealer_id) : null,
+    dealerType: optText(row.dealer_type),
     // Everything below was never stored. Unknown is the honest value.
-    listingId: null,
-    drivetrain: null,
     powertrain: null,
     transmission: null,
-    certified: null,
     certificationProgram: null,
-    dealerId: null,
     rooftopId: null,
     dealerGroupId: null,
     dealerGroupName: null,
     dealerDomain: null,
-    dealerType: null,
     equipmentCodes: [],
     historyStatus: "unknown",
     conditionStatus: "unknown",

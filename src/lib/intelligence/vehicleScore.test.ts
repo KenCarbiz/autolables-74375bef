@@ -5,7 +5,7 @@ import {
   type VehicleScoreInput,
 } from "./vehicleScore";
 import {
-  exactIdentity, fullInput, inspectedCondition, knownProvenance, recall, thinInput, unknownCondition, unknownRecall, unverifiedTitle, verifiedTitle,
+  exactIdentity, stale as staleFreshness, fullInput, inspectedCondition, knownProvenance, recall, thinInput, unknownCondition, unknownRecall, unverifiedTitle, verifiedTitle,
 } from "./scoreFixtures.test";
 
 const domain = (r: ReturnType<typeof buildVehicleScore>, key: string) => r.domains.find((d) => d.key === key)!;
@@ -81,6 +81,17 @@ describe("missing evidence does not lower the score", () => {
     expect(partial.missingDomains).toEqual(["integrity", "condition"]);
     expect(partial.assessedWeightPct).toBe(35);
     expect(partial.reasons).toContain("public_ineligible:required_domain_not_assessed:integrity");
+  });
+
+  it("stale title, condition or recall evidence blocks the public label and is disclosed", () => {
+    const fresh = buildVehicleScore(fullInput());
+    expect(fresh.evidenceFreshness).toEqual({ title_odometer: "current", condition: "current", recall: "current" });
+    const stale = buildVehicleScore(fullInput({ titleOdometer: verifiedTitle({ freshness: staleFreshness() }) }));
+    expect(stale.score).toBe(fresh.score);
+    expect(stale.label).toBeNull();
+    expect(stale.publication).toBe("provisional");
+    expect(stale.evidenceFreshness.title_odometer).toBe("stale");
+    expect(stale.reasons).toContain("public_ineligible:evidence_stale:title_odometer");
   });
 
   it("documents alone cannot assess the safety domain without an answered VIN recall check", () => {

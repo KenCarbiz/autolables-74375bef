@@ -207,7 +207,11 @@ export function dedupeByVin<T extends MarketComparable>(comps: T[]): DedupeResul
     const [a0, a1, a2] = score(a); const [b0, b1, b2] = score(b);
     if (a0 !== b0) return a0 > b0;
     if (a1 !== b1) return a1 > b1;
-    return a2 > b2;
+    if (a2 !== b2) return a2 > b2;
+    // Final ties are broken on the listing itself so arrival order never decides.
+    const ka = `${a.listingId ?? ""}|${a.distanceMiles ?? ""}|${a.normalizedVehiclePrice ?? ""}`;
+    const kb = `${b.listingId ?? ""}|${b.distanceMiles ?? ""}|${b.normalizedVehiclePrice ?? ""}`;
+    return ka < kb;
   };
 
   for (const c of comps) {
@@ -220,7 +224,8 @@ export function dedupeByVin<T extends MarketComparable>(comps: T[]): DedupeResul
     dropped.push({ ...loser, inclusionStatus: "excluded", exclusionReasons: [...loser.exclusionReasons, "duplicate_vin"] });
   }
 
-  return { kept: [...best.values()], dropped };
+  const kept = [...best.values()].sort((a, b) => (a.vin < b.vin ? -1 : a.vin > b.vin ? 1 : 0));
+  return { kept, dropped };
 }
 
 export interface TierAssignment {
