@@ -230,7 +230,7 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready, strip }: { vehicle: Veh
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {header}
 
       {loading ? (
@@ -279,7 +279,7 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready, strip }: { vehicle: Veh
           <p className="-mt-2 text-[13px] leading-[18px] text-adm-muted">Complete all items to make this vehicle retail ready.</p>
           <ul className="divide-y divide-adm-border">
             {ready.checks.map((c) => (
-              <li key={c.label} className="flex items-center justify-between gap-3 py-[6px] text-[14px] leading-[20px]">
+              <li key={c.label} className="flex items-center justify-between gap-3 py-[4px] text-[14px] leading-[20px]">
                 <span className="inline-flex items-center gap-2 min-w-0">
                   <span role="img" aria-label={c.ok ? "Complete" : c.blocks ? "Open, blocks publish" : "Open"} className={`h-4 w-4 shrink-0 rounded-[3px] border inline-flex items-center justify-center ${c.ok ? "bg-adm-primary border-adm-primary text-white" : "bg-adm-surface border-adm-border"}`}>
                     {c.ok && <Check className="w-3 h-3" strokeWidth={3} aria-hidden="true" />}

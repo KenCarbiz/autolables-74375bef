@@ -173,7 +173,7 @@ const PlatformTenantDetail = () => {
                 {shown.map((m) => {
                   const st = memberStatus(m);
                   return (
-                    <tr key={m.id} className="[&>td]:!py-2.5">
+                    <tr key={m.id} className="[&>td]:!py-2">
                       <Td className="max-w-[240px]">
                         <Link to={`/platform-admin/members/${m.id}`} className="block truncate font-semibold text-adm-primary hover:underline">
                           {memberLabel(m) ?? "Pending seat"}

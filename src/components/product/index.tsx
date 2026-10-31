@@ -253,7 +253,7 @@ export const MetricStrip = ({ metrics, label, className, action, numberFirst = f
             const valueNode = m.loading ? <SkeletonBlock className="h-7 w-16" /> : <ValueOrUnknown value={m.value} />;
             const body = numberFirst ? (
               <>
-                <dd className={cn("font-bold tabular-nums text-[28px] leading-[34px]", valueTone)}>{valueNode}</dd>
+                <dd className={cn("font-bold tabular-nums text-[28px] leading-[30px]", valueTone)}>{valueNode}</dd>
                 <dt className="text-[14px] leading-[20px] font-medium text-adm-ink">{m.label}</dt>
                 {m.hint && <dd className="truncate text-[12px] leading-[18px] text-adm-muted">{m.hint}</dd>}
               </>
@@ -269,8 +269,8 @@ export const MetricStrip = ({ metrics, label, className, action, numberFirst = f
             const barred = noBars ? false : numberFirst || allBars ? !m.loading : !m.loading && m.value !== 0 && m.value !== "0" && (m.tone === "danger" || m.tone === "success" || m.tone === "warning");
             const barColor = m.tone === "danger" ? "before:bg-adm-danger" : m.tone === "success" ? "before:bg-adm-success" : m.tone === "warning" ? "before:bg-[#B45309]" : m.tone === "info" ? "before:bg-adm-primary" : "before:bg-adm-border";
             const cell = cn(
-              "relative block py-3 px-5 min-w-0",
-              barred && "before:absolute before:left-0 before:top-3 before:bottom-3 before:w-[3px]",
+              "relative block px-5 min-w-0", numberFirst ? "py-2.5" : "py-3",
+              barred && "before:absolute before:left-0 before:top-2.5 before:bottom-2.5 before:w-[3px]",
               barred && barColor,
               i % 2 === 1 && "border-l border-adm-border",
               i >= 2 && "border-t border-adm-border lg:border-t-0",

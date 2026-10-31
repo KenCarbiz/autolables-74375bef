@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import { ChevronDown } from "lucide-react";
 import Seo from "@/components/Seo";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   EmptyState,
   LinkButton,
@@ -264,11 +266,16 @@ const DealDetail = () => {
         description={deal.returnInfo ? deal.returnInfo.label : deal.stateDetail}
         actions={
           <>
-            {deal.listingId && (
-              <LinkButton to={`/vehicle-file/${deal.listingId}`}>View vehicle</LinkButton>
-            )}
-            {deal.customerId && deal.customerName && (
-              <LinkButton to={`/customers/${encodeURIComponent(deal.customerId)}`}>Customer record</LinkButton>
+            {(deal.listingId || (deal.customerId && deal.customerName)) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger className="inline-flex min-h-[36px] items-center gap-1.5 rounded-md border border-adm-border bg-adm-surface px-3.5 text-[14px] font-semibold text-adm-ink hover:bg-adm-workspace">
+                  More <ChevronDown className="h-5 w-5" aria-hidden="true" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  {deal.listingId && <DropdownMenuItem asChild><Link to={`/vehicle-file/${deal.listingId}`}>View vehicle</Link></DropdownMenuItem>}
+                  {deal.customerId && deal.customerName && <DropdownMenuItem asChild><Link to={`/customers/${encodeURIComponent(deal.customerId)}`}>Customer record</Link></DropdownMenuItem>}
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
             {deal.priceIntegrity.state !== "verified" && resolveTo && deal.state !== "signed" && deal.state !== "delivered" ? (
               <LinkButton to={resolveTo} variant="primary">Resolve price</LinkButton>

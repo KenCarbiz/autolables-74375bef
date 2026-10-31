@@ -106,12 +106,13 @@ const CustomerRecord = () => {
         }
       />
 
-      <div className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)_320px] lg:items-start">
-        <div className="flex min-w-0 flex-col gap-6">
-          <Panel className="[&>div]:flex [&>div]:flex-col [&>div]:gap-5">
+      <div className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)_320px] lg:items-start lg:gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
+          <Panel className="[&>div]:flex [&>div]:flex-col [&>div]:gap-3">
             <section aria-label="Contact information">
             <h3 className="mb-2 text-[16px] leading-[22px] font-semibold text-adm-ink">Contact information</h3>
             <SummaryList
+              dense
               rows={[
                 { label: "Name", value: customer.identified ? customer.name || "Not given" : "Unidentified" },
                 { label: "Phone", value: customer.phone || "Not captured" },
@@ -131,11 +132,11 @@ const CustomerRecord = () => {
               </p>
             )}
             </section>
-            <section aria-label="Communication consent" className="border-t border-adm-border pt-4">
+            <section aria-label="Communication consent" className="border-t border-adm-border pt-3">
               <h3 className="mb-2 text-[16px] leading-[22px] font-semibold text-adm-ink">Communication consent</h3>
               <SummaryList dense rows={[{ label: "Email", value: "Unknown" }, { label: "SMS", value: "Unknown" }, { label: "Phone", value: "Unknown" }]} />
             </section>
-            <section aria-label="Assigned to" className="border-t border-adm-border pt-4">
+            <section aria-label="Assigned to" className="border-t border-adm-border pt-3">
               <h3 className="mb-1 text-[16px] leading-[22px] font-semibold text-adm-ink">Assigned to</h3>
               <p className="text-[14px] leading-[20px] text-adm-ink">
                 {customer.assignedEmployee ? customer.assignedEmployee.name : "Unassigned"}
@@ -145,7 +146,7 @@ const CustomerRecord = () => {
           </Panel>
         </div>
 
-        <div className="flex min-w-0 flex-col gap-6">
+        <div className="flex min-w-0 flex-col gap-4">
           <Panel title="Current vehicle journey" description={`${customer.vehicles.length} ${customer.vehicles.length === 1 ? "vehicle" : "vehicles"} touched`}>
             {customer.vehicles.length === 0 ? (
               <p className="text-[14px] leading-[20px] text-adm-muted">No lead, document request, deal or tracked session names a vehicle for this customer.</p>
@@ -262,7 +263,7 @@ const CustomerRecord = () => {
           </Panel>
         </div>
 
-        <div className="flex min-w-0 flex-col gap-6">
+        <div className="flex min-w-0 flex-col gap-4">
           <Panel title={`Tasks (${followUp.tasks.filter((t) => t.status !== "completed").length + (customer.nextAction ? 1 : 0)})`}>
             {!customer.nextAction && followUp.tasks.length === 0 ? (
               <p className="text-[14px] leading-[20px] text-adm-muted">No open task.</p>
