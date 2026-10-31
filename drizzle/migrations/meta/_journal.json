@@ -64,6 +64,13 @@
       "when": 1793430544871,
       "tag": "0008_marketcheck_bulk_feeds",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793462111306,
+      "tag": "0009_noop_apply_pending_0006_0008",
+      "breakpoints": true
     }
   ]
 }
