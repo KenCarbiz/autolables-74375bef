@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { screen, waitFor, within } from "@testing-library/react";
 import { renderAdmin } from "@/test/adminRender";
 import { functionCalls, resetSupabaseSpy, rpcCalls, spyResponses, writeCalls } from "@/test/mocks/supabaseSpy";
@@ -25,6 +25,8 @@ beforeEach(() => {
   spyResponses.rpcs.inv_dedupe_overview = { data: fx.overview };
 });
 
+afterEach(() => vi.useRealTimers());
+
 describe("Duplicate handling", () => {
   it("lists candidates by suffix only and reads without writing or calling functions", async () => {
     renderAdmin(<InventoryNetworkPage />, { route: route("") });
@@ -39,6 +41,9 @@ describe("Duplicate handling", () => {
 
   it("shows KEEP, ARCHIVE, LINK and PRESERVE for an eligible preview, with zero provider calls", async () => {
     spyResponses.rpcs.inv_dedupe_get_preview = { data: fx.eligible };
+    // The fixture's preview carries a real expiry; read it while still open.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(fx.eligible.expires_at).getTime() - 60_000);
     renderAdmin(<InventoryNetworkPage />, { route: route(`&preview=${fx.eligibleId}`) });
     const list = await screen.findByRole("heading", { name: "What happens to each record" });
     const section = list.closest("section")!;
