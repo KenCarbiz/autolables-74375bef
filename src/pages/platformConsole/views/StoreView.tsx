@@ -33,7 +33,7 @@ export default function StoreView() {
               </Panel>
               <Panel id="pc-store-assoc" title="Associated inventory" helper={m.sharingNote} className="min-h-[328px]">
                 <PanelLines className="mt-[20px] gap-[17px]" lines={m.sharing} />
-                <LinkButton to={consolePath.action(`review-sharing:${storeId}`)} className="mt-[60px] w-[300px] max-w-full">Review sharing permissions</LinkButton>
+                <LinkButton to={consolePath.action(`review-sharing.${storeId}`)} className="mt-[60px] w-[300px] max-w-full">Review sharing permissions</LinkButton>
               </Panel>
             </div>
             <Panel id="pc-store-onboarding" title="Onboarding checklist" helper="Store identity → feed mapping → first import → price validation → publish authorization" className="min-h-[180px]">

@@ -1,6 +1,7 @@
 import type { ConsoleFixture } from "@/lib/platformConsole/dataSource";
 import { OVERVIEW_FIXTURE } from "./overview";
 import { STORES_FIXTURE, STORE_FIXTURE } from "./stores";
+import { ACTION_FIXTURE, ACTION_PHONE_FIXTURE, CONNECTIONS_FIXTURE, FILESCOM_FIXTURE, MAPPING_FIXTURE } from "./connections";
 
 // Reference screen id -> the console path it renders and the synthetic data it
 // needs. Development-only: imported solely by ConsoleDesignFixture.
@@ -23,5 +24,12 @@ export const CONSOLE_FIXTURES: Record<string, ConsoleFixtureEntry> = {
   // builder A
   "D02-stores": { path: "/platform-console/stores", frame: "desktop", fixture: base("D02-stores", { stores: STORES_FIXTURE }) },
   "D03-store": { path: "/platform-console/stores/store-a", frame: "desktop", fixture: base("D03-store", { store: STORE_FIXTURE }) },
+  "D04-connections": { path: "/platform-console/connections", frame: "desktop", fixture: base("D04-connections", { connections: CONNECTIONS_FIXTURE }) },
+  "D05-files": { path: "/platform-console/connections/files-com", frame: "desktop", fixture: base("D05-files", { "files-com": FILESCOM_FIXTURE }) },
+  "D18-mapping": { path: "/platform-console/connections/mapping", frame: "desktop", fixture: base("D18-mapping", { mapping: MAPPING_FIXTURE }) },
+  "D17-action": { path: "/platform-console/actions/replay-import.IMP-1042", frame: "desktop", fixture: base("D17-action", { action: ACTION_FIXTURE }) },
+  "T02-files": { path: "/platform-console/connections/files-com", frame: "tablet", fixture: base("T02-files", { "files-com": FILESCOM_FIXTURE }) },
+  "M02-files": { path: "/platform-console/connections/files-com", frame: "phone", fixture: base("M02-files", { "files-com": FILESCOM_FIXTURE }) },
+  "M06-action": { path: "/platform-console/actions/replay-import.IMP-1042", frame: "phone", fixture: base("M06-action", { action: ACTION_PHONE_FIXTURE }) },
   // end builder A
 };

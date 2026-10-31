@@ -28,7 +28,7 @@ export default function StoresView() {
           <>
             <MetricGrid metrics={m.metrics} label="Store summary" />
             <div className="flex justify-end">
-              <LinkButton to={consolePath.action("add-store")} variant="primary" icon="plus" className="w-full justify-start md:w-[200px]">Add store / group</LinkButton>
+              <LinkButton to={consolePath.action("add-store.new")} variant="primary" icon="plus" className="w-full justify-start md:w-[200px]">Add store / group</LinkButton>
             </div>
             {m.rows.length === 0 ? (
               <p className="text-[13px] text-[#52677C]">{m.rowsNote}</p>
