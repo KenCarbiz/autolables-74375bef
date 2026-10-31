@@ -819,6 +819,336 @@ export type Database = {
           },
         ]
       }
+      bulk_feed_contracts: {
+        Row: {
+          compression: string
+          contract_evidence: string | null
+          contract_verified_at: string | null
+          contract_verified_by: string | null
+          contracted: boolean
+          customer_display: string
+          data_refresh_cadence: string | null
+          delivery_method: string
+          delivery_scope: string
+          enabled: boolean
+          feed_key: string
+          format: string
+          label: string
+          max_bytes: number
+          max_row_drop_pct: number
+          max_rows: number
+          provider: string
+          replay_rights: string
+          retention_days: number | null
+          sharing_rights: string
+          storage_rights: string
+          updated_at: string
+          updated_by: string | null
+          webhook_secret_ref: string | null
+        }
+        Insert: {
+          compression?: string
+          contract_evidence?: string | null
+          contract_verified_at?: string | null
+          contract_verified_by?: string | null
+          contracted?: boolean
+          customer_display?: string
+          data_refresh_cadence?: string | null
+          delivery_method: string
+          delivery_scope?: string
+          enabled?: boolean
+          feed_key: string
+          format: string
+          label: string
+          max_bytes?: number
+          max_row_drop_pct?: number
+          max_rows?: number
+          provider?: string
+          replay_rights?: string
+          retention_days?: number | null
+          sharing_rights?: string
+          storage_rights?: string
+          updated_at?: string
+          updated_by?: string | null
+          webhook_secret_ref?: string | null
+        }
+        Update: {
+          compression?: string
+          contract_evidence?: string | null
+          contract_verified_at?: string | null
+          contract_verified_by?: string | null
+          contracted?: boolean
+          customer_display?: string
+          data_refresh_cadence?: string | null
+          delivery_method?: string
+          delivery_scope?: string
+          enabled?: boolean
+          feed_key?: string
+          format?: string
+          label?: string
+          max_bytes?: number
+          max_row_drop_pct?: number
+          max_rows?: number
+          provider?: string
+          replay_rights?: string
+          retention_days?: number | null
+          sharing_rights?: string
+          storage_rights?: string
+          updated_at?: string
+          updated_by?: string | null
+          webhook_secret_ref?: string | null
+        }
+        Relationships: []
+      }
+      bulk_feed_deliveries: {
+        Row: {
+          completed_at: string | null
+          completion_evidence: string
+          completion_evidence_ref: string | null
+          created_at: string
+          data_as_of: string | null
+          delivery_key: string
+          enriched_at: string | null
+          environment: string
+          error: string | null
+          expected_at: string | null
+          expected_parts: number | null
+          expected_row_count: number | null
+          feed_key: string
+          id: string
+          imported_at: string | null
+          invalid_rows: number | null
+          received_at: string | null
+          replay_of: string | null
+          replay_reason: string | null
+          row_count: number | null
+          schema_version: string | null
+          scope: string
+          status: string
+          valid_rows: number | null
+          validated_at: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          completion_evidence?: string
+          completion_evidence_ref?: string | null
+          created_at?: string
+          data_as_of?: string | null
+          delivery_key: string
+          enriched_at?: string | null
+          environment: string
+          error?: string | null
+          expected_at?: string | null
+          expected_parts?: number | null
+          expected_row_count?: number | null
+          feed_key: string
+          id?: string
+          imported_at?: string | null
+          invalid_rows?: number | null
+          received_at?: string | null
+          replay_of?: string | null
+          replay_reason?: string | null
+          row_count?: number | null
+          schema_version?: string | null
+          scope: string
+          status?: string
+          valid_rows?: number | null
+          validated_at?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          completion_evidence?: string
+          completion_evidence_ref?: string | null
+          created_at?: string
+          data_as_of?: string | null
+          delivery_key?: string
+          enriched_at?: string | null
+          environment?: string
+          error?: string | null
+          expected_at?: string | null
+          expected_parts?: number | null
+          expected_row_count?: number | null
+          feed_key?: string
+          id?: string
+          imported_at?: string | null
+          invalid_rows?: number | null
+          received_at?: string | null
+          replay_of?: string | null
+          replay_reason?: string | null
+          row_count?: number | null
+          schema_version?: string | null
+          scope?: string
+          status?: string
+          valid_rows?: number | null
+          validated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulk_feed_deliveries_feed_key_fkey"
+            columns: ["feed_key"]
+            isOneToOne: false
+            referencedRelation: "bulk_feed_contracts"
+            referencedColumns: ["feed_key"]
+          },
+          {
+            foreignKeyName: "bulk_feed_deliveries_replay_of_fkey"
+            columns: ["replay_of"]
+            isOneToOne: false
+            referencedRelation: "bulk_feed_deliveries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bulk_feed_delivery_parts: {
+        Row: {
+          actual_checksum: string | null
+          delivery_id: string
+          downloaded_at: string | null
+          expected_checksum: string | null
+          integrity: string
+          part_no: number
+          path: string
+          received_at: string
+          row_count: number | null
+          size_bytes: number | null
+          storage_ref: string | null
+        }
+        Insert: {
+          actual_checksum?: string | null
+          delivery_id: string
+          downloaded_at?: string | null
+          expected_checksum?: string | null
+          integrity?: string
+          part_no: number
+          path: string
+          received_at?: string
+          row_count?: number | null
+          size_bytes?: number | null
+          storage_ref?: string | null
+        }
+        Update: {
+          actual_checksum?: string | null
+          delivery_id?: string
+          downloaded_at?: string | null
+          expected_checksum?: string | null
+          integrity?: string
+          part_no?: number
+          path?: string
+          received_at?: string
+          row_count?: number | null
+          size_bytes?: number | null
+          storage_ref?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulk_feed_delivery_parts_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "bulk_feed_deliveries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bulk_feed_exceptions: {
+        Row: {
+          delivery_id: string | null
+          detail: string | null
+          feed_key: string | null
+          id: number
+          kind: string
+          opened_at: string
+          resolution: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+        }
+        Insert: {
+          delivery_id?: string | null
+          detail?: string | null
+          feed_key?: string | null
+          id?: number
+          kind: string
+          opened_at?: string
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+        }
+        Update: {
+          delivery_id?: string | null
+          detail?: string | null
+          feed_key?: string | null
+          id?: number
+          kind?: string
+          opened_at?: string
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulk_feed_exceptions_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "bulk_feed_deliveries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bulk_feed_schema_versions: {
+        Row: {
+          announced_at: string | null
+          deprecated_fields: string[]
+          effective_at: string | null
+          feed_key: string
+          fields: Json
+          notes: string | null
+          release_kind: string
+          status: string
+          validated_at: string | null
+          validated_by: string | null
+          validation_deadline: string | null
+          version: string
+        }
+        Insert: {
+          announced_at?: string | null
+          deprecated_fields?: string[]
+          effective_at?: string | null
+          feed_key: string
+          fields?: Json
+          notes?: string | null
+          release_kind?: string
+          status?: string
+          validated_at?: string | null
+          validated_by?: string | null
+          validation_deadline?: string | null
+          version: string
+        }
+        Update: {
+          announced_at?: string | null
+          deprecated_fields?: string[]
+          effective_at?: string | null
+          feed_key?: string
+          fields?: Json
+          notes?: string | null
+          release_kind?: string
+          status?: string
+          validated_at?: string | null
+          validated_by?: string | null
+          validation_deadline?: string | null
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulk_feed_schema_versions_feed_key_fkey"
+            columns: ["feed_key"]
+            isOneToOne: false
+            referencedRelation: "bulk_feed_contracts"
+            referencedColumns: ["feed_key"]
+          },
+        ]
+      }
       compliance_form_templates: {
         Row: {
           content_hash: string
@@ -1380,6 +1710,48 @@ export type Database = {
         }
         Relationships: []
       }
+      dealer_groups: {
+        Row: {
+          created_at: string
+          id: string
+          legal_name: string | null
+          name: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          legal_name?: string | null
+          name: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          legal_name?: string | null
+          name?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dealer_groups_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dealer_groups_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dealer_passport_settings: {
         Row: {
           created_at: string
@@ -1732,6 +2104,124 @@ export type Database = {
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "sticker_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dealer_stores: {
+        Row: {
+          adopt_legacy_matches: boolean
+          city: string | null
+          created_at: string
+          created_by: string | null
+          customer_browser_enabled: boolean
+          display_name: string
+          feed_import_paused: boolean
+          feed_price_updates_listing: boolean
+          group_id: string
+          id: string
+          inventory_feed_enabled: boolean
+          inventory_sharing_enabled: boolean
+          is_primary_inventory_store: boolean
+          legal_name: string | null
+          listing_sync_enabled: boolean
+          max_invalid_rows: number
+          missing_snapshot_threshold: number
+          phone: string | null
+          provider_ids: Json
+          retirement_automation_enabled: boolean
+          state: string | null
+          status: string
+          street: string | null
+          subscription_status: string
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+          website: string | null
+          zip: string | null
+        }
+        Insert: {
+          adopt_legacy_matches?: boolean
+          city?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_browser_enabled?: boolean
+          display_name: string
+          feed_import_paused?: boolean
+          feed_price_updates_listing?: boolean
+          group_id: string
+          id?: string
+          inventory_feed_enabled?: boolean
+          inventory_sharing_enabled?: boolean
+          is_primary_inventory_store?: boolean
+          legal_name?: string | null
+          listing_sync_enabled?: boolean
+          max_invalid_rows?: number
+          missing_snapshot_threshold?: number
+          phone?: string | null
+          provider_ids?: Json
+          retirement_automation_enabled?: boolean
+          state?: string | null
+          status?: string
+          street?: string | null
+          subscription_status?: string
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+          website?: string | null
+          zip?: string | null
+        }
+        Update: {
+          adopt_legacy_matches?: boolean
+          city?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_browser_enabled?: boolean
+          display_name?: string
+          feed_import_paused?: boolean
+          feed_price_updates_listing?: boolean
+          group_id?: string
+          id?: string
+          inventory_feed_enabled?: boolean
+          inventory_sharing_enabled?: boolean
+          is_primary_inventory_store?: boolean
+          legal_name?: string | null
+          listing_sync_enabled?: boolean
+          max_invalid_rows?: number
+          missing_snapshot_threshold?: number
+          phone?: string | null
+          provider_ids?: Json
+          retirement_automation_enabled?: boolean
+          state?: string | null
+          status?: string
+          street?: string | null
+          subscription_status?: string
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          website?: string | null
+          zip?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dealer_stores_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "dealer_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dealer_stores_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dealer_stores_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -4793,6 +5283,54 @@ export type Database = {
         }
         Relationships: []
       }
+      integration_timing: {
+        Row: {
+          delivery_grace_minutes: number
+          enrichment_cron: string | null
+          enrichment_mode: string
+          expected_delivery_cron: string | null
+          expected_delivery_tz: string | null
+          import_cron: string | null
+          import_mode: string
+          integration: string
+          integration_key: string
+          note: string | null
+          reconciliation_cron: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          delivery_grace_minutes?: number
+          enrichment_cron?: string | null
+          enrichment_mode?: string
+          expected_delivery_cron?: string | null
+          expected_delivery_tz?: string | null
+          import_cron?: string | null
+          import_mode?: string
+          integration: string
+          integration_key: string
+          note?: string | null
+          reconciliation_cron?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          delivery_grace_minutes?: number
+          enrichment_cron?: string | null
+          enrichment_mode?: string
+          expected_delivery_cron?: string | null
+          expected_delivery_tz?: string | null
+          import_cron?: string | null
+          import_mode?: string
+          integration?: string
+          integration_key?: string
+          note?: string | null
+          reconciliation_cron?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       inventory_feed_bindings: {
         Row: {
           approved_at: string | null
@@ -4861,6 +5399,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      inventory_feed_controls: {
+        Row: {
+          emergency_stop: boolean
+          id: number
+          ingestion_paused: boolean
+          reason: string | null
+          reconcile_enabled: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          emergency_stop?: boolean
+          id?: number
+          ingestion_paused?: boolean
+          reason?: string | null
+          reconcile_enabled?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          emergency_stop?: boolean
+          id?: number
+          ingestion_paused?: boolean
+          reason?: string | null
+          reconcile_enabled?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
       }
       inventory_feed_events: {
         Row: {
@@ -4972,8 +5540,78 @@ export type Database = {
         }
         Relationships: []
       }
+      inventory_feed_jobs: {
+        Row: {
+          attempts: number
+          created_at: string
+          event_id: string | null
+          finished_at: string | null
+          id: string
+          kind: string
+          last_error: string | null
+          lock_token: string | null
+          locked_until: string | null
+          max_attempts: number
+          next_attempt_at: string
+          path: string
+          provider: string
+          requested_by: string | null
+          result: Json | null
+          run_id: string | null
+          started_at: string | null
+          status: string
+          trigger: string
+          version_key: string | null
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          event_id?: string | null
+          finished_at?: string | null
+          id?: string
+          kind?: string
+          last_error?: string | null
+          lock_token?: string | null
+          locked_until?: string | null
+          max_attempts?: number
+          next_attempt_at?: string
+          path: string
+          provider?: string
+          requested_by?: string | null
+          result?: Json | null
+          run_id?: string | null
+          started_at?: string | null
+          status?: string
+          trigger: string
+          version_key?: string | null
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          event_id?: string | null
+          finished_at?: string | null
+          id?: string
+          kind?: string
+          last_error?: string | null
+          lock_token?: string | null
+          locked_until?: string | null
+          max_attempts?: number
+          next_attempt_at?: string
+          path?: string
+          provider?: string
+          requested_by?: string | null
+          result?: Json | null
+          run_id?: string | null
+          started_at?: string | null
+          status?: string
+          trigger?: string
+          version_key?: string | null
+        }
+        Relationships: []
+      }
       inventory_feed_runs: {
         Row: {
+          affected_store_ids: string[]
           binding_id: string | null
           binding_status: string | null
           content_sha256: string | null
@@ -4981,6 +5619,7 @@ export type Database = {
           file_id: string | null
           finished_at: string | null
           id: string
+          job_id: string | null
           kind: string
           path: string
           provider: string
@@ -4993,6 +5632,7 @@ export type Database = {
           triggered_by: string | null
         }
         Insert: {
+          affected_store_ids?: string[]
           binding_id?: string | null
           binding_status?: string | null
           content_sha256?: string | null
@@ -5000,6 +5640,7 @@ export type Database = {
           file_id?: string | null
           finished_at?: string | null
           id?: string
+          job_id?: string | null
           kind?: string
           path: string
           provider?: string
@@ -5012,6 +5653,7 @@ export type Database = {
           triggered_by?: string | null
         }
         Update: {
+          affected_store_ids?: string[]
           binding_id?: string | null
           binding_status?: string | null
           content_sha256?: string | null
@@ -5019,6 +5661,7 @@ export type Database = {
           file_id?: string | null
           finished_at?: string | null
           id?: string
+          job_id?: string | null
           kind?: string
           path?: string
           provider?: string
@@ -5043,6 +5686,531 @@ export type Database = {
             columns: ["file_id"]
             isOneToOne: false
             referencedRelation: "inventory_feed_files"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_feed_runs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_feed_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_feed_versions: {
+        Row: {
+          claimed_until: string | null
+          content_sha256: string | null
+          created_at: string
+          finished_at: string | null
+          id: string
+          job_id: string | null
+          path: string
+          provider: string
+          remote_checksum: string | null
+          remote_mtime: string | null
+          remote_size: number | null
+          run_id: string | null
+          status: string
+          version_key: string
+        }
+        Insert: {
+          claimed_until?: string | null
+          content_sha256?: string | null
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          job_id?: string | null
+          path: string
+          provider?: string
+          remote_checksum?: string | null
+          remote_mtime?: string | null
+          remote_size?: number | null
+          run_id?: string | null
+          status?: string
+          version_key: string
+        }
+        Update: {
+          claimed_until?: string | null
+          content_sha256?: string | null
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          job_id?: string | null
+          path?: string
+          provider?: string
+          remote_checksum?: string | null
+          remote_mtime?: string | null
+          remote_size?: number | null
+          run_id?: string | null
+          status?: string
+          version_key?: string
+        }
+        Relationships: []
+      }
+      inventory_network_audit: {
+        Row: {
+          action: string
+          actor: string | null
+          after: Json | null
+          at: string
+          before: Json | null
+          entity: string
+          entity_id: string | null
+          group_id: string | null
+          id: number
+          store_id: string | null
+        }
+        Insert: {
+          action: string
+          actor?: string | null
+          after?: Json | null
+          at?: string
+          before?: Json | null
+          entity: string
+          entity_id?: string | null
+          group_id?: string | null
+          id?: number
+          store_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor?: string | null
+          after?: Json | null
+          at?: string
+          before?: Json | null
+          entity?: string
+          entity_id?: string | null
+          group_id?: string | null
+          id?: number
+          store_id?: string | null
+        }
+        Relationships: []
+      }
+      inventory_sharing_rules: {
+        Row: {
+          connect_card: boolean
+          created_at: string
+          created_by: string | null
+          customer_room: boolean
+          destination_store_id: string
+          effective_from: string
+          effective_until: string | null
+          group_id: string
+          id: string
+          include_certified: boolean
+          include_new: boolean
+          include_used: boolean
+          note: string | null
+          priority: number
+          revoked_at: string | null
+          revoked_by: string | null
+          show_details: boolean
+          show_prices: boolean
+          source_store_id: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          connect_card?: boolean
+          created_at?: string
+          created_by?: string | null
+          customer_room?: boolean
+          destination_store_id: string
+          effective_from?: string
+          effective_until?: string | null
+          group_id: string
+          id?: string
+          include_certified?: boolean
+          include_new?: boolean
+          include_used?: boolean
+          note?: string | null
+          priority?: number
+          revoked_at?: string | null
+          revoked_by?: string | null
+          show_details?: boolean
+          show_prices?: boolean
+          source_store_id: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          connect_card?: boolean
+          created_at?: string
+          created_by?: string | null
+          customer_room?: boolean
+          destination_store_id?: string
+          effective_from?: string
+          effective_until?: string | null
+          group_id?: string
+          id?: string
+          include_certified?: boolean
+          include_new?: boolean
+          include_used?: boolean
+          note?: string | null
+          priority?: number
+          revoked_at?: string | null
+          revoked_by?: string | null
+          show_details?: boolean
+          show_prices?: boolean
+          source_store_id?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_sharing_rules_destination_store_id_fkey"
+            columns: ["destination_store_id"]
+            isOneToOne: false
+            referencedRelation: "dealer_stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_sharing_rules_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "dealer_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_sharing_rules_source_store_id_fkey"
+            columns: ["source_store_id"]
+            isOneToOne: false
+            referencedRelation: "dealer_stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_snapshot_vehicles: {
+        Row: {
+          body: string | null
+          certified: boolean
+          condition: string
+          description: string | null
+          drivetrain: string | null
+          engine: string | null
+          equipment: Json
+          exterior_color: string | null
+          feed_price: number | null
+          feed_price_status: string
+          fuel: string | null
+          interior_color: string | null
+          inventory_date: string | null
+          make: string | null
+          mileage: number | null
+          model: string | null
+          msrp: number | null
+          photos: Json
+          photos_modified_at: string | null
+          row_number: number
+          series_detail: string | null
+          snapshot_id: string
+          stock_number: string | null
+          transmission: string | null
+          trim: string | null
+          vin: string
+          year: number | null
+        }
+        Insert: {
+          body?: string | null
+          certified?: boolean
+          condition: string
+          description?: string | null
+          drivetrain?: string | null
+          engine?: string | null
+          equipment?: Json
+          exterior_color?: string | null
+          feed_price?: number | null
+          feed_price_status: string
+          fuel?: string | null
+          interior_color?: string | null
+          inventory_date?: string | null
+          make?: string | null
+          mileage?: number | null
+          model?: string | null
+          msrp?: number | null
+          photos?: Json
+          photos_modified_at?: string | null
+          row_number: number
+          series_detail?: string | null
+          snapshot_id: string
+          stock_number?: string | null
+          transmission?: string | null
+          trim?: string | null
+          vin: string
+          year?: number | null
+        }
+        Update: {
+          body?: string | null
+          certified?: boolean
+          condition?: string
+          description?: string | null
+          drivetrain?: string | null
+          engine?: string | null
+          equipment?: Json
+          exterior_color?: string | null
+          feed_price?: number | null
+          feed_price_status?: string
+          fuel?: string | null
+          interior_color?: string | null
+          inventory_date?: string | null
+          make?: string | null
+          mileage?: number | null
+          model?: string | null
+          msrp?: number | null
+          photos?: Json
+          photos_modified_at?: string | null
+          row_number?: number
+          series_detail?: string | null
+          snapshot_id?: string
+          stock_number?: string | null
+          transmission?: string | null
+          trim?: string | null
+          vin?: string
+          year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_snapshot_vehicles_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_store_snapshots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_source_mappings: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          evidence: Json | null
+          group_id: string
+          id: string
+          identity_acknowledged: boolean
+          note: string | null
+          observed_identity: Json
+          proposed_at: string
+          proposed_by: string | null
+          provider: string
+          revoked_at: string | null
+          revoked_by: string | null
+          source_dealer_id: string
+          status: string
+          store_id: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          evidence?: Json | null
+          group_id: string
+          id?: string
+          identity_acknowledged?: boolean
+          note?: string | null
+          observed_identity: Json
+          proposed_at?: string
+          proposed_by?: string | null
+          provider?: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          source_dealer_id: string
+          status?: string
+          store_id: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          evidence?: Json | null
+          group_id?: string
+          id?: string
+          identity_acknowledged?: boolean
+          note?: string | null
+          observed_identity?: Json
+          proposed_at?: string
+          proposed_by?: string | null
+          provider?: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          source_dealer_id?: string
+          status?: string
+          store_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_source_mappings_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "dealer_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_source_mappings_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "dealer_stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_store_snapshots: {
+        Row: {
+          applied_at: string | null
+          clean: boolean
+          content_sha256: string
+          created_at: string
+          duplicate_count: number
+          group_id: string | null
+          id: string
+          invalid_count: number
+          job_id: string | null
+          mapping_id: string | null
+          path: string
+          photo_missing_count: number
+          price_missing_count: number
+          reason: string | null
+          report: Json | null
+          row_count: number
+          run_id: string | null
+          source_dealer_id: string
+          source_mtime: string
+          status: string
+          store_id: string | null
+          valid_count: number
+        }
+        Insert: {
+          applied_at?: string | null
+          clean?: boolean
+          content_sha256: string
+          created_at?: string
+          duplicate_count?: number
+          group_id?: string | null
+          id?: string
+          invalid_count?: number
+          job_id?: string | null
+          mapping_id?: string | null
+          path: string
+          photo_missing_count?: number
+          price_missing_count?: number
+          reason?: string | null
+          report?: Json | null
+          row_count?: number
+          run_id?: string | null
+          source_dealer_id: string
+          source_mtime: string
+          status?: string
+          store_id?: string | null
+          valid_count?: number
+        }
+        Update: {
+          applied_at?: string | null
+          clean?: boolean
+          content_sha256?: string
+          created_at?: string
+          duplicate_count?: number
+          group_id?: string | null
+          id?: string
+          invalid_count?: number
+          job_id?: string | null
+          mapping_id?: string | null
+          path?: string
+          photo_missing_count?: number
+          price_missing_count?: number
+          reason?: string | null
+          report?: Json | null
+          row_count?: number
+          run_id?: string | null
+          source_dealer_id?: string
+          source_mtime?: string
+          status?: string
+          store_id?: string | null
+          valid_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_store_snapshots_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "dealer_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_store_snapshots_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_feed_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_store_snapshots_mapping_id_fkey"
+            columns: ["mapping_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_source_mappings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_store_snapshots_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_feed_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_store_snapshots_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "dealer_stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_store_state: {
+        Row: {
+          last_applied_at: string | null
+          last_applied_sha256: string | null
+          last_applied_snapshot_id: string | null
+          last_applied_source_mtime: string | null
+          last_failure_at: string | null
+          last_failure_reason: string | null
+          last_run_id: string | null
+          store_id: string
+          updated_at: string
+        }
+        Insert: {
+          last_applied_at?: string | null
+          last_applied_sha256?: string | null
+          last_applied_snapshot_id?: string | null
+          last_applied_source_mtime?: string | null
+          last_failure_at?: string | null
+          last_failure_reason?: string | null
+          last_run_id?: string | null
+          store_id: string
+          updated_at?: string
+        }
+        Update: {
+          last_applied_at?: string | null
+          last_applied_sha256?: string | null
+          last_applied_snapshot_id?: string | null
+          last_applied_source_mtime?: string | null
+          last_failure_at?: string | null
+          last_failure_reason?: string | null
+          last_run_id?: string | null
+          store_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_store_state_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: true
+            referencedRelation: "dealer_stores"
             referencedColumns: ["id"]
           },
         ]
@@ -5144,6 +6312,96 @@ export type Database = {
           updated_vehicles?: number
         }
         Relationships: []
+      }
+      inventory_vin_conflicts: {
+        Row: {
+          claiming_store_id: string
+          existing_inventory_id: string | null
+          existing_listing_id: string | null
+          existing_store_id: string | null
+          first_seen_at: string
+          group_id: string
+          id: string
+          kind: string
+          last_seen_at: string
+          note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          snapshot_id: string | null
+          status: string
+          vin: string
+        }
+        Insert: {
+          claiming_store_id: string
+          existing_inventory_id?: string | null
+          existing_listing_id?: string | null
+          existing_store_id?: string | null
+          first_seen_at?: string
+          group_id: string
+          id?: string
+          kind: string
+          last_seen_at?: string
+          note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          snapshot_id?: string | null
+          status?: string
+          vin: string
+        }
+        Update: {
+          claiming_store_id?: string
+          existing_inventory_id?: string | null
+          existing_listing_id?: string | null
+          existing_store_id?: string | null
+          first_seen_at?: string
+          group_id?: string
+          id?: string
+          kind?: string
+          last_seen_at?: string
+          note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          snapshot_id?: string | null
+          status?: string
+          vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_vin_conflicts_claiming_store_id_fkey"
+            columns: ["claiming_store_id"]
+            isOneToOne: false
+            referencedRelation: "dealer_stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_vin_conflicts_existing_inventory_id_fkey"
+            columns: ["existing_inventory_id"]
+            isOneToOne: false
+            referencedRelation: "store_inventory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_vin_conflicts_existing_listing_id_fkey"
+            columns: ["existing_listing_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_vin_conflicts_existing_store_id_fkey"
+            columns: ["existing_store_id"]
+            isOneToOne: false
+            referencedRelation: "dealer_stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_vin_conflicts_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "dealer_groups"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       leads: {
         Row: {
@@ -6488,6 +7746,108 @@ export type Database = {
         }
         Relationships: []
       }
+      passport_payment_estimator_settings: {
+        Row: {
+          config: Json
+          created_at: string
+          enabled: boolean
+          last_request_id: string | null
+          store_id: string
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+          version: number
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          enabled?: boolean
+          last_request_id?: string | null
+          store_id: string
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          enabled?: boolean
+          last_request_id?: string | null
+          store_id?: string
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "passport_payment_estimator_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "passport_payment_estimator_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      passport_payment_estimator_versions: {
+        Row: {
+          actor: string | null
+          config: Json
+          created_at: string
+          id: string
+          prev_config: Json | null
+          request_id: string | null
+          store_id: string
+          tenant_id: string
+          version: number
+        }
+        Insert: {
+          actor?: string | null
+          config: Json
+          created_at?: string
+          id?: string
+          prev_config?: Json | null
+          request_id?: string | null
+          store_id: string
+          tenant_id: string
+          version: number
+        }
+        Update: {
+          actor?: string | null
+          config?: Json
+          created_at?: string
+          id?: string
+          prev_config?: Json | null
+          request_id?: string | null
+          store_id?: string
+          tenant_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "passport_payment_estimator_versions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "passport_payment_estimator_versions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       passport_sms_verifications: {
         Row: {
           attempts: number
@@ -7044,6 +8404,116 @@ export type Database = {
         }
         Relationships: []
       }
+      provider_accounts: {
+        Row: {
+          account_ref: string
+          credential_refs: string[]
+          monthly_call_quota: number
+          monthly_usd_cap: number | null
+          pilot_mode: boolean
+          plan_name: string | null
+          priority_floors: Json
+          protected_reserve: number
+          provider: string
+          provider_reported_at: string | null
+          provider_reported_limit: number | null
+          provider_reported_remaining: number | null
+          provider_reported_used: number | null
+          provider_reset_at: string | null
+          rate_limit_per_minute: number
+          uncertain_retry_hold_hours: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          account_ref: string
+          credential_refs?: string[]
+          monthly_call_quota: number
+          monthly_usd_cap?: number | null
+          pilot_mode?: boolean
+          plan_name?: string | null
+          priority_floors?: Json
+          protected_reserve?: number
+          provider?: string
+          provider_reported_at?: string | null
+          provider_reported_limit?: number | null
+          provider_reported_remaining?: number | null
+          provider_reported_used?: number | null
+          provider_reset_at?: string | null
+          rate_limit_per_minute?: number
+          uncertain_retry_hold_hours?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          account_ref?: string
+          credential_refs?: string[]
+          monthly_call_quota?: number
+          monthly_usd_cap?: number | null
+          pilot_mode?: boolean
+          plan_name?: string | null
+          priority_floors?: Json
+          protected_reserve?: number
+          provider?: string
+          provider_reported_at?: string | null
+          provider_reported_limit?: number | null
+          provider_reported_remaining?: number | null
+          provider_reported_used?: number | null
+          provider_reset_at?: string | null
+          rate_limit_per_minute?: number
+          uncertain_retry_hold_hours?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      provider_ai_tools: {
+        Row: {
+          account_ref: string
+          allowed_for_automation: boolean
+          label: string
+          max_requests_per_invocation: number
+          note: string | null
+          product_keys: string[]
+          staff_enabled: boolean
+          tool_name: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          account_ref: string
+          allowed_for_automation?: boolean
+          label: string
+          max_requests_per_invocation?: number
+          note?: string | null
+          product_keys: string[]
+          staff_enabled?: boolean
+          tool_name: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          account_ref?: string
+          allowed_for_automation?: boolean
+          label?: string
+          max_requests_per_invocation?: number
+          note?: string | null
+          product_keys?: string[]
+          staff_enabled?: boolean
+          tool_name?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_ai_tools_account_ref_fkey"
+            columns: ["account_ref"]
+            isOneToOne: false
+            referencedRelation: "provider_accounts"
+            referencedColumns: ["account_ref"]
+          },
+        ]
+      }
       provider_call_budgets: {
         Row: {
           enabled: boolean
@@ -7119,6 +8589,30 @@ export type Database = {
         }
         Relationships: []
       }
+      provider_field_definitions: {
+        Row: {
+          cadence: string
+          description: string
+          field_key: string
+          label: string
+          semantic_kind: string
+        }
+        Insert: {
+          cadence: string
+          description: string
+          field_key: string
+          label: string
+          semantic_kind: string
+        }
+        Update: {
+          cadence?: string
+          description?: string
+          field_key?: string
+          label?: string
+          semantic_kind?: string
+        }
+        Relationships: []
+      }
       provider_payload_shapes: {
         Row: {
           dependency_types: Json
@@ -7163,6 +8657,119 @@ export type Database = {
           shape_hash?: string
         }
         Relationships: []
+      }
+      provider_product_catalog: {
+        Row: {
+          account_ref: string
+          billing_product: string
+          billing_unit: string
+          bundled_fields: string[]
+          cross_store_reuse: string
+          customer_display: string
+          enabled: boolean
+          endpoint: string
+          evidence: string | null
+          evidence_url: string | null
+          failure_cooldown_hours: number
+          failure_max_attempts: number
+          freshness_days: number | null
+          initial_charge_usd: number | null
+          label: string
+          product_key: string
+          quota_units: number
+          rate_status: string
+          rate_usd: number | null
+          repeat_allowance: number | null
+          repeat_charge_policy: string
+          repeat_charge_usd: number | null
+          repeat_consumes_quota: string
+          repeat_window_days: number | null
+          retention_days: number | null
+          retention_policy: string
+          unavailable_cooldown_hours: number
+          unavailable_max_attempts: number
+          update_cadence: string
+          updated_at: string
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          account_ref: string
+          billing_product: string
+          billing_unit?: string
+          bundled_fields: string[]
+          cross_store_reuse?: string
+          customer_display?: string
+          enabled?: boolean
+          endpoint: string
+          evidence?: string | null
+          evidence_url?: string | null
+          failure_cooldown_hours?: number
+          failure_max_attempts?: number
+          freshness_days?: number | null
+          initial_charge_usd?: number | null
+          label: string
+          product_key: string
+          quota_units?: number
+          rate_status?: string
+          rate_usd?: number | null
+          repeat_allowance?: number | null
+          repeat_charge_policy?: string
+          repeat_charge_usd?: number | null
+          repeat_consumes_quota?: string
+          repeat_window_days?: number | null
+          retention_days?: number | null
+          retention_policy?: string
+          unavailable_cooldown_hours?: number
+          unavailable_max_attempts?: number
+          update_cadence: string
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          account_ref?: string
+          billing_product?: string
+          billing_unit?: string
+          bundled_fields?: string[]
+          cross_store_reuse?: string
+          customer_display?: string
+          enabled?: boolean
+          endpoint?: string
+          evidence?: string | null
+          evidence_url?: string | null
+          failure_cooldown_hours?: number
+          failure_max_attempts?: number
+          freshness_days?: number | null
+          initial_charge_usd?: number | null
+          label?: string
+          product_key?: string
+          quota_units?: number
+          rate_status?: string
+          rate_usd?: number | null
+          repeat_allowance?: number | null
+          repeat_charge_policy?: string
+          repeat_charge_usd?: number | null
+          repeat_consumes_quota?: string
+          repeat_window_days?: number | null
+          retention_days?: number | null
+          retention_policy?: string
+          unavailable_cooldown_hours?: number
+          unavailable_max_attempts?: number
+          update_cadence?: string
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_product_catalog_account_ref_fkey"
+            columns: ["account_ref"]
+            isOneToOne: false
+            referencedRelation: "provider_accounts"
+            referencedColumns: ["account_ref"]
+          },
+        ]
       }
       provider_request_reservations: {
         Row: {
@@ -7221,6 +8828,113 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "tenants"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      provider_requests: {
+        Row: {
+          account_ref: string
+          actual_cost_usd: number | null
+          billing_product: string | null
+          caller: string
+          channel: string
+          dedupe_key: string | null
+          estimated_cost_usd: number | null
+          expires_at: string | null
+          free_refresh: boolean
+          group_id: string | null
+          http_status: number | null
+          id: string
+          initiated_by: string | null
+          invocation_id: string | null
+          joined_request_id: string | null
+          priority: number
+          product_key: string
+          provider_event_id: number | null
+          provider_headers: Json | null
+          purpose: string | null
+          quota_units: number
+          reason: string
+          refusal_reason: string | null
+          reserved_at: string
+          settled_at: string | null
+          status: string
+          store_id: string | null
+          tenant_id: string | null
+          tool_name: string | null
+          vin: string | null
+        }
+        Insert: {
+          account_ref: string
+          actual_cost_usd?: number | null
+          billing_product?: string | null
+          caller: string
+          channel?: string
+          dedupe_key?: string | null
+          estimated_cost_usd?: number | null
+          expires_at?: string | null
+          free_refresh?: boolean
+          group_id?: string | null
+          http_status?: number | null
+          id?: string
+          initiated_by?: string | null
+          invocation_id?: string | null
+          joined_request_id?: string | null
+          priority: number
+          product_key: string
+          provider_event_id?: number | null
+          provider_headers?: Json | null
+          purpose?: string | null
+          quota_units?: number
+          reason: string
+          refusal_reason?: string | null
+          reserved_at?: string
+          settled_at?: string | null
+          status: string
+          store_id?: string | null
+          tenant_id?: string | null
+          tool_name?: string | null
+          vin?: string | null
+        }
+        Update: {
+          account_ref?: string
+          actual_cost_usd?: number | null
+          billing_product?: string | null
+          caller?: string
+          channel?: string
+          dedupe_key?: string | null
+          estimated_cost_usd?: number | null
+          expires_at?: string | null
+          free_refresh?: boolean
+          group_id?: string | null
+          http_status?: number | null
+          id?: string
+          initiated_by?: string | null
+          invocation_id?: string | null
+          joined_request_id?: string | null
+          priority?: number
+          product_key?: string
+          provider_event_id?: number | null
+          provider_headers?: Json | null
+          purpose?: string | null
+          quota_units?: number
+          reason?: string
+          refusal_reason?: string | null
+          reserved_at?: string
+          settled_at?: string | null
+          status?: string
+          store_id?: string | null
+          tenant_id?: string | null
+          tool_name?: string | null
+          vin?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_requests_account_ref_fkey"
+            columns: ["account_ref"]
+            isOneToOne: false
+            referencedRelation: "provider_accounts"
+            referencedColumns: ["account_ref"]
           },
         ]
       }
@@ -8604,6 +10318,391 @@ export type Database = {
         }
         Relationships: []
       }
+      store_enrichment_policies: {
+        Row: {
+          account_ref: string
+          allowed_products: string[]
+          backfill_limit: number
+          budget_blocked: boolean
+          credential_ref: string | null
+          daily_request_limit: number
+          enrich_shared_inventory: boolean
+          freshness_hours: number | null
+          hard_stop_pct: number
+          manual_refresh_allowed: boolean
+          mc_rooftop_id: string | null
+          mc_rooftop_verified_at: string | null
+          mc_rooftop_verified_by: string | null
+          mode: string
+          monthly_request_cap: number
+          monthly_usd_cap: number | null
+          per_run_limit: number
+          refresh_cadence_hours: number | null
+          required_fields: string[]
+          store_id: string
+          updated_at: string
+          updated_by: string | null
+          warn_pct: number
+        }
+        Insert: {
+          account_ref?: string
+          allowed_products?: string[]
+          backfill_limit?: number
+          budget_blocked?: boolean
+          credential_ref?: string | null
+          daily_request_limit?: number
+          enrich_shared_inventory?: boolean
+          freshness_hours?: number | null
+          hard_stop_pct?: number
+          manual_refresh_allowed?: boolean
+          mc_rooftop_id?: string | null
+          mc_rooftop_verified_at?: string | null
+          mc_rooftop_verified_by?: string | null
+          mode?: string
+          monthly_request_cap?: number
+          monthly_usd_cap?: number | null
+          per_run_limit?: number
+          refresh_cadence_hours?: number | null
+          required_fields?: string[]
+          store_id: string
+          updated_at?: string
+          updated_by?: string | null
+          warn_pct?: number
+        }
+        Update: {
+          account_ref?: string
+          allowed_products?: string[]
+          backfill_limit?: number
+          budget_blocked?: boolean
+          credential_ref?: string | null
+          daily_request_limit?: number
+          enrich_shared_inventory?: boolean
+          freshness_hours?: number | null
+          hard_stop_pct?: number
+          manual_refresh_allowed?: boolean
+          mc_rooftop_id?: string | null
+          mc_rooftop_verified_at?: string | null
+          mc_rooftop_verified_by?: string | null
+          mode?: string
+          monthly_request_cap?: number
+          monthly_usd_cap?: number | null
+          per_run_limit?: number
+          refresh_cadence_hours?: number | null
+          required_fields?: string[]
+          store_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          warn_pct?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_enrichment_policies_account_ref_fkey"
+            columns: ["account_ref"]
+            isOneToOne: false
+            referencedRelation: "provider_accounts"
+            referencedColumns: ["account_ref"]
+          },
+          {
+            foreignKeyName: "store_enrichment_policies_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: true
+            referencedRelation: "dealer_stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      store_enrichment_requests: {
+        Row: {
+          created_at: string
+          deny_reason: string | null
+          finished_at: string | null
+          id: string
+          inventory_id: string
+          product: string
+          reason: string
+          requested_by: string | null
+          status: string
+          store_id: string
+          vin: string
+        }
+        Insert: {
+          created_at?: string
+          deny_reason?: string | null
+          finished_at?: string | null
+          id?: string
+          inventory_id: string
+          product: string
+          reason: string
+          requested_by?: string | null
+          status?: string
+          store_id: string
+          vin: string
+        }
+        Update: {
+          created_at?: string
+          deny_reason?: string | null
+          finished_at?: string | null
+          id?: string
+          inventory_id?: string
+          product?: string
+          reason?: string
+          requested_by?: string | null
+          status?: string
+          store_id?: string
+          vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_enrichment_requests_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "store_inventory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_enrichment_requests_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "dealer_stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      store_inventory: {
+        Row: {
+          body: string | null
+          certified: boolean
+          condition: string
+          created_at: string
+          description: string | null
+          drivetrain: string | null
+          engine: string | null
+          enriched_at: string | null
+          enrichment: Json
+          enrichment_status: string
+          equipment: Json
+          exterior_color: string | null
+          feed_price: number | null
+          feed_price_observed_at: string | null
+          feed_price_status: string
+          first_seen_at: string
+          fuel: string | null
+          group_id: string
+          id: string
+          interior_color: string | null
+          inventory_date: string | null
+          last_seen_at: string
+          last_snapshot_id: string | null
+          listing_id: string | null
+          make: string | null
+          mileage: number | null
+          missing_snapshots: number
+          model: string | null
+          msrp: number | null
+          photo_count: number
+          photos: Json
+          photos_modified_at: string | null
+          presence: string
+          retire_reason: string | null
+          retired_at: string | null
+          retired_by: string | null
+          series_detail: string | null
+          source_dealer_id: string
+          source_provider: string
+          stock_number: string | null
+          store_id: string
+          transmission: string | null
+          trim: string | null
+          updated_at: string
+          vin: string
+          year: number | null
+        }
+        Insert: {
+          body?: string | null
+          certified?: boolean
+          condition: string
+          created_at?: string
+          description?: string | null
+          drivetrain?: string | null
+          engine?: string | null
+          enriched_at?: string | null
+          enrichment?: Json
+          enrichment_status?: string
+          equipment?: Json
+          exterior_color?: string | null
+          feed_price?: number | null
+          feed_price_observed_at?: string | null
+          feed_price_status: string
+          first_seen_at?: string
+          fuel?: string | null
+          group_id: string
+          id?: string
+          interior_color?: string | null
+          inventory_date?: string | null
+          last_seen_at?: string
+          last_snapshot_id?: string | null
+          listing_id?: string | null
+          make?: string | null
+          mileage?: number | null
+          missing_snapshots?: number
+          model?: string | null
+          msrp?: number | null
+          photo_count?: number
+          photos?: Json
+          photos_modified_at?: string | null
+          presence?: string
+          retire_reason?: string | null
+          retired_at?: string | null
+          retired_by?: string | null
+          series_detail?: string | null
+          source_dealer_id: string
+          source_provider?: string
+          stock_number?: string | null
+          store_id: string
+          transmission?: string | null
+          trim?: string | null
+          updated_at?: string
+          vin: string
+          year?: number | null
+        }
+        Update: {
+          body?: string | null
+          certified?: boolean
+          condition?: string
+          created_at?: string
+          description?: string | null
+          drivetrain?: string | null
+          engine?: string | null
+          enriched_at?: string | null
+          enrichment?: Json
+          enrichment_status?: string
+          equipment?: Json
+          exterior_color?: string | null
+          feed_price?: number | null
+          feed_price_observed_at?: string | null
+          feed_price_status?: string
+          first_seen_at?: string
+          fuel?: string | null
+          group_id?: string
+          id?: string
+          interior_color?: string | null
+          inventory_date?: string | null
+          last_seen_at?: string
+          last_snapshot_id?: string | null
+          listing_id?: string | null
+          make?: string | null
+          mileage?: number | null
+          missing_snapshots?: number
+          model?: string | null
+          msrp?: number | null
+          photo_count?: number
+          photos?: Json
+          photos_modified_at?: string | null
+          presence?: string
+          retire_reason?: string | null
+          retired_at?: string | null
+          retired_by?: string | null
+          series_detail?: string | null
+          source_dealer_id?: string
+          source_provider?: string
+          stock_number?: string | null
+          store_id?: string
+          transmission?: string | null
+          trim?: string | null
+          updated_at?: string
+          vin?: string
+          year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_inventory_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "dealer_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_inventory_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_inventory_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "dealer_stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      store_provider_usage: {
+        Row: {
+          actual_cost_usd: number | null
+          at: string
+          caller: string
+          cost_basis: string
+          deny_reason: string | null
+          estimated_cost_usd: number | null
+          group_id: string | null
+          id: number
+          outcome: string
+          product: string
+          provider: string
+          reason: string
+          store_id: string | null
+          vin: string | null
+        }
+        Insert: {
+          actual_cost_usd?: number | null
+          at?: string
+          caller: string
+          cost_basis?: string
+          deny_reason?: string | null
+          estimated_cost_usd?: number | null
+          group_id?: string | null
+          id?: number
+          outcome: string
+          product: string
+          provider?: string
+          reason: string
+          store_id?: string | null
+          vin?: string | null
+        }
+        Update: {
+          actual_cost_usd?: number | null
+          at?: string
+          caller?: string
+          cost_basis?: string
+          deny_reason?: string | null
+          estimated_cost_usd?: number | null
+          group_id?: string | null
+          id?: number
+          outcome?: string
+          product?: string
+          provider?: string
+          reason?: string
+          store_id?: string | null
+          vin?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_provider_usage_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "dealer_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_provider_usage_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "dealer_stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_incentive_settings: {
         Row: {
           created_at: string
@@ -9961,6 +12060,7 @@ export type Database = {
           id: string
           in_service_date: string | null
           install_token: string
+          inventory_record_id: string | null
           key_specs: Json
           market_checked_at: string | null
           market_meta: Json | null
@@ -9974,6 +12074,7 @@ export type Database = {
           oem_sticker_url: string | null
           open_recall_count: number | null
           orchestrated_at: string | null
+          owning_store_id: string | null
           packet_modules: Json
           passport_version: string
           payment_estimate: Json | null
@@ -10051,6 +12152,7 @@ export type Database = {
           id?: string
           in_service_date?: string | null
           install_token?: string
+          inventory_record_id?: string | null
           key_specs?: Json
           market_checked_at?: string | null
           market_meta?: Json | null
@@ -10064,6 +12166,7 @@ export type Database = {
           oem_sticker_url?: string | null
           open_recall_count?: number | null
           orchestrated_at?: string | null
+          owning_store_id?: string | null
           packet_modules?: Json
           passport_version?: string
           payment_estimate?: Json | null
@@ -10141,6 +12244,7 @@ export type Database = {
           id?: string
           in_service_date?: string | null
           install_token?: string
+          inventory_record_id?: string | null
           key_specs?: Json
           market_checked_at?: string | null
           market_meta?: Json | null
@@ -10154,6 +12258,7 @@ export type Database = {
           oem_sticker_url?: string | null
           open_recall_count?: number | null
           orchestrated_at?: string | null
+          owning_store_id?: string | null
           packet_modules?: Json
           passport_version?: string
           payment_estimate?: Json | null
@@ -10199,6 +12304,20 @@ export type Database = {
           ymm?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "vehicle_listings_inventory_record_id_fkey"
+            columns: ["inventory_record_id"]
+            isOneToOne: false
+            referencedRelation: "store_inventory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_listings_owning_store_id_fkey"
+            columns: ["owning_store_id"]
+            isOneToOne: false
+            referencedRelation: "dealer_stores"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "vehicle_listings_tenant_id_fkey"
             columns: ["tenant_id"]
@@ -10604,6 +12723,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      vehicle_provider_states: {
+        Row: {
+          account_ref: string
+          attempts: number
+          confidence: number | null
+          confidence_scale: string | null
+          data_delivery_date: string | null
+          detail: string | null
+          last_attempt_at: string | null
+          last_request_id: string | null
+          next_eligible_at: string | null
+          partial_fields: string[]
+          product_key: string
+          state: string
+          updated_at: string
+          vin: string
+        }
+        Insert: {
+          account_ref: string
+          attempts?: number
+          confidence?: number | null
+          confidence_scale?: string | null
+          data_delivery_date?: string | null
+          detail?: string | null
+          last_attempt_at?: string | null
+          last_request_id?: string | null
+          next_eligible_at?: string | null
+          partial_fields?: string[]
+          product_key: string
+          state: string
+          updated_at?: string
+          vin: string
+        }
+        Update: {
+          account_ref?: string
+          attempts?: number
+          confidence?: number | null
+          confidence_scale?: string | null
+          data_delivery_date?: string | null
+          detail?: string | null
+          last_attempt_at?: string | null
+          last_request_id?: string | null
+          next_eligible_at?: string | null
+          partial_fields?: string[]
+          product_key?: string
+          state?: string
+          updated_at?: string
+          vin?: string
+        }
+        Relationships: []
       }
       vehicle_snapshots: {
         Row: {
@@ -11541,6 +13711,16 @@ export type Database = {
         Args: { _doc: Json; _vehicle_id: string }
         Returns: Json
       }
+      apply_payment_estimator_settings: {
+        Args: {
+          _base_version: number
+          _config: Json
+          _request_id: string
+          _store_id: string
+          _tenant_id: string
+        }
+        Returns: Json
+      }
       approve_description_version: {
         Args: {
           p_approve?: boolean
@@ -11621,6 +13801,48 @@ export type Database = {
         }
         Returns: string
       }
+      bulk_feed_check_schedule: { Args: never; Returns: number }
+      bulk_feed_commit_decision: { Args: { p_delivery: string }; Returns: Json }
+      bulk_feed_mark_complete: {
+        Args: {
+          p_delivery: string
+          p_evidence: string
+          p_evidence_ref: string
+          p_expected_parts?: number
+          p_expected_rows?: number
+        }
+        Returns: Json
+      }
+      bulk_feed_open_exception: {
+        Args: {
+          p_delivery: string
+          p_detail: string
+          p_feed: string
+          p_kind: string
+          p_severity: string
+        }
+        Returns: undefined
+      }
+      bulk_feed_record_part: {
+        Args: {
+          p_data_as_of?: string
+          p_delivery_key: string
+          p_environment: string
+          p_expected_checksum: string
+          p_expected_parts: number
+          p_feed: string
+          p_part_no: number
+          p_path: string
+          p_schema_version?: string
+          p_scope: string
+          p_size: number
+        }
+        Returns: string
+      }
+      bulk_feed_request_replay: {
+        Args: { p_delivery: string; p_reason: string }
+        Returns: string
+      }
       certify_safety_inspection: {
         Args: {
           p_inspection_id: string
@@ -11694,6 +13916,33 @@ export type Database = {
         Returns: string
       }
       current_tenant_id: { Args: never; Returns: string }
+      customer_group_inventory: {
+        Args: {
+          p_channel: string
+          p_filters?: Json
+          p_limit?: number
+          p_offset?: number
+          p_slug: string
+        }
+        Returns: Json
+      }
+      customer_group_inventory_interest: {
+        Args: {
+          p_channel: string
+          p_email?: string
+          p_inventory_id: string
+          p_message?: string
+          p_name: string
+          p_phone?: string
+          p_slug: string
+        }
+        Returns: Json
+      }
+      customer_group_inventory_vehicle: {
+        Args: { p_channel: string; p_inventory_id: string; p_slug: string }
+        Returns: Json
+      }
+      customer_origin_context: { Args: { p_slug: string }; Returns: Json }
       decide_recon_estimate: {
         Args: {
           _action: string
@@ -12072,6 +14321,7 @@ export type Database = {
           id: string
           in_service_date: string | null
           install_token: string
+          inventory_record_id: string | null
           key_specs: Json
           market_checked_at: string | null
           market_meta: Json | null
@@ -12085,6 +14335,7 @@ export type Database = {
           oem_sticker_url: string | null
           open_recall_count: number | null
           orchestrated_at: string | null
+          owning_store_id: string | null
           packet_modules: Json
           passport_version: string
           payment_estimate: Json | null
@@ -12141,6 +14392,24 @@ export type Database = {
         Args: { p_product_id: string; p_tenant_id: string; p_vin: string }
         Returns: string
       }
+      group_inventory_core: {
+        Args: {
+          p_channel: string
+          p_filters?: Json
+          p_home_store_id: string
+          p_limit?: number
+          p_offset?: number
+        }
+        Returns: Json
+      }
+      group_inventory_visible: {
+        Args: {
+          p_channel: string
+          p_home_store_id: string
+          p_inventory_id: string
+        }
+        Returns: boolean
+      }
       has_app_access: { Args: { _app_slug: string }; Returns: boolean }
       has_description_authority: {
         Args: { p_level?: string; p_tenant_id: string }
@@ -12161,6 +14430,194 @@ export type Database = {
       installs_block_finalize: {
         Args: { _tenant_id: string; _vin: string }
         Returns: boolean
+      }
+      inv_admin_decide_mapping: {
+        Args: {
+          p_acknowledge_identity?: boolean
+          p_decision: string
+          p_mapping_id: string
+          p_note?: string
+        }
+        Returns: undefined
+      }
+      inv_admin_delivery_timeline: { Args: { p_limit?: number }; Returns: Json }
+      inv_admin_enqueue_import: { Args: { p_path: string }; Returns: Json }
+      inv_admin_overview: { Args: { p_group_id: string }; Returns: Json }
+      inv_admin_preview_context: { Args: { p_store_id: string }; Returns: Json }
+      inv_admin_preview_customer_inventory: {
+        Args: { p_channel: string; p_filters?: Json; p_home_store_id: string }
+        Returns: Json
+      }
+      inv_admin_propose_mapping: {
+        Args: {
+          p_evidence: Json
+          p_note?: string
+          p_observed_identity: Json
+          p_source_dealer_id: string
+          p_store_id: string
+        }
+        Returns: string
+      }
+      inv_admin_provider_dashboard: {
+        Args: { p_account_ref: string }
+        Returns: Json
+      }
+      inv_admin_reset_vehicle_state: {
+        Args: { p_account_ref: string; p_product_key: string; p_vin: string }
+        Returns: undefined
+      }
+      inv_admin_resolve_bulk_exception: {
+        Args: { p_id: number; p_resolution: string }
+        Returns: undefined
+      }
+      inv_admin_resolve_conflict: {
+        Args: { p_action: string; p_conflict_id: string; p_note?: string }
+        Returns: undefined
+      }
+      inv_admin_retry_job: { Args: { p_job_id: string }; Returns: Json }
+      inv_admin_review_retirement: {
+        Args: { p_action: string; p_inventory_id: string }
+        Returns: undefined
+      }
+      inv_admin_revoke_sharing_rule: {
+        Args: { p_note?: string; p_rule_id: string }
+        Returns: undefined
+      }
+      inv_admin_save_ai_tool: {
+        Args: {
+          p_max_requests?: number
+          p_staff_enabled: boolean
+          p_tool_name: string
+        }
+        Returns: undefined
+      }
+      inv_admin_save_bulk_contract: { Args: { p: Json }; Returns: undefined }
+      inv_admin_save_catalog_product: { Args: { p: Json }; Returns: undefined }
+      inv_admin_save_enrichment_policy: {
+        Args: { p: Json }
+        Returns: undefined
+      }
+      inv_admin_save_provider_account: { Args: { p: Json }; Returns: undefined }
+      inv_admin_save_sharing_rule: { Args: { p: Json }; Returns: string }
+      inv_admin_save_store: { Args: { p: Json }; Returns: string }
+      inv_admin_save_timing: { Args: { p: Json }; Returns: undefined }
+      inv_admin_set_controls: {
+        Args: {
+          p_emergency_stop: boolean
+          p_ingestion_paused: boolean
+          p_reason: string
+          p_reconcile_enabled: boolean
+        }
+        Returns: undefined
+      }
+      inv_admin_usage: { Args: { p_store_id: string }; Returns: Json }
+      inv_admin_vehicle_provider_history: {
+        Args: { p_vin: string }
+        Returns: Json
+      }
+      inv_require_platform_admin: { Args: never; Returns: string }
+      inv_store_request_enrichment: {
+        Args: { p_inventory_id: string; p_product: string }
+        Returns: Json
+      }
+      inventory_apply_store_snapshot: {
+        Args: { p_snapshot_id: string }
+        Returns: Json
+      }
+      inventory_feed_claim_job: {
+        Args: { p_job_id: string; p_lock_seconds?: number }
+        Returns: {
+          attempts: number
+          created_at: string
+          event_id: string | null
+          finished_at: string | null
+          id: string
+          kind: string
+          last_error: string | null
+          lock_token: string | null
+          locked_until: string | null
+          max_attempts: number
+          next_attempt_at: string
+          path: string
+          provider: string
+          requested_by: string | null
+          result: Json | null
+          run_id: string | null
+          started_at: string | null
+          status: string
+          trigger: string
+          version_key: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "inventory_feed_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      inventory_feed_claim_jobs: {
+        Args: { p_limit?: number; p_lock_seconds?: number }
+        Returns: {
+          attempts: number
+          created_at: string
+          event_id: string | null
+          finished_at: string | null
+          id: string
+          kind: string
+          last_error: string | null
+          lock_token: string | null
+          locked_until: string | null
+          max_attempts: number
+          next_attempt_at: string
+          path: string
+          provider: string
+          requested_by: string | null
+          result: Json | null
+          run_id: string | null
+          started_at: string | null
+          status: string
+          trigger: string
+          version_key: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "inventory_feed_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      inventory_feed_claim_version: {
+        Args: {
+          p_checksum: string
+          p_job_id: string
+          p_mtime: string
+          p_path: string
+          p_size: number
+          p_version_key: string
+        }
+        Returns: Json
+      }
+      inventory_feed_enqueue: {
+        Args: {
+          p_event_id?: string
+          p_path: string
+          p_requested_by?: string
+          p_trigger: string
+        }
+        Returns: Json
+      }
+      inventory_feed_finish_job: {
+        Args: {
+          p_error?: string
+          p_job_id: string
+          p_lock_token: string
+          p_result?: Json
+          p_retryable?: boolean
+          p_run_id?: string
+          p_status: string
+          p_version_key?: string
+        }
+        Returns: string
       }
       invite_tenant_member: {
         Args: { p_email: string; p_role: string; p_tenant_id: string }
@@ -12405,6 +14862,11 @@ export type Database = {
       oem_franchise_min_new_units: { Args: never; Returns: number }
       oem_make_from_ymm: { Args: { _ymm: string }; Returns: string }
       operating_metrics: { Args: { p_tenant_id: string }; Returns: Json }
+      payment_estimator_config_errors: {
+        Args: { _config: Json }
+        Returns: string[]
+      }
+      payment_estimator_num: { Args: { v: Json }; Returns: number }
       platform_vehicle_counts: {
         Args: never
         Returns: {
@@ -12449,6 +14911,79 @@ export type Database = {
           p_outcome: string
         }
         Returns: undefined
+      }
+      provider_local_usage: {
+        Args: { p_account_ref: string }
+        Returns: Record<string, unknown>
+      }
+      provider_period: {
+        Args: { p_account_ref: string }
+        Returns: Record<string, unknown>
+      }
+      provider_reconcile_account: {
+        Args: {
+          p_account_ref: string
+          p_limit: number
+          p_remaining: number
+          p_reset_at: string
+          p_used: number
+        }
+        Returns: Json
+      }
+      provider_record_avoided: {
+        Args: {
+          p_account_ref: string
+          p_caller: string
+          p_kind: string
+          p_product_key: string
+          p_store_id: string
+          p_vin: string
+        }
+        Returns: undefined
+      }
+      provider_reserve: {
+        Args: {
+          p_account_ref: string
+          p_caller: string
+          p_context?: Json
+          p_dedupe_key?: string
+          p_estimated_cost_usd?: number
+          p_free_refresh?: boolean
+          p_priority: number
+          p_product_key: string
+          p_provider_event_id?: number
+          p_reason: string
+          p_store_id?: string
+          p_tenant_id?: string
+          p_ttl_seconds?: number
+          p_vin?: string
+        }
+        Returns: Json
+      }
+      provider_settle: {
+        Args: {
+          p_actual_cost_usd?: number
+          p_confidence?: number
+          p_confidence_scale?: string
+          p_data_delivery_date?: string
+          p_detail?: string
+          p_headers?: Json
+          p_http_status?: number
+          p_outcome: string
+          p_partial_fields?: string[]
+          p_request_id: string
+          p_vehicle_state?: string
+        }
+        Returns: string
+      }
+      provider_settle_event: {
+        Args: {
+          p_event_id: number
+          p_headers?: Json
+          p_http_status?: number
+          p_outcome: string
+        }
+        Returns: string
       }
       publish_description_internal: {
         Args: {
@@ -13005,6 +15540,18 @@ export type Database = {
           signing_started: number
         }[]
       }
+      store_enrichment_admit: {
+        Args: {
+          p_caller: string
+          p_estimated_cost_usd?: number
+          p_product: string
+          p_reason?: string
+          p_tenant_id: string
+          p_vin: string
+        }
+        Returns: Json
+      }
+      store_enrichment_products: { Args: never; Returns: string[] }
       submit_detail_signoff: {
         Args: {
           _content_hash: string
