@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { screen, waitFor, within } from "@testing-library/react";
 import { renderAdmin } from "@/test/adminRender";
 import { functionCalls, resetSupabaseSpy, rpcCalls, spyResponses, writeCalls } from "@/test/mocks/supabaseSpy";
@@ -18,11 +18,19 @@ const controls = { id: 1, ingestion_paused: true, emergency_stop: false, reconci
 const overview = { group, controls, stores: [], exceptions: { open_conflicts: 0, retirement_review: 0, quarantined_partitions_7d: 0, failed_jobs: 0, pending_mappings: 0 } };
 const route = (q: string) => `/admin/integrations/inventory-network?view=duplicates${q}`;
 
+// The fixture previews expire from 21:21 UTC on the day they were generated, so
+// the clock is pinned before that; otherwise the approve button disappears.
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-31T21:20:00Z"));
   resetSupabaseSpy();
   spyResponses.tables.dealer_groups = { data: [group] };
   spyResponses.rpcs.inv_admin_overview = { data: overview };
   spyResponses.rpcs.inv_dedupe_overview = { data: fx.overview };
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("Duplicate handling", () => {
