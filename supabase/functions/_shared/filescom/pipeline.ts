@@ -335,7 +335,7 @@ export async function processImportJob(deps: Deps, job: Job): Promise<JobOutcome
       } else {
         const a = ap.data as { applied: boolean; reason?: string };
         rep.apply = a;
-        rep.status = a.applied ? "applied" : a.reason === "older_than_applied_snapshot" || a.reason === "same_version_already_applied" ? "superseded" : "rejected";
+        rep.status = a.applied ? "applied" : a.reason === "older_than_applied_snapshot" || a.reason === "same_version_already_applied" ? "superseded" : a.reason === "held_for_review" ? "held" : "rejected";
         rep.reason = a.applied ? null : a.reason ?? null;
         if (a.applied) { applied++; affected.push(m.store_id); }
       }
@@ -347,14 +347,24 @@ export async function processImportJob(deps: Deps, job: Job): Promise<JobOutcome
   }
 
   const total = partitions.length;
-  const runStatus = applied === total ? "applied" : applied > 0 ? "partial" : transientFailure ? "failed" : "rejected";
-  const report = { kind: "import", outcome: runStatus, headers: parts.headers, rowsWithoutDealer: parts.rowsWithoutDealer, identities: total, partitions, inventoryWrites: applied, providerCalls: 0 };
-  await finishRun(db, runId, file?.id ?? null, runStatus, { ...version, failure_reason: runStatus === "applied" ? null : partitions.filter((x) => x.status !== "applied").map((x) => `${x.sourceDealerId}:${x.reason}`).join(",").slice(0, 300), report, affected_store_ids: affected });
+  const missingPartitions = await missingPartitionsFor(db, job.path, parts.partitions.map((p) => p.sourceDealerId));
+  const runStatus = applied === total && missingPartitions.length === 0 ? "applied" : applied > 0 ? "partial" : transientFailure ? "failed" : "rejected";
+  const report = { kind: "import", outcome: runStatus, headers: parts.headers, rowsWithoutDealer: parts.rowsWithoutDealer, identities: total, partitions, missingPartitions, inventoryWrites: applied, providerCalls: 0 };
+  await finishRun(db, runId, file?.id ?? null, runStatus, { ...version, failure_reason: runStatus === "applied" ? null : [...partitions.filter((x) => x.status !== "applied").map((x) => `${x.sourceDealerId}:${x.reason}`), ...missingPartitions.map((d) => `${d}:partition_missing`)].join(",").slice(0, 300), report, affected_store_ids: affected });
   await setVersion(db, c.version_id, runStatus === "applied" ? "applied" : runStatus === "partial" ? "partial" : runStatus === "failed" ? "failed" : "rejected", { run_id: runId, content_sha256: loaded.sha });
   const result = { runId, partitions: partitions.map((x) => ({ sourceDealerId: x.sourceDealerId, storeId: x.mapping?.storeId ?? null, snapshotId: x.snapshotId ?? null, status: x.status, reason: x.reason ?? null, apply: x.apply ?? null })) };
   const jobStatus = runStatus === "applied" ? "succeeded" : runStatus === "partial" ? "partial" : "failed";
   const st = await finishJob(db, job, jobStatus, { error: jobStatus === "succeeded" ? undefined : report.partitions.find((x) => x.status !== "applied")?.reason ?? runStatus, retryable: runStatus === "failed", result, runId, versionKey: vkey });
   return { status: st, result };
+}
+
+// A dealer whose stock this file delivered before but which is absent now.
+// Its store receives no snapshot, so nothing changes; the run says why.
+async function missingPartitionsFor(db: Db, path: string, present: string[]): Promise<string[]> {
+  const r = await db.from("inventory_store_snapshots").select("source_dealer_id").eq("path", path).eq("status", "applied").order("created_at", { ascending: false }).limit(200);
+  if (r.error) return [];
+  const seen = new Set(((r.data ?? []) as Array<{ source_dealer_id: string }>).map((x) => x.source_dealer_id));
+  return [...seen].filter((d) => !present.includes(d)).sort();
 }
 
 // Reconciliation: compare the folder listing against the newest processed

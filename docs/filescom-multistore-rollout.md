@@ -121,6 +121,19 @@ removes the account reservation from every caller.
   `shrink_guard_held` audit row. Confirm a genuine sell-down with
   `inv_admin_set_shrink_guard(store, pct, reason)`. Apply 0012 and redeploy
   files-inventory-worker before enabling ingestion automation.
+- Completeness hold (proposed, supabase/proposed/feed_completeness_hold.sql,
+  applies after 0014): a suspicious full snapshot is held whole (status
+  `held`): no additions, price or listing changes, missing counters or
+  baseline move. Rules: absent-vs-live (0012 percentage, floor from
+  `min_absent_vehicles`, NULL keeps 6) and count-drop-vs-last-trusted
+  (`max_count_drop_pct`, NULL = off). `feed_semantics` = full_snapshot or
+  incremental (incremental never counts absence). Admins decide in Runs >
+  Held files (apply as complete, apply without missing counts, reject; reason
+  required, audited). The worker reports a dealer the file delivered before but
+  omits now as `partition_missing`. Proposed thresholds for owner approval:
+  min_absent_vehicles 2, max_count_drop_pct 20, keep max_snapshot_shrink_pct 20,
+  feed_semantics full_snapshot for vAuto. Requires a files-inventory-worker
+  redeploy and a frontend publish.
 - Ownership: one live owner per VIN per group; a VIN seen at another store is a
   conflict until an admin transfers it; legacy listings are never assigned
   automatically unless the store opts in.

@@ -1,15 +1,15 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Panel, QueryState, StatusText, Td, Th, WorkTable } from "@/components/product";
 import {
-  explainError, listAudit, listConflicts, listFeedEvents, listFeedJobs, listFeedRuns, listRetirementReview, listSnapshots, resolveConflict, retryJob, reviewRetirement,
+  explainError, listAudit, listConflicts, listFeedEvents, listFeedJobs, listFeedRuns, listHeldSnapshots, listRetirementReview, listSnapshots, resolveConflict, resolveHeldSnapshot, retryJob, reviewRetirement,
   type DealerStore, type InventoryVinConflict,
 } from "@/lib/inventoryNetwork/api";
 import { ConfirmButton, NavLink, STATUS_TONE, fileName, humanize, shortId, useAct, useNet, when, inputClass } from "./shared";
 
-type Panelkey = "timeline" | "conflicts" | "retirement" | "log";
-const PANELS: Array<{ key: Panelkey; label: string }> = [{ key: "timeline", label: "Timeline" }, { key: "conflicts", label: "VIN conflicts" }, { key: "retirement", label: "Retirement review" }, { key: "log", label: "Change log" }];
+type Panelkey = "timeline" | "held" | "conflicts" | "retirement" | "log";
+const PANELS: Array<{ key: Panelkey; label: string }> = [{ key: "timeline", label: "Timeline" }, { key: "held", label: "Held files" }, { key: "conflicts", label: "VIN conflicts" }, { key: "retirement", label: "Retirement review" }, { key: "log", label: "Change log" }];
 
 interface Item { key: string; at: string; type: "Event" | "Job" | "Run" | "Snapshot"; path: string; storeIds: string[]; dealerId?: string; runId: string | null; status: string; detail: string; retryJobId?: string }
 
@@ -108,6 +108,51 @@ function Conflicts() {
   );
 }
 
+const HOLD_RULE: Record<string, string> = {
+  absent_vs_live: "more of the store's current cars are missing than the guard allows",
+  count_drop_vs_trusted: "the file has far fewer cars than the last trusted file",
+};
+
+function HeldFiles() {
+  const { groupId, stores } = useNet();
+  const { act, busy } = useAct();
+  const rows = stores.map((s) => s.store);
+  const [reason, setReason] = useState<Record<string, string>>({});
+  const q = useQuery({ queryKey: ["inv-net", "held", groupId], queryFn: () => listHeldSnapshots(groupId) });
+  return (
+    <Panel title="Held files" description="Files that look incomplete. Nothing in them was applied: no prices, no new cars, no missing counts. Decide each one." flush>
+      <QueryState status={q.isLoading ? "loading" : q.isError ? "error" : (q.data ?? []).length === 0 ? "empty" : "ready"} errorTitle="Could not load held files" errorDetail={q.isError ? explainError(q.error) : undefined} onRetry={() => q.refetch()} emptyTitle="No files are held">
+        <WorkTable caption="Held files" minWidth={960}>
+          <thead><tr><Th>Store</Th><Th>File</Th><Th>Why it is held</Th><Th align="right">In file</Th><Th align="right">Missing</Th><Th>Reason for decision</Th><Th align="right">Actions</Th></tr></thead>
+          <tbody>{(q.data ?? []).map((s) => {
+            const h = s.report?.hold;
+            const why = (h?.rules ?? []).map((r) => HOLD_RULE[r] ?? humanize(r)).join("; ");
+            const note = reason[s.id] ?? "";
+            const ok = note.trim().length >= 3;
+            return (
+              <tr key={s.id}>
+                <Td>{storeLabel(rows, s.store_id)}</Td>
+                <Td>{fileName(s.path)}<div className="text-[12px] text-adm-muted">{when(s.created_at)}</div></Td>
+                <Td>{why || "Held for review"}{h?.trusted_valid != null ? <div className="text-[12px] text-adm-muted">Last trusted file had {h.trusted_valid} cars</div> : null}</Td>
+                <Td align="right">{s.valid_count}</Td>
+                <Td align="right">{h ? `${h.absent} of ${h.live} (allowed ${h.allowed_absent})` : ""}</Td>
+                <Td><input aria-label="Reason for decision" className={`${inputClass} w-56`} placeholder="Required" value={note} onChange={(e) => setReason((m) => ({ ...m, [s.id]: e.target.value }))} /></Td>
+                <Td align="right">
+                  <div className="flex justify-end gap-2">
+                    <ConfirmButton label="Apply as complete" confirmLabel="Count missing cars" variant="danger" disabled={busy || !ok} onConfirm={() => act(() => resolveHeldSnapshot(s.id, "apply_full", note), "File applied as complete")} />
+                    <Button size="sm" disabled={busy || !ok} onClick={() => act(() => resolveHeldSnapshot(s.id, "apply_without_absence", note), "File applied without missing counts")}>Apply without missing</Button>
+                    <Button size="sm" variant="ghost" disabled={busy || !ok} onClick={() => act(() => resolveHeldSnapshot(s.id, "reject", note), "File rejected")}>Reject</Button>
+                  </div>
+                </Td>
+              </tr>
+            );
+          })}</tbody>
+        </WorkTable>
+      </QueryState>
+    </Panel>
+  );
+}
+
 function Retirement() {
   const { groupId, stores } = useNet();
   const { act, busy } = useAct();
@@ -168,6 +213,7 @@ export default function RunsSection() {
         ))}
       </nav>
       {panel === "timeline" && <Timeline />}
+      {panel === "held" && <HeldFiles />}
       {panel === "conflicts" && <Conflicts />}
       {panel === "retirement" && <Retirement />}
       {panel === "log" && <ChangeLog />}
