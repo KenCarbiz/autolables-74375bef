@@ -14448,6 +14448,14 @@ export type Database = {
         Args: { p_channel: string; p_filters?: Json; p_home_store_id: string }
         Returns: Json
       }
+      inv_admin_preview_mapping: {
+        Args: {
+          p_run_id: string
+          p_source_dealer_id: string
+          p_store_id: string
+        }
+        Returns: Json
+      }
       inv_admin_propose_mapping: {
         Args: {
           p_evidence: Json
@@ -14515,6 +14523,16 @@ export type Database = {
         Args: { p_vin: string }
         Returns: Json
       }
+      inv_dry_run_partition: {
+        Args: { p_run_id: string; p_source_dealer_id: string }
+        Returns: Json
+      }
+      inv_identity_compare: {
+        Args: { p_observed: Json; p_store_id: string }
+        Returns: Json
+      }
+      inv_norm_street: { Args: { t: string }; Returns: string }
+      inv_norm_text: { Args: { t: string }; Returns: string }
       inv_require_platform_admin: { Args: never; Returns: string }
       inv_store_request_enrichment: {
         Args: { p_inventory_id: string; p_product: string }
