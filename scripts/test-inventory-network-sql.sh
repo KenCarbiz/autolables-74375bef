@@ -20,3 +20,5 @@ $P -d "$DB" -f supabase/tests/inventory_network/20_pilot_coordinator.sql
 $P -d "$DB" -f supabase/tests/inventory_network/30_bulk_feeds.sql
 $P -d "$DB" -f drizzle/migrations/0010_store_mapping_review.sql
 $P -d "$DB" -f supabase/tests/inventory_network/40_mapping_review.sql
+$P -d "$DB" -f drizzle/migrations/0012_snapshot_shrink_guard.sql
+$P -d "$DB" -f supabase/tests/inventory_network/50_shrink_guard.sql

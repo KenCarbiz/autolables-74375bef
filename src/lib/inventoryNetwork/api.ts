@@ -131,7 +131,7 @@ export interface PartitionReportItem {
   mapping: { id: string; status: "pending" | "approved"; storeId: string; storeName: string } | null;
   comparison: IdentityComparison | null;
   outcome: PartitionOutcome; reasons: string[]; counts: PartitionCounts; errors: RowIssue[]; warnings: RowIssue[];
-  inventoryDiff: { compared: boolean; additions: number; updates: number; unchanged: number; absenceCandidates: number } | null;
+  inventoryDiff: { compared: boolean; additions: number; updates: number; unchanged: number; absenceCandidates: number; shrinkGuard?: { held: boolean; live: number; absent: number; allowed: number } } | null;
 }
 export interface PartitionDryRunReport {
   kind: "partition_dry_run"; outcome: "passed" | "rejected"; rejectReasons: string[];

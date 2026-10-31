@@ -115,6 +115,12 @@ removes the account reservation from every caller.
   are superseded; empty, incomplete, quarantined or failed snapshots change
   nothing; only clean snapshots count absences; no hard deletes; no automatic
   retirement unless enabled per store.
+- Shrink guard (0012): a clean snapshot that is missing more than
+  max(5, max_snapshot_shrink_pct of the store's live cars; default 20) holds
+  absence, still applies additions and updates, and writes a
+  `shrink_guard_held` audit row. Confirm a genuine sell-down with
+  `inv_admin_set_shrink_guard(store, pct, reason)`. Apply 0012 and redeploy
+  files-inventory-worker before enabling ingestion automation.
 - Ownership: one live owner per VIN per group; a VIN seen at another store is a
   conflict until an admin transfers it; legacy listings are never assigned
   automatically unless the store opts in.

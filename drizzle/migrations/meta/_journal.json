@@ -85,6 +85,13 @@
       "when": 1793470000001,
       "tag": "0011_store_mapping_review",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793476000000,
+      "tag": "0012_snapshot_shrink_guard",
+      "breakpoints": true
     }
   ]
 }

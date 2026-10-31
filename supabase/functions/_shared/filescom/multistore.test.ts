@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { createHash } from "node:crypto";
 import { VAUTO_HEADERS } from "./dryRun";
-import { decidePartition, diffAgainstStore, parseCondition, parseFeedDate, parsePhotoList, partitionFeed, type MappingRef } from "./partition";
+import { decidePartition, diffAgainstStore, shrinkGuard, parseCondition, parseFeedDate, parsePhotoList, partitionFeed, type MappingRef } from "./partition";
 import { processImportJob, partitionDryRun, reconcile, type Db, type Query } from "./pipeline";
 import { approvalDecision, assertConnectorWrite, FILESCOM_ORIGIN } from "./policy";
 import { admitProviderCall } from "../providerBudget";
@@ -93,6 +93,18 @@ describe("deciding whether a partition may be imported", () => {
     const r = partitionFeed(H, [row("MP15397"), row("MP15397", { VIN: "nope" })]);
     if (!r.ok) throw new Error();
     expect(diffAgainstStore(r.partitions[0], [{ vin: "1N4AZ1CP0LZ999999", feed_price: 1, mileage: 1, presence: "present" }])?.absenceCandidates).toBe(0);
+  });
+  it("holds absence when a clean snapshot shrinks past the store guard", () => {
+    expect(shrinkGuard(40, 25)).toEqual({ held: true, live: 40, absent: 25, allowed: 8 });
+    expect(shrinkGuard(40, 6).held).toBe(false);
+    expect(shrinkGuard(10, 5).held).toBe(false);
+    expect(shrinkGuard(40, 25, 90).held).toBe(false);
+    const r = partitionFeed(H, [row("MP15397")]);
+    if (!r.ok) throw new Error();
+    const stock = Array.from({ length: 40 }, (_, i) => ({ vin: `5NMJ${String(i).padStart(13, "0")}`, feed_price: 1, mileage: 1, presence: "present" }));
+    const d = diffAgainstStore(r.partitions[0], stock);
+    expect(d?.shrinkGuard.held).toBe(true);
+    expect(d?.absenceCandidates).toBe(0);
   });
 });
 

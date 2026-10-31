@@ -106,7 +106,7 @@ function PartitionCard({ p, mappings, stores, runId }: { p: PartitionReportItem;
 
       <p className="text-[13px] text-adm-muted">
         {p.inventoryDiff?.compared
-          ? `If imported: ${plural(p.inventoryDiff.additions, "addition")}, ${plural(p.inventoryDiff.updates, "update")}, ${p.inventoryDiff.unchanged} unchanged, ${plural(p.inventoryDiff.absenceCandidates, "vehicle")} absent from the file (reviewed, not removed).`
+          ? `If imported: ${plural(p.inventoryDiff.additions, "addition")}, ${plural(p.inventoryDiff.updates, "update")}, ${p.inventoryDiff.unchanged} unchanged, ${plural(p.inventoryDiff.absenceCandidates, "vehicle")} absent from the file (reviewed, not removed).${p.inventoryDiff.shrinkGuard?.held ? ` The file is missing ${p.inventoryDiff.shrinkGuard.absent} of ${p.inventoryDiff.shrinkGuard.live} current vehicles, more than the ${p.inventoryDiff.shrinkGuard.allowed} the shrink guard allows, so absence would be held for review.` : ""}`
           : "Not compared with current inventory yet. That needs an approved mapping."}
       </p>
 
