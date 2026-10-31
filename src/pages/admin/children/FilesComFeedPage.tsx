@@ -4,6 +4,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { ChildPageFrame } from "@/components/admin/v2/AdminShell";
+import { MappingReviewBoard } from "@/components/inventoryNetwork/MappingReviewBoard";
+import { NetIcon } from "@/components/inventoryNetwork/icons";
+import { ICON } from "@/components/admin/v2/primitives";
 import { Button, EmptyState, InlineNote, KeyValueList, Panel, SkeletonBlock, StatusText, Td, Th, WorkTable } from "@/components/product";
 
 // Files.com inventory connector, phase 1: discovery, explicit dealer mapping
@@ -103,7 +106,7 @@ export default function FilesComFeedPage() {
     <ChildPageFrame
       section="integrations"
       crumbs={crumbs}
-      title="Files.com inventory"
+      title={<span className="inline-flex items-center gap-3"><NetIcon name="connection" className={ICON.status} />Files.com inventory</span>}
       badge={<StatusText tone="info">Dry run only</StatusText>}
       subtitle="vAuto inventory files from Files.com. Validation never changes vehicles, prices or the customer Passport."
       actions={<Button variant="primary" disabled={!d || !config || keyMissing || run.isPending} onClick={() => run.mutate({ action: "discover" })}>Discover files</Button>}
@@ -128,6 +131,8 @@ export default function FilesComFeedPage() {
                 { label: "Last discovery", value: when(d.files.map((f) => f.discovered_at).filter(Boolean).sort().pop() ?? null) },
               ]} />
             </Panel>
+
+            <MappingReviewBoard />
 
             <Panel title="Files" description="Files without an approved dealer mapping are held in quarantine." flush>
               {d.files.length === 0 ? (

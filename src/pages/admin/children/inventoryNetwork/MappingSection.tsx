@@ -3,9 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { Button, EmptyState, InlineNote, KeyValueList, Panel, QueryState, StatusText, Td, Th, WorkTable } from "@/components/product";
 import {
-  approveBinding, decideMapping, disableBinding, discoverFiles, explainError, importNow, isPartitionReport, listFeedBindings, listFeedFiles, listFeedRuns, listSourceMappings,
+  approveBinding, decideMapping, disableBinding, discoverFiles, explainError, importNow, isPartitionReport, listSourceMappings,
   partitionDryRun, proposeBinding, proposeMapping, type DealerStore, type FeedFile, type FieldVerdict, type ImportNowResult, type InventorySourceMapping, type PartitionReportItem,
 } from "@/lib/inventoryNetwork/api";
+import { MappingReviewBoard, boardQueries } from "@/components/inventoryNetwork/MappingReviewBoard";
 import { CheckField, ConfirmButton, SelectField, STATUS_TONE, fileName, humanize, plural, storeAddress, useAct, useNet, when } from "./shared";
 
 const doNotMap = (f: FeedFile) => /test/i.test(fileName(f.path)) || (f.status === "quarantined" && !!f.quarantine_reason && f.quarantine_reason !== "unmapped");
@@ -13,13 +14,15 @@ const doNotMap = (f: FeedFile) => /test/i.test(fileName(f.path)) || (f.status ==
 function MappingActions({ mapping }: { mapping: InventorySourceMapping }) {
   const { act, busy } = useAct();
   const [ack, setAck] = useState(false);
-  const verdict = mapping.evidence?.verdict ?? "incomplete";
-  const needsAck = verdict !== "match";
+  const server = mapping.evidence?.computed_by === "server";
+  const verdict = server ? mapping.evidence?.verdict ?? "incomplete" : null;
+  const blocked = !server ? "Proposed before server review: reject and propose again." : verdict === "mismatch" ? "Address mismatch: never approvable." : verdict === "incomplete" ? "Identity incomplete: fix the store first." : null;
   if (mapping.status === "pending") {
     return (
       <div className="flex flex-wrap items-center gap-3">
-        {needsAck && <CheckField id={`ack-${mapping.id}`} label={`I reviewed the ${verdict} fields and confirm this store`} checked={ack} onChange={setAck} />}
-        <Button size="sm" variant="primary" disabled={busy || (needsAck && !ack)} onClick={() => act(() => decideMapping(mapping.id, "approve", ack), "Mapping approved")}>Approve</Button>
+        {verdict === "name_review" && <CheckField id={`ack-${mapping.id}`} label="Address matches; I confirm the dealer name belongs to this store" checked={ack} onChange={setAck} />}
+        {blocked && <span className="text-[12px] text-adm-danger">{blocked}</span>}
+        <Button size="sm" variant="primary" disabled={busy || !!blocked || (verdict === "name_review" && !ack)} onClick={() => act(() => decideMapping(mapping.id, "approve", verdict === "name_review" && ack), "Mapping approved")}>Approve</Button>
         <Button size="sm" variant="danger" disabled={busy} onClick={() => act(() => decideMapping(mapping.id, "reject"), "Mapping rejected")}>Reject</Button>
       </div>
     );
@@ -31,7 +34,7 @@ function MappingActions({ mapping }: { mapping: InventorySourceMapping }) {
 const FIELD_ROWS: Array<[string, "name" | "address" | "city" | "postal" | "region"]> = [["Dealer name", "name"], ["Address", "address"], ["City", "city"], ["Postal code", "postal"], ["Region", "region"]];
 const FIELD_TONE: Record<FieldVerdict, "success" | "danger" | "neutral"> = { match: "success", mismatch: "danger", unknown: "neutral" };
 
-function PartitionCard({ p, mappings, stores }: { p: PartitionReportItem; mappings: InventorySourceMapping[]; stores: DealerStore[] }) {
+function PartitionCard({ p, mappings, stores, runId }: { p: PartitionReportItem; mappings: InventorySourceMapping[]; stores: DealerStore[]; runId: string | null }) {
   const { act, busy } = useAct();
   const { startNewStore } = useNet();
   const [target, setTarget] = useState("");
@@ -113,7 +116,7 @@ function PartitionCard({ p, mappings, stores }: { p: PartitionReportItem; mappin
           <div className="flex flex-wrap items-end gap-3">
             <Button disabled={busy} onClick={() => startNewStore({ display_name: p.identity.dealerName, street: p.identity.address, city: p.identity.city, state: p.identity.region.toUpperCase(), zip: p.identity.postal })}>Create store from this identity</Button>
             <SelectField id={`pm-${p.sourceDealerId}`} label="Propose mapping to store" value={target} onChange={setTarget} options={[{ value: "", label: "Choose a store" }, ...stores.map((s) => ({ value: s.id, label: s.display_name }))]} className="min-w-[240px]" />
-            <Button variant="primary" disabled={busy || !target} onClick={() => act(() => proposeMapping({ sourceDealerId: p.sourceDealerId, storeId: target, observedIdentity: p.identity, evidence: p.comparison ?? { verdict: "incomplete" } }), "Mapping proposed")}>Propose mapping</Button>
+            <Button variant="primary" disabled={busy || !target || !runId} onClick={() => act(() => proposeMapping({ sourceDealerId: p.sourceDealerId, storeId: target, runId: runId! }), "Mapping proposed from the dry run. Review it in Store mapping review.")}>Propose mapping</Button>
           </div>
         )}
         {!live && <p className="text-[12px] text-adm-muted">Creating a store only opens the form prefilled. Review it and save, then propose the mapping.</p>}
@@ -130,7 +133,7 @@ function FilePanel({ file, binding, tenantId, groupName, stores, mappings }: {
   const [imported, setImported] = useState<ImportNowResult | null>(null);
   const [armed, setArmed] = useState(false);
   const [ack, setAck] = useState(false);
-  const runs = useQuery({ queryKey: ["inv-net", "runs-report"], queryFn: () => listFeedRuns({ limit: 40, withReport: true }) });
+  const runs = useQuery(boardQueries.runs);
   const mine = (runs.data ?? []).filter((r) => r.path === file.path);
   const latest = mine.find((r) => isPartitionReport(r.report));
   const report = latest && isPartitionReport(latest.report) ? latest.report : null;
@@ -202,7 +205,7 @@ function FilePanel({ file, binding, tenantId, groupName, stores, mappings }: {
               {held.length > 0 && ready > 0 && <InlineNote tone="info" title="Ready partitions import on their own.">The rest stay in quarantine until their mapping is sorted out.</InlineNote>}
               {report.outcome === "rejected" && <InlineNote tone="danger" title="The whole file was rejected">{report.rejectReasons.map(humanize).join(", ")}</InlineNote>}
               {(report.headers.missing.length > 0 || report.headers.extra.length > 0) && <InlineNote tone="warning" title="Column headers differ from the expected layout">{report.headers.missing.length > 0 && `Missing: ${report.headers.missing.join(", ")}. `}{report.headers.extra.length > 0 && `Unexpected: ${report.headers.extra.join(", ")}.`}</InlineNote>}
-              <ul className="space-y-4">{parts.map((p) => <PartitionCard key={p.sourceDealerId} p={p} mappings={mappings} stores={stores} />)}</ul>
+              <ul className="space-y-4">{parts.map((p) => <PartitionCard key={p.sourceDealerId} p={p} mappings={mappings} stores={stores} runId={latest?.status === "passed" ? latest.id : null} />)}</ul>
             </div>
           )}
         </QueryState>
@@ -222,8 +225,8 @@ export default function MappingSection() {
   const { groupId, group, stores } = useNet();
   const { act, busy } = useAct();
   const [params, setParams] = useSearchParams();
-  const files = useQuery({ queryKey: ["inv-net", "files"], queryFn: listFeedFiles });
-  const bindings = useQuery({ queryKey: ["inv-net", "bindings"], queryFn: listFeedBindings });
+  const files = useQuery(boardQueries.files);
+  const bindings = useQuery(boardQueries.bindings);
   const mappings = useQuery({ queryKey: ["inv-net", "mappings", groupId], queryFn: () => listSourceMappings(groupId) });
   const storeRows = stores.map((s) => s.store);
   const sel = params.get("file");
@@ -234,6 +237,7 @@ export default function MappingSection() {
 
   return (
     <div className="space-y-4">
+      <MappingReviewBoard groupId={groupId} />
       <Panel
         title="Feed files"
         description="Each file may hold several dealers. Dry runs read the file and never change vehicles."
