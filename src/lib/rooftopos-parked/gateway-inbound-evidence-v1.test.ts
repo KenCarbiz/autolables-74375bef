@@ -196,6 +196,9 @@ describe("AutoLabels parked Gateway inbound projections — no deployment", () =
     expect(testEvent({ ...MEDIA, payload: {
       ...MEDIA.payload, data_base64: "AAA",
     } }, FA).status).toBe("rejected");
+    expect(testEvent({ ...MEDIA, payload: {
+      ...MEDIA.payload, object_ref: "objref:synthetic-bucket/../other-tenant/image.webp",
+    } }, FA).status).toBe("rejected");
     expect(testEvent(MEDIA, A).status).toBe("rejected");
   });
   it("same VIN in another dealer must never resolve to original custody episode", () => {
