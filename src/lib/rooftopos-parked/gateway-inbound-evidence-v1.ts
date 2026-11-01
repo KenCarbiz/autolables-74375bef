@@ -149,6 +149,11 @@ function sensitive(value: unknown): string | null {
 function keysOnly(v: Record<string, unknown>, allowed: readonly string[]): boolean {
   return Object.keys(v).every((k) => allowed.includes(k));
 }
+function safeMediaObjectRef(value: unknown): value is string {
+  if (typeof value !== "string" || !OPAQUE_MEDIA.test(value)) return false;
+  const segments = value.slice(value.indexOf("/") + 1).split("/");
+  return segments.every((s) => s.length > 0 && s !== "." && s !== "..");
+}
 
 /**
  * Pre-apply plan, NOT a state mutation. Transactional inbox enforcement is
@@ -245,7 +250,7 @@ export function evaluateGatewayEvidenceV1(
       "height", "preset_version", "preset_order", "approval"]))
       return reject("unexpected_media_payload_field");
     if (!str(p["media_id"]) || !SHA256.test(String(p["content_sha256"])) ||
-        !str(p["object_ref"]) || !OPAQUE_MEDIA.test(p["object_ref"]) ||
+        !safeMediaObjectRef(p["object_ref"]) ||
         !["image/jpeg", "image/png", "image/webp"].includes(String(p["mime"])) ||
         !positiveInt(p["width"]) || !positiveInt(p["height"]) ||
         !str(p["preset_version"]) || !Number.isSafeInteger(p["preset_order"]) ||
@@ -257,7 +262,7 @@ export function evaluateGatewayEvidenceV1(
     // the consumer can decide separately whether to display historical media.
     effect = {
       kind: "approved_media_reference", sourceApp: "autoframe", ...common,
-      mediaId: p["media_id"], objectRef: p["object_ref"],
+      mediaId: String(p["media_id"]), objectRef: String(p["object_ref"]),
       sourceEpisodeId: vehicle.episodeId,
       publishPublicUrl: false, reopenInventory: false,
     };
