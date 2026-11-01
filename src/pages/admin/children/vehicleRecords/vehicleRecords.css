@@ -1,0 +1,38 @@
+.invnet-ov .vr-note{font-size:12px;color:#526a82;margin:0;padding:12px 0}
+.invnet-ov .vr-notice{font-size:12px;margin:10px 0 0;padding:9px 11px;border-radius:5px;border:1px solid #cddbea;background:#f4f7fa;color:#28445f}
+.invnet-ov .vr-notice.bad{border-color:#ce3e51;background:#ffe9ed;color:#aa2a3d}
+.invnet-ov .vr-notice.ok{border-color:#a8c5f0;background:#eaf2ff;color:#1756b4}
+.invnet-ov .vr-search{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.invnet-ov .vr-search .field{flex:1 1 260px}
+.invnet-ov .vr-lane{margin-right:8px}
+.invnet-ov .vr-vin{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;letter-spacing:.02em}
+.invnet-ov .vr-stack{display:grid;gap:16px}
+.invnet-ov .vr-subhead{font-size:12px;font-weight:700;color:#25445f;margin:16px 0 8px}
+.invnet-ov .vr-subhead:first-child{margin-top:0}
+.invnet-ov .vr-setting{border:1px solid #dce4ed;border-radius:5px;padding:14px 16px;background:white;display:grid;gap:10px}
+.invnet-ov .vr-setting header{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.invnet-ov .vr-setting h3{margin:0;font-size:13px}
+.invnet-ov .vr-setting code{font-size:11px;color:#627890;overflow-wrap:anywhere}
+.invnet-ov .vr-edit{display:grid;gap:10px;grid-template-columns:minmax(120px,200px) 1fr auto;align-items:end;border-top:1px solid #dce4ed;padding-top:12px}
+.invnet-ov .vr-radio{display:grid;gap:4px;border:1px solid #dce4ed;border-radius:5px;padding:10px 12px;margin:0 0 8px}
+.invnet-ov .vr-radio label{display:flex;gap:8px;align-items:flex-start;font-size:12px;font-weight:700;color:#25445f}
+.invnet-ov .vr-radio input{margin-top:2px;width:16px;height:16px}
+.invnet-ov .vr-radio input:focus-visible,.invnet-ov select.input:focus-visible,.invnet-ov .vr-check:focus-visible{outline:2px solid #075be8;outline-offset:2px}
+.invnet-ov .vr-radio p{margin:0 0 0 24px;font-size:11px;color:#526a82}
+.invnet-ov .vr-radio.off{background:#f4f7fa}
+.invnet-ov .vr-radio.off label{color:#677e93}
+.invnet-ov .vr-effects{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0}
+.invnet-ov .vr-effects ul{margin:4px 0 0;padding-left:18px;font-size:11px;color:#28445f}
+.invnet-ov .vr-check{width:18px;height:18px}
+.invnet-ov .vr-visit{border-top:1px solid #dce4ed;padding-top:14px;margin-top:14px}
+.invnet-ov .vr-visit:first-of-type{border-top:0;padding-top:0;margin-top:0}
+.invnet-ov .vr-visit h3{margin:0 0 4px;font-size:13px}
+.invnet-ov .vr-fixture-note{font-size:11px;color:#526a82;margin:0 0 12px}
+.invnet-ov select.input{width:100%;font:inherit;font-size:11px}
+@media (max-width:639px){
+  .invnet-ov .vr-edit,.invnet-ov .vr-effects{grid-template-columns:1fr}
+  .invnet-ov .vr-search .btn{width:100%}
+  .invnet-ov .vr-setting .btn{width:100%}
+}
+.invnet-ov .timeline.vr-history li{border-left-color:#cddbea}
+.invnet-ov .timeline.vr-history li:before{background:#28445f}

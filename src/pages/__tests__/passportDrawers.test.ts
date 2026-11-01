@@ -299,7 +299,7 @@ describe("the Customer Action Center says what it does", () => {
 
 describe("only one persistent CTA system is on screen", () => {
   it("hides the floating dock while the action centre is visible", () => {
-    expect(passport).toMatch(/\{!actionCenterInView && <PassportCtaDock/);
+    expect(passport).toMatch(/\{purchasable && !actionCenterInView && <PassportCtaDock/);
   });
 
   it("observes the action centre rather than guessing from scroll position", () => {
