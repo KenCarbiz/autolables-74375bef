@@ -40,7 +40,7 @@ export function reviewRows(before: EstimatorConfig, after: EstimatorConfig): Rev
   const changed = after.rules.filter((r) => { const b = prior.get(r.id); return !b || JSON.stringify(b) !== JSON.stringify(r); });
   for (const r of changed) {
     const b = prior.get(r.id);
-    const rate = (x: YearRule | undefined) => (x && aprs(x) ? `${months(x)} at ${aprs(x)}%` : months(x));
+    const rate = (x: YearRule | undefined) => `${x && !x.enabled ? "Off · " : ""}${x && aprs(x) ? `${months(x)} at ${aprs(x)}%` : months(x)}`;
     rows.push({ setting: `Year range ${ruleLabel(r)}`, before: rate(b), after: rate(r) });
     const term = (x: YearRule | undefined) => (x?.defaultTermMonths != null ? `${x.defaultTermMonths} months` : "None");
     if (term(b) !== term(r)) rows.push({ setting: changed.length === 1 ? "Default term" : `Default term ${ruleLabel(r)}`, before: term(b), after: term(r) });

@@ -96,7 +96,7 @@ export default function InventoryNetworkPage() {
   );
 
   const al97: Al97Screen | null = view === "overview" ? "overview" : view === "stores" ? "stores" : view === "mapping" && params.get("file") && params.get("review") === "activation" ? "activation" : view === "mapping" && params.get("file") ? "mapping" : view === "runs" && params.get("job") ? "job" : view === "marketcheck" ? "budgets"
-    : view === "duplicates" && params.get("review") === "reconcile" && params.get("plan") ? "reconcile" : view === "duplicates" && params.get("review") === "safety" ? "dedupe" : null;
+    : view === "duplicates" ? (params.get("preview") ? "reconcile" : "dedupe") : null;
 
   const title = "Inventory network";
   if (loading) return <ChildPageFrame section="integrations" crumbs={crumbs} title={title}><SkeletonBlock className="h-64 w-full" /></ChildPageFrame>;
@@ -151,6 +151,7 @@ export default function InventoryNetworkPage() {
             {(al97 === "mapping" || al97 === "activation") && <MappingSection />}
             {al97 === "job" && <RunsSection />}
             {al97 === "budgets" && <MarketCheckSection />}
+            {(al97 === "dedupe" || al97 === "reconcile") && <DuplicatesSection />}
           </>
         )}
       </div>
@@ -167,7 +168,7 @@ export default function InventoryNetworkPage() {
         {al97 === "job" && <JobDetail scope={scopePicker} jobId={params.get("job")!}>{more}</JobDetail>}
         {al97 === "activation" && <FeedActivationReview scope={scopePicker} path={params.get("file")!}>{more}</FeedActivationReview>}
         {al97 === "dedupe" && <DuplicateHandling scope={scopePicker} storeId={params.get("store")}>{more}</DuplicateHandling>}
-        {al97 === "reconcile" && <ReconciliationReview scope={scopePicker} previewId={params.get("plan")!}>{more}</ReconciliationReview>}
+        {al97 === "reconcile" && <ReconciliationReview scope={scopePicker} previewId={params.get("preview")!}>{more}</ReconciliationReview>}
         {al97 === "budgets" && <ProviderBudgets scope={scopePicker}>{more}</ProviderBudgets>}
       </NetProvider>
     );

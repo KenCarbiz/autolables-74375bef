@@ -16,8 +16,8 @@ import { EstimatorIcon } from "@/pages/admin/views/brand/paymentEstimator/icons"
 import { FieldError, NumberField, Segmented, SwitchRow, fieldDomId, useMediaQuery } from "@/pages/admin/views/brand/paymentEstimator/parts";
 import { EXAMPLE_VEHICLE_ID, PreviewPanel, exampleVehicle } from "@/pages/admin/views/brand/paymentEstimator/preview";
 import { RuleCards, RuleDialog } from "@/pages/admin/views/brand/paymentEstimator/rules";
-import { Al97Frame, Banner, Card, Glyph, KeyVals, Savebar, useFixtureCopy } from "@/components/admin/al97/al97ui";
-import { shopperLabel } from "./PaymentAssumptionsPage";
+import { Al97Dialog, Al97Frame, Banner, Card, Glyph, KeyVals, Savebar, useFixtureCopy } from "@/components/admin/al97/al97ui";
+import { reviewRows, shopperLabel } from "./PaymentAssumptionsPage";
 
 // Payment estimator in the AL97 layout (pilot replacing PaymentEstimatorPage
 // on the same route). Behaviour is the approved editor's: per-store drafts,
@@ -60,6 +60,7 @@ export default function PaymentEstimatorAl97Page() {
 
   const issues = useMemo(() => validateEstimatorConfig(draft), [draft]);
   const changes = useMemo(() => estimatorChanges(published.config, draft), [published.config, draft]);
+  const rows = useMemo(() => reviewRows(published.config, draft), [published.config, draft]);
   const realVehicles = useMemo(() => src.vehicles.filter((v) => v.id !== EXAMPLE_VEHICLE_ID), [src.vehicles]);
   const coverage = useMemo(() => estimatorCoverage(draft, realVehicles), [draft, realVehicles]);
 
@@ -76,6 +77,7 @@ export default function PaymentEstimatorAl97Page() {
   const [showErrors, setShowErrors] = useState(false);
   const [ack, setAck] = useState(false);
   const errorSummaryRef = useRef<HTMLDivElement>(null);
+  const reviewTrigger = useRef<HTMLButtonElement>(null);
   useEffect(() => { setAck(false); }, [draft]);
 
   const discard = () => { if (!storeId) return; setDrafts((d) => { const n = { ...d }; delete n[storeId]; return n; }); setPhase({ kind: "idle" }); setShowErrors(false); };
@@ -206,6 +208,10 @@ export default function PaymentEstimatorAl97Page() {
   );
 
   const loading = src.state === "loading" && !src.isFixture;
+  const reviewing = phase.kind === "reviewing" || phase.kind === "applying" || phase.kind === "conflict" || (phase.kind === "failed" && dirty);
+  const reviewButton = <button ref={reviewTrigger} type="button" className="btn primary" onClick={openReview} disabled={!dirty || (!canReview && issues.length === 0)} aria-disabled={!canReview}>Review changes</button>;
+  const base = entry?.base.version ?? published.version;
+  const applyReason = phase.kind === "applying" ? "Applying." : blockedReason ?? (warnings.length > 0 && !ack ? "Confirm you reviewed the vehicles that will show no estimate." : null);
   const editors = (
     <>
       <div className="split">
@@ -287,7 +293,7 @@ export default function PaymentEstimatorAl97Page() {
         <Savebar title={status.title} detail={status.detail}
           action={<>
             {dirty && phase.kind !== "applying" && <button type="button" className="btn" onClick={discard}>Discard</button>}
-            <button type="button" className="btn primary" onClick={openReview} disabled={!dirty || (!canReview && issues.length === 0)} aria-disabled={!canReview}>Review changes</button>
+            {reviewButton}
           </>} />
       </div>
     </div>
@@ -344,10 +350,12 @@ export default function PaymentEstimatorAl97Page() {
 
   return (
     <>
-      <Al97Frame section="brand" trail={[{ label: "Dealership & Brand", to: BACK_HREF }]} crumb="Payment estimator" title="Payment estimator"
-        subtitle={`Retail finance assumptions · ${scopeText}`} scopeLabel={{ account: copy("pay.account", tenant?.name ?? "This account"), store: src.storeName }}
-        main={main} onLeave={onLeave}>
-        {more}
+      <Al97Frame section="brand" trail={[{ label: "Dealership & Brand", to: BACK_HREF }]}
+        crumb={reviewing ? "Payment estimator / review" : "Payment estimator"} title={reviewing ? "Payment estimator / review" : "Payment estimator"}
+        subtitle={reviewing ? `${src.accountWide ? "Whole account" : storeName} · exact store and base version` : `Retail finance assumptions · ${scopeText}`}
+        scopeLabel={{ account: copy("pay.account", tenant?.name ?? "This account"), store: src.storeName }}
+        main={reviewing ? <div className="work" /> : main} onLeave={onLeave}>
+        {reviewing ? <div className="invnet-ov mt-10 flex justify-center">{reviewButton}</div> : more}
       </Al97Frame>
 
       {downOpen && (
@@ -400,55 +408,45 @@ export default function PaymentEstimatorAl97Page() {
           onSave={(r) => { update({ ...draft, rules: ruleOpen.isNew ? [...draft.rules, r] : draft.rules.map((x) => (x.id === r.id ? r : x)) }); setRuleOpen(null); }} />
       )}
 
-      {(phase.kind === "reviewing" || phase.kind === "applying" || phase.kind === "conflict" || (phase.kind === "failed" && dirty)) && (
-        <ReviewDialog
-          open
-          title="Review payment changes"
-          subtitle={<>For <strong className="text-adm-ink">{storeName}</strong> only · from version {entry?.base.version ?? published.version} to {(entry?.base.version ?? published.version) + 1}</>}
-          onClose={() => { if (phase.kind !== "applying") setPhase({ kind: "idle" }); }}
-          footer={
-            <>
-              <p className="text-[12px] text-adm-muted">Applying records you, the time, and every value before and after.</p>
-              <div className="flex gap-2">
-                <AdminButton variant="secondary" className="min-h-[44px]" disabled={phase.kind === "applying"} onClick={() => setPhase({ kind: "idle" })}>Keep editing</AdminButton>
-                {phase.kind === "conflict"
-                  ? <AdminButton variant="primary" className="min-h-[44px] px-6" onClick={rebase}>Compare with latest</AdminButton>
-                  : <AdminButton variant="primary" className="min-h-[44px] px-6" disabled={phase.kind === "applying" || !!blockedReason || (warnings.length > 0 && !ack)} aria-busy={phase.kind === "applying"} onClick={() => void apply()}>
-                      {phase.kind === "applying" ? "Applying…" : phase.kind === "failed" ? "Retry apply" : "Apply changes"}
-                    </AdminButton>}
-              </div>
-            </>
-          }
-        >
-          {phase.kind === "conflict" && <InlineNote tone="danger" title="Not applied: newer settings exist">Someone applied a newer version while you were editing. Nothing was overwritten. Compare your draft with the latest, then review again.</InlineNote>}
-          {phase.kind === "failed" && <InlineNote tone="danger" title="Not applied">{phase.message} Your draft is kept; Retry uses the same request, so it can never apply twice.</InlineNote>}
-          {blockedReason && <InlineNote tone="warning" title="Can't apply">{blockedReason}</InlineNote>}
-          <table className="w-full border-collapse text-[13px]">
+      <Al97Dialog
+        open={reviewing}
+        onOpenChange={(o) => { if (!o && phase.kind !== "applying") setPhase({ kind: "idle" }); }}
+        returnFocus={reviewTrigger}
+        title="Review payment changes"
+        description={<>{src.accountWide ? "Whole account" : <><span>{storeName}</span> only</>} · {copy("pay.reviewNote", `from version ${base} to ${base + 1}`)}</>}
+        footer={<>
+          <button type="button" className="btn" disabled={phase.kind === "applying"} onClick={() => setPhase({ kind: "idle" })}>Keep editing</button>
+          {phase.kind === "conflict"
+            ? <button type="button" className="btn primary" onClick={rebase}>Compare with latest</button>
+            : <><span id="pe-apply-reason" className="sr-only">{applyReason ?? ""}</span>
+              <button type="button" className="btn primary" disabled={!!applyReason} title={applyReason ?? undefined} aria-describedby={applyReason ? "pe-apply-reason" : undefined} aria-busy={phase.kind === "applying"} onClick={() => void apply()}>
+                {phase.kind === "applying" ? "Applying…" : phase.kind === "failed" ? "Retry apply" : "Apply changes"}
+              </button></>}
+        </>}
+      >
+        {phase.kind === "conflict" && <Banner tone="red" icon="warning" title="Not applied: newer settings exist" detail="Someone applied a newer version while you were editing. Nothing was overwritten. Compare your draft with the latest, then review again." />}
+        {phase.kind === "failed" && <Banner tone="red" icon="warning" title="Not applied" detail={`${phase.message} Your draft is kept; Retry uses the same request, so it can never apply twice.`} />}
+        {blockedReason && <Banner tone="amber" icon="warning" title="Can't apply" detail={blockedReason} />}
+        <Banner tone="blue" icon="info" title={copy("pay.reviewTitle", "Store assumptions")} detail={copy("pay.reviewDetail", "Every rate here is the store's assumption. Nothing is filled in automatically, and no rate is shown as an approval or lender offer.")} />
+        <div className="table-wrap">
+          <table>
             <caption className="sr-only">Changes for {storeName}</caption>
-            <thead><tr className="text-left text-[12px] text-adm-muted"><th scope="col" className="py-1 pr-3 font-semibold">Setting</th><th scope="col" className="py-1 pr-3 font-semibold">Before</th><th scope="col" className="py-1 font-semibold">After</th></tr></thead>
-            <tbody>
-              {changes.map((c) => (
-                <tr key={c.field} className="border-t border-adm-border align-top">
-                  <th scope="row" className="py-2 pr-3 text-left font-semibold text-adm-ink">{c.field}</th>
-                  <td className="py-2 pr-3 text-adm-muted break-words">{c.before}</td>
-                  <td className="py-2 text-adm-ink break-words">{c.after}</td>
-                </tr>
-              ))}
-            </tbody>
+            <thead><tr><th scope="col">Setting</th><th scope="col">Before</th><th scope="col">After</th></tr></thead>
+            <tbody>{rows.length ? rows.map((r) => <tr key={r.setting}><td>{r.setting}</td><td>{r.before}</td><td>{r.after}</td></tr>) : <tr><td colSpan={3}>No changes</td></tr>}</tbody>
           </table>
-          {warnings.length > 0 && (
-            <div className="rounded-[6px] border border-adm-warning bg-adm-warning-bg px-4 py-3">
-              <p className="text-[14px] font-semibold text-adm-warning">Coverage gaps</p>
-              <ul className="mt-1 list-disc pl-5 text-[13px] text-adm-ink">{warnings.map((w) => <li key={w}>{w}</li>)}</ul>
-              <label className="mt-2 flex min-h-[44px] items-center gap-2 text-[13px] text-adm-ink">
-                <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} className="h-5 w-5 accent-[#2457D6]" />
-                I understand these vehicles will show no payment estimate.
-              </label>
-            </div>
-          )}
-          {draft.enabled && <p className="text-[12px] text-adm-muted">Every rate here is the store's assumption. Nothing is filled in automatically, and no rate is shown as an approval or lender offer.</p>}
-        </ReviewDialog>
-      )}
+        </div>
+        <KeyVals rows={[
+          ["Covered vehicles", src.vehiclesState === "ready" ? copy("pay.coverage", `${coverage.covered} of ${coverage.total} current vehicles${coverage.missingYear.length ? `; ${coverage.missingYear.length} without a model year` : ""}`) : src.vehiclesState === "loading" ? "Checking" : "Unknown"],
+          ["Unmatched years", coverage.uncoveredYears.length && src.vehiclesState === "ready" ? copy("pay.unmatched", `${coverage.uncoveredYears.join(", ")} · ${coverage.noRule.length} ${coverage.noRule.length === 1 ? "vehicle" : "vehicles"} with no estimate`) : "No estimate; do not use a fallback APR"],
+          ["Base version", `${base} · rechecked at Apply`],
+        ]} />
+        {warnings.length > 0 && (
+          <label className="checkline">
+            <input type="checkbox" className="sr-only" checked={ack} onChange={(e) => setAck(e.target.checked)} />
+            {`${ack ? "☑" : "□"} I reviewed uncovered vehicles and the estimate disclosures.`}
+          </label>
+        )}
+      </Al97Dialog>
 
       {leaveTo && (
         <ReviewDialog open title="Leave with unsaved changes?" subtitle="Draft payment changes are not saved anywhere until you apply them." onClose={() => setLeaveTo(null)}

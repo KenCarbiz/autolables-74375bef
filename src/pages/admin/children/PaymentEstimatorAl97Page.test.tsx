@@ -201,4 +201,21 @@ describe("payment estimator editor", () => {
     expect(screen.queryByText("Leave with unsaved changes?")).toBeNull();
     expect(review()).toHaveProperty("disabled", false);
   });
+
+  it("reviews in the AL97 dialog with exact rows and returns focus to Review changes", async () => {
+    render(ui());
+    setDollarDown("2500");
+    fireEvent.click(review());
+    const dialog = screen.getByRole("dialog", { name: "Review payment changes" });
+    const row = within(dialog).getByText("Down payment").closest("tr")!;
+    expect(within(row).getByText("10% of selling price")).toBeTruthy();
+    expect(within(row).getByText("$2,500 fixed")).toBeTruthy();
+    expect(within(dialog).getByText("3 · rechecked at Apply")).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "Apply changes" })).toHaveProperty("title", "Confirm you reviewed the vehicles that will show no estimate.");
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => expect(review()).toHaveFocus());
+    expect(h.apply).not.toHaveBeenCalled();
+  });
 });
+

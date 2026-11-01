@@ -40,7 +40,7 @@ export default function DuplicateHandling({ scope, storeId, children }: { scope?
 
   const scan = <><span id="dd-scan-reason" className="sr-only">{scanReason ?? ""}</span>
     <button type="button" className="btn" disabled={!!scanReason || busy} title={scanReason ?? undefined} aria-describedby={scanReason ? "dd-scan-reason" : undefined} onClick={() => void act(() => runDedupeScan(groupId), "Detection finished")}><Glyph name="search" />Run detection</button></>;
-  const build = (id: string) => void act(() => createDedupePreview(id), "Preview built").then((r) => { if (r.ok) navigate(href("duplicates", { review: "reconcile", plan: r.value.preview_id })); });
+  const build = (id: string) => void act(() => createDedupePreview(id), "Preview built").then((r) => { if (r.ok) navigate(href("duplicates", { preview: r.value.preview_id })); });
 
   const open = data ? data.candidates.filter((x) => x.status === "open" && (!store || x.store_id === store.id)) : [];
   const candidates = data && data.last_checked_at ? (

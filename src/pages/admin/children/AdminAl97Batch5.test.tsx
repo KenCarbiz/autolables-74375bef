@@ -93,7 +93,7 @@ describe("AL97 payment estimator review", () => {
 
 describe("AL97 duplicate handling", () => {
   it("keeps the stop engaged, reconcile and purge off, and runs nothing on load", () => {
-    renderAdmin(<InventoryNetworkPage />, { route: "/admin/integrations/inventory-network?view=duplicates&review=safety&store=s1", fixture: AL97_13.fixture });
+    renderAdmin(<InventoryNetworkPage />, { route: "/admin/integrations/inventory-network?view=duplicates&store=s1", fixture: AL97_13.fixture });
     expect(screen.getByRole("heading", { level: 1, name: "Duplicate handling" })).toBeInTheDocument();
     expect(screen.getByText("Emergency stop engaged")).toBeInTheDocument();
     expect(screen.getByText("Engaged")).toHaveClass("red");
@@ -108,7 +108,7 @@ describe("AL97 duplicate handling", () => {
 
 describe("AL97 exact reconciliation review", () => {
   it("shows the pinned plan with approval blocked by the emergency stop", () => {
-    renderAdmin(<InventoryNetworkPage />, { route: "/admin/integrations/inventory-network?view=duplicates&review=reconcile&plan=preview-demo", fixture: AL97_14.fixture });
+    renderAdmin(<InventoryNetworkPage />, { route: "/admin/integrations/inventory-network?view=duplicates&preview=preview-demo", fixture: AL97_14.fixture });
     expect(screen.getByText("Synthetic candidate · VIN ending DEMO01")).toBeInTheDocument();
     expect(screen.getByText("HOLD for manual choice")).toBeInTheDocument();
     expect(screen.getByText("Fresh scan required")).toBeInTheDocument();
