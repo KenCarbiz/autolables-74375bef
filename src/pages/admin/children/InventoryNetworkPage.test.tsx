@@ -160,4 +160,21 @@ describe("InventoryNetworkPage", () => {
     await waitFor(() => expect(screen.getByText("Awaiting worker").parentElement).toHaveTextContent(/Due in/));
     expect(screen.queryByText("Latest arrival has not been processed")).not.toBeInTheDocument();
   });
+  it("explains archived and unresolved listing conflicts without offering adoption", async () => {
+    spyResponses.tables.dealer_groups = { data: [group] };
+    spyResponses.rpcs.inv_admin_overview = { data: emptyOverview };
+    const base = { group_id: "g1", claiming_store_id: "s1", existing_store_id: null, existing_inventory_id: "i1", snapshot_id: "sn1", status: "open", first_seen_at: "2026-10-31T19:51:00Z", last_seen_at: "2026-10-31T19:51:00Z" };
+    spyResponses.tables.inventory_vin_conflicts = { data: [
+      { ...base, id: "c1", vin: "JTMABABA1PA013354", kind: "archived_listing", existing_listing_id: "l1" },
+      { ...base, id: "c2", vin: "SYNTH0000000000040", kind: "reconciled_listing_unresolved", existing_listing_id: "l2" },
+    ] };
+    renderAdmin(<InventoryNetworkPage />, { route: "/admin/integrations/inventory-network?view=runs&panel=conflicts" });
+    expect(await screen.findByText(/its listing is archived from an earlier stay or sale\. It was not revived\./)).toBeInTheDocument();
+    expect(screen.getByText(/archived as a duplicate, but the record it was merged into could not be found\. No listing was created\./)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Adopt legacy listing" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Transfer" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Dismiss" })).toHaveLength(2);
+    expect(writeCalls().filter((c) => c.kind === "table")).toEqual([]);
+    expect(functionCalls()).toEqual([]);
+  });
 });
