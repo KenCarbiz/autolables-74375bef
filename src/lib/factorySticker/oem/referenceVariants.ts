@@ -134,7 +134,7 @@ export const REFERENCE_VARIANTS: readonly ReferenceVariant[] = [
     figma: { master: "25:605", review: "25:812", map: "41:485" },
     requiredEvidence: [...COMMON_EVIDENCE, "epa_record_exact_configuration", "aala_model_year_carline_match", "oem_model_year_warranty_terms"],
     sourceGaps: ["Generic numbered text slots need a semantic crosswalk.", "Original warranty terms need an OEM model-year source."],
-    layoutStatus: "pending",
+    layoutStatus: "implemented",
   },
   {
     key: "mitsubishi-2025-outlander-se-s-awc",
@@ -158,7 +158,7 @@ export const REFERENCE_VARIANTS: readonly ReferenceVariant[] = [
       "Original reference is portrait and was rotated for the landscape template; verify physical size.",
       "Model-year AALA does not prove VIN-specific final assembly.",
     ],
-    layoutStatus: "pending",
+    layoutStatus: "implemented",
   },
   {
     key: "jeep-2024-grand-cherokee-4xe-phev",
@@ -184,7 +184,7 @@ export const REFERENCE_VARIANTS: readonly ReferenceVariant[] = [
       "PHEV label-mode fields need real-record validation before the dual-mode panel prints.",
       "AALA engine/transmission alternatives cannot be chosen by carline alone.",
     ],
-    layoutStatus: "pending",
+    layoutStatus: "implemented",
   },
   {
     key: "chrysler-2024-pacifica-select-phev",
@@ -208,7 +208,7 @@ export const REFERENCE_VARIANTS: readonly ReferenceVariant[] = [
       "Trim/model-year compatibility and PHEV label semantics need fixtures.",
       "Package membership (S Appearance) must not charge a package and its contents twice.",
     ],
-    layoutStatus: "pending",
+    layoutStatus: "implemented",
   },
   {
     key: "ford-2025-transit-250-cargo-rwd-e85-carb",
@@ -234,7 +234,7 @@ export const REFERENCE_VARIANTS: readonly ReferenceVariant[] = [
       "CARB letter ratings need an authoritative configuration-matched source; EPA scores are never converted.",
       "Passenger MPG and AALA panels do not apply without an applicability source.",
     ],
-    layoutStatus: "pending",
+    layoutStatus: "implemented",
   },
 ];
 

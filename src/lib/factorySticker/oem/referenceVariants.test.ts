@@ -50,10 +50,7 @@ describe("reference variant registry", () => {
       expect(r.variant?.key).toBe(key);
       expect(r.variant?.paperSize).toBe(paper);
       expect(r.variant?.environmentPanel).toBe(panel);
-      // Only the Letter layouts have shipped; the rest stay on the generic
-      // reproduction layout until their dedicated templates exist.
-      const implemented = paper === "LETTER_LANDSCAPE";
-      expect(r.rendering).toBe(implemented ? "variant_layout" : "generic_reproduction_layout");
+      expect(r.rendering).toBe("variant_layout");
     });
   }
 
