@@ -106,7 +106,7 @@ describe("InventoryNetworkPage", () => {
     }
     expect(functionCalls()).toEqual([]);
     expect(writeCalls().filter((c) => c.kind === "table")).toEqual([]);
-    expect(new Set(rpcCalls())).toEqual(new Set(["inv_admin_overview", "inv_admin_usage", "inv_admin_preview_context", "inv_admin_preview_customer_inventory"]));
+    expect(new Set(rpcCalls())).toEqual(new Set(["inv_admin_overview", "inv_admin_usage", "inv_admin_provider_dashboard", "inv_admin_preview_context", "inv_admin_preview_customer_inventory"]));
   });
 
   it("shows the pilot, catalog and deliveries views with live data and never claims unknown is free", async () => {

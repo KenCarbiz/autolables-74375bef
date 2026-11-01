@@ -159,3 +159,9 @@ export const AL97_22 = screen("AL97 22 Import job completed", base(allStores(), 
     "job.hash": "Exact fixture SHA-256", "job.times": "Fixed fixture timestamps", "job.held": "Reviewable with reasons",
   },
 }));
+
+export const AL97_10 = screen("AL97 10 Provider usage and budgets", base(allStores(), {
+  providerAccount: { quota: 5000, reserve: 1000 },
+  storeUsage: null,
+  copy: { "budget.quotaSub": "Configured pool · example" },
+}));

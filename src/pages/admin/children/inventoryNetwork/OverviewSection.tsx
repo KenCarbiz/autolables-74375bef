@@ -6,7 +6,7 @@ import { setControls, type InventoryFeedControls, type StoreOverview } from "@/l
 import { NetIcon } from "@/components/inventoryNetwork/icons";
 import { inputClass, mcModeLabel, plural, storeAddress, useAct, useNet, when, humanize, STATUS_TONE } from "./shared";
 import { buildOverviewModel, type OverviewModel } from "./overviewModel";
-import { Al97Frame, ChipView, Glyph, type ScopePicker } from "./al97ui";
+import { Al97Frame, ChipView, Glyph, type ScopePicker } from "@/components/admin/al97/al97ui";
 import { useLedgers } from "./ledgers";
 import connectionStages from "@/assets/inventoryNetwork/connection-stages.svg";
 

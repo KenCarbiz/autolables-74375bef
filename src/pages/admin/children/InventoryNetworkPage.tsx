@@ -14,11 +14,12 @@ import OverviewDetail, { OverviewScreen } from "./inventoryNetwork/OverviewSecti
 import StoresBoard from "./inventoryNetwork/StoresBoard";
 import MappingReview from "./inventoryNetwork/MappingReview";
 import JobDetail from "./inventoryNetwork/JobDetail";
-import { Al97Frame } from "./inventoryNetwork/al97ui";
+import ProviderBudgets from "./inventoryNetwork/ProviderBudgets";
+import { Al97Frame } from "@/components/admin/al97/al97ui";
 import type { InventoryNetworkFixture } from "./inventoryNetwork/overviewModel";
 
-type Al97Screen = "overview" | "stores" | "mapping" | "job";
-const AL97_TITLES: Record<Al97Screen, string> = { overview: "Inventory network", stores: "Stores & import readiness", mapping: "Feed mapping review", job: "Import job" };
+type Al97Screen = "overview" | "stores" | "mapping" | "job" | "budgets";
+const AL97_TITLES: Record<Al97Screen, string> = { overview: "Inventory network", stores: "Stores & import readiness", mapping: "Feed mapping review", job: "Import job", budgets: "Provider usage & budgets" };
 import StoresSection from "./inventoryNetwork/StoresSection";
 import SharingSection from "./inventoryNetwork/SharingSection";
 import MarketCheckSection from "./inventoryNetwork/MarketCheckSection";
@@ -91,7 +92,7 @@ export default function InventoryNetworkPage() {
     [group, ov, notify, refresh, href, go, newStoreDraft, startNewStore, clearNewStoreDraft],
   );
 
-  const al97: Al97Screen | null = view === "overview" ? "overview" : view === "stores" ? "stores" : view === "mapping" && params.get("file") ? "mapping" : view === "runs" && params.get("job") ? "job" : null;
+  const al97: Al97Screen | null = view === "overview" ? "overview" : view === "stores" ? "stores" : view === "mapping" && params.get("file") ? "mapping" : view === "runs" && params.get("job") ? "job" : view === "marketcheck" ? "budgets" : null;
 
   const title = "Inventory network";
   if (loading) return <ChildPageFrame section="integrations" crumbs={crumbs} title={title}><SkeletonBlock className="h-64 w-full" /></ChildPageFrame>;
@@ -145,6 +146,7 @@ export default function InventoryNetworkPage() {
             {al97 === "stores" && <StoresSection />}
             {al97 === "mapping" && <MappingSection />}
             {al97 === "job" && <RunsSection />}
+            {al97 === "budgets" && <MarketCheckSection />}
           </>
         )}
       </div>
@@ -159,6 +161,7 @@ export default function InventoryNetworkPage() {
         {al97 === "stores" && <StoresBoard scope={scopePicker}>{more}</StoresBoard>}
         {al97 === "mapping" && <MappingReview scope={scopePicker} path={params.get("file")!}>{more}</MappingReview>}
         {al97 === "job" && <JobDetail scope={scopePicker} jobId={params.get("job")!}>{more}</JobDetail>}
+        {al97 === "budgets" && <ProviderBudgets scope={scopePicker}>{more}</ProviderBudgets>}
       </NetProvider>
     );
   }

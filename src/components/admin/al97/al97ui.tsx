@@ -3,16 +3,22 @@ import { Link } from "react-router-dom";
 import { ADMIN_SECTIONS, adminTabHref, firstVisibleTab, visibleSections } from "@/lib/admin/sections";
 import { useAdminVisibility } from "@/components/admin/v2/useAdminVisibility";
 import { useViewFixture } from "@/lib/admin/dataSource";
-import type { Chip, InventoryNetworkFixture } from "./overviewModel";
+import type { Chip, InventoryNetworkFixture } from "@/pages/admin/children/inventoryNetwork/overviewModel";
 import "./al97.css";
 
-// Shared building blocks for the AL97 inventory network screens. The class
-// names mirror the handoff scaffold and are scoped under .invnet-ov in al97.css.
+// Shared building blocks for the AL97 Administration screens. The class names
+// mirror the handoff scaffold and are scoped under .invnet-ov in al97.css.
 
 export interface ScopePicker { groups: Array<{ id: string; name: string }>; groupId: string; groupName: string; onChange: (id: string) => void }
 
-export function Al97Frame({ crumb, title, subtitle, scope, storeName, main, children }: {
-  crumb: string; title: string; subtitle: ReactNode; scope?: ScopePicker; storeName?: string | null; main?: ReactNode; children?: ReactNode;
+export interface Crumb { label: string; to?: string }
+export interface ScopeLabel { account: string; store?: string | null }
+
+const DEFAULT_TRAIL: Crumb[] = [{ label: "Integrations", to: adminTabHref("inventory-feed") }];
+
+export function Al97Frame({ crumb, title, subtitle, scope, scopeLabel, storeName, main, children, section = "integrations", trail = DEFAULT_TRAIL }: {
+  crumb: string; title: string; subtitle: ReactNode; scope?: ScopePicker; scopeLabel?: ScopeLabel; storeName?: string | null; main?: ReactNode; children?: ReactNode;
+  section?: string; trail?: Crumb[];
 }) {
   const { ctx } = useAdminVisibility();
   const visible = visibleSections(ctx);
@@ -21,14 +27,16 @@ export function Al97Frame({ crumb, title, subtitle, scope, storeName, main, chil
     <div className="invnet-ov-page">
       <div className="invnet-ov">
         <nav aria-label="Breadcrumb" className="breadcrumbs">
-          <Link to="/admin">Administration</Link> / <Link to={adminTabHref("inventory-feed")} className="crumb">Integrations</Link> / <span aria-current="page">{crumb}</span>
+          <Link to="/admin">Administration</Link>
+          {trail.map((c) => <span key={c.label}> / {c.to ? <Link to={c.to} className="crumb">{c.label}</Link> : c.label}</span>)}
+          {" / "}<span aria-current="page">{crumb}</span>
         </nav>
         <div className="page-head">
           <div>
             <h1>{title}</h1>
             <p>{subtitle}</p>
           </div>
-          {scope && (
+          {scope ? (
             <div className="scope-picker">
               <small>ACCOUNT / STORE</small>
               <b>{scope.groupName}{storeName ? ` / ${storeName}` : ""}</b> ▾
@@ -36,12 +44,17 @@ export function Al97Frame({ crumb, title, subtitle, scope, storeName, main, chil
                 {scope.groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
               </select>
             </div>
-          )}
+          ) : scopeLabel ? (
+            <div className="scope-picker" role="group" aria-label="Account and store">
+              <small>ACCOUNT / STORE</small>
+              <b>{scopeLabel.account}{scopeLabel.store ? ` / ${scopeLabel.store}` : ""}</b> <span aria-hidden="true">▾</span>
+            </div>
+          ) : null}
         </div>
         <nav aria-label="Administration sections" className="tabs">
           {sections.map((s) => {
             const target = firstVisibleTab(s, ctx) ?? s.tabs[0];
-            return <Link key={s.id} to={adminTabHref(target.id)} aria-current={s.id === "integrations" ? "page" : undefined}>{s.label}</Link>;
+            return <Link key={s.id} to={adminTabHref(target.id)} aria-current={s.id === section ? "page" : undefined}>{s.label}</Link>;
           })}
         </nav>
         {main}
@@ -58,9 +71,12 @@ const PATHS = {
   car: "M3 11l3-7h12l3 7M2 11h20v8H2zM5 19v3m14-3v3M5 15h3m8 0h3",
   history: "M3 10a9 9 0 1 1 1 8M3 3v7h7M12 7v5l4 2",
   shield: "M12 2l9 4v6c0 5-9 10-9 10S3 17 3 12V6zM8 12l3 3 5-6",
+  dollar: "M12 2v20m6-16H9a4 4 0 0 0 0 8h6a4 4 0 0 1 0 8H5",
+  archive: "M3 7h18v15H3zM2 2h20v5H2zM8 12h8",
+  chevron: "M8 3l9 9-9 9",
 } as const;
 
-export type GlyphName = keyof typeof PATHS | "clock" | "info" | "plus" | "retry" | "settings" | "database";
+export type GlyphName = keyof typeof PATHS | "clock" | "info" | "plus" | "retry" | "settings" | "database" | "calculator";
 
 export const Glyph = ({ name, className = "icon" }: { name: GlyphName; className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="#47617C" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -75,6 +91,7 @@ function GlyphBody({ name }: { name: GlyphName }) {
     case "plus": return <path d="M12 2v20M2 12h20" />;
     case "retry": return <path d="M3 10a9 9 0 1 1 1 8M3 2v8h8" />;
     case "settings": return <><path d="M4 7h16M4 17h16" /><circle cx="9" cy="7" r="3" /><circle cx="15" cy="17" r="3" /></>;
+    case "calculator": return <><rect x="4" y="2" width="16" height="20" rx="2" /><path d="M7 6h10M7 11h2m6 0h2M7 15h2m6 0h2M7 19h2m6 0h2" /></>;
     case "database": return <><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5v14c0 4 18 4 18 0V5M3 12c0 4 18 4 18 0" /></>;
     default: return null;
   }
@@ -145,5 +162,6 @@ export function useNetFixture(): InventoryNetworkFixture | null {
 /** Development fixtures label their own synthetic values; live data never reads this. */
 export function useFixtureCopy(): (key: string, live: string) => string {
   const fx = useNetFixture();
-  return (key, live) => fx?.copy?.[key] ?? live;
+  const shared = useViewFixture<Record<string, string>>("al97-copy");
+  return (key, live) => shared?.[key] ?? fx?.copy?.[key] ?? live;
 }

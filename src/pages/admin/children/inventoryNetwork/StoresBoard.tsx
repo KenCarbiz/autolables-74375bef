@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import type { FeedBinding, StoreOverview } from "@/lib/inventoryNetwork/api";
-import { Al97Frame, Banner, Card, ChipView, Glyph, KeyVals, Savebar, type ScopePicker } from "./al97ui";
+import { Al97Frame, Banner, Card, ChipView, Glyph, KeyVals, Savebar, type ScopePicker } from "@/components/admin/al97/al97ui";
 import { storeSourcePath, useLedgers } from "./ledgers";
 import type { Chip } from "./overviewModel";
 import { fileName, mcModeLabel, plural, useNet } from "./shared";

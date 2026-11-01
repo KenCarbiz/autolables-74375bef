@@ -984,6 +984,10 @@ const Admin = ({ embedded = false, legacyTab }: { embedded?: boolean; legacyTab?
               </p>
             )}
 
+            <button type="button" onClick={() => navigate("/admin/integrations/vehicle-files")} className="text-xs font-semibold text-primary hover:underline">
+              Review store associations
+            </button>
+
             {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />

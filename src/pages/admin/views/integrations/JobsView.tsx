@@ -54,7 +54,8 @@ export function useJobsData() {
     });
   }, [data, now]);
 
-  return { data, rows, formatAt, now };
+  const checkedAt = fixture ? null : live.dataUpdatedAt ? new Date(live.dataUpdatedAt).toISOString() : null;
+  return { data, rows, formatAt, now, checkedAt, refetch: live.refetch };
 }
 
 export default function JobsView() {

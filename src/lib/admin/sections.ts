@@ -169,6 +169,9 @@ export const LEGACY_TAB_REDIRECTS: Readonly<Record<string, string>> = {
 export const ADMIN_CHILD_ROUTES = {
   memberRole: (memberId: string) => `/admin/people/${encodeURIComponent(memberId)}`,
   feeReview: "/admin/pricing/fee-review",
+  pricingIntegrity: "/admin/pricing/integrity",
+  vehicleFiles: "/admin/integrations/vehicle-files",
+  jobs: "/admin/integrations/jobs",
   productApplicability: (productId: string) => `/admin/products/${encodeURIComponent(productId)}/applicability`,
   escalation: "/admin/customer-experience/escalation",
   customerPreview: "/admin/customer-experience/preview",

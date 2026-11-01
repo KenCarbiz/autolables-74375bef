@@ -1,4 +1,4 @@
-import type { DealerGroup, FeedBinding, FeedFile, FeedRun, GroupInventoryData, InvOverview, InventorySourceMapping, StoreProviderUsage, InventoryFeedControls, InventoryFeedJob, InventoryStoreSnapshot, StoreOverview } from "@/lib/inventoryNetwork/api";
+import type { DealerGroup, FeedBinding, FeedFile, FeedRun, GroupInventoryData, InvOverview, InventorySourceMapping, StoreProviderUsage, InventoryFeedControls, InventoryFeedJob, InventoryStoreSnapshot, InvUsage, StoreOverview } from "@/lib/inventoryNetwork/api";
 import { mcModeLabel } from "./shared";
 import type { View } from "./shared";
 
@@ -229,5 +229,8 @@ export interface InventoryNetworkFixture {
   heartbeatAt?: string | null;
   workerSchedule?: "found" | "not_found" | null;
   /** Labels a synthetic fixture value as synthetic; keyed by the field it replaces. */
+  /** MarketCheck provider account limits; null when not read. */
+  providerAccount?: { quota: number; reserve: number } | null;
+  storeUsage?: InvUsage | null;
   copy?: Record<string, string>;
 }

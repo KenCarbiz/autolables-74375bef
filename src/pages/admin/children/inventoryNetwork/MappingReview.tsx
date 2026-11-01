@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { approveBinding, isPartitionReport, type FeedBinding, type InventorySourceMapping, type PartitionReportItem } from "@/lib/inventoryNetwork/api";
-import { Al97Frame, Banner, Card, ChipView, Glyph, KeyVals, Metrics, Savebar, useFixtureCopy, type ScopePicker } from "./al97ui";
+import { Al97Frame, Banner, Card, ChipView, Glyph, KeyVals, Metrics, Savebar, useFixtureCopy, type ScopePicker } from "@/components/admin/al97/al97ui";
 import { latestPartitionRun, useLedgers } from "./ledgers";
 import { formatClock, type Chip } from "./overviewModel";
 import { fileName, humanize, mcModeLabel, plural, useAct, useNet } from "./shared";

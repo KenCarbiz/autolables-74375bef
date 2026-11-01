@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { retryJob, type InventoryFeedJob } from "@/lib/inventoryNetwork/api";
 import { useAdminNow } from "@/lib/admin/dataSource";
-import { Al97Frame, Banner, Card, ChipView, Flow, Glyph, KeyVals, Metrics, Savebar, useFixtureCopy, type ScopePicker } from "./al97ui";
+import { Al97Frame, Banner, Card, ChipView, Flow, Glyph, KeyVals, Metrics, Savebar, useFixtureCopy, type ScopePicker } from "@/components/admin/al97/al97ui";
 import { recordLabel, useLedgers } from "./ledgers";
 import type { Chip } from "./overviewModel";
 import { fileName, humanize, mcModeLabel, plural, useAct, useNet } from "./shared";

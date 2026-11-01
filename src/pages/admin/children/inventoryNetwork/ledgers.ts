@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getPreviewInventory, listFeedJobs, listProviderUsage, listSnapshots, listSourceMappings, type FeedBinding, type FeedFile, type FeedRun, type GroupInventoryData, type InventoryFeedJob, type InventorySourceMapping, type InventoryStoreSnapshot, type StoreProviderUsage } from "@/lib/inventoryNetwork/api";
 import { boardQueries } from "@/components/inventoryNetwork/MappingReviewBoard";
 import { isPartitionReport } from "@/lib/inventoryNetwork/api";
-import { useNetFixture } from "./al97ui";
+import { useNetFixture } from "@/components/admin/al97/al97ui";
 
 export interface LedgerNeeds { jobs?: boolean; snapshots?: boolean; bindings?: boolean; files?: boolean; runs?: boolean; mappings?: string | null; usageStoreId?: string | null; previewStoreId?: string | null }
 

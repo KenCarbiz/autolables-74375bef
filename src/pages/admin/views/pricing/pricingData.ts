@@ -333,17 +333,20 @@ const countOf = async (q: PromiseLike<{ count: number | null; error: unknown }>)
 };
 
 export interface ListingCounts {
+  /** Every active vehicle, priced or not. */
+  active: CountValue;
   /** Active vehicles with an advertised price: the rows a fee change can touch. */
   eligible: CountValue;
   archived: CountValue;
 }
 
 export async function loadListingCounts(tenantId: string): Promise<ListingCounts> {
-  const [eligible, archived] = await Promise.all([
+  const [active, eligible, archived] = await Promise.all([
+    countOf(db().from("vehicle_listings").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).is("archived_at", null)),
     countOf(db().from("vehicle_listings").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).is("archived_at", null).not("advertised_price_before_doc", "is", null)),
     countOf(db().from("vehicle_listings").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).not("archived_at", "is", null)),
   ]);
-  return { eligible, archived };
+  return { active, eligible, archived };
 }
 
 export async function loadConsistency(tenantId: string, configuredFee: number, mode: PriceDisplayMode): Promise<{ rows: ConsistencyAssessment[]; truncated: boolean }> {

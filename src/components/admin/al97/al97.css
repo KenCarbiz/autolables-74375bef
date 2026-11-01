@@ -1,5 +1,5 @@
-@font-face{font-family:AuditUI;src:url('../../../../assets/inventoryNetwork/Inter-400.woff2') format('woff2');font-weight:400}
-@font-face{font-family:AuditUI;src:url('../../../../assets/inventoryNetwork/Inter-700.woff2') format('woff2');font-weight:700}
+@font-face{font-family:AuditUI;src:url('../../../assets/inventoryNetwork/Inter-400.woff2') format('woff2');font-weight:400}
+@font-face{font-family:AuditUI;src:url('../../../assets/inventoryNetwork/Inter-700.woff2') format('woff2');font-weight:700}
 .invnet-ov-page{background:#f4f6f9;padding:22px 28px 16px}
 .invnet-ov,.invnet-ov *{box-sizing:border-box}
 .invnet-ov{font-family:AuditUI,sans-serif;font-size:13px;line-height:1.5;color:#142b43}
@@ -122,3 +122,8 @@
 .invnet-ov h1{font-size:28px;line-height:1.3;margin:0 0 7px;letter-spacing:-.5px}
 .invnet-ov strong,.invnet-ov b{font-weight:700}
 .invnet-ov .timeline li:before{box-sizing:content-box}
+.invnet-ov h3{font-weight:700}
+.invnet-ov .input.pick{position:relative}
+.invnet-ov .input.pick select{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.invnet-ov .input.pick:focus-within{outline:2px solid #075be8;outline-offset:2px}
+.invnet-ov a.btn{text-decoration:none}
