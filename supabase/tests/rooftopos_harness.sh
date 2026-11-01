@@ -61,7 +61,18 @@ record "spine migration, second apply (must be clean)" "$([ $? = 0 ] && echo PAS
 diff -q <(grep -v "restrict" "$LOGS/schema1.sql") <(grep -v "restrict" "$LOGS/schema2.sql") >/dev/null
 record "schema identical after second apply (idempotent)" "$([ $? = 0 ] && echo PASS || echo FAIL)" "$LOGS/schema2.sql"
 
-for t in rooftopos_spine_rls rooftopos_apply_sql; do
+VH="$ROOT/supabase/proposed/20261109000000_vehicle_history_foundation.sql"
+"${SCRATCH[@]}" -c "CREATE TABLE IF NOT EXISTS public.dealer_stores (id uuid PRIMARY KEY, tenant_id uuid NOT NULL)" >/dev/null 2>&1
+"${SCRATCH[@]}" -f "$VH" >"$LOGS/vh1.log" 2>&1
+record "vehicle history migration, first apply" "$([ $? = 0 ] && echo PASS || echo FAIL)" "$LOGS/vh1.log"
+"$PGBIN/pg_dump" -h "$WORK" -p "$PORT" -U postgres -d scratch --schema-only --no-owner >"$LOGS/vhschema1.sql" 2>/dev/null
+"${SCRATCH[@]}" -f "$VH" >"$LOGS/vh2.log" 2>&1
+record "vehicle history migration, second apply (must be clean)" "$([ $? = 0 ] && echo PASS || echo FAIL)" "$LOGS/vh2.log"
+"$PGBIN/pg_dump" -h "$WORK" -p "$PORT" -U postgres -d scratch --schema-only --no-owner >"$LOGS/vhschema2.sql" 2>/dev/null
+diff -q <(grep -v "restrict" "$LOGS/vhschema1.sql") <(grep -v "restrict" "$LOGS/vhschema2.sql") >/dev/null
+record "vehicle history schema identical after second apply" "$([ $? = 0 ] && echo PASS || echo FAIL)" "$LOGS/vhschema2.sql"
+
+for t in rooftopos_spine_rls rooftopos_apply_sql vehicle_history_sql; do
   "${SCRATCH[@]}" -f "$ROOT/supabase/tests/$t.sql" >"$LOGS/$t.log" 2>&1
   rc=$?
   passes=$(grep -c "NOTICE:  PASS" "$LOGS/$t.log")
@@ -78,6 +89,15 @@ if [ "${SKIP_DENO:-0}" != "1" ]; then
     record "deno HTTP + concurrency tests (deno not installed: npm i -g deno)" "SKIP" "-"
   fi
 fi
+
+# Rollback keeps data and removes client entry points.
+"${SCRATCH[@]}" -c "INSERT INTO public.vehicles (vin) VALUES ('2T1BURHE0JC074211') ON CONFLICT DO NOTHING" >/dev/null 2>&1
+"${SCRATCH[@]}" -f "$ROOT/supabase/proposed/20261109000000_vehicle_history_foundation.rollback.sql" >"$LOGS/vh_rollback.log" 2>&1
+rc=$?
+kept=$("${PSQL[@]}" -d scratch -Atc "select count(*) from public.vehicles where vin = '2T1BURHE0JC074211'")
+canexec=$("${PSQL[@]}" -d scratch -Atc "select has_function_privilege('authenticated', 'public.vehicle_history_owner_view(text)', 'execute')")
+held=$("${PSQL[@]}" -d scratch -Atc "select public.vehicle_history_flag(gen_random_uuid(), null, 'integration.apply_paused')")
+record "vehicle history rollback: data kept ($kept), client execute ($canexec), apply paused ($held)" "$([ $rc = 0 ] && [ "$kept" = 1 ] && [ "$canexec" = f ] && [ "$held" = t ] && echo PASS || echo FAIL)" "$LOGS/vh_rollback.log"
 
 if [ "${SKIP_VITEST:-0}" != "1" ]; then
   (cd "$ROOT" && bunx vitest run supabase/functions/_shared/integrations) >"$LOGS/vitest.log" 2>&1
