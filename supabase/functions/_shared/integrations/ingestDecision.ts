@@ -124,6 +124,13 @@ export async function decideIngest(input: IngestInput): Promise<IngestDecision> 
   const envelope = validation.envelope;
 
   if (envelope.producer !== connection.app) return deny(403, "scope_or_tenant_denied", ["producer_mismatch"]);
+  // tenant_ref never selects the tenant (the key's connection does). When the connection is bound
+  // to an external rooftop, a body naming a different one is a cross-dealer attempt, not a typo.
+  if (
+    connection.external_rooftop_ref
+    && envelope.tenant_ref !== connection.external_rooftop_ref
+    && envelope.tenant_ref !== `rooftop:${connection.external_rooftop_ref}`
+  ) return deny(403, "scope_or_tenant_denied", ["tenant_ref_mismatch"]);
   const entry = catalogEntry(envelope.event_type);
   if (!entry || entry.producer !== connection.app) return deny(403, "scope_or_tenant_denied", ["event_not_permitted"]);
   if (!connection.scopes.includes(entry.scope)) return deny(403, "scope_or_tenant_denied", ["scope_missing"]);

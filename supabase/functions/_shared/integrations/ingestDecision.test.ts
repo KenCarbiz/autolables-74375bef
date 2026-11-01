@@ -66,6 +66,16 @@ describe("ingest decision", () => {
     expect(d.insert?.envelope.tenant_ref).toBe(TENANT_B);
   });
 
+  it("SEC-01 rejects a request signed by dealer A's rooftop key that names dealer B's rooftop", async () => {
+    const keyRecord = keyFor({ external_rooftop_ref: "rooftop-a" });
+    const named = await decideIngest(await request({ ...fixture("autofilm_inspection_completed"), tenant_ref: "rooftop:rooftop-b" }, { keyRecord }));
+    expect(named).toMatchObject({ httpStatus: 403, code: "scope_or_tenant_denied", detail: ["tenant_ref_mismatch"], insert: null });
+    for (const ok of ["rooftop-a", "rooftop:rooftop-a"]) {
+      const d = await decideIngest(await request({ ...fixture("autofilm_inspection_completed"), tenant_ref: ok }, { keyRecord }));
+      expect(d.insert?.tenant_id).toBe(TENANT_A);
+    }
+  });
+
   it("SEC-01 returns 403 when the producer is not the connection app", async () => {
     const d = await decideIngest(await request(fixture("autocurb_private_appraisal")));
     expect(d).toMatchObject({ httpStatus: 403, code: "scope_or_tenant_denied", insert: null });
