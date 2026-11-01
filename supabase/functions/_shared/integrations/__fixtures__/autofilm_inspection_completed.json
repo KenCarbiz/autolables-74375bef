@@ -1,0 +1,42 @@
+{
+  "event_id": "bfebdf39-f578-47d4-b42f-9885cdcb5521",
+  "event_type": "autofilm.inspection.completed",
+  "schema_version": "1.0.0",
+  "producer": "autofilm",
+  "source_record_id": "mpi_fixture_001",
+  "source_version": 1,
+  "idempotency_key": "autofilm:mpi_fixture_001:v1",
+  "correlation_id": "case-d001",
+  "causation_id": null,
+  "occurred_at": "2026-10-28T19:00:00Z",
+  "observed_at": "2026-10-28T18:55:00Z",
+  "sent_at": "2026-10-28T19:01:00Z",
+  "vin": "1HGCM82633A004352",
+  "tenant_ref": "TENANT_FIXTURE_A",
+  "instance_ref": null,
+  "visibility": "tenant_private",
+  "evidence_refs": [
+    "film-evidence:fixture-inspection-001"
+  ],
+  "payload_checksum": "46c4cf0156e123e75275f8913e361a1833156a25ab11c4eb167f757a4f9a68e9",
+  "payload": {
+    "inspection_id": "mpi_fixture_001",
+    "odometer_miles": 45123,
+    "inspection_status": "completed",
+    "measurements": {
+      "lf_tire_32nds": 8,
+      "rf_tire_32nds": 8,
+      "front_brake_mm": 6
+    },
+    "recommendations": [
+      {
+        "finding_id": "finding_001",
+        "item": "rear_brakes",
+        "status": "recommended",
+        "severity": "monitor"
+      }
+    ],
+    "video_ref": "video_private_001",
+    "technician_verified": false
+  }
+}
