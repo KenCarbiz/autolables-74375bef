@@ -36,7 +36,7 @@ jobs:
             exit 1
           fi
       - name: Targeted contract tests
-        run: npx vitest run src/lib/rooftopos-parked/labels-gateway-v1.test.ts
+        run: npx vitest run src/lib/rooftopos-parked
       - name: TypeScript typecheck
         run: npx tsc --noEmit -p tsconfig.app.json
       - name: Production artifact build (no publish)
