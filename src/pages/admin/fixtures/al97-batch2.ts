@@ -1,6 +1,6 @@
 import type { AdminScreenFixture } from "./index";
 import type {
-  DealerGroup, DealerStore, FeedBinding, FeedFile, FeedRun, GroupInventoryVehicle, InventoryFeedJob, InventorySourceMapping, InventoryStoreSnapshot, PartitionReportItem, StoreOverview,
+  DealerGroup, DealerStore, DedupeControls, DedupeListing, DedupeOverview, DedupeScore, FeedBinding, FeedFile, FeedRun, GroupInventoryVehicle, InventoryFeedJob, InventorySourceMapping, InventoryStoreSnapshot, PartitionReportItem, StoreOverview,
 } from "@/lib/inventoryNetwork/api";
 import type { InventoryNetworkFixture } from "@/pages/admin/children/inventoryNetwork/overviewModel";
 
@@ -170,4 +170,45 @@ export const AL97_20 = screen("AL97 20 Review store feed activation", base(nissa
   ...nissanLedgers("approved"),
   heartbeatAt: "2026-10-31T21:24:00Z",
   copy: { "fixture.label": "PROPOSED TARGET · SYNTHETIC DESIGN FIXTURE · NOT A LIVE SCREENSHOT", "fixture.id": "AL97 / 20" },
+}));
+
+const dedupeControls: DedupeControls = {
+  detection_enabled: true, auto_reconcile_enabled: false, purge_enabled: false, emergency_stop: true,
+  max_sets_per_run: 5, max_store_share_pct: 2, max_unresolved_conflicts: 0, max_failures: 1,
+  preview_ttl_minutes: 60, approval_ttl_minutes: 30, limits_approved_at: null, reason: null, updated_at: iso,
+};
+const dedupe = (over: Partial<DedupeOverview> = {}): DedupeOverview => ({
+  controls: dedupeControls, policy_version: "fixture", last_checked_at: null, store_controls: [],
+  candidates: [], previews: [], operations: [], reconciled: [], batches: [], ...over,
+});
+const score = (over: Partial<DedupeScore>): DedupeScore => ({ protected: 0, public_identity: 0, evidence: 0, side_effect: 0, unchecked: 0, published: false, linked: false, established: false, ...over });
+const listing = (id: string): DedupeListing => ({
+  id, slug: null, status: "active", owning_store_id: "s1", inventory_record_id: null, feed_source: "filescom", ymm: "2024 Example Sedan", trim: null, condition: "used",
+  mileage: null, price: null, created_at: iso, published_at: null, archived_at: null, archive_reason: null, market_value: null, market_checked_at: null,
+});
+const PREVIEW_AT = new Date(NOW).toISOString();
+const PREVIEW_EXPIRES = new Date(NOW + 60 * 60000).toISOString();
+
+export const AL97_13 = screen("AL97 13 Duplicate handling", base(allStores(), {
+  dedupe: dedupe(),
+  copy: { "fixture.label": "PROPOSED TARGET · SYNTHETIC DESIGN FIXTURE · NOT A LIVE SCREENSHOT", "fixture.id": "AL97 / 13" },
+}));
+
+export const AL97_14 = screen("AL97 14 Review exact reconciliation", base(allStores(), {
+  dedupe: dedupe(),
+  dedupePreview: {
+    id: "preview-demo", status: "pending", status_reason: null, plan_sha256: "fixture-sha256", expires_at: PREVIEW_EXPIRES, approval_expires_at: null, approved_at: null, applied_operation_id: null,
+    plan: {
+      policy_version: "fixture", preview_id: "preview-demo", expires_at: PREVIEW_EXPIRES, generated_at: PREVIEW_AT, vin_suffix: "DEMO01", store_name: "Harte INFINITI", kind: "duplicate_listings",
+      action: "archive_redundant", disposition: "eligible", reasons: [], canonical_listing_id: "LISTING-DEMO-001", redundant_listing_ids: ["LISTING-DEMO-002"], inventory_id: "INV-DEMO-001",
+      listings: [listing("LISTING-DEMO-001"), listing("LISTING-DEMO-002")], inventory: null,
+      scores: {
+        "LISTING-DEMO-001": score({ protected: 1, public_identity: 1, evidence: 1, published: true, linked: true, established: true }),
+        "LISTING-DEMO-002": score({ unchecked: 1 }),
+      },
+      decisions: [], domains: [], conflicts: [{ field: "exterior_color", canonical: "Example", redundant: "Other", rule: "hold" }], blocked_dependencies: [],
+      expected_counts: {}, provider_calls: 0, storage_operations: 0, fingerprint: "fixture",
+    },
+  },
+  copy: { "dedupe.candidate": "Synthetic candidate", "fixture.label": "PROPOSED TARGET · SYNTHETIC DESIGN FIXTURE · NOT A LIVE SCREENSHOT", "fixture.id": "AL97 / 14" },
 }));

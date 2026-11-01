@@ -147,3 +147,11 @@
 .invnet-ov input.input:focus-visible{outline:2px solid #075be8;outline-offset:2px}
 @media (max-width:639px){.invnet-ov .al97-dialog-wrap{padding:10px;align-items:flex-start}.invnet-ov .modal-body{padding:16px}.invnet-ov .modal-head{padding:16px}.invnet-ov .modal-foot{padding:12px}}
 .invnet-ov .fixture-label{font-size:9px;color:#8191a2;letter-spacing:.6px;margin-top:12px;display:flex;justify-content:space-between}
+.invnet-ov .payment{padding:14px 0;text-align:left}
+.invnet-ov .payment>small{font-size:9px;color:#6f8498;letter-spacing:.6px}
+.invnet-ov .payment>b{display:block;font-size:40px;margin:10px 0;color:#123e70}
+.invnet-ov .payment>b>span{font-size:16px;color:#6c8197;margin-left:5px}
+.invnet-ov .payment p{font-size:11px;margin-bottom:10px}
+.invnet-ov .review-meta{border:1px solid #d4e1ed;background:white;padding:16px;border-radius:6px}
+.invnet-ov .review-meta .chip{margin-right:8px}
+.invnet-ov .review-meta p{margin-top:10px;font-size:11px}

@@ -16,11 +16,13 @@ import MappingReview from "./inventoryNetwork/MappingReview";
 import JobDetail from "./inventoryNetwork/JobDetail";
 import ProviderBudgets from "./inventoryNetwork/ProviderBudgets";
 import FeedActivationReview from "./inventoryNetwork/FeedActivationReview";
+import DuplicateHandling from "./inventoryNetwork/DuplicateHandling";
+import ReconciliationReview from "./inventoryNetwork/ReconciliationReview";
 import { Al97Frame } from "@/components/admin/al97/al97ui";
 import type { InventoryNetworkFixture } from "./inventoryNetwork/overviewModel";
 
-type Al97Screen = "overview" | "stores" | "mapping" | "job" | "budgets" | "activation";
-const AL97_TITLES: Record<Al97Screen, string> = { overview: "Inventory network", stores: "Stores & import readiness", mapping: "Feed mapping review", job: "Import job", budgets: "Provider usage & budgets", activation: "Review store feed activation" };
+type Al97Screen = "overview" | "stores" | "mapping" | "job" | "budgets" | "activation" | "dedupe" | "reconcile";
+const AL97_TITLES: Record<Al97Screen, string> = { overview: "Inventory network", stores: "Stores & import readiness", mapping: "Feed mapping review", job: "Import job", budgets: "Provider usage & budgets", activation: "Review store feed activation", dedupe: "Duplicate handling", reconcile: "Review exact reconciliation" };
 import StoresSection from "./inventoryNetwork/StoresSection";
 import SharingSection from "./inventoryNetwork/SharingSection";
 import MarketCheckSection from "./inventoryNetwork/MarketCheckSection";
@@ -93,7 +95,8 @@ export default function InventoryNetworkPage() {
     [group, ov, notify, refresh, href, go, newStoreDraft, startNewStore, clearNewStoreDraft],
   );
 
-  const al97: Al97Screen | null = view === "overview" ? "overview" : view === "stores" ? "stores" : view === "mapping" && params.get("file") && params.get("review") === "activation" ? "activation" : view === "mapping" && params.get("file") ? "mapping" : view === "runs" && params.get("job") ? "job" : view === "marketcheck" ? "budgets" : null;
+  const al97: Al97Screen | null = view === "overview" ? "overview" : view === "stores" ? "stores" : view === "mapping" && params.get("file") && params.get("review") === "activation" ? "activation" : view === "mapping" && params.get("file") ? "mapping" : view === "runs" && params.get("job") ? "job" : view === "marketcheck" ? "budgets"
+    : view === "duplicates" && params.get("review") === "reconcile" && params.get("plan") ? "reconcile" : view === "duplicates" && params.get("review") === "safety" ? "dedupe" : null;
 
   const title = "Inventory network";
   if (loading) return <ChildPageFrame section="integrations" crumbs={crumbs} title={title}><SkeletonBlock className="h-64 w-full" /></ChildPageFrame>;
@@ -163,6 +166,8 @@ export default function InventoryNetworkPage() {
         {al97 === "mapping" && <MappingReview scope={scopePicker} path={params.get("file")!}>{more}</MappingReview>}
         {al97 === "job" && <JobDetail scope={scopePicker} jobId={params.get("job")!}>{more}</JobDetail>}
         {al97 === "activation" && <FeedActivationReview scope={scopePicker} path={params.get("file")!}>{more}</FeedActivationReview>}
+        {al97 === "dedupe" && <DuplicateHandling scope={scopePicker} storeId={params.get("store")}>{more}</DuplicateHandling>}
+        {al97 === "reconcile" && <ReconciliationReview scope={scopePicker} previewId={params.get("plan")!}>{more}</ReconciliationReview>}
         {al97 === "budgets" && <ProviderBudgets scope={scopePicker}>{more}</ProviderBudgets>}
       </NetProvider>
     );

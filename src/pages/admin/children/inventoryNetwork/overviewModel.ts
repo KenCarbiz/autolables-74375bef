@@ -1,4 +1,4 @@
-import type { DealerGroup, FeedBinding, FeedFile, FeedRun, GroupInventoryData, InvOverview, InventorySourceMapping, StoreProviderUsage, InventoryFeedControls, InventoryFeedJob, InventoryStoreSnapshot, InvUsage, StoreOverview } from "@/lib/inventoryNetwork/api";
+import type { DealerGroup, FeedBinding, FeedFile, FeedRun, GroupInventoryData, InvOverview, InventorySourceMapping, StoreProviderUsage, InventoryFeedControls, InventoryFeedJob, InventoryStoreSnapshot, InvUsage, StoreOverview, DedupeOverview, DedupePreview } from "@/lib/inventoryNetwork/api";
 import { mcModeLabel } from "./shared";
 import type { View } from "./shared";
 
@@ -233,4 +233,6 @@ export interface InventoryNetworkFixture {
   providerAccount?: { quota: number; reserve: number } | null;
   storeUsage?: InvUsage | null;
   copy?: Record<string, string>;
+  dedupe?: DedupeOverview | null;
+  dedupePreview?: DedupePreview | null;
 }

@@ -77,9 +77,10 @@ const PATHS = {
   archive: "M3 7h18v15H3zM2 2h20v5H2zM8 12h8",
   chevron: "M8 3l9 9-9 9",
   close: "M4 4l16 16M20 4L4 20",
+  pause: "M7 3v18M17 3v18",
 } as const;
 
-export type GlyphName = keyof typeof PATHS | "clock" | "info" | "plus" | "retry" | "settings" | "database" | "calculator";
+export type GlyphName = keyof typeof PATHS | "clock" | "info" | "plus" | "retry" | "settings" | "database" | "calculator" | "search";
 
 export const Glyph = ({ name, className = "icon" }: { name: GlyphName; className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="#47617C" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -92,6 +93,7 @@ function GlyphBody({ name }: { name: GlyphName }) {
     case "clock": return <><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 3" /></>;
     case "info": return <><circle cx="12" cy="12" r="10" /><path d="M12 11v7m0-12v1" /></>;
     case "plus": return <path d="M12 2v20M2 12h20" />;
+    case "search": return <><circle cx="10" cy="10" r="7" /><path d="m16 16 5 5" /></>;
     case "retry": return <path d="M3 10a9 9 0 1 1 1 8M3 2v8h8" />;
     case "settings": return <><path d="M4 7h16M4 17h16" /><circle cx="9" cy="7" r="3" /><circle cx="15" cy="17" r="3" /></>;
     case "calculator": return <><rect x="4" y="2" width="16" height="20" rx="2" /><path d="M7 6h10M7 11h2m6 0h2M7 15h2m6 0h2M7 19h2m6 0h2" /></>;
@@ -123,9 +125,9 @@ export const Metrics = ({ items, label }: { items: MetricItem[]; label: string }
   </ul>
 );
 
-export const Card = ({ id, title, description, children }: { id: string; title: string; description?: string; children: ReactNode }) => (
+export const Card = ({ id, title, description, action, children }: { id: string; title: string; description?: string; action?: ReactNode; children: ReactNode }) => (
   <section className="card" aria-labelledby={id}>
-    <div className="card-head"><div><h2 id={id}>{title}</h2>{description && <p>{description}</p>}</div></div>
+    <div className="card-head"><div><h2 id={id}>{title}</h2>{description && <p>{description}</p>}</div>{action}</div>
     {children}
   </section>
 );
