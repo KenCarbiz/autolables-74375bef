@@ -111,6 +111,14 @@ describe("AutoLabels parked Gateway inbound projections — no deployment", () =
     expect(testEvent({ ...E, schema_version: "1.1.0" as unknown as number }).status)
       .toBe("rejected");
   });
+  it("rejects unexpected fields even when they evade generic PII-key detection", () => {
+    expect(testEvent({
+      ...E, payload: { ...E.payload, internal_dealer_notes: "sensitive business data" },
+    }).status).toBe("rejected");
+    expect(testEvent({
+      ...APP, payload: { ...APP.payload, user_identifier: "unnecessary-person-reference" },
+    }, CA).status).toBe("rejected");
+  });
   it("rejects binary, PII and signed/public image links in payload", () => {
     for (const payload of [
       { ...E.payload, customer_email: "hidden@example.test" },
