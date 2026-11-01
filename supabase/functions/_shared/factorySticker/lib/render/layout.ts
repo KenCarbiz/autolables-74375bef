@@ -1879,6 +1879,8 @@ export function validateModel(model: LayoutModel): void {
   const bad = (msg: string): never => {
     throw new Error(`layout invariant violated: ${msg}`);
   };
+  const W = model.width;
+  const H = model.height;
   for (const [pi, page] of model.pages.entries()) {
     for (const prim of page.primitives) {
       if (prim.kind === "text") {
@@ -1886,15 +1888,15 @@ export function validateModel(model: LayoutModel): void {
         if (/\b(undefined|null|NaN)\b/.test(prim.str)) bad(`placeholder artifact ${JSON.stringify(prim.str)}`);
         if (prim.size < MIN_BODY_FONT_SIZE) bad(`font size ${prim.size} below minimum`);
         const box = textBBox(prim);
-        if (box.x0 < PAGE_MARGIN - 0.51 || box.x1 > PAGE_WIDTH - PAGE_MARGIN + 0.51 ||
-            box.y0 < PAGE_MARGIN - prim.size || box.y1 > PAGE_HEIGHT - PAGE_MARGIN + 0.51) {
+        if (box.x0 < PAGE_MARGIN - 0.51 || box.x1 > W - PAGE_MARGIN + 0.51 ||
+            box.y0 < PAGE_MARGIN - prim.size || box.y1 > H - PAGE_MARGIN + 0.51) {
           bad(`text out of bounds on page ${pi + 1}: ${JSON.stringify(prim.str)}`);
         }
       } else {
         const w = prim.kind === "qr" ? prim.size : prim.w;
         const h = prim.kind === "qr" ? prim.size : prim.h;
         if (prim.x < PAGE_MARGIN - 0.01 || prim.y < PAGE_MARGIN - 0.01 ||
-            prim.x + w > PAGE_WIDTH - PAGE_MARGIN + 0.01 || prim.y + h > PAGE_HEIGHT - PAGE_MARGIN + 0.01) {
+            prim.x + w > W - PAGE_MARGIN + 0.01 || prim.y + h > H - PAGE_MARGIN + 0.01) {
           bad(`${prim.kind} out of bounds on page ${pi + 1}`);
         }
         if ((prim.kind === "barcode" || prim.kind === "qr") && !prim.payload) {

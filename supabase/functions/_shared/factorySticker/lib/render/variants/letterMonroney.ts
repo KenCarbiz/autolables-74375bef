@@ -25,21 +25,34 @@
 
 import type { FactoryStickerData, StandardEquipmentGroup } from "../../types.ts";
 import {
-  MIN_BODY_FONT_SIZE,
   PAGE_HEIGHT,
   PAGE_WIDTH,
   Painter,
   formatMoney,
   formatPlain,
   measureText,
-  starPath,
   validateModel,
   wrapText,
   type LayoutFont,
   type LayoutModel,
   type LayoutPage,
-  type StickerLayoutInput,
 } from "../layout.ts";
+import {
+  EPA_BLUE,
+  INK,
+  PAPER,
+  baseline,
+  box,
+  pt,
+  pump,
+  roundedRectPath,
+  scale,
+  stars,
+  txt,
+  u,
+  wrapFigma,
+  type VariantRenderInput,
+} from "./shared.ts";
 import {
   PASSPORT_QR_CAPTION,
   REPRODUCTION_BANNER,
@@ -48,17 +61,7 @@ import {
 
 export const LETTER_VARIANT_LAYOUT_VERSION = "1.0.0";
 
-const u = (figma: number): number => figma / 2;
-const INK = "#000000";
-const PAPER = "#ffffff";
-const EPA_BLUE = "#8cc4e3";
 
-// Font sizes are Figma px halved, floored at the engine's readable minimum.
-const pt = (figmaPx: number): number => Math.max(MIN_BODY_FONT_SIZE, figmaPx / 2);
-
-/** Baseline for a text box whose top edge is `top` (Figma units). */
-const baseline = (top: number, sizePx: number, lineHeightPx = sizePx * 1.05): number =>
-  top + (lineHeightPx - 1.117 * sizePx) / 2 + 0.905 * sizePx;
 
 interface SectionSpec {
   id: string;
@@ -260,46 +263,10 @@ function placeEquipment(blocks: Array<{ column: 1 | 2; lines: FlowLine[] }>): { 
 
 // ── Painting helpers ──────────────────────────────────────────────────
 
-function txt(
-  p: Painter, s: string, xFigma: number, topFigma: number, sizePx: number, font: LayoutFont,
-  opts: { align?: "left" | "right" | "center"; color?: string; lh?: number; spacing?: number } = {},
-): void {
-  p.text(s, u(xFigma), u(baseline(topFigma, sizePx, opts.lh)), pt(sizePx), font, opts.color ?? INK, {
-    ...(opts.align ? { align: opts.align } : {}),
-    ...(opts.spacing ? { charSpacing: opts.spacing } : {}),
-  });
-}
 
-function box(p: Painter, x: number, y: number, w: number, h: number, fill: string | null, strokePx?: number): void {
-  if (strokePx) {
-    const s = u(strokePx);
-    p.rect(u(x) + s / 2, u(y) + s / 2, u(w) - s, u(h) - s, fill, INK, s);
-  } else {
-    p.rect(u(x), u(y), u(w), u(h), fill);
-  }
-}
 
-function stars(p: Painter, xFigma: number, topFigma: number, count: number): void {
-  const size = u(15);
-  for (let i = 0; i < count; i++) {
-    p.path(starPath(size), u(xFigma) + i * (size + 1.2), u(topFigma), size, size, INK);
-  }
-}
 
-function pump(p: Painter, xFigma: number, yFigma: number, hFigma: number, color: string): void {
-  // Plain fuel-pump glyph built from rectangles (no source artwork).
-  const h = u(hFigma);
-  const x = u(xFigma);
-  const y = u(yFigma);
-  p.rect(x, y + h * 0.08, h * 0.5, h * 0.84, color);
-  p.rect(x + h * 0.08, y + h * 0.18, h * 0.34, h * 0.22, color === INK ? PAPER : INK);
-  p.rect(x + h * 0.56, y + h * 0.28, h * 0.08, h * 0.5, color);
-  p.rect(x + h * 0.5, y + h * 0.24, h * 0.14, h * 0.07, color);
-}
 
-function wrapFigma(s: string, font: LayoutFont, sizePx: number, widthFigma: number): string[] {
-  return wrapText(s, font, pt(sizePx), u(widthFigma));
-}
 
 // ── Sections ──────────────────────────────────────────────────────────
 
@@ -500,20 +467,7 @@ function paintEpa(p: Painter, d: FactoryStickerData): void {
   paintEpaFooter(p, d.document.passportUrl.trim());
 }
 
-function roundedRectPath(w: number, h: number, r: number): string {
-  return [
-    `M${r} 0`, `L${w - r} 0`, `Q${w} 0 ${w} ${r}`, `L${w} ${h - r}`, `Q${w} ${h} ${w - r} ${h}`,
-    `L${r} ${h}`, `Q0 ${h} 0 ${h - r}`, `L0 ${r}`, `Q0 0 ${r} 0`, "Z",
-  ].join(" ");
-}
 
-function scale(p: Painter, x: number, y: number, w: number): void {
-  box(p, x, y, w, 16, EPA_BLUE);
-  box(p, x, y, 20, 16, INK);
-  box(p, x + w - 20, y, 20, 16, INK);
-  txt(p, "1", x + 10, y + 1, 13, "bold", { align: "center", color: PAPER, lh: 16 });
-  txt(p, "10", x + w - 10, y + 1, 13, "bold", { align: "center", color: PAPER, lh: 16 });
-}
 
 function paintEpaFooter(p: Painter, passportUrl: string): void {
   const X = RIGHT_X + 4;
@@ -711,12 +665,6 @@ function paintContinuation(
   return lines.slice(i);
 }
 
-export interface LetterVariantRenderInput {
-  layout: StickerLayoutInput;
-  /** Source equipment groups by their original group names. */
-  equipmentGroups: Array<{ hint: string; items: string[] }>;
-  displayMake: string;
-}
 
 /**
  * Builds the dedicated reference layout, or returns null when the content
@@ -725,7 +673,7 @@ export interface LetterVariantRenderInput {
  */
 export function buildLetterVariantLayout(
   variantKey: string,
-  input: LetterVariantRenderInput,
+  input: VariantRenderInput,
 ): LayoutModel | null {
   const config = LETTER_VARIANT_CONFIGS[variantKey];
   if (!config) return null;

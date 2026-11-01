@@ -17,7 +17,7 @@ import type {
 } from "../types.ts";
 import { resolveOem } from "../oem/identity.ts";
 import { resolveReferenceVariant } from "../oem/referenceVariants.ts";
-import { LETTER_VARIANT_CONFIGS, buildLetterVariantLayout } from "./variants/letterMonroney.ts";
+import { VARIANT_LAYOUTS } from "./variants/index.ts";
 import { getTheme, type OemStickerTheme } from "../oem/themes.ts";
 import { resolveThemeProfile, type ResolvedThemeProfile } from "../oem/profiles.ts";
 import { buildStickerLayout, type LayoutModel, type StickerLayoutInput } from "./layout.ts";
@@ -454,8 +454,9 @@ function resolveVariantLayout(
     fuelType: data.epa?.fuelType ?? null,
   });
   if (match.status !== "matched" || match.rendering !== "variant_layout" || !match.variant) return null;
-  if (!LETTER_VARIANT_CONFIGS[match.variant.key]) return null;
-  return buildLetterVariantLayout(match.variant.key, {
+  const build = VARIANT_LAYOUTS[match.variant.key];
+  if (!build) return null;
+  return build({
     layout: input,
     equipmentGroups: Object.entries(data.standardEquipment).map(([hint, items]) => ({ hint, items })),
     displayMake: data.identity.make.trim().toUpperCase() === "INFINITI" ? "INFINITI" : titleCase(data.identity.make),
