@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useTenant } from "@/contexts/TenantContext";
 import { useVehicleFiles } from "@/hooks/useVehicleFiles";
 import { useViewFixture } from "@/lib/admin/dataSource";
-import { adminTabHref } from "@/lib/admin/sections";
+import { ADMIN_CHILD_ROUTES, adminTabHref } from "@/lib/admin/sections";
 import type { VehicleFile } from "@/types/vehicleFile";
 import { recordLabel } from "@/pages/admin/children/inventoryNetwork/ledgers";
 import { Al97Frame, Banner, Card, KeyVals, Metrics, Savebar, useFixtureCopy, type MetricItem } from "@/components/admin/al97/al97ui";
@@ -46,7 +46,7 @@ export function VehicleFilesScreen({ account, store, storeId, rows, stats, provi
   const scopeLabel = { account, store };
   const more = (
     <p className="mt-4 text-[13px] text-adm-muted">
-      Search, stickers and signing status for every file stay on the <Link to={FILES_TAB} className="font-semibold text-adm-primary hover:underline">Vehicle files</Link> tab.
+      Search, stickers and signing status for every file stay on the <Link to={FILES_TAB} className="font-semibold text-adm-primary hover:underline">Vehicle files</Link> tab. Custody episodes, service visits and returns are on <Link to={ADMIN_CHILD_ROUTES.vehicleRecords} className="font-semibold text-adm-primary hover:underline">Vehicle records &amp; lifecycle</Link>.
     </p>
   );
   const frame = (crumb: string, subtitle: string, main: ReactNode) => (

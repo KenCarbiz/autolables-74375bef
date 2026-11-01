@@ -17,6 +17,7 @@ import { AL97_11, AL97_12, AL97_15, AL97_16, AL97_18, AL97_19 } from "./al97-bat
 import { AL97_07, AL97_08, AL97_09, AL97_21, AL97_24 } from "./al97-batch3";
 import { AL97_05, AL97_06, AL97_06_PILOT, AL97_17, AL97_17_SWAP } from "./al97-batch5";
 import { PAYMENT_ESTIMATOR_FIXTURES } from "./paymentEstimator";
+import { VEHICLE_RECORDS_FIXTURES } from "./vehicleRecords";
 
 // Design fixtures for the parity harness. Each entry renders one reference
 // screen with synthetic data under /admin/design-fixture/:screen, a route that
@@ -71,4 +72,5 @@ export const ADMIN_FIXTURES: Record<string, AdminScreenFixture> = {
   "al97-14": AL97_14,
   "al97-17": AL97_17,
   ...PAYMENT_ESTIMATOR_FIXTURES,
+  ...VEHICLE_RECORDS_FIXTURES,
 };

@@ -76,6 +76,7 @@ describe("opening an Administration screen starts no edge function", () => {
     "/admin/integrations/jobs/:jobId": "/admin/integrations/jobs/inventory_sync",
     "/admin/pricing/integrity": "/admin/pricing/integrity",
     "/admin/integrations/vehicle-files": "/admin/integrations/vehicle-files",
+    "/admin/integrations/vehicle-records": "/admin/integrations/vehicle-records",
     "/admin/integrations/jobs": "/admin/integrations/jobs",
     "/admin/access/activity": "/admin/access/activity",
     "/admin/access/permission-verification": "/admin/access/permission-verification",
