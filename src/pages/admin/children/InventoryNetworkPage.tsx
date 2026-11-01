@@ -6,13 +6,19 @@ import { useTenant } from "@/contexts/TenantContext";
 import { adminTabHref } from "@/lib/admin/sections";
 import { ChildPageFrame } from "@/components/admin/v2/AdminShell";
 import { Button, EmptyState, InlineNote, LocalTabs, Panel, SkeletonBlock, StatusText } from "@/components/product";
-import { getOverview, getPreviewInventory, listFeedBindings, listFeedJobs, listGroups, listSnapshots, explainError, type StoreDraft } from "@/lib/inventoryNetwork/api";
-import { useAdminNow, useViewFixture } from "@/lib/admin/dataSource";
+import { getOverview, listGroups, explainError, type StoreDraft } from "@/lib/inventoryNetwork/api";
+import { useViewFixture } from "@/lib/admin/dataSource";
 import { NetIcon, type NetIconName } from "@/components/inventoryNetwork/icons";
 import { NetProvider, SelectField, VIEW_PATH, type Notice, type View } from "./inventoryNetwork/shared";
-import OverviewDetail, { OverviewMain } from "./inventoryNetwork/OverviewSection";
-import OverviewFrame from "./inventoryNetwork/OverviewFrame";
-import { buildOverviewModel, type InventoryNetworkFixture } from "./inventoryNetwork/overviewModel";
+import OverviewDetail, { OverviewScreen } from "./inventoryNetwork/OverviewSection";
+import StoresBoard from "./inventoryNetwork/StoresBoard";
+import MappingReview from "./inventoryNetwork/MappingReview";
+import JobDetail from "./inventoryNetwork/JobDetail";
+import { Al97Frame } from "./inventoryNetwork/al97ui";
+import type { InventoryNetworkFixture } from "./inventoryNetwork/overviewModel";
+
+type Al97Screen = "overview" | "stores" | "mapping" | "job";
+const AL97_TITLES: Record<Al97Screen, string> = { overview: "Inventory network", stores: "Stores & import readiness", mapping: "Feed mapping review", job: "Import job" };
 import StoresSection from "./inventoryNetwork/StoresSection";
 import SharingSection from "./inventoryNetwork/SharingSection";
 import MarketCheckSection from "./inventoryNetwork/MarketCheckSection";
@@ -48,7 +54,6 @@ const crumbs = [{ label: "Administration", href: "/admin" }, { label: "Integrati
 export default function InventoryNetworkPage() {
   const auth = useAuth();
   const fx = useViewFixture<InventoryNetworkFixture>("inventory-network");
-  const now = useAdminNow();
   const isAdmin = fx ? true : auth.isAdmin;
   const loading = fx ? false : auth.loading;
   const qc = useQueryClient();
@@ -86,23 +91,7 @@ export default function InventoryNetworkPage() {
     [group, ov, notify, refresh, href, go, newStoreDraft, startNewStore, clearNewStoreDraft],
   );
 
-  const onOverview = view === "overview";
-  const ledgers = !fx && isAdmin && onOverview && !!ov;
-  const primaryId = (ov?.stores.find((s) => s.store.is_primary_inventory_store) ?? ov?.stores[0])?.store.id ?? null;
-  const jobsQ = useQuery({ queryKey: ["inv-net", "jobs"], queryFn: () => listFeedJobs(100), enabled: ledgers });
-  const snapsQ = useQuery({ queryKey: ["inv-net", "snapshots"], queryFn: () => listSnapshots(100), enabled: ledgers });
-  const bindingsQ = useQuery({ queryKey: ["inv-net", "bindings"], queryFn: listFeedBindings, enabled: ledgers });
-  const previewQ = useQuery({ queryKey: ["inv-net", "preview", primaryId, "customer_room"], queryFn: () => getPreviewInventory(primaryId!, "customer_room"), enabled: ledgers && !!primaryId });
-  const model = useMemo(() => (ov && onOverview ? buildOverviewModel({
-    now,
-    stores: ov.stores,
-    controls: ov.controls,
-    jobs: fx ? fx.jobs : jobsQ.data ?? null,
-    snapshots: fx ? fx.snapshots : snapsQ.data ?? null,
-    bindings: fx ? fx.bindings : bindingsQ.data ?? null,
-    preview: fx ? fx.preview : previewQ.data,
-    heartbeatAt: fx ? fx.heartbeatAt : null,
-  }) : null), [ov, onOverview, now, fx, jobsQ.data, snapsQ.data, bindingsQ.data, previewQ.data]);
+  const al97: Al97Screen | null = view === "overview" ? "overview" : view === "stores" ? "stores" : view === "mapping" && params.get("file") ? "mapping" : view === "runs" && params.get("job") ? "job" : null;
 
   const title = "Inventory network";
   if (loading) return <ChildPageFrame section="integrations" crumbs={crumbs} title={title}><SkeletonBlock className="h-64 w-full" /></ChildPageFrame>;
@@ -139,28 +128,38 @@ export default function InventoryNetworkPage() {
     </>
   );
 
-  if (onOverview) {
-    const scopeStore = ov?.stores.find((s) => s.store.is_primary_inventory_store) ?? ov?.stores[0] ?? null;
+  if (al97) {
+    const scopePicker = groups.data && groups.data.length > 0 && groupId ? {
+      groups: groups.data, groupId, groupName: group?.name ?? "",
+      onChange: (v: string) => { setNewStoreDraft(null); setParams(new URLSearchParams({ view, group: v })); },
+    } : undefined;
+    const more = (
+      <div className="mt-4 space-y-4">
+        {notices}
+        {loadStates}
+        {ctx && (
+          <>
+            <h2 className="pt-2 text-[16px] font-semibold text-adm-ink">More inventory network views</h2>
+            {tabsRow}
+            {al97 === "overview" && <OverviewDetail />}
+            {al97 === "stores" && <StoresSection />}
+            {al97 === "mapping" && <MappingSection />}
+            {al97 === "job" && <RunsSection />}
+          </>
+        )}
+      </div>
+    );
+    if (!ctx) {
+      const t = AL97_TITLES[al97];
+      return <Al97Frame crumb={t} title={t} subtitle="Reading the inventory network ledgers." scope={scopePicker}>{more}</Al97Frame>;
+    }
     return (
-      <OverviewFrame
-        scope={groups.data && groups.data.length > 0 && groupId ? {
-          groups: groups.data, groupId, groupName: group?.name ?? "", storeName: scopeStore?.store.display_name ?? null,
-          onChange: (v) => { setNewStoreDraft(null); setParams(new URLSearchParams({ view, group: v })); },
-        } : undefined}
-        main={ctx && model ? <NetProvider value={ctx}><OverviewMain model={model} /></NetProvider> : undefined}
-      >
-        <div className="mt-4 space-y-4">
-          {notices}
-          {loadStates}
-          {ctx && (
-            <NetProvider value={ctx}>
-              <h2 className="pt-2 text-[16px] font-semibold text-adm-ink">More inventory network views</h2>
-              {tabsRow}
-              <OverviewDetail />
-            </NetProvider>
-          )}
-        </div>
-      </OverviewFrame>
+      <NetProvider value={ctx}>
+        {al97 === "overview" && <OverviewScreen scope={scopePicker}>{more}</OverviewScreen>}
+        {al97 === "stores" && <StoresBoard scope={scopePicker}>{more}</StoresBoard>}
+        {al97 === "mapping" && <MappingReview scope={scopePicker} path={params.get("file")!}>{more}</MappingReview>}
+        {al97 === "job" && <JobDetail scope={scopePicker} jobId={params.get("job")!}>{more}</JobDetail>}
+      </NetProvider>
     );
   }
 
@@ -183,7 +182,6 @@ export default function InventoryNetworkPage() {
             {loadStates}
             {ctx && (
               <NetProvider value={ctx}>
-                {view === "stores" && <StoresSection />}
                 {view === "sharing" && <SharingSection />}
                 {view === "marketcheck" && <MarketCheckSection />}
                 {view === "mapping" && <MappingSection />}

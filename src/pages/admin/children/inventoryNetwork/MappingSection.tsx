@@ -167,7 +167,7 @@ function FilePanel({ file, binding, tenantId, groupName, stores, mappings }: {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 border-t border-adm-border pt-4">
+        <div id="inv-file-import" className="flex flex-wrap items-center gap-3 border-t border-adm-border pt-4">
           <Button disabled={busy} onClick={() => act(() => partitionDryRun(file.path), "Dry run finished. No vehicles were changed.")}>Dry run</Button>
           {!armed ? (
             <Button variant="primary" disabled={busy || !approved || !!blocked} onClick={() => setArmed(true)}>Import now</Button>

@@ -12,6 +12,7 @@ import { FIXTURE_11 } from "./11";
 import { FIXTURE_12 } from "./12";
 import { FIXTURE_13 } from "./13";
 import { al97Fixture01 } from "./al97-01";
+import { AL97_02, AL97_03, AL97_04, AL97_22, AL97_23 } from "./al97-batch2";
 import { PAYMENT_ESTIMATOR_FIXTURES } from "./paymentEstimator";
 
 // Design fixtures for the parity harness. Each entry renders one reference
@@ -41,5 +42,10 @@ export const ADMIN_FIXTURES: Record<string, AdminScreenFixture> = {
   "12": FIXTURE_12,
   "13": FIXTURE_13,
   "al97-01": al97Fixture01,
+  "al97-02": AL97_02,
+  "al97-03": AL97_03,
+  "al97-23": AL97_23,
+  "al97-04": AL97_04,
+  "al97-22": AL97_22,
   ...PAYMENT_ESTIMATOR_FIXTURES,
 };

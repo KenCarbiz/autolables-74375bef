@@ -1,4 +1,4 @@
-import type { DealerGroup, FeedBinding, GroupInventoryData, InvOverview, InventoryFeedControls, InventoryFeedJob, InventoryStoreSnapshot, StoreOverview } from "@/lib/inventoryNetwork/api";
+import type { DealerGroup, FeedBinding, FeedFile, FeedRun, GroupInventoryData, InvOverview, InventorySourceMapping, StoreProviderUsage, InventoryFeedControls, InventoryFeedJob, InventoryStoreSnapshot, StoreOverview } from "@/lib/inventoryNetwork/api";
 import { mcModeLabel } from "./shared";
 import type { View } from "./shared";
 
@@ -218,9 +218,16 @@ export function buildOverviewModel(i: OverviewInputs): OverviewModel {
 export interface InventoryNetworkFixture {
   groups: DealerGroup[];
   overview: InvOverview;
-  jobs: InventoryFeedJob[];
-  snapshots: InventoryStoreSnapshot[];
-  bindings: FeedBinding[];
-  preview: GroupInventoryData;
-  heartbeatAt: string | null;
+  jobs?: InventoryFeedJob[];
+  snapshots?: InventoryStoreSnapshot[];
+  bindings?: FeedBinding[];
+  files?: FeedFile[];
+  runs?: FeedRun[];
+  mappings?: InventorySourceMapping[];
+  providerUsage?: StoreProviderUsage[];
+  preview?: GroupInventoryData;
+  heartbeatAt?: string | null;
+  workerSchedule?: "found" | "not_found" | null;
+  /** Labels a synthetic fixture value as synthetic; keyed by the field it replaces. */
+  copy?: Record<string, string>;
 }

@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+import { useAdminNow } from "@/lib/admin/dataSource";
 import { Link } from "react-router-dom";
 import { Button, EmptyState, InlineNote, KeyValueList, Panel, StatusText, type Tone } from "@/components/product";
 import { setControls, type InventoryFeedControls, type StoreOverview } from "@/lib/inventoryNetwork/api";
 import { NetIcon } from "@/components/inventoryNetwork/icons";
 import { inputClass, mcModeLabel, plural, storeAddress, useAct, useNet, when, humanize, STATUS_TONE } from "./shared";
-import type { OverviewModel, Chip } from "./overviewModel";
+import { buildOverviewModel, type OverviewModel } from "./overviewModel";
+import { Al97Frame, ChipView, Glyph, type ScopePicker } from "./al97ui";
+import { useLedgers } from "./ledgers";
 import connectionStages from "@/assets/inventoryNetwork/connection-stages.svg";
 
 interface Change { title: string; detail: string; next: Pick<InventoryFeedControls, "ingestion_paused" | "emergency_stop" | "reconcile_enabled">; danger?: boolean; confirmLabel: string }
@@ -162,23 +165,6 @@ export default function OverviewDetail() {
   );
 }
 
-const ICONS = {
-  warning: "M12 2L2 21h20zM12 8v6m0 3v1",
-  store: "M3 10v11h18V10M2 10l2-7h16l2 7M8 21v-7h8v7M2 10c2 3 4 3 5 0 2 3 4 3 5 0 2 3 4 3 5 0 1 3 3 3 5 0",
-  file: "M4 2h10l6 6v14H4zM14 2v6h6M7 12h10m-10 4h10",
-  car: "M3 11l3-7h12l3 7M2 11h20v8H2zM5 19v3m14-3v3M5 15h3m8 0h3",
-  history: "M3 10a9 9 0 1 1 1 8M3 3v7h7M12 7v5l4 2",
-  shield: "M12 2l9 4v6c0 5-9 10-9 10S3 17 3 12V6zM8 12l3 3 5-6",
-} as const;
-
-const Glyph = ({ name, className = "icon" }: { name: keyof typeof ICONS | "clock"; className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="#47617C" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    {name === "clock" ? <><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 3" /></> : <path d={ICONS[name]} />}
-  </svg>
-);
-
-const ChipView = ({ chip }: { chip: Chip }) => <span className={`chip ${chip.tone === "neutral" ? "" : chip.tone}`}>{chip.label}</span>;
-
 export function OverviewMain({ model }: { model: OverviewModel }) {
   const { href } = useNet();
   return (
@@ -252,5 +238,20 @@ export function OverviewMain({ model }: { model: OverviewModel }) {
         <div className="push"><Link className="btn" to={href("runs")}><Glyph name="history" className="icon" />View runs</Link></div>
       </div>
     </div>
+  );
+}
+
+export function OverviewScreen({ scope, children }: { scope?: ScopePicker; children?: ReactNode }) {
+  const { overview, stores } = useNet();
+  const now = useAdminNow();
+  const primary = stores.find((s) => s.store.is_primary_inventory_store) ?? stores[0] ?? null;
+  const l = useLedgers({ jobs: true, snapshots: true, bindings: true, previewStoreId: primary?.store.id ?? null });
+  const model = useMemo(() => buildOverviewModel({
+    now, stores, controls: overview.controls, jobs: l.jobs, snapshots: l.snapshots, bindings: l.bindings, preview: l.preview, heartbeatAt: l.heartbeatAt,
+  }), [now, stores, overview.controls, l.jobs, l.snapshots, l.bindings, l.preview, l.heartbeatAt]);
+  return (
+    <Al97Frame crumb="Inventory network" title="Inventory network" subtitle="Know what arrived, what applied, and what shoppers can see." scope={scope} storeName={primary?.store.display_name ?? null} main={<OverviewMain model={model} />}>
+      {children}
+    </Al97Frame>
   );
 }

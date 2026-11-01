@@ -69,6 +69,41 @@
 .invnet-ov .savebar strong{font-size:12px}
 .invnet-ov .savebar p{font-size:10px;margin-top:4px}
 .invnet-ov .push{margin-left:auto;display:flex;gap:8px}
+.invnet-ov .fields{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.invnet-ov .field{display:block;min-width:0}
+.invnet-ov .field>span{display:block;font-size:11px;font-weight:700;margin-bottom:6px}
+.invnet-ov .input{min-height:39px;border:1px solid #cddbea;border-radius:5px;padding:10px 11px;background:white;color:#28445f;font-size:11px;display:flex;justify-content:space-between;align-items:center;overflow-wrap:anywhere}
+.invnet-ov .input .icon{width:14px;height:14px}
+.invnet-ov .input.bad{border-color:#ce3e51}
+.invnet-ov .field small{display:block;font-size:10px;color:#667e95;margin-top:5px}
+.invnet-ov .scope-bar,.invnet-ov .identity-strip{display:flex;align-items:center;gap:13px;padding:14px 17px;background:#edf4ff;border:1px solid #cbdcf7;border-radius:6px}
+.invnet-ov .scope-bar small,.invnet-ov .identity-strip small{display:block;font-size:10px;color:#567392;margin-top:3px}
+.invnet-ov .identity-strip>.chip{margin-left:auto}
+.invnet-ov .toggle-row{display:flex;gap:18px;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid #e3ebf3}
+.invnet-ov .toggle-row:first-child{padding-top:0}
+.invnet-ov .toggle-row:last-child{border:0}
+.invnet-ov .toggle-row strong{font-size:12px}
+.invnet-ov .toggle-row p{font-size:10px;margin-top:5px;max-width:390px}
+.invnet-ov .switch{height:22px;width:39px;border-radius:12px;background:#cad6e4;position:relative;flex:none}
+.invnet-ov .switch:after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;background:white;border-radius:50%}
+.invnet-ov .switch.on{background:#075be8}
+.invnet-ov .switch.on:after{left:20px}
+.invnet-ov .switch.disabled{opacity:.6}
+.invnet-ov .art{display:block;max-width:100%;height:94px;margin:18px auto 8px}
+.invnet-ov .fine{font-size:10px;margin-top:12px;line-height:1.65}
+.invnet-ov .checkline{display:flex;align-items:center;min-height:44px;font-size:11px;margin:10px 0;color:#4f6781}
+.invnet-ov .empty{text-align:center;padding:2px 15px 15px}
+.invnet-ov .empty .art{height:100px}
+.invnet-ov .empty h3{margin:8px 0}
+.invnet-ov .empty p{margin:0 auto 15px;max-width:430px}
+.invnet-ov .timeline{list-style:none;margin:0;padding:0 0 0 8px}
+.invnet-ov .timeline li{border-left:2px solid #a6cbb9;padding:0 0 23px 23px;position:relative}
+.invnet-ov .timeline li:before{content:'';position:absolute;left:-6px;top:3px;width:10px;height:10px;background:#16805a;border:2px solid white;border-radius:50%}
+.invnet-ov .timeline small{display:block;font-size:10px;color:#6b8096;margin-top:4px}
+.invnet-ov .timeline .waiting{border-color:#e1c894}
+.invnet-ov .timeline .waiting:before{background:#bc8117}
+.invnet-ov .timeline .muted{color:#7b8fa2;border-color:#d5dfe8}
+.invnet-ov .timeline .muted:before{background:#b5c4d3}
 .invnet-ov .art{display:block;max-width:100%;height:94px;margin:18px auto 8px}
 .invnet-ov .tabs a{height:41px;padding-top:10px;color:#5b7189;font-weight:400;display:inline-block}
 .invnet-ov .tabs a[aria-current="page"]{color:#075be8;font-weight:700;border-bottom:2px solid #075be8}
@@ -86,3 +121,4 @@
 .invnet-ov h1,.invnet-ov h2{font-weight:700}
 .invnet-ov h1{font-size:28px;line-height:1.3;margin:0 0 7px;letter-spacing:-.5px}
 .invnet-ov strong,.invnet-ov b{font-weight:700}
+.invnet-ov .timeline li:before{box-sizing:content-box}
