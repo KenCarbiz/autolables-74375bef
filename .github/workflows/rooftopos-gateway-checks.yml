@@ -1,0 +1,43 @@
+name: RooftopOS adapter verification (no external services)
+
+on:
+  pull_request:
+    paths:
+      - 'src/lib/rooftopos-parked/**'
+      - 'supabase/functions/_shared/integrations/envelope.ts'
+      - '.github/workflows/rooftopos-gateway-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  parked_contract:
+    name: Parked Gateway contract — unit, typecheck, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: 'true'
+    steps:
+      - name: Checkout proposed branch
+        uses: actions/checkout@v4
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install only repo dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Verify the parked adapter never enters runtime imports
+        run: |
+          if grep -R -E "from [\"'][^\x27\x22]*rooftopos-parked|import\([^)]*rooftopos-parked" src --include="*.ts" --include="*.tsx" --exclude="*.test.ts" | grep -v 'src/lib/rooftopos-parked/'; then
+            echo "Parked adapter imported from active source"
+            exit 1
+          fi
+      - name: Targeted contract tests
+        run: npx vitest run src/lib/rooftopos-parked/labels-gateway-v1.test.ts
+      - name: TypeScript typecheck
+        run: npx tsc --noEmit -p tsconfig.app.json
+      - name: Production artifact build (no publish)
+        run: npm run build
