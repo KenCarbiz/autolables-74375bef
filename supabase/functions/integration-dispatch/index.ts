@@ -37,6 +37,11 @@ function supabaseStore(db: SupabaseClient): DispatchStore {
         .eq("tenant_id", tenantId).eq("direction", direction).maybeSingle();
       return (data as { enabled?: boolean } | null)?.enabled === true;
     },
+    async deliveryAllowed(tenantId) {
+      const { data, error } = await db.rpc("integration_delivery_allowed", { p_tenant: tenantId });
+      // Unknown pause state fails closed: do not deliver.
+      return !error && data === true;
+    },
     async lease(rowId, nowIso, leaseUntilIso) {
       const claimed = await db.from("integration_outbox")
         .update({ status: "delivering", next_attempt_at: leaseUntilIso })

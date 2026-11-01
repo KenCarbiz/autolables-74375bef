@@ -173,6 +173,14 @@ describe("autofilm.v1 ingest of real AutoFilm events", () => {
     expect(called).toBe(false);
   });
 
+  it("carries the RO as service_visit_ref (schema 1.1.0) so evidence resolves without active inventory", async () => {
+    const d = await decideAutofilmIngest(request(autofilmDelivery("mpi.report.published", { data: { ro_id: RO, ro_number: "x", vin: VIN } })));
+    const envelope = d.inserts[0].envelope as unknown as { schema_version: string; service_visit_ref: unknown; instance_ref: unknown };
+    expect(envelope.schema_version).toBe("1.1.0");
+    expect(envelope.service_visit_ref).toEqual({ app: "autofilm", id: RO });
+    expect(envelope.instance_ref).toBeNull();
+  });
+
   it("stores an event with no resolvable VIN as unmatched with a 2xx, never a 4xx", async () => {
     const d = await decideAutofilmIngest(request(autofilmDelivery("mpi.report.published"), { resolveVin: async () => null }));
     expect(d).toMatchObject({ httpStatus: 202, code: "unmatched", detail: ["vin_unresolved"] });

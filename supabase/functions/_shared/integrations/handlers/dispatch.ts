@@ -1,7 +1,7 @@
 import { json, preflight } from "../../http.ts";
 import { afSignedHeaders, toAfOutbound } from "../adapters/autofilmV1.ts";
 import { nextRetry } from "../backoff.ts";
-import { outboundDirection, type Direction, type EnvelopeV1 } from "../envelope.ts";
+import { downgradeToV10, outboundDirection, type Direction, type EnvelopeV1 } from "../envelope.ts";
 import { sign } from "../signing.ts";
 
 export interface OutboxRow {
@@ -26,6 +26,8 @@ export interface DispatchStore {
   listDue(limit: number, nowIso: string): Promise<OutboxRow[]>;
   loadConnection(connectionId: string): Promise<DispatchConnection | null>;
   directionEnabled(tenantId: string, direction: Direction): Promise<boolean>;
+  // integration.delivery_paused: pausing delivery keeps outbox rows; it never stops capture.
+  deliveryAllowed?(tenantId: string): Promise<boolean>;
   lease(rowId: string, nowIso: string, leaseUntilIso: string): Promise<boolean>;
   activeKey(connectionId: string): Promise<{ key_id: string; secret: string } | null>;
   markDelivered(rowId: string, attempts: number, atIso: string, connectionId: string): Promise<void>;
@@ -82,6 +84,10 @@ export async function handleDispatch(req: Request, deps: DispatchDeps): Promise<
         bump("skipped_flag_off");
         continue;
       }
+      if (store.deliveryAllowed && !(await store.deliveryAllowed(row.tenant_id))) {
+        bump("skipped_paused");
+        continue;
+      }
       if (!(await store.lease(row.id, nowIso, new Date(now() + LEASE_MS).toISOString()))) continue;
 
       const attempts = row.attempts + 1;
@@ -95,7 +101,7 @@ export async function handleDispatch(req: Request, deps: DispatchDeps): Promise<
         const isAf = connection.adapter === "autofilm.v1";
         const payload = isAf
           ? toAfOutbound(row.envelope, connection.external_rooftop_ref ?? "")
-          : row.envelope;
+          : downgradeToV10(row.envelope);
         const rawBody = JSON.stringify(payload);
         const headers = isAf
           ? await afSignedHeaders(key.secret, rawBody, now())

@@ -103,14 +103,23 @@ DECLARE t uuid; i uuid; r jsonb;
 BEGIN
   SELECT tenant_b INTO t FROM _ids;
   PERFORM public.vehicle_history_set_setting('tenant', t, 'service.attach_enabled', 'false', 0, 'synthetic: B not enabled');
-  INSERT INTO public.vehicle_instances (tenant_id, vin) VALUES (t, '1HGCM82633A004352');
   i := public._vh_enqueue((SELECT conn_b FROM _ids), t, 'autofilm.inspection.completed', 'insp:b-1', 1, '1HGCM82633A004352', 'ro-b-1');
   r := public.integration_apply_event(i, '{"verdict":"apply","outcome":"applied","effect":{"kind":"inspection_evidence_upsert"}}');
   IF r->>'status' <> 'held' OR (SELECT status FROM public.integration_inbox WHERE id = i) <> 'held' THEN
     RAISE EXCEPTION 'FAIL: disabled attach did not hold: %', r;
   END IF;
   IF EXISTS (SELECT 1 FROM public.service_visits WHERE tenant_id = t) THEN RAISE EXCEPTION 'FAIL: disabled attach wrote a visit'; END IF;
-  RAISE NOTICE 'PASS: service attach disabled holds the event without writing or dropping it';
+  RAISE NOTICE 'PASS: service attach disabled holds a no-stock event without writing or dropping it';
+
+  -- Same switch off, car in B stock: unchanged spine 1.0 behaviour (attach to the episode).
+  INSERT INTO public.vehicle_instances (tenant_id, vin) VALUES (t, '1HGCM82633A004352');
+  i := public._vh_enqueue((SELECT conn_b FROM _ids), t, 'autofilm.inspection.completed', 'insp:b-2', 1, '1HGCM82633A004352', 'ro-b-2');
+  r := public.integration_apply_event(i, '{"verdict":"apply","outcome":"applied","effect":{"kind":"inspection_evidence_upsert"}}');
+  IF r->>'status' <> 'applied' OR (SELECT service_visit_id FROM public.inspection_evidence WHERE source_record_id = 'insp:b-2') IS NOT NULL
+     OR (SELECT instance_id FROM public.inspection_evidence WHERE source_record_id = 'insp:b-2') IS NULL THEN
+    RAISE EXCEPTION 'FAIL: switch-off in-stock path changed: %', r;
+  END IF;
+  RAISE NOTICE 'PASS: with the switch off, an in-stock car keeps the existing episode attachment';
 END $$;
 
 -- S3. Service-only vehicle: unknown at this dealer -> quarantined until the policy allows it.
@@ -430,7 +439,8 @@ DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM public.service_visits WHERE tenant_id <> (SELECT tenant_b FROM _ids)) THEN RAISE EXCEPTION 'FAIL: B sees A visits'; END IF;
   IF EXISTS (SELECT 1 FROM public.vehicle_custody_milestones) THEN RAISE EXCEPTION 'FAIL: B sees A milestones'; END IF;
-  IF EXISTS (SELECT 1 FROM public.inspection_evidence) THEN RAISE EXCEPTION 'FAIL: B sees A evidence'; END IF;
+  IF EXISTS (SELECT 1 FROM public.inspection_evidence WHERE tenant_id <> (SELECT tenant_b FROM _ids)) THEN RAISE EXCEPTION 'FAIL: B sees A evidence'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.inspection_evidence) THEN RAISE EXCEPTION 'FAIL: B cannot see its own evidence'; END IF;
   IF EXISTS (SELECT 1 FROM public.vehicle_identity_quarantine) THEN RAISE EXCEPTION 'FAIL: B sees A quarantine'; END IF;
   IF jsonb_array_length(public.vehicle_history_owner_view('1HGCM82633A004352')) <> 0 THEN RAISE EXCEPTION 'FAIL: B reads owner view'; END IF;
   BEGIN

@@ -237,7 +237,7 @@ export async function translateAutofilm(af: AfEnvelope, ctx: AfContext): Promise
     const envelope: EnvelopeV1 = {
       event_id: await uuidFrom(`${ctx.connection.id}\n${af.event_id}\n${item.record}`),
       event_type: eventType,
-      schema_version: "1.0.0",
+      schema_version: "1.1.0",
       producer: "autofilm",
       source_record_id: item.record,
       source_version: version,
@@ -250,6 +250,7 @@ export async function translateAutofilm(af: AfEnvelope, ctx: AfContext): Promise
       vin: vin || UNRESOLVED_VIN_PLACEHOLDER,
       tenant_ref: `rooftop:${af.tenant_id}`.slice(0, 256),
       instance_ref: null,
+      service_visit_ref: { app: "autofilm", id: roKey },
       visibility: mapped.requested,
       evidence_refs: [],
       payload,

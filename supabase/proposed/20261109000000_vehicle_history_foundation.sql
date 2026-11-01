@@ -942,8 +942,8 @@ BEGIN
    WHERE tenant_id = r.tenant_id AND vin = r.vin AND status = 'active';
 
   v_visit_ref := NULLIF(r.envelope #>> '{service_visit_ref,id}', '');
-  IF v_visit_ref IS NOT NULL THEN
-    IF NOT public.vehicle_history_flag(r.tenant_id, NULL, 'service.attach_enabled') THEN
+  IF v_visit_ref IS NOT NULL AND NOT public.vehicle_history_flag(r.tenant_id, NULL, 'service.attach_enabled') THEN
+    IF v_instance IS NULL THEN
       -- Paused, not discarded: retry later once the switch is on.
       UPDATE public.integration_inbox
          SET status = 'held', outcome_code = 'service_attach_disabled', claimed_until = NULL,
@@ -951,6 +951,10 @@ BEGIN
        WHERE id = r.id;
       RETURN jsonb_build_object('status', 'held', 'outcome', 'service_attach_disabled');
     END IF;
+    -- Switch off and the car is in stock: keep the spine 1.0 behaviour exactly.
+    v_visit_ref := NULL;
+  END IF;
+  IF v_visit_ref IS NOT NULL THEN
 
     SELECT * INTO v_visit FROM public.service_visits
      WHERE tenant_id = r.tenant_id AND source_app = r.producer AND source_record_id = v_visit_ref;

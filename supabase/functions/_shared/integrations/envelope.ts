@@ -37,6 +37,9 @@ export interface EnvelopeV1 {
   vin: string;
   tenant_ref: string;
   instance_ref?: InstanceRef | null;
+  // Schema 1.1.0 lifecycle extension: the service visit (RO) that evidence belongs to,
+  // resolved independently of any active inventory episode. Rejected on 1.0.x.
+  service_visit_ref?: InstanceRef | null;
   visibility: Visibility;
   evidence_refs?: string[];
   payload_checksum?: string;
@@ -46,7 +49,7 @@ export interface EnvelopeV1 {
 const ALLOWED_KEYS = new Set([
   "event_id", "event_type", "schema_version", "producer", "source_record_id", "source_version",
   "idempotency_key", "correlation_id", "causation_id", "occurred_at", "observed_at", "sent_at",
-  "vin", "tenant_ref", "instance_ref", "visibility", "evidence_refs", "payload_checksum", "payload",
+  "vin", "tenant_ref", "instance_ref", "service_visit_ref", "visibility", "evidence_refs", "payload_checksum", "payload",
 ]);
 const REQUIRED_KEYS = [
   "event_id", "event_type", "schema_version", "producer", "source_record_id", "source_version",
@@ -105,13 +108,14 @@ export function validateEnvelope(input: unknown): EnvelopeValidation {
     Array.isArray(e.evidence_refs) && e.evidence_refs.length <= 100 && e.evidence_refs.every((r) => typeof r === "string"),
   );
 
-  if (e.instance_ref !== undefined && e.instance_ref !== null) {
-    const ref = e.instance_ref;
-    const ok = isObject(ref)
-      && Object.keys(ref).every((k) => k === "app" || k === "id")
-      && typeof ref.app === "string" && (PRODUCERS as readonly string[]).includes(ref.app)
-      && typeof ref.id === "string" && ref.id.length >= 1;
-    if (!ok) errors.push("invalid:instance_ref");
+  const validRef = (ref: unknown) => isObject(ref)
+    && Object.keys(ref).every((k) => k === "app" || k === "id")
+    && typeof ref.app === "string" && (PRODUCERS as readonly string[]).includes(ref.app)
+    && typeof ref.id === "string" && ref.id.length >= 1 && ref.id.length <= 256;
+  if (e.instance_ref !== undefined && e.instance_ref !== null && !validRef(e.instance_ref)) errors.push("invalid:instance_ref");
+  if (e.service_visit_ref !== undefined && e.service_visit_ref !== null) {
+    if (!supportsServiceVisitRef(e.schema_version)) errors.push("unknown_field:service_visit_ref");
+    else if (!validRef(e.service_visit_ref)) errors.push("invalid:service_visit_ref");
   }
 
   if (
@@ -125,6 +129,19 @@ export function validateEnvelope(input: unknown): EnvelopeValidation {
   return errors.length === 0
     ? { ok: true, errors, envelope: e as unknown as EnvelopeV1 }
     : { ok: false, errors, envelope: null };
+}
+
+// 1.1.0 is additive over 1.0.0: only service_visit_ref is new. Consumers that have not
+// declared 1.1 support must keep receiving 1.0.0 envelopes without that field.
+export function supportsServiceVisitRef(schemaVersion: unknown): boolean {
+  if (typeof schemaVersion !== "string" || !SEMVER.test(schemaVersion)) return false;
+  const [major, minor] = schemaVersion.split(".").map(Number);
+  return major === 1 && minor >= 1;
+}
+
+export function downgradeToV10(envelope: EnvelopeV1): EnvelopeV1 {
+  const { service_visit_ref: _drop, ...rest } = envelope;
+  return { ...rest, schema_version: "1.0.0" };
 }
 
 export function canonicalJson(value: unknown): string {
@@ -149,7 +166,7 @@ const entries = (producer: Producer, scope: string, types: string[]): [string, C
   types.map((t) => [`${producer}.${t}`, { producer, scope }]);
 
 export const EVENT_CATALOG: Readonly<Record<string, CatalogEntry>> = Object.fromEntries([
-  ...entries("autolabels", "vehicle:read", ["vehicle.listed", "vehicle.updated", "vehicle.price_changed", "vehicle.archived", "vehicle.sold"]),
+  ...entries("autolabels", "vehicle:read", ["vehicle.listed", "vehicle.updated", "vehicle.price_changed", "vehicle.archived", "vehicle.sold", "vehicle.delivered", "vehicle.sale_voided"]),
   ...entries("autolabels", "passport:read", ["passport.published", "passport.revoked"]),
   ...entries("autolabels", "market:read", ["market.handoff"]),
   ...entries("autofilm", "inspection:write", ["inspection.completed", "inspection.corrected", "inspection.revoked", "finding.recorded", "finding.corrected"]),
