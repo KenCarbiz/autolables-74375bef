@@ -2,13 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { renderAdmin } from "@/test/adminRender";
 import { functionCalls, resetSupabaseSpy, writeCalls } from "@/test/mocks/supabaseSpy";
-import { AL97_06, AL97_17 } from "@/pages/admin/fixtures/al97-batch5";
+import { AL97_05, AL97_06, AL97_17 } from "@/pages/admin/fixtures/al97-batch5";
 import { AL97_13, AL97_14 } from "@/pages/admin/fixtures/al97-batch2";
 import { ADMIN_CHILD_ROUTES } from "@/lib/admin/sections";
 import { amortizedPayment, normalizeEstimatorConfig } from "@/lib/payment/estimator";
 import type { DedupePreview } from "@/lib/inventoryNetwork/api";
 import PaymentAssumptionsPage, { reviewRows } from "./PaymentAssumptionsPage";
 import InventoryNetworkPage from "./InventoryNetworkPage";
+import StoreIdentityPage, { REGISTRY_MIGRATION, stateDisplay } from "./StoreIdentityPage";
 import { approveBlocked } from "./inventoryNetwork/ReconciliationReview";
 
 vi.mock("@/integrations/supabase/client", async () => {
@@ -18,7 +19,7 @@ vi.mock("@/integrations/supabase/client", async () => {
 vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ user: { id: "u1" }, isAdmin: true, loading: false }) }));
 vi.mock("@/contexts/TenantContext", () => ({ useTenant: () => ({ tenant: null, currentStore: null, stores: [] }) }));
 vi.mock("@/hooks/useEntitlements", () => ({ useEntitlements: () => ({ member: { role: "admin" }, loading: false }) }));
-vi.mock("@/contexts/DealerSettingsContext", () => ({ useDealerSettings: () => ({ settings: { dealer_timezone: "UTC" }, loading: false }) }));
+vi.mock("@/contexts/DealerSettingsContext", async (orig) => ({ ...(await orig<typeof import("@/contexts/DealerSettingsContext")>()), useDealerSettings: () => ({ settings: { dealer_timezone: "UTC" }, loading: false }) }));
 
 const noWrites = () => {
   expect(functionCalls()).toEqual([]);
@@ -126,5 +127,30 @@ describe("AL97 exact reconciliation review", () => {
     expect(approveBlocked(p, false, now + 61 * 60000)).toMatch(/expired/);
     expect(approveBlocked({ ...p, plan: { ...p.plan, disposition: "needs_review" } }, false, now)).toMatch(/person's review/);
     expect(approveBlocked(null, false, now)).toMatch(/could not be read/);
+  });
+});
+
+describe("AL97 store identity and scope", () => {
+  it("labels account settings as the whole account and keeps the page read-only", () => {
+    renderAdmin(<StoreIdentityPage />, { route: ADMIN_CHILD_ROUTES.storeIdentity, fixture: AL97_05.fixture });
+    expect(screen.getByText("Harte Auto Group / Hartford, CT · whole account")).toBeInTheDocument();
+    expect(screen.getByText("Account setting")).toBeInTheDocument();
+    expect(screen.getByText("Not stored")).toBeInTheDocument();
+    expect(screen.getByText("Canonical store registry")).toBeInTheDocument();
+    const review = screen.getByRole("button", { name: "Review changes" });
+    expect(review).toBeDisabled();
+    expect(review).toHaveAccessibleDescription(/read-only/);
+    noWrites();
+  });
+
+  it("shows a legacy state name as its code without rewriting it, and the registry as Unknown when unreadable", () => {
+    const brand = AL97_05.fixture.views.brand as { settings: Record<string, unknown> };
+    renderAdmin(<StoreIdentityPage />, { route: ADMIN_CHILD_ROUTES.storeIdentity, fixture: { ...AL97_05.fixture, views: { ...AL97_05.fixture.views, brand: { ...brand, settings: { ...brand.settings, dealer_state: "Connecticut" } }, "al97-identity": { registry: null } } } });
+    expect(screen.getByText(/Stored as "Connecticut"; shown as CT/)).toBeInTheDocument();
+    expect(screen.getByText("Inventory ownership").closest("tr")).toHaveTextContent("Unknown");
+    expect(screen.getByText(new RegExp(REGISTRY_MIGRATION.replace(/\./g, "\\.")))).toBeInTheDocument();
+    expect(stateDisplay("CT").hint).toBe("Stored as two-letter code; displayed as Connecticut.");
+    expect(stateDisplay("Narnia").code).toBe("Narnia");
+    noWrites();
   });
 });

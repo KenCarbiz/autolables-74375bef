@@ -1,5 +1,8 @@
 import type { AdminScreenFixture } from "./index";
 import { ADMIN_CHILD_ROUTES } from "@/lib/admin/sections";
+import type { Store } from "@/types/tenant";
+import type { BrandFixture } from "@/pages/admin/views/brand/useBrandForm";
+import type { StoreIdentityFixture } from "@/pages/admin/children/StoreIdentityPage";
 import type { EstimatorFixture, PreviewVehicle } from "@/pages/admin/views/brand/paymentEstimator/data";
 
 // AL97 screens 06 and 17. Synthetic design fixtures only: the store, rates and
@@ -59,3 +62,23 @@ export const AL97_17 = screen("AL97 17 Payment estimator review", {
     "pay.coverage": "Computed from current store inventory", "pay.unmatched": "No estimate; do not use a fallback APR",
   },
 });
+
+const STORE: Store = {
+  id: "store-al97", tenant_id: "t-al97", name: "Harte INFINITI", slug: "harte-infiniti", address: "150 Weston St", city: "Hartford", state: "CT", zip: "06120",
+  phone: "", logo_url: "", tagline: "", primary_color: "", created_at: "2026-10-01T00:00:00Z", is_active: true,
+};
+
+export const AL97_05: AdminScreenFixture = {
+  childPath: ADMIN_CHILD_ROUTES.storeIdentity,
+  fixture: {
+    label: "AL97 05 Store identity and scope", now: NOW,
+    views: {
+      brand: {
+        settings: { dealer_name: "Harte INFINITI", dealer_address: "150 Weston St", dealer_city: "Hartford", dealer_state: "CT", dealer_zip: "06120" },
+        tenantName: "Harte Auto Group", stores: [STORE], activeStoreId: STORE.id,
+      } satisfies BrandFixture,
+      "al97-identity": { registry: 6 } satisfies StoreIdentityFixture,
+      "al97-copy": label("05"),
+    },
+  },
+};
