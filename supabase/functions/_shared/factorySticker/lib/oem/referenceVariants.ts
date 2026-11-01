@@ -97,7 +97,7 @@ export const REFERENCE_VARIANTS: readonly ReferenceVariant[] = [
     figma: { master: "2:12", review: "2:148", map: "41:273" },
     requiredEvidence: [...COMMON_EVIDENCE, "epa_record_exact_configuration", "aala_model_year_carline_match"],
     sourceGaps: ["VIN-specific final assembly and engine/transmission origin need evidence beyond the AALA carline row."],
-    layoutStatus: "pending",
+    layoutStatus: "implemented",
   },
   {
     key: "nissan-2026-pathfinder-platinum-4wd",
@@ -117,7 +117,7 @@ export const REFERENCE_VARIANTS: readonly ReferenceVariant[] = [
     figma: { master: "24:167", review: "24:621", map: "41:379" },
     requiredEvidence: [...COMMON_EVIDENCE, "epa_record_exact_configuration", "aala_model_year_carline_match"],
     sourceGaps: ["2026 Pathfinder AALA match is pending; 2025 percentages must never be reused."],
-    layoutStatus: "pending",
+    layoutStatus: "implemented",
   },
   {
     key: "hyundai-2026-santa-fe-hybrid-se-awd",

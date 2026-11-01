@@ -199,7 +199,7 @@ export function textBBox(t: TextPrimitive): { x0: number; x1: number; y0: number
   return { x0, x1: x0 + w, y0: t.y - t.size, y1: t.y };
 }
 
-function wrapText(str: string, font: LayoutFont, size: number, maxWidth: number): string[] {
+export function wrapText(str: string, font: LayoutFont, size: number, maxWidth: number): string[] {
   const words = str.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let line = "";
@@ -419,7 +419,7 @@ function familyStyle(theme: OemStickerTheme): FamilyStyle {
   return override ? { ...base, ...override } : base;
 }
 
-class Painter {
+export class Painter {
   primitives: LayoutPrimitive[] = [];
   constructor(private drawn: string[] | null) {}
 
@@ -481,7 +481,7 @@ class Painter {
 
 // ── Vector glyphs ─────────────────────────────────────────────────────
 
-function starPath(s: number): string {
+export function starPath(s: number): string {
   // 5-point star in an s×s box, y-down.
   const p = (a: number, r: number): [number, number] => [
     s / 2 + r * Math.sin(a), s / 2 - r * Math.cos(a),
@@ -1875,7 +1875,7 @@ function paintContinuationPage(
 
 // ── Validation ────────────────────────────────────────────────────────
 
-function validateModel(model: LayoutModel): void {
+export function validateModel(model: LayoutModel): void {
   const bad = (msg: string): never => {
     throw new Error(`layout invariant violated: ${msg}`);
   };

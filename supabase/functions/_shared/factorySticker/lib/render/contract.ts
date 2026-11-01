@@ -20,6 +20,8 @@ import type {
   VehicleCondition,
 } from "../types.ts";
 import { resolveOem } from "../oem/identity.ts";
+import { resolveReferenceVariant } from "../oem/referenceVariants.ts";
+import { LETTER_VARIANT_CONFIGS, buildLetterVariantLayout } from "./variants/letterMonroney.ts";
 import { getTheme, type OemStickerTheme } from "../oem/themes.ts";
 import { resolveThemeProfile, type ResolvedThemeProfile } from "../oem/profiles.ts";
 import { buildStickerLayout, type LayoutModel, type StickerLayoutInput } from "./layout.ts";
@@ -429,7 +431,43 @@ export function buildRenderLayout(
   data: FactoryStickerRenderData,
   theme: FactoryStickerTheme,
 ): LayoutModel {
-  return buildStickerLayout(adaptRenderData(data), resolveRenderTheme(data, theme));
+  const input = adaptRenderData(data);
+  const variant = resolveVariantLayout(data, theme, input);
+  return variant ?? buildStickerLayout(input, resolveRenderTheme(data, theme));
+}
+
+/**
+ * Dedicated reference layout, used only for an exact registry match whose
+ * layout is implemented and only when no template override is in force.
+ * Anything else, or content the variant cannot hold faithfully, renders
+ * on the generic reproduction layout.
+ */
+function resolveVariantLayout(
+  data: FactoryStickerRenderData,
+  theme: FactoryStickerTheme,
+  input: StickerLayoutInput,
+): LayoutModel | null {
+  if (String(theme.templateOverrideKey ?? "").trim()) return null;
+  const year = Number(data.identity.year);
+  const match = resolveReferenceVariant({
+    make: data.identity.make,
+    modelYear: Number.isFinite(year) ? year : null,
+    model: data.identity.model,
+    trim: data.identity.trim,
+    drivetrain: data.mechanical?.drivetrain ?? null,
+    fuelType: data.epa?.fuelType ?? null,
+  });
+  if (match.status !== "matched" || match.rendering !== "variant_layout" || !match.variant) return null;
+  if (!LETTER_VARIANT_CONFIGS[match.variant.key]) return null;
+  return buildLetterVariantLayout(match.variant.key, {
+    layout: input,
+    equipmentGroups: Object.entries(data.standardEquipment).map(([hint, items]) => ({ hint, items })),
+    displayMake: data.identity.make.trim().toUpperCase() === "INFINITI" ? "INFINITI" : titleCase(data.identity.make),
+  });
+}
+
+function titleCase(s: string): string {
+  return s.trim().toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase());
 }
 
 export async function runRenderPipeline(
