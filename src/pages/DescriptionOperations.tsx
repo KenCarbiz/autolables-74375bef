@@ -687,6 +687,7 @@ export default function DescriptionOperations() {
         {summary && summary.missing > 0 ? ` ${summary.missing} active vehicle${summary.missing === 1 ? "" : "s"} never started a description.` : ""}
         {perms.canGenerate && (<> <button type="button" onClick={runReconcile} disabled={syncing} className="font-semibold text-adm-primary hover:underline disabled:opacity-50">{syncing ? "Reconciling" : "Review reconciliation"}</button></>)}
         {perms.canConfigure && (<> <button type="button" onClick={() => navigate("/admin?tab=merchandising-seo")} className="font-semibold text-adm-primary hover:underline">Automation settings</button></>)}
+        {perms.canConfigure && (<> <button type="button" onClick={() => navigate("/admin/publishing/description-engine")} className="font-semibold text-adm-primary hover:underline">Description Engine</button></>)}
       </p>
     </PageBody>
   );

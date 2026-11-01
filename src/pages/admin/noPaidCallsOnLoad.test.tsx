@@ -71,6 +71,7 @@ describe("opening an Administration screen starts no edge function", () => {
     "/admin/brand/payment-estimator": "/admin/brand/payment-estimator",
     "/admin/brand/payment-assumptions": "/admin/brand/payment-assumptions",
     "/admin/brand/store-identity": "/admin/brand/store-identity",
+    "/admin/publishing/description-engine": "/admin/publishing/description-engine",
     "/admin/integrations/runs/:runId": "/admin/integrations/runs/run-1",
     "/admin/integrations/providers/:providerId": "/admin/integrations/providers/syndication",
     "/admin/integrations/jobs/:jobId": "/admin/integrations/jobs/inventory_sync",
