@@ -70,7 +70,7 @@ function VehicleResult({ v }: { v: VehicleLookup }) {
         </div>
       )}
       <h3 className="vr-subhead">Timeline</h3>
-      <ol className="timeline" aria-label={`Timeline for ${v.vin}`}>
+      <ol className="timeline vr-history" aria-label={`Timeline for ${v.vin}`}>
         {timeline.map((t, i) => (
           <li key={i}>
             <span className="vr-lane"><Chip chip={{ label: t.lane, tone: LANE_TONE[t.lane] }} /></span>

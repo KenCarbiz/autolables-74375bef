@@ -34,3 +34,5 @@
   .invnet-ov .vr-search .btn{width:100%}
   .invnet-ov .vr-setting .btn{width:100%}
 }
+.invnet-ov .timeline.vr-history li{border-left-color:#cddbea}
+.invnet-ov .timeline.vr-history li:before{background:#28445f}
