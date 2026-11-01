@@ -75,6 +75,12 @@ describe("opening an Administration screen starts no edge function", () => {
     "/admin/pricing/integrity": "/admin/pricing/integrity",
     "/admin/integrations/vehicle-files": "/admin/integrations/vehicle-files",
     "/admin/integrations/jobs": "/admin/integrations/jobs",
+    "/admin/access/activity": "/admin/access/activity",
+    "/admin/access/permission-verification": "/admin/access/permission-verification",
+    "/admin/customer-experience/contact-routing": "/admin/customer-experience/contact-routing",
+    "/admin/brand/legacy-store-assignments": "/admin/brand/legacy-store-assignments",
+    "/admin/integrations/connections": "/admin/integrations/connections",
+    "/admin/integrations/worker-setup": "/admin/integrations/worker-setup",
   };
   it.each(ADMIN_CHILD_ROUTE_ELEMENTS.map((r) => r.path))("child page %s", async (path) => {
     const route = ADMIN_CHILD_ROUTE_ELEMENTS.find((r) => r.path === path)!;

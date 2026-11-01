@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { useRef, type ReactNode, type RefObject } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 import { Link } from "react-router-dom";
 import { ADMIN_SECTIONS, adminTabHref, firstVisibleTab, visibleSections } from "@/lib/admin/sections";
 import { useAdminVisibility } from "@/components/admin/v2/useAdminVisibility";
@@ -58,6 +59,7 @@ export function Al97Frame({ crumb, title, subtitle, scope, scopeLabel, storeName
           })}
         </nav>
         {main}
+        <FixtureLabel />
       </div>
       {children}
     </div>
@@ -74,6 +76,7 @@ const PATHS = {
   dollar: "M12 2v20m6-16H9a4 4 0 0 0 0 8h6a4 4 0 0 1 0 8H5",
   archive: "M3 7h18v15H3zM2 2h20v5H2zM8 12h8",
   chevron: "M8 3l9 9-9 9",
+  close: "M4 4l16 16M20 4L4 20",
 } as const;
 
 export type GlyphName = keyof typeof PATHS | "clock" | "info" | "plus" | "retry" | "settings" | "database" | "calculator";
@@ -164,4 +167,51 @@ export function useFixtureCopy(): (key: string, live: string) => string {
   const fx = useNetFixture();
   const shared = useViewFixture<Record<string, string>>("al97-copy");
   return (key, live) => shared?.[key] ?? fx?.copy?.[key] ?? live;
+}
+
+/**
+ * A review dialog in the scaffold's modal style. Radix supplies the focus
+ * trap, Escape and focus return; focus lands on the dialog itself so no
+ * control is pre-selected, and closing returns focus to `returnFocus`.
+ */
+export function Al97Dialog({ open, onOpenChange, title, description, children, footer, returnFocus }: {
+  open: boolean; onOpenChange: (open: boolean) => void; title: string; description: ReactNode; children: ReactNode; footer: ReactNode;
+  returnFocus?: RefObject<HTMLElement>;
+}) {
+  const content = useRef<HTMLDivElement>(null);
+  return (
+    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+      <Dialog.Portal>
+        <div className="invnet-ov al97-dialog-root">
+          <Dialog.Overlay className="al97-backdrop" />
+          <div className="al97-dialog-wrap">
+            <Dialog.Content
+              ref={content}
+              className="modal"
+              onOpenAutoFocus={(e) => { e.preventDefault(); content.current?.focus(); }}
+              onCloseAutoFocus={(e) => { if (returnFocus?.current) { e.preventDefault(); returnFocus.current.focus(); } }}
+            >
+              <div className="modal-head">
+                <div>
+                  <Dialog.Title asChild><h2>{title}</h2></Dialog.Title>
+                  <Dialog.Description asChild><p>{description}</p></Dialog.Description>
+                </div>
+                <Dialog.Close className="al97-close" aria-label="Close"><Glyph name="close" /></Dialog.Close>
+              </div>
+              <div className="modal-body">{children}</div>
+              <div className="modal-foot">{footer}</div>
+            </Dialog.Content>
+          </div>
+        </div>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
+/** Design fixtures label themselves as synthetic; live pages never render this. */
+function FixtureLabel() {
+  const copy = useFixtureCopy();
+  const label = copy("fixture.label", "");
+  if (!label) return null;
+  return <div className="fixture-label"><span>{label}</span><span>{copy("fixture.id", "")}</span></div>;
 }

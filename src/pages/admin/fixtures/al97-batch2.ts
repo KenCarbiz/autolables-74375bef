@@ -165,3 +165,9 @@ export const AL97_10 = screen("AL97 10 Provider usage and budgets", base(allStor
   storeUsage: null,
   copy: { "budget.quotaSub": "Configured pool · example" },
 }));
+
+export const AL97_20 = screen("AL97 20 Review store feed activation", base(nissan({}), {
+  ...nissanLedgers("approved"),
+  heartbeatAt: "2026-10-31T21:24:00Z",
+  copy: { "fixture.label": "PROPOSED TARGET · SYNTHETIC DESIGN FIXTURE · NOT A LIVE SCREENSHOT", "fixture.id": "AL97 / 20" },
+}));
