@@ -37,19 +37,19 @@ Custody milestones, service visits, evidence not tied to an active episode, reap
 - Spine 1.0 rule "no active instance -> unmatched" for AutoFilm evidence: superseded when `service.attach_enabled` is on (see conflict 1). With the switch off, behaviour is byte-for-byte the 1.0 path.
 - Spine `integration_claim_inbox` and `integration_apply_event`: replaced by the versions in `20261109000000_vehicle_history_foundation.sql` (same signatures).
 
-### Legacy integrations audited (still present, unchanged)
+### Legacy integrations audited and hardened (2026-11-01 corrections)
 
-| Endpoint | Finding (verified in code today) | Plan |
+| Endpoint | Finding before | Now (local code, not deployed) |
 |---|---|---|
-| `autofilm-feed` | One global `AUTOLABELS_LOOKUP_SECRET`; `tenant_id` comes from the query string (`index.ts:113`), so any key holder can read any tenant's inventory. Read-only. | Replace with a connection-scoped key through the spine; keep until parity and cutover are approved. |
-| `autocurb-sync` | Global `AUTOCURB_SYNC_SECRET` HMAC over the body with no timestamp, so a captured request replays. Updates an existing listing of any status, including archived, without review (`index.ts:198-221`). | Move to signed `X-Rooftop-*` with a replay window; route archived matches to `vehicle_history_flag_reappearance`. |
-| `dms-webhook` | Tenant from the `x-dms-tenant` header (`index.ts:199`) with one secret per provider, so a provider secret can write any tenant; no timestamp. Same archived-listing update path (`index.ts:259-295`). | Same as above. |
+| `autofilm-feed` | One global `AUTOLABELS_LOOKUP_SECRET`; `tenant_id` from the query string, so any key holder could read any tenant. Detail could return a retired row with no `archived_at`. | Optional signed mode with a tenant-scoped key; tenant from the key; detail returns 404 `not_current_inventory` for retired rows. |
+| `autocurb-sync` | Global HMAC with no timestamp (replayable); tenant from the body; updated archived listings. | Signed mode with a 300s window, `Idempotency-Key` receipts and tenant from the key; archived listings are held for review, never updated. |
+| `dms-webhook` | Tenant from `X-Dms-Tenant`, so one vendor secret could write any tenant; no timestamp; same archived update path. | Same as `autocurb-sync`. |
 
-None of these were changed: they are live feeds and the brief requires a tested transition, not a big-bang replacement.
+The unsigned formats keep working per dealer until that dealer is cut over. See `04-legacy-feed-transition.md` and `05-review-package.md`.
 
 ## 2. The six earlier-plan conflicts
 
-1. **No active instance is not "cannot accept service".** `integration_apply_event` now resolves `service_visit_ref` first. A sold, delivered or archived car gets a `service_visits` row (instance link only when the car is in this dealer's stock) and the evidence is anchored to VIN + visit. Test S1.
+1. **No active instance is not "cannot accept service".** With `service.attach_enabled` on, `integration_apply_event` resolves `service_visit_ref` first (the receiving path passes local tests; AutoFilm's sending side is unverified). A sold, delivered or archived car gets a `service_visits` row (instance link only when the car is in this dealer's stock) and the evidence is anchored to VIN + visit. Test S1.
 2. **Retries vs replay.** Unchanged spine behaviour, verified: a duplicate `event_id` returns the original receipt; same idempotency key with a different payload hash is 409 and not applied; re-applying a finalized row is a no-op. Transport replay (old timestamp) is rejected before lookup. Deno HTTP tests + S1.
 3. **One listing per tenant/VIN vs many episodes.** The listing index is kept. Episodes live in `vehicle_instances` (one *active* per tenant/VIN, partial unique index) with `previous_instance_id` and `opened_reason`; the listing is a projection that can point at the current episode. Test S5.
 4. **Global identity is not global access.** `vehicles` holds VIN + internal id only, no client grants at all. Every business row is tenant-scoped with RLS; the cross-tenant test (S13) shows no reads, writes or existence leaks.

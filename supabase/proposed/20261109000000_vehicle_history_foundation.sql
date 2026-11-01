@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS public.vehicle_identity_quarantine (
   raw_vin       text NOT NULL,
   reason        text NOT NULL CHECK (reason IN (
     'vin_format','vin_check_digit','vin_conflict','store_mismatch','ro_conflict',
-    'service_visit_vin_conflict','unknown_vehicle','service_only_disabled','other')),
+    'service_visit_vin_conflict','unknown_vehicle','service_only_disabled','service_only_unverified','other')),
   source_app    text NOT NULL,
   source_ref    text,
   inbox_id      uuid REFERENCES public.integration_inbox(id) ON DELETE SET NULL,
@@ -33,6 +33,10 @@ CREATE TABLE IF NOT EXISTS public.vehicle_identity_quarantine (
   resolved_at   timestamptz,
   created_at    timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE public.vehicle_identity_quarantine DROP CONSTRAINT IF EXISTS vehicle_identity_quarantine_reason_check;
+ALTER TABLE public.vehicle_identity_quarantine ADD CONSTRAINT vehicle_identity_quarantine_reason_check CHECK (reason IN (
+  'vin_format','vin_check_digit','vin_conflict','store_mismatch','ro_conflict',
+  'service_visit_vin_conflict','unknown_vehicle','service_only_disabled','service_only_unverified','other'));
 CREATE INDEX IF NOT EXISTS vehicle_identity_quarantine_open_idx
   ON public.vehicle_identity_quarantine (tenant_id, status, created_at DESC);
 
@@ -234,6 +238,7 @@ CREATE TABLE IF NOT EXISTS public.vehicle_access_grants (
   revoked_at          timestamptz,
   revoked_by          uuid,
   revoke_reason       text,
+  transaction_access_until timestamptz,
   created_by          uuid,
   created_at          timestamptz NOT NULL DEFAULT now(),
   FOREIGN KEY (instance_id, tenant_id) REFERENCES public.vehicle_instances (id, tenant_id) ON DELETE RESTRICT,
@@ -397,8 +402,8 @@ CREATE OR REPLACE FUNCTION public.vehicle_history_audit_write(
 $$;
 
 -- Effective value: platform -> tenant -> store. any_true: any level's true wins (holds).
--- all_true: every level that has a row must be true and the safe default applies when
--- no level says anything. minimum: the smallest configured value wins (hard caps).
+-- all_true: every level that has a row must be true, and the platform level counts
+-- as its safe default when it has no row. minimum: the smallest configured value wins (hard caps).
 CREATE OR REPLACE FUNCTION public.vehicle_history_effective_setting(p_tenant uuid, p_store uuid, p_key text)
 RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = '' AS $$
 DECLARE
@@ -427,6 +432,12 @@ BEGIN
 
   IF cardinality(v_vals) = 0 THEN
     RETURN jsonb_build_object('value', k.safe_default, 'source', 'safe_default', 'policy_status', k.policy_status);
+  END IF;
+  -- An enable (all_true) needs the platform to say yes. With no platform row the
+  -- safe default stands in for it, so a dealer cannot switch on a policy alone.
+  IF k.combine = 'all_true' AND NOT ('platform' = ANY (v_src)) THEN
+    v_vals := v_vals || k.safe_default;
+    v_src := v_src || 'safe_default'::text;
   END IF;
 
   IF k.combine = 'any_true' THEN
@@ -745,6 +756,24 @@ BEGIN
   RETURN v_id;
 END; $$;
 
+-- Retention for a former customer's own transaction records. No date, no access after
+-- the relationship ends, whatever the policy says.
+CREATE OR REPLACE FUNCTION public.vehicle_history_set_transaction_retention(p_grant_id uuid, p_until timestamptz, p_reason text)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE g public.vehicle_access_grants%ROWTYPE;
+BEGIN
+  SELECT * INTO g FROM public.vehicle_access_grants WHERE id = p_grant_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'unknown_grant'; END IF;
+  IF NOT (public.vehicle_history_is_manager(g.tenant_id) OR public.vehicle_history_is_service()) THEN
+    RAISE EXCEPTION 'not_authorized';
+  END IF;
+  IF p_reason IS NULL OR length(trim(p_reason)) < 5 THEN RAISE EXCEPTION 'reason_required'; END IF;
+  IF NOT ('transaction_records' = ANY (g.scopes)) THEN RAISE EXCEPTION 'grant_has_no_transaction_scope'; END IF;
+  UPDATE public.vehicle_access_grants SET transaction_access_until = p_until WHERE id = g.id;
+  PERFORM public.vehicle_history_audit_write(g.tenant_id, 'access.transaction_retention', 'vehicle_access_grant', g.id::text, p_reason,
+    jsonb_build_object('transaction_access_until', g.transaction_access_until), jsonb_build_object('transaction_access_until', p_until));
+END; $$;
+
 -- Ending a relationship stops future records at p_effective_at. Revoking removes access
 -- entirely. Both take effect on the next read because every read re-evaluates grants.
 CREATE OR REPLACE FUNCTION public.vehicle_history_end_access(p_grant_id uuid, p_mode text, p_effective_at timestamptz, p_reason text)
@@ -770,6 +799,8 @@ BEGIN
     jsonb_build_object('ends_at', g.ends_at, 'revoked_at', g.revoked_at), jsonb_build_object('effective_at', p_effective_at));
 END; $$;
 
+ALTER TABLE public.vehicle_access_grants ADD COLUMN IF NOT EXISTS transaction_access_until timestamptz;
+
 CREATE OR REPLACE FUNCTION public.vehicle_history_can_read(
   p_grant public.vehicle_access_grants, p_scope text, p_record_instance uuid, p_record_at timestamptz
 ) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
@@ -777,9 +808,12 @@ CREATE OR REPLACE FUNCTION public.vehicle_history_can_read(
     AND p_scope = ANY (p_grant.scopes)
     AND CASE
       WHEN p_scope = 'transaction_records' THEN
+        -- Own episode only. After the relationship ends, a former customer keeps these
+        -- records only while the policy is on AND a retention date is set and not passed.
         p_record_instance IS NOT DISTINCT FROM p_grant.instance_id
         AND (p_grant.ends_at IS NULL OR p_grant.ends_at > now()
-             OR public.vehicle_history_flag(p_grant.tenant_id, NULL, 'access.prior_owner_keeps_transaction_records'))
+             OR (public.vehicle_history_flag(p_grant.tenant_id, NULL, 'access.prior_owner_keeps_transaction_records')
+                 AND p_grant.transaction_access_until IS NOT NULL AND p_grant.transaction_access_until > now()))
       ELSE
         p_record_at IS NOT NULL AND p_record_at >= p_grant.starts_at
         AND (p_grant.ends_at IS NULL OR p_record_at < p_grant.ends_at)
@@ -976,6 +1010,19 @@ BEGIN
          WHERE id = r.id;
         RETURN jsonb_build_object('status', 'unmatched', 'outcome', 'service_only_disabled');
       END IF;
+      -- A vehicle this dealer never stocked gets a service record only from verified,
+      -- authorized intake: a connection that is still active, a full VIN, and a repair
+      -- order number from the producer. It never opens inventory or a listing.
+      IF NOT v_known AND NOT (
+           EXISTS (SELECT 1 FROM public.integration_connections c WHERE c.id = r.connection_id AND c.status = 'active')
+           AND r.vin ~ '^[A-HJ-NPR-Z0-9]{17}$'
+           AND COALESCE(NULLIF(trim(r.envelope #>> '{payload,ro_number}'), ''), NULL) IS NOT NULL) THEN
+        PERFORM public.integration_quarantine(r, 'service_only_unverified');
+        UPDATE public.integration_inbox
+           SET status = 'unmatched', outcome_code = 'service_only_unverified', attempts = attempts + 1, claimed_until = NULL
+         WHERE id = r.id;
+        RETURN jsonb_build_object('status', 'unmatched', 'outcome', 'service_only_unverified');
+      END IF;
       INSERT INTO public.vehicles (vin) VALUES (r.vin) ON CONFLICT (vin) DO NOTHING;
       v_unit := CASE WHEN r.envelope #>> '{payload,odometer_unit}' IN ('mi','km') THEN r.envelope #>> '{payload,odometer_unit}' END;
       INSERT INTO public.service_visits (tenant_id, vin, instance_id, source_app, source_record_id, ro_number, opened_at,
@@ -1161,6 +1208,7 @@ BEGIN
     'public.vehicle_history_resolve_reappearance(uuid, text, text)',
     'public.vehicle_history_grant_access(uuid, text, uuid, text, uuid, text, text, text[], text, timestamptz, timestamptz)',
     'public.vehicle_history_end_access(uuid, text, timestamptz, text)',
+    'public.vehicle_history_set_transaction_retention(uuid, timestamptz, text)',
     'public.vehicle_history_owner_view(text)',
     'public.integration_replay_inbox(uuid, uuid[], text)',
     'public.vehicle_history_apply_identity_correction(uuid)'

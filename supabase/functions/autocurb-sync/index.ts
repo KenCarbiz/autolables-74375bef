@@ -1,6 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { artifactPostsIdle, autoPreload } from "../_shared/intake-autoprovision.ts";
+import { authenticateLegacyFeed } from "../_shared/legacyFeeds/auth.ts";
+import { planListingWrite, type HeldVehicle } from "../_shared/legacyFeeds/archivedGuard.ts";
+import { runFeedWrite } from "../_shared/legacyFeeds/idempotency.ts";
+import { supabaseLegacyFeedStore } from "../_shared/legacyFeeds/supabaseStore.ts";
 
 // Artifact posts are queued and paced, so they can still be in flight when the
 // handler returns. Without this the isolate is torn down mid-queue and the
@@ -23,6 +27,10 @@ function drainArtifactPosts(): void {
 // Contract:
 //   POST /functions/v1/autocurb-sync
 //   Headers: X-Autocurb-Signature: sha256=<hmac>
+//   Signed (preferred): X-Rooftop-Key-Id / X-Rooftop-Timestamp / X-Rooftop-Signature over the
+//            raw body, plus Idempotency-Key. The tenant is the key's connection;
+//            autocurb_tenant_id, when sent, must resolve to it. See
+//            docs/vehicle-history/04-legacy-feed-transition.md.
 //   Body: {
 //     autocurb_tenant_id: string,
 //     vehicles: [{
@@ -31,7 +39,9 @@ function drainArtifactPosts(): void {
 //     }, ...]
 //   }
 //
-// Returns: { upserted: N, errors: [...] }
+// Returns: { upserted: N, errors: [...], held: [{ vin, reason, review_id }] }
+// held: VINs whose existing listing is archived (or otherwise retired). They are not
+// updated; a vehicle reappearance review is opened instead.
 //
 // HMAC shared secret is AUTOCURB_SYNC_SECRET (env). Autocurb computes
 // HMAC-SHA256 over the raw body and prefixes "sha256=". We recompute
@@ -52,43 +62,15 @@ function drainArtifactPosts(): void {
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-autocurb-signature",
+    "authorization, x-client-info, apikey, content-type, x-autocurb-signature, x-rooftop-key-id, x-rooftop-timestamp, x-rooftop-signature, idempotency-key",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const json = (status: number, body: unknown) =>
+const json = (status: number, body: unknown, extra: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders, "Content-Type": "application/json", ...extra },
   });
-
-const hexEncode = (buf: ArrayBuffer) =>
-  Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-
-const hmacSha256Hex = async (secret: string, body: string) => {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  const sig = await crypto.subtle.sign(
-    "HMAC",
-    key,
-    new TextEncoder().encode(body)
-  );
-  return hexEncode(sig);
-};
-
-const timingSafeEqual = (a: string, b: string) => {
-  if (a.length !== b.length) return false;
-  let mismatch = 0;
-  for (let i = 0; i < a.length; i++) mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return mismatch === 0;
-};
 
 const makeSlug = (vin: string, ymm: string | undefined) => {
   const seed = `${(ymm || "veh").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${vin
@@ -117,20 +99,30 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const sharedSecret = Deno.env.get("AUTOCURB_SYNC_SECRET");
     if (!supabaseUrl || !serviceKey) {
       return json(500, { error: "supabase env not configured" });
     }
-    if (!sharedSecret) {
-      return json(500, { error: "AUTOCURB_SYNC_SECRET not configured" });
-    }
 
     const raw = await req.text();
-    const sigHeader = req.headers.get("x-autocurb-signature") || "";
-    const expected = "sha256=" + (await hmacSha256Hex(sharedSecret, raw));
-    if (!timingSafeEqual(sigHeader, expected)) {
-      return json(401, { error: "invalid signature" });
-    }
+    const admin = createClient(supabaseUrl, serviceKey);
+    const feedStore = supabaseLegacyFeedStore(admin);
+    let namedTenant = "";
+    try {
+      const named = (JSON.parse(raw) as { autocurb_tenant_id?: unknown })?.autocurb_tenant_id;
+      if (typeof named === "string") namedTenant = named;
+    } catch { /* the body is validated after authentication */ }
+    const auth = await authenticateLegacyFeed({
+      feed: "autocurb_sync",
+      method: "POST",
+      pathAndQuery: "",
+      rawBody: raw,
+      headers: req.headers,
+      nowSeconds: Math.floor(Date.now() / 1000),
+      claimedTenant: namedTenant ? { kind: "autocurb_tenant_id", value: namedTenant } : null,
+    }, feedStore);
+    if (!auth.ok) return json(auth.status, { error: auth.error });
+    const reply = (status: number, body: unknown) =>
+      json(status, body, auth.mode === "legacy" ? { "X-AutoLabels-Auth-Deprecated": "legacy-shared-secret" } : {});
 
     let body: {
       autocurb_tenant_id?: string;
@@ -141,28 +133,29 @@ serve(async (req) => {
     } catch {
       return json(400, { error: "invalid JSON body" });
     }
-    if (!body.autocurb_tenant_id || !Array.isArray(body.vehicles)) {
-      return json(400, { error: "autocurb_tenant_id and vehicles[] required" });
+    if ((auth.mode === "legacy" && !body.autocurb_tenant_id) || !Array.isArray(body.vehicles)) {
+      return reply(400, { error: "autocurb_tenant_id and vehicles[] required" });
     }
-    if (body.vehicles.length === 0) return json(200, { upserted: 0, errors: [] });
+    if (body.vehicles.length === 0) return reply(200, { upserted: 0, errors: [], held: [] });
     if (body.vehicles.length > 500) {
-      return json(413, { error: "max 500 vehicles per request" });
+      return reply(413, { error: "max 500 vehicles per request" });
     }
 
-    const admin = createClient(supabaseUrl, serviceKey);
-
-    const { data: tenant } = await admin
-      .from("tenants")
-      .select("id,name,slug,is_active")
-      .eq("autocurb_tenant_id", body.autocurb_tenant_id)
-      .maybeSingle();
+    const tenantQuery = admin.from("tenants").select("id,name,slug,is_active");
+    const { data: tenant } = await (auth.mode === "signed"
+      ? tenantQuery.eq("id", auth.tenantId)
+      : tenantQuery.eq("autocurb_tenant_id", body.autocurb_tenant_id)
+    ).maybeSingle();
 
     if (!tenant) {
-      return json(404, {
+      return reply(404, {
         error: "no autolabels tenant linked to this autocurb_tenant_id",
       });
     }
-    if (!tenant.is_active) return json(403, { error: "tenant is disabled" });
+    if (!tenant.is_active) return reply(403, { error: "tenant is disabled" });
+
+    const inbound = body.vehicles;
+    const outcome = await runFeedWrite(feedStore, auth, "autocurb_sync", async () => {
 
     const { data: profile } = await admin
       .from("onboarding_profiles")
@@ -187,10 +180,11 @@ serve(async (req) => {
       String((dprof?.settings as Record<string, unknown> | null)?.title_email_on_intake) !== "false";
 
     const errors: Array<{ vin: string; error: string }> = [];
+    const held: HeldVehicle[] = [];
     const updatedIds: string[] = [];
     let upserted = 0;
 
-    for (const v of body.vehicles) {
+    for (const v of inbound) {
       if (!v.vin || v.vin.length < 11) {
         errors.push({ vin: v.vin || "(missing)", error: "invalid VIN" });
         continue;
@@ -198,10 +192,17 @@ serve(async (req) => {
 
       const { data: existing } = await admin
         .from("vehicle_listings")
-        .select("id,slug,status")
+        .select("id,slug,status,archived_at,archive_reason")
         .eq("tenant_id", tenant.id)
         .eq("vin", v.vin)
         .maybeSingle();
+
+      if (planListingWrite(existing) === "hold_archived") {
+        held.push(await feedStore.holdArchived(
+          tenant.id, v.vin, existing, "autocurb_sync", auth.mode === "signed" ? auth.connectionId : "legacy",
+        ));
+        continue;
+      }
 
       if (existing) {
         // Update ONLY the inventory fields the feed actually carries. The feed
@@ -276,14 +277,17 @@ serve(async (req) => {
       entity_id: tenant.id,
       details: {
         autocurb_tenant_id: body.autocurb_tenant_id,
-        received: body.vehicles.length,
+        received: inbound.length,
         upserted,
+        held: held.length,
         errors: errors.length,
       },
     });
 
     drainArtifactPosts();
-    return json(200, { upserted, errors });
+    return { status: 200, body: { upserted, errors, held } };
+    });
+    return json(outcome.status, outcome.body, outcome.headers);
   } catch (err) {
     return json(500, {
       error: err instanceof Error ? err.message : "unknown error",

@@ -29,9 +29,9 @@ Signing is unchanged from the spine: `X-Rooftop-Key-Id`, `X-Rooftop-Timestamp`, 
 
 | Pair | AutoLabels side | Other side | End-to-end |
 |---|---|---|---|
-| AutoFilm -> AutoLabels (MPI, repairs) | Adapter + apply implemented and tested on scratch Postgres | AutoFilm repo not available in this session | Not verified |
+| AutoFilm -> AutoLabels (MPI, repairs) | Receiving path passes local tests, incl. sold -> delivered -> MPI through the real adapter (`supabase/tests/deno/sold_then_mpi.test.ts`) | AutoFilm repo not available in this session: unverified | Not verified |
 | AutoLabels -> AutoFilm (custody events) | Outbox + dispatch implemented; AF shape renderer from the spine | Not available | Not verified |
-| AutoCurb <-> AutoLabels | Inbox accepts and records; legacy `autocurb-sync` unchanged | Not available | Not verified |
+| AutoCurb <-> AutoLabels | Inbox accepts and records; `autocurb-sync` hardened (signed mode, archived hold) and passes local HTTP tests | AutoCurb repo (`hartecash-2edb8fec`) has no caller of `autocurb-sync` and no receiver for AutoLabels events: unimplemented | Not verified |
 | AutoFrame | None | None | Not started |
 
 Do not describe any of these as live. A passing local test proves the AutoLabels half only.
@@ -40,18 +40,18 @@ Fixtures: `supabase/functions/_shared/integrations/__fixtures__/*.json` (spine),
 
 ## 4. Setting -> server consumer matrix
 
-Every setting is read through `vehicle_history_effective_setting(tenant, store, key)` at the point of effect. Writes go only through `vehicle_history_set_setting` (role check, type and bounds check, parent-cap check, expected-version check under an advisory lock, append-only version row, audit row). A revert is a new version.
+Every setting is read through `vehicle_history_effective_setting(tenant, store, key)` at the point of effect. For `all_true` keys the platform level counts as its safe default when it has no row, so a dealer cannot enable a policy the platform has not. Writes go only through `vehicle_history_set_setting` (role check, type and bounds check, parent-cap check, expected-version check under an advisory lock, append-only version row, audit row). A revert is a new version.
 
 | Key | Type / combine | Scopes | Safe default | Server consumer | Policy |
 |---|---|---|---|---|---|
 | `lifecycle.emergency_hold` | bool, any level true wins | platform, tenant, store | false | `vehicle_history_record_milestone`, `vehicle_history_resolve_reappearance` refuse with `emergency_hold` | approved default |
 | `service.attach_enabled` | bool, all levels must agree | platform, tenant, store* | false | `integration_apply_event`: visit path; off = in-stock cars keep 1.0 behaviour, no-stock events are held (not dropped) | awaiting approval |
-| `service.allow_service_only_vehicle` | bool, all agree | platform, tenant | false | `integration_apply_event`: VIN unknown to this dealer is quarantined unless on | awaiting approval |
+| `service.allow_service_only_vehicle` | bool, all agree | platform, tenant | false | `integration_apply_event`: VIN unknown to this dealer is quarantined unless on; when on, only from an active connection with a full VIN and an RO number (else `service_only_unverified`) | awaiting approval |
 | `integration.apply_paused` | bool, any true wins | platform, tenant | false | `integration_claim_inbox` stops leasing; ingest keeps capturing | approved default |
 | `integration.delivery_paused` | bool, any true wins | platform, tenant | false | `integration-dispatch` via `integration_delivery_allowed`; unreadable state = do not deliver | approved default |
 | `integration.outbound_capture_enabled` | bool, all agree | platform, tenant | false | `vehicle_history_record_milestone` outbox write | awaiting approval |
 | `integration.replay_max_batch` | int, minimum wins, 1-500 | platform, tenant | 25 | `integration_replay_inbox` refuses larger batches; a tenant cannot set above the platform value | awaiting approval |
-| `access.prior_owner_keeps_transaction_records` | bool, all agree | platform, tenant | false | `vehicle_history_can_read` / `vehicle_history_owner_view` | awaiting approval |
+| `access.prior_owner_keeps_transaction_records` | bool, all agree | platform, tenant | false | `vehicle_history_can_read` / `vehicle_history_owner_view`: own episode only, and only while `transaction_access_until` is set and in the future | awaiting approval |
 
 \* `service.attach_enabled` is evaluated at tenant scope by the apply function today because inbound events do not carry a store; a store row is stored and audited but not yet consumed. The admin screen states this.
 

@@ -30,10 +30,11 @@ Nothing in this document has been done in production. Every step below needs its
 |---|---|---|---|---|
 | 1 | `supabase/proposed/20261030000000_rooftopos_spine.sql` | `tenants`, `tenant_members`, `vehicle_listings`, Vault | No existing objects with the spine table names; `update_updated_at_column()` exists | Not merging/applying is the rollback; once applied, the spine is inert until env flag + direction flags |
 | 2 | `supabase/proposed/20261109000000_vehicle_history_foundation.sql` | #1, `user_roles`, `dealer_stores` (drizzle 0006), `vehicle_files` | #1 applied; no rows in `inspection_evidence`/`repair_items` violating the new anchor CHECK (empty today) | `20261109000000_vehicle_history_foundation.rollback.sql`: platform holds on, client EXECUTE revoked, all data kept |
+| 3 | `supabase/proposed/20261109010000_legacy_feed_hardening.sql` | #1, #2 | #1 and #2 applied | `.rollback.sql`: every dealer back to legacy `allowed`, client EXECUTE revoked, bindings/receipts kept |
 
 Drizzle journal numbering: production is at 0017 (memory). If these go through Lovable's migration tool they need the next free numbers at the time (0018+ today), checked against open branches. They must not be placed in `supabase/migrations/` before approval.
 
-Both files ran twice on a scratch Postgres 16 loaded with the repo's full migration history, producing an identical schema (idempotent).
+All three files ran twice on a scratch Postgres 16 loaded with the repo's full migration history, producing an identical schema (idempotent).
 
 ## 3. Staged rollout (each stage is a separate approval)
 
@@ -55,16 +56,12 @@ Monitoring gates before each step: zero cross-tenant reads in the RLS checks; qu
 | `ROOFTOP_INTEGRATIONS_ENABLED` env | Config | Ken | Per environment |
 | Cron for apply/dispatch | Job | Ken | None exists; do not add without approval |
 | Frontend: Vehicle records & lifecycle admin screen | Publish | Ken (per thread brief) | Renders "Not installed" until the migration is applied |
-| Settings marked `awaiting_approval` | Policy | Ken | Service attach, service-only vehicles, outbound capture, replay cap, prior-owner transaction access |
+| Settings marked `awaiting_approval` | Policy | Ken | Service attach, service-only vehicles, outbound capture, replay cap, prior-owner transaction access (detail in `05-review-package.md` section 3) |
+| Legacy feed hardening migration + `autocurb-sync`, `dms-webhook`, `autofilm-feed` deploy | DB + Edge deploy | Ken | Unsigned callers unaffected until a dealer is cut over |
+| `public-listing-view` availability projection | Edge deploy | Ken (deploy hold + Passport sign-off) | Prepared only |
 
 Held and untouched by this branch: `vehicle-enrich`, `public-listing-view`, `marketcheck-recalls`, `marketcheck-specs` (deploy hold); MarketCheck pause and pilot quota; crawler pause; Stage 2 (PR #42); duplicate reconciliation (detection only, no purge); the Harte Subaru 013354 reactivation and the pending QX80 decision; `/platform-admin` (scored screen 34); the customer Passport layout. No paid provider call exists on any new path.
 
-## 5. Verification record (local only)
+## 5. Verification record
 
-| Layer | What ran | Result |
-|---|---|---|
-| Build time | `bunx tsc -p tsconfig.app.json --noEmit`, `bun run build` | See PR description |
-| Unit | `bunx vitest run supabase/functions/_shared/integrations` | 88 passed |
-| Scratch database | `supabase/tests/rooftopos_harness.sh` (Postgres 16, real migration history, spine + foundation applied twice, RLS/apply/scenario SQL, Deno HTTP + concurrency, rollback) | All pass: spine RLS 10, spine apply 10, vehicle history 28 scenario checks, Deno 26 |
-| Runtime against Supabase | Not run | Not verified |
-| Live production | Not run | Not verified |
+Local results, CI results and what was never run are reported separately in `05-review-package.md` section 5.

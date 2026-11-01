@@ -72,7 +72,17 @@ record "vehicle history migration, second apply (must be clean)" "$([ $? = 0 ] &
 diff -q <(grep -v "restrict" "$LOGS/vhschema1.sql") <(grep -v "restrict" "$LOGS/vhschema2.sql") >/dev/null
 record "vehicle history schema identical after second apply" "$([ $? = 0 ] && echo PASS || echo FAIL)" "$LOGS/vhschema2.sql"
 
-for t in rooftopos_spine_rls rooftopos_apply_sql vehicle_history_sql; do
+LF="$ROOT/supabase/proposed/20261109010000_legacy_feed_hardening.sql"
+"${SCRATCH[@]}" -f "$LF" >"$LOGS/lf1.log" 2>&1
+record "legacy feed hardening migration, first apply" "$([ $? = 0 ] && echo PASS || echo FAIL)" "$LOGS/lf1.log"
+"$PGBIN/pg_dump" -h "$WORK" -p "$PORT" -U postgres -d scratch --schema-only --no-owner >"$LOGS/lfschema1.sql" 2>/dev/null
+"${SCRATCH[@]}" -f "$LF" >"$LOGS/lf2.log" 2>&1
+record "legacy feed hardening migration, second apply (must be clean)" "$([ $? = 0 ] && echo PASS || echo FAIL)" "$LOGS/lf2.log"
+"$PGBIN/pg_dump" -h "$WORK" -p "$PORT" -U postgres -d scratch --schema-only --no-owner >"$LOGS/lfschema2.sql" 2>/dev/null
+diff -q <(grep -v "restrict" "$LOGS/lfschema1.sql") <(grep -v "restrict" "$LOGS/lfschema2.sql") >/dev/null
+record "legacy feed schema identical after second apply" "$([ $? = 0 ] && echo PASS || echo FAIL)" "$LOGS/lfschema2.sql"
+
+for t in rooftopos_spine_rls rooftopos_apply_sql vehicle_history_sql legacy_feeds_sql; do
   "${SCRATCH[@]}" -f "$ROOT/supabase/tests/$t.sql" >"$LOGS/$t.log" 2>&1
   rc=$?
   passes=$(grep -c "NOTICE:  PASS" "$LOGS/$t.log")
@@ -99,8 +109,23 @@ canexec=$("${PSQL[@]}" -d scratch -Atc "select has_function_privilege('authentic
 held=$("${PSQL[@]}" -d scratch -Atc "select public.vehicle_history_flag(gen_random_uuid(), null, 'integration.apply_paused')")
 record "vehicle history rollback: data kept ($kept), client execute ($canexec), apply paused ($held)" "$([ $rc = 0 ] && [ "$kept" = 1 ] && [ "$canexec" = f ] && [ "$held" = t ] && echo PASS || echo FAIL)" "$LOGS/vh_rollback.log"
 
+"${SCRATCH[@]}" -f "$ROOT/supabase/proposed/20261109010000_legacy_feed_hardening.rollback.sql" >"$LOGS/lf_rollback.log" 2>&1
+rc=$?
+lfkept=$("${PSQL[@]}" -d scratch -Atc "select (select count(*) from public.legacy_feed_bindings) || '/' || (select count(*) from public.legacy_feed_receipts)")
+lfexec=$("${PSQL[@]}" -d scratch -Atc "select has_function_privilege('authenticated', 'public.legacy_feed_claim_request(uuid, text, text, text)', 'execute')")
+record "legacy feed rollback: bindings/receipts kept ($lfkept), client execute ($lfexec)" "$([ $rc = 0 ] && [ "$lfexec" = f ] && echo PASS || echo FAIL)" "$LOGS/lf_rollback.log"
+
+if [ "${SKIP_PUBLIC_VIEW:-0}" != "1" ] && command -v deno >/dev/null 2>&1; then
+  for wf in 1 0; do
+    WITH_FOUNDATION=$wf "$ROOT/supabase/tests/public_view/run.sh" >"$LOGS/public_view_$wf.log" 2>&1
+    rc=$?
+    summary=$(sed 's/\x1b\[[0-9;]*m//g' "$LOGS/public_view_$wf.log" | grep -E "^(ok|FAILED) \|" | tail -1 | tr -d '\r')
+    record "real public-listing-view + legacy feed functions (custody tables $([ $wf = 1 ] && echo present || echo absent)): $summary" "$([ $rc = 0 ] && echo PASS || echo FAIL)" "$LOGS/public_view_$wf.log"
+  done
+fi
+
 if [ "${SKIP_VITEST:-0}" != "1" ]; then
-  (cd "$ROOT" && bunx vitest run supabase/functions/_shared/integrations) >"$LOGS/vitest.log" 2>&1
+  (cd "$ROOT" && bunx vitest run supabase/functions/_shared/integrations supabase/functions/_shared/legacyFeeds supabase/functions/_shared/listingDisposition.test.ts) >"$LOGS/vitest.log" 2>&1
   rc=$?
   summary=$(grep -E "^\s+Tests " "$LOGS/vitest.log" | tail -1 | sed 's/^ *//')
   record "vitest integration unit tests: $summary" "$([ $rc = 0 ] && echo PASS || echo FAIL)" "$LOGS/vitest.log"

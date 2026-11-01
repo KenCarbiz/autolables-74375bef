@@ -32,6 +32,7 @@ BEGIN
     'public.vehicle_history_resolve_reappearance(uuid, text, text)',
     'public.vehicle_history_grant_access(uuid, text, uuid, text, uuid, text, text, text[], text, timestamptz, timestamptz)',
     'public.vehicle_history_end_access(uuid, text, timestamptz, text)',
+    'public.vehicle_history_set_transaction_retention(uuid, timestamptz, text)',
     'public.vehicle_history_owner_view(text)',
     'public.integration_replay_inbox(uuid, uuid[], text)',
     'public.vehicle_history_apply_identity_correction(uuid)'

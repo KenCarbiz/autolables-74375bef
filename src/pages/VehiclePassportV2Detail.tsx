@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { availabilityCopy, readPassportAvailability, PURCHASE_SECTIONS } from "../../supabase/functions/_shared/listingDisposition";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   ChevronLeft, Upload, Phone, MessageSquare, Send, CheckCircle2, ShieldCheck,
@@ -1507,6 +1508,22 @@ const VehiclePassportV2Detail = () => {
     </div>
   );
 
+  const avail = readPassportAvailability(listing);
+  const availCopy = availabilityCopy(avail, d.dealerName);
+  if (availCopy && section && PURCHASE_SECTIONS.has(section)) return (
+    <div className="min-h-[100svh] flex items-center justify-center px-6 bg-[#F6F7F9]">
+      <div className="text-center max-w-sm" data-module="availability" data-availability={avail.disposition} role="status">
+        <Package className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+        <h1 className="text-xl font-bold">{availCopy.label}</h1>
+        <p className="text-sm text-slate-500 mt-2">{availCopy.message}</p>
+        <div className="mt-4 flex flex-col gap-2 items-center">
+          <button onClick={() => navigate(`/${base}/${vehicleSlug}/contact`)} className="h-11 px-5 rounded-xl bg-[#2563EB] text-white text-sm font-bold inline-flex items-center justify-center gap-2"><Mail className="w-4 h-4" /> Contact {d.dealerName || "the dealership"}</button>
+          <button onClick={back} className="text-[#2563EB] text-sm font-semibold">Back to Passport</button>
+        </div>
+      </div>
+    </div>
+  );
+
   const heroSrc = listingHero(listing);
   const widthCls = def.wide ? "max-w-[1180px]" : "max-w-[760px]";
 
@@ -1521,7 +1538,7 @@ const VehiclePassportV2Detail = () => {
           {heroSrc && <img src={heroSrc} alt="" className={`${def.wide ? "w-14 h-10" : "w-9 h-9"} rounded-lg object-cover shrink-0`} />}
           <div className="min-w-0">
             <p className={`${def.wide ? "text-[15px]" : "text-[14px]"} font-bold leading-tight truncate`}>{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
-            <p className="text-[12px] leading-tight truncate">{d.price != null && <span className="font-bold text-[#2563EB]">{fmt$(d.price)}</span>}{d.price != null && listing.mileage != null && <span className="text-slate-400"> · </span>}{listing.mileage != null && <span className="text-slate-500 font-medium">{listing.mileage.toLocaleString()} miles</span>}</p>
+            <p className="text-[12px] leading-tight truncate">{avail.purchasable && d.price != null && <span className="font-bold text-[#2563EB]">{fmt$(d.price)}</span>}{avail.purchasable && d.price != null && listing.mileage != null && <span className="text-slate-400"> · </span>}{listing.mileage != null && <span className="text-slate-500 font-medium">{listing.mileage.toLocaleString()} miles</span>}</p>
           </div>
           <span className="flex-1" />
           {def.headerPill && <span className="hidden sm:inline-flex text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1 shrink-0">{def.headerPill}</span>}
@@ -1540,7 +1557,9 @@ const VehiclePassportV2Detail = () => {
           <Card className="p-5">
             <p className="text-[13px] font-semibold text-slate-700 mb-3">Ready to move forward?</p>
             <div className="grid grid-cols-2 gap-2.5">
-              <button onClick={() => navigate(`/${base}/${vehicleSlug}/reserve`)} className="h-11 rounded-xl bg-[#2563EB] text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5"><BadgeCheck className="w-4 h-4" /> Request Hold</button>
+              {avail.purchasable
+                ? <button onClick={() => navigate(`/${base}/${vehicleSlug}/reserve`)} className="h-11 rounded-xl bg-[#2563EB] text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5"><BadgeCheck className="w-4 h-4" /> Request Hold</button>
+                : <button onClick={() => navigate(`/${base}/${vehicleSlug}/contact`)} className="h-11 rounded-xl bg-[#2563EB] text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5"><Mail className="w-4 h-4" /> Contact Dealer</button>}
               <button onClick={() => navigate(`/${base}/${vehicleSlug}/trade`)} className="h-11 rounded-xl border-2 border-[#2563EB] text-[#2563EB] text-[13px] font-bold inline-flex items-center justify-center gap-1.5"><GaugeIcon className="w-4 h-4" /> Trade value</button>
             </div>
             <button onClick={back} className="w-full mt-2.5 h-11 rounded-xl border border-[#E6E8EC] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>
@@ -1571,7 +1590,7 @@ const VehiclePassportV2Detail = () => {
                 : section === "todays-price"
                 ? { key: "price", icon: DollarSign, label: resolveTodaysPrice(listing as unknown as { todays_price_mode?: unknown }).barLabel, primary: true, onClick: () => { const el = document.getElementById("tp-form"); el?.scrollIntoView({ behavior: "smooth" }); window.setTimeout(() => document.getElementById("tp-name")?.focus({ preventScroll: true }), 450); } }
                 : { key: "price", icon: DollarSign, label: "Today's Price", sub: d.price != null ? fmt$(d.price) : undefined, primary: true, onClick: () => navigate(`/${base}/${vehicleSlug}/todays-price`) },
-            ].map((b) => {
+            ].filter((b) => avail.purchasable || (b.key !== "td" && b.key !== "price" && b.key !== "hold")).map((b) => {
               const sub = (b as { sub?: string }).sub;
               return (
                 <button key={b.key} onClick={b.onClick} className={`h-12 rounded-xl text-[10px] leading-[1.05] font-bold inline-flex flex-col items-center justify-center gap-0.5 text-center px-0.5 sm:h-[52px] sm:flex-row sm:gap-2.5 sm:px-6 sm:text-[13px] sm:text-left ${b.primary ? "bg-[#2563EB] text-white hover:bg-[#1d4fd7]" : "bg-white text-[#0F172A] sm:border sm:border-transparent sm:hover:border-[#d8dce0]"}`}>

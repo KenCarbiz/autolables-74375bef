@@ -138,11 +138,22 @@ BEGIN
   PERFORM public.vehicle_history_set_setting('platform', NULL, 'service.allow_service_only_vehicle', 'true', 0, 'synthetic enable');
   IF public.integration_replay_inbox(t, ARRAY[i], 'synthetic replay after enable') <> 1 THEN RAISE EXCEPTION 'FAIL: replay count'; END IF;
   r := public.integration_apply_event(i, '{"verdict":"apply","outcome":"applied","effect":{"kind":"inspection_evidence_upsert"}}');
+  IF r->>'outcome' <> 'service_only_unverified' THEN RAISE EXCEPTION 'FAIL: service-only accepted without a repair order: %', r; END IF;
+  IF EXISTS (SELECT 1 FROM public.service_visits WHERE tenant_id = t AND vin = 'JH4KA7561PC008269') THEN
+    RAISE EXCEPTION 'FAIL: unverified service-only intake wrote a visit';
+  END IF;
+  IF (SELECT status FROM public.vehicle_identity_quarantine WHERE inbox_id = i AND reason = 'service_only_disabled') <> 'resolved' THEN
+    RAISE EXCEPTION 'FAIL: quarantine not resolved by replay';
+  END IF;
+  RAISE NOTICE 'PASS: with the policy on, service-only intake without a repair order number is quarantined, not recorded';
+
+  i := public._vh_enqueue((SELECT conn_a FROM _ids), t, 'autofilm.inspection.completed', 'insp:svc-only', 2, 'JH4KA7561PC008269', 'ro-7',
+    '{"ro_number":"7"}');
+  r := public.integration_apply_event(i, '{"verdict":"apply","outcome":"applied","effect":{"kind":"inspection_evidence_upsert"}}');
   IF r->>'status' <> 'applied' THEN RAISE EXCEPTION 'FAIL: service-only not applied after enable: %', r; END IF;
   IF EXISTS (SELECT 1 FROM public.vehicle_instances WHERE tenant_id = t AND vin = 'JH4KA7561PC008269') THEN
     RAISE EXCEPTION 'FAIL: service-only intake created inventory';
   END IF;
-  IF (SELECT status FROM public.vehicle_identity_quarantine WHERE inbox_id = i) <> 'resolved' THEN RAISE EXCEPTION 'FAIL: quarantine not resolved by replay'; END IF;
   RAISE NOTICE 'PASS: service-only vehicle gets a service record without sale inventory once allowed';
 END $$;
 
@@ -318,6 +329,18 @@ BEGIN
   RAISE NOTICE 'PASS: the most restrictive emergency hold wins over a tenant setting';
 END $$;
 
+-- S9b. A dealer cannot switch on a policy the platform has not enabled.
+DO $$
+DECLARE t uuid;
+BEGIN
+  SELECT tenant_b INTO t FROM _ids;
+  PERFORM public.vehicle_history_set_setting('tenant', t, 'integration.outbound_capture_enabled', 'true', 0, 'dealer tries alone');
+  IF public.vehicle_history_flag(t, NULL, 'integration.outbound_capture_enabled') THEN
+    RAISE EXCEPTION 'FAIL: tenant enabled an unapproved policy without the platform';
+  END IF;
+  RAISE NOTICE 'PASS: an enable needs the platform; a tenant true alone stays off';
+END $$;
+
 -- S10. Pause application: capture continues, nothing is claimed, nothing is lost.
 DO $$
 DECLARE t uuid; i uuid; n int;
@@ -429,6 +452,76 @@ DO $$
 BEGIN
   IF jsonb_array_length(public.vehicle_history_owner_view('1HGCM82633A004352')) <> 0 THEN RAISE EXCEPTION 'FAIL: revoked grant still reads'; END IF;
   RAISE NOTICE 'PASS: revocation is effective on the very next read';
+END $$;
+
+-- S12b. Proposed former-customer policy: own episode's transaction records only, only
+-- while the policy is on and a retention date is set; never the next owner's episode.
+RESET ROLE;
+SET LOCAL ROLE service_role;
+SELECT set_config('request.jwt.claims', '{"role":"service_role"}', true);
+DO $$
+DECLARE t uuid; cur uuid;
+BEGIN
+  SELECT tenant_a INTO t FROM _ids;
+  SELECT id INTO cur FROM public.vehicle_instances WHERE tenant_id = t AND vin = '1HGCM82633A004352' AND opened_reason = 'reacquisition';
+  IF NOT EXISTS (SELECT 1 FROM public.vehicle_custody_milestones WHERE instance_id = cur) THEN
+    PERFORM public.vehicle_history_record_milestone(cur, 'sold', now() - interval '1 day', NULL, 'staff', 'deal-2', NULL);
+  END IF;
+  PERFORM public.vehicle_history_set_setting('platform', NULL, 'access.prior_owner_keeps_transaction_records', 'true', 0, 'synthetic policy on');
+  PERFORM public.vehicle_history_set_setting('tenant', t, 'access.prior_owner_keeps_transaction_records', 'true', 0, 'synthetic policy on');
+END $$;
+RESET ROLE;
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims', (SELECT json_build_object('sub', cust_1, 'role', 'authenticated')::text FROM _ids), true);
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM jsonb_array_elements(public.vehicle_history_owner_view('1HGCM82633A004352')) x WHERE x->>'kind' = 'custody_milestone') THEN
+    RAISE EXCEPTION 'FAIL: policy on but no retention date still grants transaction records';
+  END IF;
+  RAISE NOTICE 'PASS: policy on without a retention date grants nothing after the relationship ends';
+END $$;
+RESET ROLE;
+SET LOCAL ROLE service_role;
+SELECT public.vehicle_history_set_transaction_retention(current_setting('vh.g1')::uuid, now() + interval '30 days', 'synthetic retention window');
+RESET ROLE;
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims', (SELECT json_build_object('sub', cust_1, 'role', 'authenticated')::text FROM _ids), true);
+DO $$
+DECLARE v jsonb; prior_inst uuid; t uuid;
+BEGIN
+  v := public.vehicle_history_owner_view('1HGCM82633A004352');
+  IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v) x WHERE x->>'kind' = 'custody_milestone' AND x #>> '{detail,milestone}' = 'delivered') THEN
+    RAISE EXCEPTION 'FAIL: former customer lost their own delivery record inside retention: %', v;
+  END IF;
+  IF EXISTS (SELECT 1 FROM jsonb_array_elements(v) x WHERE x->>'kind' = 'custody_milestone' AND (x->>'at')::timestamptz >= now() - interval '5 days') THEN
+    RAISE EXCEPTION 'FAIL: former customer sees the next owner''s transaction: %', v;
+  END IF;
+  IF EXISTS (SELECT 1 FROM jsonb_array_elements(v) x WHERE x->>'kind' <> 'custody_milestone' AND (x->>'at')::timestamptz >= now() - interval '5 days') THEN
+    RAISE EXCEPTION 'FAIL: former customer sees service after the relationship ended: %', v;
+  END IF;
+  RAISE NOTICE 'PASS: inside retention a former customer reads their own transaction records, not the next owner''s or later service';
+END $$;
+RESET ROLE;
+SET LOCAL ROLE service_role;
+SELECT public.vehicle_history_set_transaction_retention(current_setting('vh.g1')::uuid, now() - interval '1 second', 'synthetic retention expired');
+RESET ROLE;
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims', (SELECT json_build_object('sub', cust_1, 'role', 'authenticated')::text FROM _ids), true);
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM jsonb_array_elements(public.vehicle_history_owner_view('1HGCM82633A004352')) x WHERE x->>'kind' = 'custody_milestone') THEN
+    RAISE EXCEPTION 'FAIL: transaction records still readable after retention ended';
+  END IF;
+  RAISE NOTICE 'PASS: transaction access ends when the retention date passes';
+END $$;
+RESET ROLE;
+SET LOCAL ROLE service_role;
+SELECT set_config('request.jwt.claims', '{"role":"service_role"}', true);
+DO $$
+DECLARE t uuid;
+BEGIN
+  SELECT tenant_a INTO t FROM _ids;
+  PERFORM public.vehicle_history_set_setting('platform', NULL, 'access.prior_owner_keeps_transaction_records', 'false', 1, 'synthetic policy back off');
 END $$;
 
 -- S13. Two tenants, same VIN: staff see only their own tenant; a store cannot change settings it does not own.
