@@ -1,4 +1,4 @@
-import { useRef, type ReactNode, type RefObject } from "react";
+import { useRef, type MouseEvent, type ReactNode, type RefObject } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Link } from "react-router-dom";
 import { ADMIN_SECTIONS, adminTabHref, firstVisibleTab, visibleSections } from "@/lib/admin/sections";
@@ -17,9 +17,11 @@ export interface ScopeLabel { account: string; store?: string | null }
 
 const DEFAULT_TRAIL: Crumb[] = [{ label: "Integrations", to: adminTabHref("inventory-feed") }];
 
-export function Al97Frame({ crumb, title, subtitle, scope, scopeLabel, storeName, main, children, section = "integrations", trail = DEFAULT_TRAIL }: {
+export function Al97Frame({ crumb, title, subtitle, scope, scopeLabel, storeName, main, children, section = "integrations", trail = DEFAULT_TRAIL, onLeave }: {
   crumb: string; title: string; subtitle: ReactNode; scope?: ScopePicker; scopeLabel?: ScopeLabel; storeName?: string | null; main?: ReactNode; children?: ReactNode;
   section?: string; trail?: Crumb[];
+  /** Runs before a breadcrumb or section link navigates, so a page can hold an unsaved draft. */
+  onLeave?: (e: MouseEvent<HTMLElement>) => void;
 }) {
   const { ctx } = useAdminVisibility();
   const visible = visibleSections(ctx);
@@ -27,7 +29,7 @@ export function Al97Frame({ crumb, title, subtitle, scope, scopeLabel, storeName
   return (
     <div className="invnet-ov-page">
       <div className="invnet-ov">
-        <nav aria-label="Breadcrumb" className="breadcrumbs">
+        <nav aria-label="Breadcrumb" className="breadcrumbs" onClickCapture={onLeave}>
           <Link to="/admin">Administration</Link>
           {trail.map((c) => <span key={c.label}> / {c.to ? <Link to={c.to} className="crumb">{c.label}</Link> : c.label}</span>)}
           {" / "}<span aria-current="page">{crumb}</span>
@@ -52,7 +54,7 @@ export function Al97Frame({ crumb, title, subtitle, scope, scopeLabel, storeName
             </div>
           ) : null}
         </div>
-        <nav aria-label="Administration sections" className="tabs">
+        <nav aria-label="Administration sections" className="tabs" onClickCapture={onLeave}>
           {sections.map((s) => {
             const target = firstVisibleTab(s, ctx) ?? s.tabs[0];
             return <Link key={s.id} to={adminTabHref(target.id)} aria-current={s.id === section ? "page" : undefined}>{s.label}</Link>;

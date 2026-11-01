@@ -82,3 +82,5 @@ export const AL97_05: AdminScreenFixture = {
     },
   },
 };
+
+export const AL97_06_PILOT: AdminScreenFixture = { childPath: ADMIN_CHILD_ROUTES.paymentEstimator, fixture: { ...AL97_06.fixture, label: "AL97 06 Payment estimator (pilot route)" } };
