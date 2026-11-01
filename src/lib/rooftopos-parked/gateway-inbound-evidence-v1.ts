@@ -111,6 +111,27 @@ const OPAQUE_MEDIA = /^objref:[a-z0-9-]{1,64}\/[A-Za-z0-9._/-]{1,255}$/;
 const PII_KEY = /(^|_)(customer|first_name|last_name|full_name|email|phone|address|ssn|dob|birth_date|card|account_number|loan|finance|token|secret|password)($|_)/i;
 const BINARY_KEY = /(base64|binary|blob|image_bytes|video_bytes|raw_media|data_uri)/i;
 const MEDIA_ROLES = new Set(["sales_manager", "inventory_manager", "general_manager"]);
+const ALLOWED_EVENT_PAYLOAD_KEYS: Record<ApprovedEvent, readonly string[]> = {
+  "service.mpi_verified": [
+    "mpi_id", "service_visit_ref", "evidence_ref", "items_green",
+    "independent_review_ref", "independent_review_at", "verification_state",
+  ],
+  "service.repair_verified": [
+    "service_visit_ref", "evidence_ref", "evidence_refs",
+    "completed_verified", "verification_state", "repair_ref",
+  ],
+  "appraisal.completed": [
+    "source_submission_ref", "appraisal_finalized_at", "appraisal_finalized_by_ref",
+    "acv_value", "verified_state",
+  ],
+  "acquisition.closed": [
+    "source_submission_ref", "purchase_ref", "custody_verified_at", "verified_state",
+  ],
+  "media.approved": [
+    "media_id", "content_sha256", "object_ref", "mime", "width",
+    "height", "preset_version", "preset_order", "approval",
+  ],
+};
 const EVENT_SOURCE: Record<ApprovedEvent, ExternalSource> = {
   "service.mpi_verified": "autofilm",
   "service.repair_verified": "autofilm",
@@ -183,6 +204,8 @@ export function evaluateGatewayEvidenceV1(
   if (!str(e.payload_hash) || !SHA256.test(e.payload_hash)) return reject("hash_required");
   const forbidden = sensitive(e.payload) || sensitive(e.refs);
   if (forbidden) return reject(forbidden);
+  if (!keysOnly(e.payload, ALLOWED_EVENT_PAYLOAD_KEYS[eventType]))
+    return reject("unexpected_source_payload_field");
   if (!auth || auth.destinationApp !== "autolabels" ||
       auth.signerApp !== e.source_app || auth.signatureVerified !== true ||
       auth.replayChecked !== true || auth.payloadChecksumVerified !== true ||
