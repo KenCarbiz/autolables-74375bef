@@ -102,13 +102,26 @@ export interface PathPrimitive {
   strokeWidth?: number;
 }
 
+// Authorized raster artwork (manufacturer logos on reference-variant
+// layouts). `png` is base64 PNG data; `assetId` names the governed asset.
+export interface ImagePrimitive {
+  kind: "image";
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  png: string;
+  assetId: string;
+}
+
 export type LayoutPrimitive =
   | TextPrimitive
   | RulePrimitive
   | RectPrimitive
   | BarcodePrimitive
   | QrPrimitive
-  | PathPrimitive;
+  | PathPrimitive
+  | ImagePrimitive;
 
 export interface LayoutPage {
   primitives: LayoutPrimitive[];
@@ -476,6 +489,10 @@ export class Painter {
       ...(stroke !== undefined ? { stroke } : {}),
       ...(strokeWidth !== undefined ? { strokeWidth } : {}),
     });
+  }
+
+  image(png: string, assetId: string, x: number, y: number, w: number, h: number): void {
+    this.primitives.push({ kind: "image", png, assetId, x, y, w, h });
   }
 }
 
@@ -1899,6 +1916,7 @@ export function validateModel(model: LayoutModel): void {
             prim.x + w > W - PAGE_MARGIN + 0.01 || prim.y + h > H - PAGE_MARGIN + 0.01) {
           bad(`${prim.kind} out of bounds on page ${pi + 1}`);
         }
+        if (prim.kind === "image" && !prim.png) bad(`image ${prim.assetId} with empty data`);
         if ((prim.kind === "barcode" || prim.kind === "qr") && !prim.payload) {
           bad(`${prim.kind} with empty payload`);
         }

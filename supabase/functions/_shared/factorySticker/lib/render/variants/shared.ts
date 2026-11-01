@@ -5,6 +5,7 @@
 // Drawing helpers shared by the reference-variant layouts. Coordinates are
 // in Figma units (the masters are drawn at 2x) and halved into PDF points.
 
+import { VARIANT_LOGOS } from "./logoArtwork.ts";
 import { MIN_BODY_FONT_SIZE, Painter, starPath, wrapText, type LayoutFont, type LayoutModel, type StickerLayoutInput } from "../layout.ts";
 
 export const u = (figma: number): number => figma / 2;
@@ -83,4 +84,10 @@ export function scale(p: Painter, x: number, y: number, w: number): void {
   box(p, x + w - 20, y, 20, 16, INK);
   txt(p, "1", x + 10, y + 1, 13, "bold", { align: "center", color: PAPER, lh: 16 });
   txt(p, "10", x + w - 10, y + 1, 13, "bold", { align: "center", color: PAPER, lh: 16 });
+}
+
+/** Draws a brand's authorized logo in its master slot (Figma units on the master page). */
+export function paintVariantLogo(p: Painter, brand: keyof typeof VARIANT_LOGOS): void {
+  const logo = VARIANT_LOGOS[brand];
+  p.image(logo.png, logo.assetId, u(logo.slot.x), u(logo.slot.y), u(logo.slot.w), u(logo.slot.h));
 }

@@ -2,17 +2,18 @@
 // Mirror of src/lib/factorySticker/render/variants/chryslerPacificaPhev.ts, copied so the edge runtime can
 // bundle the engine (Supabase ships only supabase/functions/). Edit the
 // source file and run `bun run sync:edge-sticker`.
+import { paintVariantLogo } from "./shared.ts";
 // Dedicated reproduction layout for the Chrysler 2024 Pacifica Select PHEV
 // (Figma master 25:4667, review 25:4945). See stellantisCommon.ts.
 
 import type { FactoryStickerData } from "../../types.ts";
 import type { Painter } from "../layout.ts";
-import { T, Tfit, buildStellantisPhevLayout, wordmark, type StellantisVariantConfig } from "./stellantisCommon.ts";
+import { T, Tfit, buildStellantisPhevLayout, type StellantisVariantConfig } from "./stellantisCommon.ts";
 import type { VariantLayoutBuilder } from "./shared.ts";
 
 function paintHeader(p: Painter, d: FactoryStickerData, _displayMake: string): void {
   const v = d.vehicle;
-  wordmark(p, "CHRYSLER", 95, 134, 34, 403);
+  paintVariantLogo(p, "chrysler");
   if (v.year > 0) {
     String(v.year).split("").forEach((digit, i) =>
       T(p, digit, 533.2, 78.05 + i * 27.758, 27.6, "bold", { align: "center", lh: 27.758 }));

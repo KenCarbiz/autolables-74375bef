@@ -48,7 +48,7 @@ export const INNER_Y = 58;
 export interface StellantisVariantConfig {
   variantKey: string;
   frameColor: string;
-  /** Paints the logo wordmark and model-year/model title block. */
+  /** Paints the logo and model-year/model title block. */
   paintHeader: (p: Painter, d: FactoryStickerData, displayMake: string) => void;
   /** First bold line of the vehicle spec block. */
   specTitle: (d: FactoryStickerData, displayMake: string) => string;
@@ -62,13 +62,6 @@ export function T(
 ): void {
   const { spacing, ...rest } = opts;
   txt(p, s, x + INNER_X, y + INNER_Y, size, font, { lh: size, ...rest, ...(spacing ? { spacing: spacing / 2 } : {}) });
-}
-
-/** Letter-spaced text wordmark stretched to a target width (Figma units). */
-export function wordmark(p: Painter, s: string, x: number, y: number, sizePx: number, targetW: number): void {
-  const base = measureText(s, "bold", pt(sizePx));
-  const spacing = s.length > 1 ? Math.max(0, (targetW / 2 - base) / (s.length - 1)) : 0;
-  p.text(s, u(x + INNER_X), u(y + INNER_Y + sizePx * 0.8465), pt(sizePx), "bold", INK, spacing ? { charSpacing: spacing } : {});
 }
 
 export function R(p: Painter, x: number, y: number, w: number, h: number, fill: string | null, strokePx?: number): void {

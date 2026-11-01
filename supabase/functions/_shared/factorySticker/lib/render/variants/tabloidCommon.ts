@@ -129,11 +129,6 @@ export function paintDisclosure(p: Painter, lines: string[], top: number): void 
 
 // ── Identity ──────────────────────────────────────────────────────────
 
-export function wordmark(p: Painter, text: string, cx: number, top: number, size: number, spacing: number, color = INK): void {
-  const w = widthD(text, "bold", size, spacing);
-  tx(p, text, cx - w / 2, top, size, "bold", { color, spacing });
-}
-
 export function yearModelTrim(d: FactoryStickerData, parts: Array<"year" | "make" | "model" | "trim" | "drivetrain">, displayMake: string): string {
   const v = d.vehicle;
   const map: Record<string, string> = {

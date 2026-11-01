@@ -1,3 +1,4 @@
+import { paintVariantLogo } from "./shared.ts";
 // Dedicated 17x11 reproduction layout for the 2026 Hyundai Santa Fe Hybrid
 // SE AWD, translated from Figma master 25:605 (file bNby4OyBUWhkHvVTbldgy4).
 // Geometry is in display units (see tabloidCommon.ts); every printed value
@@ -29,7 +30,6 @@ import {
   warrantySection,
   wrapD,
   yearModelTrim,
-  wordmark,
   type FirstPageContext,
   type FlowEntry,
   type FlowStyle,
@@ -41,7 +41,7 @@ export const HYUNDAI_SANTA_FE_HYBRID_KEY = "hyundai-2026-santa-fe-hybrid-se-awd"
 const EQ_STYLE: FlowStyle = { size: 11.3, lh: 12, hang: 6, inset: 0 };
 
 function paintHeader(p: Painter, d: FactoryStickerData): void {
-  wordmark(p, "HYUNDAI", 355, 124, 44, 3);
+  paintVariantLogo(p, "hyundai");
   tx(p, yearModelTrim(d, ["year", "model", "trim", "drivetrain"], ""), 608, 128, 28.1, "bold");
   tx(p, `VIN:   ${d.vehicle.vin}`, 1821, 70, 14.5, "bold", { align: "right" });
 }

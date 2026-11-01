@@ -118,6 +118,12 @@ describe("Letter reference variant layouts", () => {
         for (let i = 0; i < last; i++) expect(pageStrings(long, i)).toContain(PRINTED_BANNER);
       });
 
+      it("draws the owner-authorized logo artwork in the master logo slot", () => {
+        const imgs = model.pages[0].primitives.filter((p) => p.kind === "image");
+        expect(imgs).toHaveLength(1);
+        expect(imgs[0].kind === "image" && imgs[0].assetId).toMatch(/^figma-(infiniti|nissan)-logo-v1$/);
+      });
+
       it("falls back to the generic layout under a template override", () => {
         const overridden = buildRenderLayout(data, { ...themeFor(theme), templateOverrideKey: "autolabels_fallback" });
         expect(isVariant(overridden.drawnStrings)).toBe(false);

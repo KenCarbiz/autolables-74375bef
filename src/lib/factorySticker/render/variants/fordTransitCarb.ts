@@ -1,3 +1,4 @@
+import { paintVariantLogo } from "./shared.ts";
 // Dedicated 17x11 reproduction layout for the 2025 Ford Transit-250 Cargo
 // RWD E85 with the California Air Resources Board environmental panel
 // (no parts-content panel), translated from Figma master 25:7587 (file
@@ -29,7 +30,6 @@ import {
   underlined,
   widthD,
   warrantySection,
-  wordmark,
   wrapD,
   yearModelTrim,
   type FirstPageContext,
@@ -54,7 +54,7 @@ function paintFrame(p: Painter): void {
 
 function paintHeader(p: Painter, d: FactoryStickerData): void {
   bx(p, 178, 103, 182, 122, PAPER);
-  wordmark(p, "FORD", 269, 150, 32, 3);
+  paintVariantLogo(p, "ford");
   const v = d.vehicle;
   tx(p, "VEHICLE DESCRIPTION", 366, 104, 11, "body", { color: PAPER });
   const model = v.model.toUpperCase();

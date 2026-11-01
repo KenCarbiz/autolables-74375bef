@@ -1,3 +1,4 @@
+import { paintVariantLogo } from "./shared.ts";
 // Dedicated 17x11 reproduction layout for the 2025 Mitsubishi Outlander SE
 // S-AWC, translated from Figma master 25:1619 (file bNby4OyBUWhkHvVTbldgy4).
 // Geometry is in display units (see tabloidCommon.ts). Values come only from
@@ -25,7 +26,6 @@ import {
   totalMsrp,
   tx,
   widthD,
-  wordmark,
   wrapD,
   yearModelTrim,
   type FirstPageContext,
@@ -40,7 +40,7 @@ const EQ_STYLE: FlowStyle = { size: 10.6, lh: 13.1, hang: 0, inset: 10 };
 const RULE_GREY = "#bdbdbd";
 
 function paintIdentity(p: Painter, d: FactoryStickerData): void {
-  wordmark(p, "MITSUBISHI", 281, 196, 17, 2.4);
+  paintVariantLogo(p, "mitsubishi");
   tx(p, yearModelTrim(d, ["year", "model", "trim", "drivetrain"], ""), 376, 124, 15.5, "bold");
   const v = d.vehicle;
   const colors = [v.exteriorColor, v.interiorColor].filter((s): s is string => !!s).map((s) => s.toUpperCase()).join(" / ");

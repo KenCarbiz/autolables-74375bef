@@ -11,8 +11,7 @@
 //   * every value comes from the render data; reference sample text is
 //     never a default, and an absent fact omits its line or prints an
 //     explicit "not available" state, never a zero
-//   * manufacturer logo artwork is not authorized, so the logo slot
-//     carries the text wordmark
+//   * the logo slot carries the owner-authorized artwork from the master
 //   * EPA agency seals and the source QR are not reproduced; the QR slot
 //     carries a new Vehicle Passport QR only when a Passport URL exists
 //   * the OEM publication/phone footer is omitted until verified per OEM
@@ -26,7 +25,6 @@ import {
   Painter,
   formatMoney,
   formatPlain,
-  measureText,
   validateModel,
   wrapText,
   type LayoutFont,
@@ -37,11 +35,11 @@ import {
   EPA_BLUE,
   INK,
   PAPER,
-  baseline,
   box,
   pt,
   pump,
   roundedRectPath,
+  paintVariantLogo,
   scale,
   stars,
   txt,
@@ -69,8 +67,7 @@ interface SectionSpec {
 
 export interface LetterVariantConfig {
   variantKey: string;
-  wordmark: string;
-  wordmarkSpacing: number;
+  logo: "infiniti" | "nissan";
   sections: SectionSpec[];
   /** Section that receives groups no other section claims. */
   fallbackSection: string;
@@ -82,8 +79,7 @@ const AUDIO = /audio|infotainment|entertainment|technolog|connect|multimedia|nav
 
 export const INFINITI_QX60_CONFIG: LetterVariantConfig = {
   variantKey: "infiniti-2026-qx60-sport-awd",
-  wordmark: "INFINITI",
-  wordmarkSpacing: 4.2,
+  logo: "infiniti",
   sections: [
     { id: "mechanical", heading: "MECHANICAL AND PERFORMANCE:", column: 1, match: MECHANICAL },
     { id: "driver", heading: "DRIVER ASSISTANCE:", column: 1, match: /driver|assist|adas|propilot/ },
@@ -100,8 +96,7 @@ export const INFINITI_QX60_CONFIG: LetterVariantConfig = {
 // Convenience and "safety" prints Exterior (see the binding crosswalk).
 export const NISSAN_PATHFINDER_CONFIG: LetterVariantConfig = {
   variantKey: "nissan-2026-pathfinder-platinum-4wd",
-  wordmark: "NISSAN",
-  wordmarkSpacing: 2.4,
+  logo: "nissan",
   sections: [
     { id: "mechanical", heading: "MECHANICAL AND PERFORMANCE:", column: 1, match: MECHANICAL },
     { id: "safetySecurity", heading: "SAFETY & SECURITY:", column: 1, match: /safety|security|airbag|driver|assist|adas|propilot/ },
@@ -286,11 +281,7 @@ function titleLines(d: FactoryStickerData, displayMake: string): [string, string
 }
 
 function paintHeader(p: Painter, d: FactoryStickerData, config: LetterVariantConfig, displayMake: string): void {
-  const markSize = 18;
-  const markW = measureText(config.wordmark, "bold", pt(markSize), config.wordmarkSpacing);
-  p.text(config.wordmark, u(BODY_X + 85) - markW / 2, u(baseline(BODY_Y + 28, markSize)), pt(markSize), "bold", INK, {
-    charSpacing: config.wordmarkSpacing,
-  });
+  paintVariantLogo(p, config.logo);
   const [l1, l2] = titleLines(d, displayMake);
   txt(p, l1, BODY_X + 182 + 275, BODY_Y + 18.5, 30, "bold", { align: "center", lh: 35 });
   if (l2) txt(p, l2, BODY_X + 182 + 275, BODY_Y + 18.5 + 35, 30, "bold", { align: "center", lh: 35 });
