@@ -1,7 +1,7 @@
 # rtgip/2 — RooftopOS Gateway Interoperability Protocol, version 2
 
 **Status: specification + parked reference implementation. Transport is hard OFF. Nothing here is deployed, migrated or connected.**
-The same spec, core code (`protocol.ts`, `delivery.ts`, `produce.ts`, `harness.ts`, `fixtures.ts`), proposed SQL and corpus are kept byte-identical in AutoLabels (`src/lib/rooftopos-parked/rtgip2/`), AutoCurb (`src/lib/rooftopos/rtgip2/`) and the AutoFrame handoff package.
+The same spec, core code (`protocol.ts`, `delivery.ts`, `produce.ts`, `harness.ts`, `fixtures.ts`), proposed SQL and corpus are kept byte-identical in AutoLabels (`src/lib/rooftopos-parked/rtgip2/`), AutoCurb (`src/lib/rooftopos/rtgip2/`) and AutoFrame (`showroom-photo-polish`, `src/lib/af/rtgip2/`).
 
 ## 1. Why a new version
 
