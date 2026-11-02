@@ -453,7 +453,7 @@ RETURNS boolean LANGUAGE sql STABLE SET search_path = '' AS $$
   -- current_user is the definer inside SECURITY DEFINER callers, so read the session
   -- role (SET ROLE by PostgREST) and the JWT claim instead.
   SELECT COALESCE(current_setting('role', true), '') = 'service_role'
-      OR COALESCE(current_setting('request.jwt.claims', true)::jsonb->>'role', '') = 'service_role';
+      OR COALESCE(NULLIF(current_setting('request.jwt.claims', true), '')::jsonb->>'role', '') = 'service_role';
 $$;
 
 CREATE OR REPLACE FUNCTION public.vehicle_history_is_platform_admin()
