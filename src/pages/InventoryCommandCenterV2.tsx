@@ -47,6 +47,10 @@ interface VRow {
   market_position?: string | null; market_value?: number | null;
 }
 
+// Untyped client: several of these columns/tables predate the generated types.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const sb = () => supabase as any;
+
 const PAGE_SIZE = 1000;
 const MAX_ROWS = 5000;
 const CHUNK = 200;
@@ -127,10 +131,10 @@ const InventoryCommandCenterV2 = () => {
       let list: VRow[] = [];
       let failed = false;
       for (let from = 0; from < MAX_ROWS; from += PAGE_SIZE) {
-        const tryCols = cols ? [cols] : colSets;
+        const tryCols: string[] = cols ? [cols] : colSets;
         let pageData: VRow[] | null = null;
         for (const c of tryCols) {
-          const res = await (supabase as any).from("vehicle_listings").select(c)
+          const res = await sb().from("vehicle_listings").select(c)
             .or(`tenant_id.eq.${tenant.id},tenant_id.is.null`)
             .order("updated_at", { ascending: false }).order("id", { ascending: true })
             .range(from, from + PAGE_SIZE - 1);
@@ -151,8 +155,8 @@ const InventoryCommandCenterV2 = () => {
         const delivered = new Set<string>(); const stockByVin = new Map<string, string>();
         for (const part of chunks(vins, CHUNK)) {
           const [{ data: allAdd }, { data: vfiles }] = await Promise.all([
-            (supabase as any).from("addendums").select("vehicle_vin").in("vehicle_vin", part),
-            (supabase as any).from("vehicle_files").select("vin, stock_number, deal_status").in("vin", part),
+            sb().from("addendums").select("vehicle_vin").in("vehicle_vin", part),
+            sb().from("vehicle_files").select("vin, stock_number, deal_status").in("vin", part),
           ]);
           for (const a of (allAdd || []) as Array<{ vehicle_vin: string }>) ad.add((a.vehicle_vin || "").toUpperCase());
           for (const f of (vfiles || []) as Array<{ vin: string; stock_number: string | null; deal_status: string }>) {
@@ -170,7 +174,7 @@ const InventoryCommandCenterV2 = () => {
       let docsOk = true;
       try {
         for (const part of chunks(list.map((r) => r.id), CHUNK)) {
-          const { data, error } = await (supabase as any).from("generated_documents")
+          const { data, error } = await sb().from("generated_documents")
             .select("vehicle_id, document_type, document_status")
             .eq("tenant_id", tenant.id).in("vehicle_id", part);
           if (error) { docsOk = false; break; }
@@ -180,7 +184,7 @@ const InventoryCommandCenterV2 = () => {
       if (!on) return;
       setRows(list); setAddVins(ad); setStickerDocs(docMap); setDocsLoaded(docsOk);
       try {
-        const { data: cfg } = await (supabase as any).from("marketcheck_sync_config").select("last_run_at").eq("tenant_id", tenant.id).maybeSingle();
+        const { data: cfg } = await sb().from("marketcheck_sync_config").select("last_run_at").eq("tenant_id", tenant.id).maybeSingle();
         if (on) setLastSync({ at: cfg?.last_run_at ?? null });
       } catch { /* noop */ }
       if (on) setLoading(false);
