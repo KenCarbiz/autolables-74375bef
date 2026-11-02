@@ -35,7 +35,9 @@ test("rollback revokes browser SQL table and privileged RPC access", () => {
 });
 
 test("scratch regression exercises both signed-only and legacy-allowed dealers", () => {
-  assert.match(harness, /'allowed','rejected'/);
+  assert.match(harness, /'autofilm_feed','allowed'/);
+  assert.match(harness, /'autofilm_feed','rejected'/);
+  assert.match(harness, /'allowed,rejected'/);
   assert.match(harness, /post_flags.*pre_flags/);
   assert.match(harness, /unsigned_rejected/);
   assert.match(harness, /unsigned_allowed/);
