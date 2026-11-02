@@ -69,7 +69,7 @@ const ev = (rev: number, status = "frontline", type: EventType = "inventory.stat
 
 async function pump(w: ReturnType<typeof world>, worker = "w1") {
   for (const r of w.outbox.claim(worker, w.clock.now, 50))
-    await w.outbox.deliver(r, worker, w.transport, w.reg.keys, w.clock.now, () => 0);
+    await w.outbox.deliver(r, worker, w.transport, w.reg, w.clock.now, () => 0);
 }
 
 describe("transactional outbox", () => {
@@ -103,7 +103,7 @@ describe("transactional outbox", () => {
     expect(w.outbox.rows.size).toBe(1);
     const b = await sealEnvelope({
       ...draftEnvelope("autolabels", "autocurb", "inventory.status_changed", {
-        event_id: a.envelope.event_id,
+        origin: a.envelope.origin,
       }),
       payload: { status: "sold", stock_number: "SYN1001", changed_at: "2027-01-15T15:00:00Z" },
     });
@@ -150,7 +150,10 @@ describe("acknowledgment levels", () => {
     w.clock.now = row.next_attempt_at;
     await pump(w);
     expect(row.state).toBe("consumer_committed");
-    expect(row.receipts.find((r) => r.kind === "consumer_commit")?.outcome).toBe("duplicate");
+    expect(
+      row.receipts.find((r) => r.kind === "target_inbox" && r.outcome === "duplicate"),
+    ).toBeTruthy();
+    expect(row.receipts.find((r) => r.kind === "consumer_commit")?.outcome).toBe("applied");
     expect(w.inbox.effectsApplied.get(a.envelope.event_id)).toBe(1);
   });
 
@@ -170,7 +173,7 @@ describe("acknowledgment levels", () => {
       };
     };
     for (const r of w.outbox.claim("w1", w.clock.now, 5))
-      await w.outbox.deliver(r, "w1", forging, w.reg.keys, w.clock.now, () => 0);
+      await w.outbox.deliver(r, "w1", forging, w.reg, w.clock.now, () => 0);
     expect(w.outbox.rows.get(a.envelope.event_id)!.last_error).toBe("ack_bad_signature");
   });
 });
@@ -205,8 +208,8 @@ describe("crash recovery", () => {
     w.clock.now += 61;
     const r = w.outbox.claim("w2", w.clock.now, 5)[0]!;
     expect(r.lease_owner).toBe("w2");
-    expect(await w.outbox.deliver(r, "w1", w.transport, w.reg.keys, w.clock.now)).toBe("in_flight");
-    expect(await w.outbox.deliver(r, "w2", w.transport, w.reg.keys, w.clock.now)).toBe(
+    expect(await w.outbox.deliver(r, "w1", w.transport, w.reg, w.clock.now)).toBe("in_flight");
+    expect(await w.outbox.deliver(r, "w2", w.transport, w.reg, w.clock.now)).toBe(
       "consumer_committed",
     );
   });
@@ -224,7 +227,7 @@ describe("crash recovery", () => {
     }));
     await Promise.all(
       batches.flatMap(({ wk, rows }) =>
-        rows.map((r) => w.outbox.deliver(r, wk, w.transport, w.reg.keys, w.clock.now, () => 0)),
+        rows.map((r) => w.outbox.deliver(r, wk, w.transport, w.reg, w.clock.now, () => 0)),
       ),
     );
     for (let k = 0; k < 4; k++) {
@@ -325,7 +328,7 @@ describe("retry, dead letter and reconciliation", () => {
     const down = async () => ({ http_status: 503 });
     for (let k = 0; k < RETRY.maxAttempts; k++) {
       for (const r of w.outbox.claim("w1", w.clock.now, 1))
-        await w.outbox.deliver(r, "w1", down, w.reg.keys, w.clock.now, () => 0);
+        await w.outbox.deliver(r, "w1", down, w.reg, w.clock.now, () => 0);
       w.clock.now += RETRY.capSec + 1;
     }
     const row = w.outbox.rows.get(a.envelope.event_id)!;
@@ -366,9 +369,9 @@ describe("retry, dead letter and reconciliation", () => {
       return res;
     };
     for (const r of w.outbox.claim("w1", w.clock.now, 2))
-      await w.outbox.deliver(r, "w1", lossy, w.reg.keys, w.clock.now, () => 0);
+      await w.outbox.deliver(r, "w1", lossy, w.reg, w.clock.now, () => 0);
     for (const r of w.outbox.claim("w1", w.clock.now, 1))
-      await w.outbox.deliver(r, "w1", lossy, w.reg.keys, w.clock.now, () => 0);
+      await w.outbox.deliver(r, "w1", lossy, w.reg, w.clock.now, () => 0);
     const before = JSON.stringify([...w.inbox.rows.entries()]);
     const rep = reconcile(w.outbox.rows.values(), w.inbox as MemoryInbox<unknown>, "autocurb");
     expect(JSON.stringify([...w.inbox.rows.entries()])).toBe(before);

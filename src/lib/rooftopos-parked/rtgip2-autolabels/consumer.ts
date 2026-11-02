@@ -32,6 +32,9 @@ export interface MediaRef {
   episode_id: string;
   state: "approved" | "revoked";
   active_in_gallery: boolean;
+  /** Withdrawal tombstones. Kept forever; a later approval must name an audited reinstatement. */
+  revocations: { revision: number; reason: string; audit_ref: string }[];
+  reinstatements: string[];
   approval_revision: number;
   rendition_id: string | null;
   storage_bucket: string | null;
@@ -125,9 +128,11 @@ function fromAutoFrame(p: LabelsProjection, e: EnvelopeV2): { ok: true } | Fail 
   const prior = p.media[mediaId];
   if (prior && (prior.instance_id !== e.vehicle.instance_id || prior.episode_id !== e.vehicle.episode_id)) return fail("media_vehicle_reassignment");
   if (e.event_type === "media.revoked") {
+    const base = prior ?? { instance_id: e.vehicle.instance_id, episode_id: e.vehicle.episode_id, rendition_id: null, storage_bucket: null, storage_object_key: null, content_sha256: null, media_order: null, shot_type: null, revocations: [], reinstatements: [] };
     p.media[mediaId] = {
-      ...(prior ?? { instance_id: e.vehicle.instance_id, episode_id: e.vehicle.episode_id, rendition_id: null, storage_bucket: null, storage_object_key: null, content_sha256: null, media_order: null, shot_type: null }),
+      ...base,
       state: "revoked", active_in_gallery: false, approval_revision: e.aggregate.revision, source_event_id: e.origin.event_id,
+      revocations: [...base.revocations, { revision: e.aggregate.revision, reason: String(pl.reason), audit_ref: String(pl.revocation_audit_ref) }],
     };
     return { ok: true };
   }
@@ -135,7 +140,16 @@ function fromAutoFrame(p: LabelsProjection, e: EnvelopeV2): { ok: true } | Fail 
   const storage = pl.storage_ref as { bucket: string; object_key: string };
   const scopePrefix = `${e.tenant_id}/${e.rooftop_id}/${e.vehicle.instance_id}/`;
   if (!storage.object_key.startsWith(scopePrefix)) return fail("storage_ref_out_of_scope");
+  // A higher revision alone never resurrects withdrawn media: once a tombstone exists the
+  // approval must carry a reinstatement audit ref that has not been used before.
+  const reinstatement = typeof pl.reinstatement_audit_ref === "string" ? pl.reinstatement_audit_ref : null;
+  if (prior && prior.revocations.length) {
+    if (!reinstatement) return fail("revoked_media_requires_reinstatement");
+    if (prior.reinstatements.includes(reinstatement) || prior.revocations.some((r) => r.audit_ref === reinstatement)) return fail("reinstatement_ref_reused");
+  }
   p.media[mediaId] = {
+    revocations: prior?.revocations ?? [],
+    reinstatements: reinstatement && prior?.revocations.length ? [...prior.reinstatements, reinstatement] : (prior?.reinstatements ?? []),
     instance_id: e.vehicle.instance_id, episode_id: e.vehicle.episode_id, state: "approved",
     // Approved media for a sold/closed episode is kept as history, never shown as current inventory.
     active_in_gallery: r.episode.state === "open",

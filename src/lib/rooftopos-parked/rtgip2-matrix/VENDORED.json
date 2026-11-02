@@ -1,0 +1,49 @@
+{
+  "note": "Regenerate with the evidence script after any change to the shared core or a vendored adapter; all three repos must carry the same core hashes.",
+  "files": {
+    "rtgip2/protocol.ts": {
+      "origin": "shared core (byte-identical in all three repos)",
+      "sha256": "aa742ce374f35b90cdeb3044e280f0d9c00c30b99c3e2c5e85b81e7ccf920279"
+    },
+    "rtgip2/delivery.ts": {
+      "origin": "shared core (byte-identical in all three repos)",
+      "sha256": "0842819a97a19aa24e856456a442910ecfa349c033572d35be0cd3ac52352e2b"
+    },
+    "rtgip2/harness.ts": {
+      "origin": "shared core (byte-identical in all three repos)",
+      "sha256": "df5d414cb841c405899bbcadcc6d490b11c1cdd0a73b769c52073d25965d6bfd"
+    },
+    "rtgip2/produce.ts": {
+      "origin": "shared core (byte-identical in all three repos)",
+      "sha256": "e0edfafa441d19f1bd85af10654272e6d246a5c3dfa050b9fa17de91b41b78f1"
+    },
+    "rtgip2/fixtures.ts": {
+      "origin": "shared core (byte-identical in all three repos)",
+      "sha256": "cf53cb274a5274465042f412ac7e8f0bb40087bb7becea2156913c355871170d"
+    },
+    "rtgip2/rtgip2-corpus.v2.json": {
+      "origin": "shared core (byte-identical in all three repos)",
+      "sha256": "91d63fb3e2a4daf08ae1b71efae8c82cc12db30005a7fd4ae4163dd82b26aeac"
+    },
+    "denylist.ts": {
+      "origin": "KenCarbiz/hartecash-2edb8fec:src/lib/rooftopos/denylist.ts",
+      "sha256": "15ccf5763175ec14f9551dee8b7919b43b484d696fe137520ef330cd70bea966"
+    },
+    "rtgip2-autocurb/producer.ts": {
+      "origin": "KenCarbiz/hartecash-2edb8fec:src/lib/rooftopos/rtgip2-autocurb/producer.ts",
+      "sha256": "bfb560097306045c6593227445eb925ed38a3f273593486fa58992ffe759a58e"
+    },
+    "rtgip2-autocurb/consumer.ts": {
+      "origin": "KenCarbiz/hartecash-2edb8fec:src/lib/rooftopos/rtgip2-autocurb/consumer.ts",
+      "sha256": "87dd22bfc71f74ad2afab57c0aeb948a832d9f9da48cd0cb543498485fb56705"
+    },
+    "rtgip2-autoframe/producer.ts": {
+      "origin": "KenCarbiz/showroom-photo-polish:src/lib/af/rtgip2-autoframe/producer.ts",
+      "sha256": "afaffa820aee7f56fbed642f3472d20b9c69090a0955e0b4b7bcc23d5cb70ede"
+    },
+    "rtgip2-autoframe/consumer.ts": {
+      "origin": "KenCarbiz/showroom-photo-polish:src/lib/af/rtgip2-autoframe/consumer.ts",
+      "sha256": "6144b7acd2639939a125e552b69ba3c69aa9482e0953116677760865ac4de77d"
+    }
+  }
+}

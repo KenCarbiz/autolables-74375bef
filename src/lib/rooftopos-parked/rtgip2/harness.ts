@@ -56,7 +56,11 @@ export function makeTarget<P>(
         protocol: "rtgip/2" as const,
         event_id: e.event_id,
         route: e.route,
+        source_app: e.source_app,
+        target_app: e.target_app,
         tenant_id: e.tenant_id,
+        rooftop_id: e.rooftop_id,
+        connection_id: v.delivery.connection_id,
         payload_sha256: e.payload_sha256,
         issuer: app,
         issued_at: now,
@@ -64,14 +68,12 @@ export function makeTarget<P>(
       const receipts: Receipt[] = [
         await signReceipt({ ...base, kind: "target_inbox", outcome: res.outcome }, receiptKey),
       ];
-      if (res.committed && res.outcome !== "quarantined") {
+      // A consumer_commit is only ever issued for a committed effect (C1): never for a held
+      // or quarantined event, including when a duplicate of one is redelivered.
+      if (res.committed && res.committed_outcome) {
         receipts.push(
           await signReceipt(
-            {
-              ...base,
-              kind: "consumer_commit",
-              outcome: res.outcome === "duplicate" ? "duplicate" : res.outcome,
-            },
+            { ...base, kind: "consumer_commit", outcome: res.committed_outcome },
             receiptKey,
           ),
         );
@@ -138,7 +140,11 @@ export class ReferenceGateway {
         kind: "gateway_admission",
         event_id: e.event_id,
         route: e.route,
+        source_app: e.source_app,
+        target_app: e.target_app,
         tenant_id: e.tenant_id,
+        rooftop_id: e.rooftop_id,
+        connection_id: v.delivery.connection_id,
         payload_sha256: e.payload_sha256,
         issuer: "gateway",
         outcome: "admitted",

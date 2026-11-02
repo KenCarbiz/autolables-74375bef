@@ -2,7 +2,7 @@
 // AutoLabels side of the shared rtgip/2 cross-app corpus (generated from the real
 // AutoLabels, AutoCurb and AutoFrame producers). Synthetic data only.
 import { describe, expect, it } from "vitest";
-import corpus from "../rtgip2/rtgip2-corpus.v1.json";
+import corpus from "../rtgip2/rtgip2-corpus.v2.json";
 import { MemoryNonceStore, verifyDelivery, type EnvelopeV2 } from "../rtgip2/protocol.ts";
 import { MemoryInbox } from "../rtgip2/delivery.ts";
 import { syntheticRegistry, T0, TENANT, ROOFTOP, VIN, INSTANCE, EPISODE } from "../rtgip2/fixtures.ts";
@@ -46,7 +46,8 @@ describe("AutoLabels against the shared rtgip/2 corpus", () => {
   it("rejects a tampered inbound entry and a replay of an entry under a different body", async () => {
     const reg = syntheticRegistry();
     const e = inbound[0];
-    const tampered = e.body.replace("audit-apr-1", "audit-apr-9");
+    const tampered = e.body.replace("corr-syn-1", "corr-syn-9");
+    expect(tampered).not.toBe(e.body);
     const v = await verifyDelivery(e.gateway_headers as Record<string, string>, tampered, { registry: reg, nonces: new MemoryNonceStore(), nowSec: corpus.t0, expectedSigner: "gateway", receiver: "autolabels" });
     expect(v).toEqual({ ok: false, reason: "bad_signature" });
     const wrongReceiver = await verifyDelivery(e.gateway_headers as Record<string, string>, e.body, { registry: reg, nonces: new MemoryNonceStore(), nowSec: corpus.t0, expectedSigner: "gateway", receiver: "autocurb" });
@@ -63,14 +64,49 @@ describe("AutoLabels producer guards", () => {
     expect(() => L.listingAvailabilityChanged(scope, sold, true, null, meta.occurred_at, meta, ["autoframe"])).toThrow("closed_episode_cannot_be_available");
     expect(() => L.pricePublished(scope, sold, { vehicle_selling_price_cents: 1, doc_fee_cents: 0, total_advertised_price_cents: 1, published_at: meta.occurred_at }, meta, ["autocurb"])).toThrow("closed_episode_has_no_price");
   });
-  it("requires a new episode and a resolved review for a returning vehicle", () => {
-    const open = { ...sold, episode_state: "open" as const };
-    expect(() => L.episodeOpened(scope, open, { opened_reason: "reappearance_reviewed", predecessor_episode_id: EPISODE, opened_at: meta.occurred_at, reappearance_review_resolved: true }, meta, ["autocurb"])).toThrow("returning_vehicle_needs_new_episode");
-    expect(() => L.episodeOpened(scope, { ...open, episode_id: "ep-syn-0001-2" }, { opened_reason: "reappearance_reviewed", predecessor_episode_id: EPISODE, opened_at: meta.occurred_at }, meta, ["autocurb"])).toThrow("reappearance_review_unresolved");
+  const STAFF = "44444444-4444-4444-8444-444444444444";
+  const prior: L.EpisodeRecord = { episode_id: EPISODE, tenant_id: TENANT, vin: VIN, instance_id: INSTANCE, opened_reason: "initial", previous_episode_id: null, custody_state: "delivered", status: "disposed" };
+  const back: L.EpisodeRecord = { episode_id: "ep-syn-0001-2", tenant_id: TENANT, vin: VIN, instance_id: INSTANCE, opened_reason: "reacquisition", previous_episode_id: EPISODE, custody_state: "in_stock", status: "active" };
+  const delivered: L.CustodyMilestoneRecord = { id: "ms-1", tenant_id: TENANT, episode_id: EPISODE, vin: VIN, milestone: "delivered", to_state: "delivered", occurred_at: "2027-01-10T15:00:00Z", source: "staff", confirmed_by: STAFF, corrects_id: null };
+  const review: L.ReappearanceReviewRecord = { id: "rv-1", tenant_id: TENANT, vin: VIN, prior_episode_id: EPISODE, status: "resolved", decision: "new_episode", decided_by: STAFF, resulting_episode_id: "ep-syn-0001-2" };
+  const returning = { ...sold, episode_id: "ep-syn-0001-2", episode_state: "open" as const };
+  const history = (over: Partial<L.EpisodeHistory> = {}): L.EpisodeHistory => ({ episode: back, vin_episodes: [prior], predecessor_milestones: [delivered], review, ...over });
+  const open = (h: L.EpisodeHistory, i: L.LabelsInstance = returning) => () => L.episodeOpened(scope, i, h, { opened_at: meta.occurred_at }, meta, ["autocurb"]);
+
+  it("H4: a returning vehicle opens only as a reviewed reacquisition of a closed predecessor", async () => {
+    const [out] = await open(history())();
+    expect(out!.envelope.payload).toMatchObject({ opened_reason: "reappearance_reviewed", predecessor_episode_id: EPISODE });
+    expect(open(history({ review: { ...review, status: "open", decision: null } }))).toThrow("reappearance_review_unresolved");
+    expect(open(history({ review: { ...review, decision: "restore_episode" } }))).toThrow("reappearance_review_unresolved");
+    expect(open(history({ review: { ...review, resulting_episode_id: "ep-other" } }))).toThrow("reappearance_review_unresolved");
+    expect(open(history({ review: { ...review, decided_by: null } }))).toThrow("reappearance_review_unresolved");
+    expect(open(history({ review: null }))).toThrow("reappearance_review_unresolved");
   });
-  it("refuses unverified sale milestones and unverified server scope", () => {
-    const open = { ...sold, episode_state: "open" as const };
-    expect(() => L.saleMilestone(scope, open, { milestone: "sold", recorded_at: meta.occurred_at, audit_ref: "a-1", verified_by_server: false }, meta, ["autocurb"])).toThrow("sale_milestone_unverified");
-    expect(() => L.identityRegistered({ ...scope, scope_verified_server_side: false as unknown as true }, open, { year: 2024, make: "S", model: "S", trim: null, registered_at: meta.occurred_at }, meta, ["autocurb"])).toThrow("scope_not_server_verified");
+  it("H4: the opening reason comes from the episode record, so a returning VIN cannot be relabelled as a fresh acquisition or trade-in", () => {
+    const relabel = history({ episode: { ...back, opened_reason: "initial", previous_episode_id: null } });
+    expect(open(relabel)).toThrow("prior_history_requires_reappearance_review");
+    expect(() => L.episodeOpened(scope, returning, relabel, { opened_at: meta.occurred_at, acquisition_kind: "trade_in" }, meta, ["autocurb"])).toThrow("prior_history_requires_reappearance_review");
+    expect(open(history({ episode: { ...back, opened_reason: "transfer_in", previous_episode_id: null } }))).toThrow("prior_history_requires_reappearance_review");
+    expect(open(history({ episode: { ...back, opened_reason: "restore" } }))).toThrow("restore_is_not_a_new_episode");
+  });
+  it("H4: the predecessor must really have ended, with an unreverted terminal milestone, and no other episode may be open", () => {
+    expect(open(history({ vin_episodes: [{ ...prior, custody_state: "in_stock", status: "active" }] }))).toThrow("another_episode_open");
+    expect(open(history({ vin_episodes: [{ ...prior, custody_state: "sold", status: "disposed" }] }))).toThrow("predecessor_not_closed");
+    expect(open(history({ predecessor_milestones: [] }))).toThrow("predecessor_closure_unverified");
+    expect(open(history({ predecessor_milestones: [delivered, { ...delivered, id: "ms-2", milestone: "restored", to_state: "in_stock", occurred_at: "2027-01-12T15:00:00Z" }] }))).toThrow("predecessor_closure_unverified");
+    expect(open(history({ vin_episodes: [] }))).toThrow("predecessor_not_in_history");
+    expect(open(history({ episode: { ...back, previous_episode_id: "ep-syn-0001-2" } }))).toThrow("returning_vehicle_needs_new_episode");
+    expect(open(history({ vin_episodes: [{ ...prior, tenant_id: "tnt-other" }] }))).toThrow("history_tenant_mismatch");
+  });
+  it("H5: sale milestones come from the milestone row: trusted source, confirmed, not superseded", async () => {
+    const o = { ...sold, episode_state: "open" as const };
+    const row: L.CustodyMilestoneRecord = { ...delivered, id: "ms-sold", milestone: "sold", to_state: "sold" };
+    const [out] = await L.saleMilestone(scope, o, row, [row], meta, ["autocurb"]);
+    expect(out!.envelope.payload).toMatchObject({ milestone: "sold", audit_ref: "ms-sold", verified: true });
+    expect(() => L.saleMilestone(scope, o, { ...row, source: "integration" }, [], meta, ["autocurb"])).toThrow("sale_milestone_unverified");
+    expect(() => L.saleMilestone(scope, o, { ...row, confirmed_by: null }, [], meta, ["autocurb"])).toThrow("sale_milestone_unverified");
+    expect(() => L.saleMilestone(scope, o, row, [row, { ...row, id: "ms-void", milestone: "sale_voided", corrects_id: "ms-sold" }], meta, ["autocurb"])).toThrow("sale_milestone_superseded");
+    expect(() => L.saleMilestone(scope, o, { ...row, tenant_id: "tnt-other" }, [], meta, ["autocurb"])).toThrow("milestone_scope_mismatch");
+    expect(() => L.identityRegistered({ ...scope, scope_verified_server_side: false as unknown as true }, o, { year: 2024, make: "S", model: "S", trim: null, registered_at: meta.occurred_at }, meta, ["autocurb"])).toThrow("scope_not_server_verified");
   });
 });

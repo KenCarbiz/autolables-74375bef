@@ -1,6 +1,5 @@
 // Shared producer helper: one source fact -> one sealed envelope per authorized target route.
 import {
-  deriveEventId,
   EVENT_CATALOG,
   ProtocolError,
   routeFor,
@@ -49,7 +48,6 @@ export async function produceFor(
     if (!purposes) throw new ProtocolError(`event_not_on_route:${route.id}`);
     const purpose = fact.purpose ?? purposes[0];
     if (!purpose || !purposes.includes(purpose)) throw new ProtocolError("purpose_not_allowed");
-    const event_id = await deriveEventId(fact.origin_event_id, route.id);
     const pr = fact.prev_revision;
     const prev: number | null | undefined =
       pr !== null && typeof pr === "object"
@@ -59,7 +57,7 @@ export async function produceFor(
     const sealed = await sealEnvelope({
       protocol: "rtgip/2",
       schema_version: 2,
-      event_id,
+      event_id: "",
       event_type: fact.event_type,
       source_app: fact.source,
       target_app: target,

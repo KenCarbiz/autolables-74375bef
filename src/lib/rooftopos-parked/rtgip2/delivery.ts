@@ -4,13 +4,16 @@
 // executable specification, not a substitute for the database transaction.
 
 import {
+  authorize,
   canonicalize,
   hmacHex,
   sha256Hex,
   timingSafeEqual,
+  MAX_SKEW_SECONDS,
   PROTOCOL,
   type AppId,
   type EnvelopeV2,
+  type Registry,
   type ServiceKey,
   type Signer,
   type VerifiedDelivery,
@@ -23,13 +26,27 @@ import {
 
 export type ReceiptKind = "gateway_admission" | "target_inbox" | "consumer_commit";
 export type InboxOutcome = "applied" | "duplicate" | "stale_ignored" | "held" | "quarantined";
+/** Outcomes that mean the consumer effect (or its deliberate no-op) is durably committed. */
+export type CommittedOutcome = "applied" | "stale_ignored";
+export const COMMITTED_OUTCOMES: ReadonlySet<string> = new Set(["applied", "stale_ignored"]);
+
+/** Outcomes each receipt kind may carry. A consumer_commit can only state a committed effect. */
+export const RECEIPT_OUTCOMES: Record<ReceiptKind, ReadonlySet<string>> = {
+  gateway_admission: new Set(["admitted"]),
+  target_inbox: new Set(["applied", "duplicate", "stale_ignored", "held", "quarantined"]),
+  consumer_commit: COMMITTED_OUTCOMES,
+};
 
 export interface Receipt {
   protocol: typeof PROTOCOL;
   kind: ReceiptKind;
   event_id: string;
   route: string;
+  source_app: AppId;
+  target_app: AppId;
   tenant_id: string;
+  rooftop_id: string;
+  connection_id: string;
   payload_sha256: string;
   issuer: Signer;
   outcome: InboxOutcome | "admitted";
@@ -40,31 +57,110 @@ export interface Receipt {
 
 type Unsigned = Omit<Receipt, "signature" | "key_id">;
 
-export async function signReceipt(r: Unsigned, key: ServiceKey): Promise<Receipt> {
-  if (key.owner !== r.issuer) throw new Error("receipt_issuer_key_mismatch");
-  const withKey = { ...r, key_id: key.key_id };
+/** Everything a receipt must match: the exact delivery, its connection and its issuer. */
+export interface ReceiptExpectation {
+  kind: ReceiptKind;
+  event_id: string;
+  route: string;
+  source_app: AppId;
+  target_app: AppId;
+  tenant_id: string;
+  rooftop_id: string;
+  connection_id: string;
+  payload_sha256: string;
+  issuer: Signer;
+}
+
+export function expectReceipt(
+  e: EnvelopeV2,
+  connection_id: string,
+  kind: ReceiptKind,
+): ReceiptExpectation {
   return {
-    ...withKey,
-    signature: await hmacHex(key.secret, `rtgip/2-receipt\n${canonicalize(withKey)}`),
+    kind,
+    event_id: e.event_id,
+    route: e.route,
+    source_app: e.source_app,
+    target_app: e.target_app,
+    tenant_id: e.tenant_id,
+    rooftop_id: e.rooftop_id,
+    connection_id,
+    payload_sha256: e.payload_sha256,
+    issuer: kind === "gateway_admission" ? "gateway" : e.target_app,
   };
 }
 
+/** The exact bytes a receipt signature covers (also what the SQL verifier recomputes). */
+export const receiptSigningJson = (r: Omit<Receipt, "signature">): string => canonicalize(r);
+const RECEIPT_DOMAIN = "rtgip/2-receipt\n";
+
+export async function signReceipt(r: Unsigned, key: ServiceKey): Promise<Receipt> {
+  if (key.owner !== r.issuer) throw new Error("receipt_issuer_key_mismatch");
+  if (key.dialect !== PROTOCOL) throw new Error("receipt_key_dialect_mismatch");
+  if (!key.connection_ids.includes(r.connection_id)) throw new Error("receipt_key_not_bound");
+  if (!RECEIPT_OUTCOMES[r.kind].has(r.outcome)) throw new Error("receipt_outcome_not_allowed");
+  const withKey = { ...r, key_id: key.key_id };
+  return {
+    ...withKey,
+    signature: await hmacHex(key.secret, RECEIPT_DOMAIN + receiptSigningJson(withKey)),
+  };
+}
+
+const BOUND_FIELDS = [
+  "event_id",
+  "route",
+  "source_app",
+  "target_app",
+  "tenant_id",
+  "rooftop_id",
+  "connection_id",
+  "payload_sha256",
+] as const;
+
+/**
+ * Verify a receipt against the delivery it claims to acknowledge. Fails closed on any
+ * difference in event, route, tenant, rooftop, connection or payload hash, on an outcome
+ * the receipt kind may not carry, and on a key that is unknown, of another dialect,
+ * revoked, outside its validity window, not owned by the issuer or not bound to the
+ * connection. The connection itself must still be active and grant the rooftop.
+ */
 export async function verifyReceipt(
   r: Receipt | undefined,
-  expect: { kind: ReceiptKind; event_id: string; payload_sha256: string; issuer: Signer },
-  keys: readonly ServiceKey[],
+  expect: ReceiptExpectation,
+  reg: Registry,
+  nowSec: number,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   if (!r) return { ok: false, reason: "ack_missing" };
   if (r.protocol !== PROTOCOL || r.kind !== expect.kind)
     return { ok: false, reason: "ack_wrong_kind" };
-  if (r.event_id !== expect.event_id || r.payload_sha256 !== expect.payload_sha256)
-    return { ok: false, reason: "ack_wrong_event" };
+  for (const f of BOUND_FIELDS)
+    if (r[f] !== expect[f]) return { ok: false, reason: `ack_wrong_${f}` };
   if (r.issuer !== expect.issuer) return { ok: false, reason: "ack_wrong_issuer" };
-  const key = keys.find((k) => k.key_id === r.key_id);
-  if (!key || key.owner !== r.issuer || key.status === "revoked")
-    return { ok: false, reason: "ack_bad_key" };
+  if (!RECEIPT_OUTCOMES[r.kind].has(r.outcome))
+    return { ok: false, reason: "ack_outcome_not_allowed" };
+  if (!Number.isSafeInteger(r.issued_at) || r.issued_at > nowSec + MAX_SKEW_SECONDS)
+    return { ok: false, reason: "ack_issued_in_future" };
+  const key = reg.keys.find((k) => k.key_id === r.key_id);
+  if (!key || key.owner !== r.issuer) return { ok: false, reason: "ack_bad_key" };
+  if (key.dialect !== PROTOCOL) return { ok: false, reason: "ack_key_dialect_mismatch" };
+  if (key.status === "revoked") return { ok: false, reason: "ack_key_revoked" };
+  if (r.issued_at < key.not_before || r.issued_at > key.not_after)
+    return { ok: false, reason: "ack_key_outside_validity" };
+  if (!key.connection_ids.includes(r.connection_id))
+    return { ok: false, reason: "ack_key_not_bound_to_connection" };
+  const conn = reg.connections.find((c) => c.connection_id === r.connection_id);
+  if (
+    !conn ||
+    conn.source_app !== r.source_app ||
+    conn.target_app !== r.target_app ||
+    conn.tenant_id !== r.tenant_id ||
+    !conn.rooftop_ids.includes(r.rooftop_id)
+  )
+    return { ok: false, reason: "ack_connection_mismatch" };
+  if (conn.status !== "active") return { ok: false, reason: "ack_connection_inactive" };
   const { signature, ...rest } = r;
-  const expected = await hmacHex(key.secret, `rtgip/2-receipt\n${canonicalize(rest)}`);
+  if (typeof signature !== "string") return { ok: false, reason: "ack_bad_signature" };
+  const expected = await hmacHex(key.secret, RECEIPT_DOMAIN + receiptSigningJson(rest));
   if (!timingSafeEqual(expected, signature)) return { ok: false, reason: "ack_bad_signature" };
   return { ok: true };
 }
@@ -193,18 +289,23 @@ export class MemoryOutbox<S> {
   }
 
   /**
-   * Process one leased row. The row only advances when the Gateway admission receipt and
-   * the target receipts verify against the exact event and payload hash.
+   * Process one leased row. The connection is re-authorized at send time (a revoked or
+   * suspended connection fails closed), and the row only advances on receipts that verify
+   * against the exact delivery: admission, then the target inbox, then a consumer commit
+   * whose outcome states a committed effect consistent with the inbox outcome.
    */
   async deliver(
     r: OutboxRow,
     worker: string,
     transport: Transport,
-    keys: readonly ServiceKey[],
+    reg: Registry,
     now: number,
     rand?: () => number,
   ): Promise<OutboxState> {
     if (r.lease_owner !== worker || r.state !== "in_flight") return r.state;
+    const az = authorize(r.envelope, reg);
+    if ("reason" in az) return this.fail(r, `authorization:${az.reason}`, now, rand);
+    const conn = az.connection.connection_id;
     let res: TransportResult;
     try {
       res = await transport(r);
@@ -213,46 +314,34 @@ export class MemoryOutbox<S> {
     }
     if (res.http_status < 200 || res.http_status >= 300)
       return this.fail(r, `http_${res.http_status}`, now, rand);
-    const sha = r.envelope.payload_sha256;
     const find = (k: ReceiptKind) => res.receipts?.find((x) => x.kind === k);
-    const adm = await verifyReceipt(
-      find("gateway_admission"),
-      { kind: "gateway_admission", event_id: r.event_id, payload_sha256: sha, issuer: "gateway" },
-      keys,
-    );
+    const check = (k: ReceiptKind) =>
+      verifyReceipt(find(k), expectReceipt(r.envelope, conn, k), reg, now);
+    const adm = await check("gateway_admission");
     if ("reason" in adm) return this.fail(r, adm.reason, now, rand);
     r.receipts.push(find("gateway_admission")!);
     this.move(r, "gateway_admitted", now, "admission_verified");
-    const target = r.envelope.target_app;
     const inbox = find("target_inbox");
-    const inboxOk = await verifyReceipt(
-      inbox,
-      { kind: "target_inbox", event_id: r.event_id, payload_sha256: sha, issuer: target },
-      keys,
-    );
+    const inboxOk = await check("target_inbox");
     if ("reason" in inboxOk) return this.fail(r, inboxOk.reason, now, rand);
     r.receipts.push(inbox!);
+    const commit = find("consumer_commit");
     if (inbox!.outcome === "quarantined") {
+      if (commit) return this.fail(r, "ack_commit_contradicts_inbox", now, rand);
       this.release(r);
       this.move(r, "target_quarantined", now, "target_quarantined");
       return r.state;
     }
     this.move(r, "target_persisted", now, `inbox:${inbox!.outcome}`);
-    const commit = find("consumer_commit");
-    const commitOk = await verifyReceipt(
-      commit,
-      { kind: "consumer_commit", event_id: r.event_id, payload_sha256: sha, issuer: target },
-      keys,
-    );
-    if ("reason" in commitOk) {
-      // Held or still-uncommitted at target: keep retrying; target answers idempotently.
-      return this.fail(
-        r,
-        inbox!.outcome === "held" ? "target_held_awaiting_predecessor" : commitOk.reason,
-        now,
-        rand,
-      );
+    if (inbox!.outcome === "held") {
+      // Held at target: no effect exists yet, so no commit may be accepted. Retry later.
+      if (commit) return this.fail(r, "ack_commit_contradicts_inbox", now, rand);
+      return this.fail(r, "target_held_awaiting_predecessor", now, rand);
     }
+    const commitOk = await check("consumer_commit");
+    if ("reason" in commitOk) return this.fail(r, commitOk.reason, now, rand);
+    if (inbox!.outcome !== "duplicate" && commit!.outcome !== inbox!.outcome)
+      return this.fail(r, "ack_commit_contradicts_inbox", now, rand);
     r.receipts.push(commit!);
     this.release(r);
     this.move(r, "consumer_committed", now, `commit:${commit!.outcome}`);
@@ -310,7 +399,27 @@ export type ConsumerEffect<P> = (
 
 export const inboxKey = (e: EnvelopeV2) => `${e.tenant_id}|${e.origin.app}|${e.event_id}`;
 export const watermarkKey = (e: EnvelopeV2) =>
-  `${e.tenant_id}|${e.rooftop_id}|${e.origin.app}|${e.aggregate.domain}|${e.aggregate.type}|${e.aggregate.id}`;
+  [
+    e.tenant_id,
+    e.rooftop_id,
+    e.route,
+    e.origin.app,
+    e.aggregate.domain,
+    e.aggregate.type,
+    e.aggregate.id,
+    e.vehicle.instance_id,
+    // Instance-level identity spans episodes; every other chain is scoped to its episode so
+    // a returning vehicle's new episode can never be suppressed by its prior episode.
+    e.aggregate.type === "vehicle_instance" ? "*" : e.vehicle.episode_id,
+  ].join("|");
+
+export interface ReceiveResult {
+  outcome: InboxOutcome;
+  reason: string | null;
+  committed: boolean;
+  /** The committed outcome a consumer_commit receipt may state, or null when none may be sent. */
+  committed_outcome: CommittedOutcome | null;
+}
 
 export class MemoryInbox<P> {
   rows = new Map<string, InboxRow>();
@@ -327,11 +436,7 @@ export class MemoryInbox<P> {
    * inbox row, watermark, consumer effect, and draining of held successors. Any throw
    * leaves the inbox, watermark and projection exactly as they were.
    */
-  receive(
-    d: VerifiedDelivery,
-    now: number,
-    crashAfterEffect = false,
-  ): { outcome: InboxOutcome; reason: string | null; committed: boolean } {
+  receive(d: VerifiedDelivery, now: number, crashAfterEffect = false): ReceiveResult {
     const e = d.envelope;
     if (e.target_app !== this.app) throw new Error("wrong_destination");
     const key = inboxKey(e);
@@ -341,12 +446,28 @@ export class MemoryInbox<P> {
         const qkey = `${key}|conflict|${e.payload_sha256}`;
         if (!this.rows.has(qkey))
           this.rows.set(qkey, this.row(qkey, e, "quarantined", "conflicting_duplicate", now));
-        return { outcome: "quarantined", reason: "conflicting_duplicate", committed: false };
+        return {
+          outcome: "quarantined",
+          reason: "conflicting_duplicate",
+          committed: false,
+          committed_outcome: null,
+        };
       }
+      // A redelivery repeats the original decision. Only a committed original (applied or
+      // stale_ignored) may be acknowledged as committed; a held or quarantined original
+      // stays uncommitted however many times it is redelivered.
+      if (prior.committed_at !== null && COMMITTED_OUTCOMES.has(prior.outcome))
+        return {
+          outcome: "duplicate",
+          reason: `duplicate_of:${prior.outcome}`,
+          committed: true,
+          committed_outcome: prior.outcome as CommittedOutcome,
+        };
       return {
-        outcome: "duplicate",
-        reason: prior.outcome,
-        committed: prior.committed_at !== null || prior.outcome !== "held",
+        outcome: prior.outcome,
+        reason: `duplicate_of:${prior.outcome}`,
+        committed: false,
+        committed_outcome: null,
       };
     }
     const draftRows = new Map(this.rows);
@@ -390,12 +511,17 @@ export class MemoryInbox<P> {
     wm: Map<string, number>,
     proj: P,
     fx: Map<string, number>,
-  ) {
+  ): ReceiveResult {
     const wk = watermarkKey(e);
     const mark = wm.get(wk) ?? null;
     if (mark !== null && e.aggregate.revision <= mark) {
       rows.set(key, this.row(key, e, "stale_ignored", `watermark:${mark}`, now));
-      return { outcome: "stale_ignored" as const, reason: `watermark:${mark}`, committed: true };
+      return {
+        outcome: "stale_ignored" as const,
+        reason: `watermark:${mark}`,
+        committed: true,
+        committed_outcome: "stale_ignored" as const,
+      };
     }
     if (e.aggregate.prev_revision !== mark) {
       rows.set(
@@ -406,12 +532,18 @@ export class MemoryInbox<P> {
         outcome: "held" as const,
         reason: `awaiting_revision:${e.aggregate.prev_revision}`,
         committed: false,
+        committed_outcome: null,
       };
     }
     const res = this.effect(proj, e);
     if ("reason" in res) {
       rows.set(key, this.row(key, e, "quarantined", res.reason, now));
-      return { outcome: "quarantined" as const, reason: res.reason, committed: false };
+      return {
+        outcome: "quarantined" as const,
+        reason: res.reason,
+        committed: false,
+        committed_outcome: null,
+      };
     }
     rows.set(key, this.row(key, e, "applied", null, now));
     wm.set(wk, e.aggregate.revision);
@@ -424,7 +556,12 @@ export class MemoryInbox<P> {
       this.applyInto(r.envelope, r.key, now, rows, wm, proj, fx);
       break;
     }
-    return { outcome: "applied" as const, reason: null, committed: true };
+    return {
+      outcome: "applied" as const,
+      reason: null,
+      committed: true,
+      committed_outcome: "applied" as const,
+    };
   }
 
   /** Release a quarantined row for re-application after an operator fix (audited by caller). */

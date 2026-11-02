@@ -244,6 +244,8 @@ export const EVENT_CATALOG: Record<EventType, EventSpec> = {
       media_order: f("int"),
       shot_type: f("ref"),
       approved_at: f("iso"),
+      /** Required by consumers when this media was previously revoked (audited reinstatement). */
+      reinstatement_audit_ref: f("ref", { optional: true }),
     },
   },
   "media.revoked": {
@@ -803,20 +805,60 @@ export async function payloadHash(payload: Record<string, unknown>): Promise<str
   return sha256Hex(canonicalize(payload));
 }
 
+export const EVENT_ID_DERIVATION = "rtgip/2-event/v2" as const;
+
+export interface EventIdScope {
+  source_app: AppId;
+  tenant_id: string;
+  rooftop_id: string;
+  instance_id: string;
+  episode_id: string;
+  origin_event_id: string;
+  route: RouteId | string;
+}
+
 /**
- * Deterministic per-route event id derived from the origin event, so a producer that
- * rebuilds an event after a crash produces the same id (and the outbox dedupes it).
+ * Deterministic event id. Version 2 binds the id to the source namespace, tenant, rooftop,
+ * vehicle instance and episode as well as the origin event and route, so the same origin id
+ * reused by another dealership, rooftop or episode can never collide. The canonical array
+ * encoding keeps the fields unambiguous. A producer that rebuilds an event after a crash
+ * gets the same id, so the outbox dedupes it.
  */
-export async function deriveEventId(originEventId: string, route: RouteId): Promise<string> {
-  const h = await sha256Hex(`rtgip/2-event\n${originEventId}\n${route}`);
+export async function deriveEventId(s: EventIdScope): Promise<string> {
+  const h = await sha256Hex(
+    canonicalize([
+      EVENT_ID_DERIVATION,
+      s.source_app,
+      s.tenant_id,
+      s.rooftop_id,
+      s.instance_id,
+      s.episode_id,
+      s.origin_event_id,
+      s.route,
+    ]),
+  );
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-5${h.slice(13, 16)}-${((parseInt(h.charAt(16), 16) & 3) | 8).toString(16)}${h.slice(17, 20)}-${h.slice(20, 32)}`;
 }
 
-/** Fill payload_sha256 and return the canonical body bytes for an envelope. */
+export const eventIdScopeOf = (e: Omit<EnvelopeV2, "payload_sha256">): EventIdScope => ({
+  source_app: e.source_app,
+  tenant_id: e.tenant_id,
+  rooftop_id: e.rooftop_id,
+  instance_id: e.vehicle.instance_id,
+  episode_id: e.vehicle.episode_id,
+  origin_event_id: e.origin.event_id,
+  route: e.route,
+});
+
+/**
+ * Fill payload_sha256 and the derived event id, and return the canonical body bytes. Any
+ * caller-supplied event_id is replaced: ids are always derived from the envelope scope.
+ */
 export async function sealEnvelope(
   e: Omit<EnvelopeV2, "payload_sha256">,
 ): Promise<{ envelope: EnvelopeV2; body: string }> {
-  const envelope = { ...e, payload_sha256: await payloadHash(e.payload) } as EnvelopeV2;
+  const event_id = await deriveEventId(eventIdScopeOf(e));
+  const envelope = { ...e, event_id, payload_sha256: await payloadHash(e.payload) } as EnvelopeV2;
   const v = validateEnvelope(envelope);
   if ("errors" in v) throw new ProtocolError(`invalid_envelope:${v.errors.join(",")}`);
   return { envelope, body: canonicalize(envelope) };
@@ -1091,6 +1133,8 @@ export async function verifyDelivery(
   if (scopeOf(e) !== scope) return { ok: false, reason: "scope_mismatch" };
   if ((await payloadHash(e.payload)) !== e.payload_sha256)
     return { ok: false, reason: "payload_hash_mismatch" };
+  if ((await deriveEventId(eventIdScopeOf(e))) !== e.event_id)
+    return { ok: false, reason: "event_id_not_derived" };
   if (ctx.receiver && e.target_app !== ctx.receiver)
     return { ok: false, reason: "wrong_destination" };
   if (signer !== "gateway" && signer !== e.source_app)
@@ -1196,6 +1240,25 @@ export async function verifyLegacy(
   return { ok: true, key, body, replay_key: replayKey };
 }
 
+/** Tenant/rooftop/source claims in a legacy body (flat or AutoFrame's nested source.app). */
+export function legacyScopeClaims(
+  body: unknown,
+): { tenant_id: string; rooftop_id: string; source_app: string | null } | null {
+  if (!isObj(body)) return null;
+  const t = body["tenant_id"];
+  const r = body["rooftop_id"];
+  if (typeof t !== "string" || typeof r !== "string" || !t || !r) return null;
+  const src = body["source"];
+  const flat = body["source_app"];
+  const source_app =
+    typeof flat === "string"
+      ? flat
+      : isObj(src) && typeof src["app"] === "string"
+        ? (src["app"] as string)
+        : null;
+  return { tenant_id: t, rooftop_id: r, source_app };
+}
+
 export type LegacyMapper = (
   body: unknown,
   source: AppId,
@@ -1228,6 +1291,14 @@ export async function translateAndResign(
   const draft = mapper(lv.body, source);
   if (!draft) return { ok: false, reason: "unmappable_event" };
   if (draft.source_app !== source || draft.origin.app !== source)
+    return { ok: false, reason: "source_impersonation" };
+  // The mapper may only restate what the authenticated legacy message claimed: its tenant,
+  // rooftop and (when present) source app must be carried over unchanged.
+  const claims = legacyScopeClaims(lv.body);
+  if (!claims) return { ok: false, reason: "legacy_scope_claims_missing" };
+  if (claims.tenant_id !== draft.tenant_id || claims.rooftop_id !== draft.rooftop_id)
+    return { ok: false, reason: "legacy_scope_mismatch" };
+  if (claims.source_app !== null && claims.source_app !== source)
     return { ok: false, reason: "source_impersonation" };
   let sealed: { envelope: EnvelopeV2; body: string };
   try {
