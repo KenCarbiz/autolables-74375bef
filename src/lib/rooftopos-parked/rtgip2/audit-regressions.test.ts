@@ -16,6 +16,7 @@ import {
 } from "./protocol.ts";
 import {
   expectReceipt,
+  receiptContext,
   MemoryInbox,
   MemoryOutbox,
   receiptSigningJson,
@@ -236,7 +237,7 @@ describe("C1: a quarantined or held event never receives a successful commit ack
           `rtgip/2-receipt\n${receiptSigningJson(unsigned)}`,
         ),
       };
-      expect(await verifyReceipt(forged, ex, reg, T0)).toEqual({
+      expect(await verifyReceipt(forged, ex, reg, T0, receiptContext(a.envelope, 0))).toEqual({
         ok: false,
         reason: "ack_outcome_not_allowed",
       });
@@ -360,12 +361,12 @@ describe("H2: receipts are bound to the exact delivery, connection and a valid k
       ...(unsigned as Omit<Receipt, "signature">),
       signature: await hmacHex(key.secret, `rtgip/2-receipt\n${receiptSigningJson(toSign)}`),
     };
-    return { r, ex, reg };
+    return { r, ex, reg, ctx: receiptContext(a.envelope, 0) };
   }
 
   it("accepts a correctly bound receipt", async () => {
-    const { r, ex, reg } = await signed();
-    expect(await verifyReceipt(r, ex, reg, T0)).toEqual({ ok: true });
+    const { r, ex, reg, ctx } = await signed();
+    expect(await verifyReceipt(r, ex, reg, T0, ctx)).toEqual({ ok: true });
   });
 
   it.each([
@@ -380,8 +381,8 @@ describe("H2: receipts are bound to the exact delivery, connection and a valid k
   ] as const)(
     "refuses a validly signed receipt with a different %s",
     async (field, value, reason) => {
-      const { r, ex, reg } = await signed({ [field]: value } as Partial<Receipt>);
-      expect(await verifyReceipt(r, ex, reg, T0)).toEqual({ ok: false, reason });
+      const { r, ex, reg, ctx } = await signed({ [field]: value } as Partial<Receipt>);
+      expect(await verifyReceipt(r, ex, reg, T0, ctx)).toEqual({ ok: false, reason });
     },
   );
 
@@ -393,17 +394,17 @@ describe("H2: receipts are bound to the exact delivery, connection and a valid k
       keys: reg.keys.map((k) => (k.key_id === "ac-dev-1" ? { ...k, status: "revoked" } : k)),
     };
     let s = await signed({}, "ac-dev-1", revoked);
-    expect(await verifyReceipt(s.r, s.ex, revoked, T0)).toEqual({
+    expect(await verifyReceipt(s.r, s.ex, revoked, T0, s.ctx)).toEqual({
       ok: false,
       reason: "ack_key_revoked",
     });
     s = await signed({ issued_at: ac.not_after + 1 }, "ac-dev-1", reg);
-    expect(await verifyReceipt(s.r, s.ex, reg, ac.not_after + 1)).toEqual({
+    expect(await verifyReceipt(s.r, s.ex, reg, ac.not_after + 1, s.ctx)).toEqual({
       ok: false,
       reason: "ack_key_outside_validity",
     });
     s = await signed({}, "ac-legacy-1", reg);
-    expect(await verifyReceipt(s.r, s.ex, reg, T0)).toEqual({
+    expect(await verifyReceipt(s.r, s.ex, reg, T0, s.ctx)).toEqual({
       ok: false,
       reason: "ack_key_dialect_mismatch",
     });
@@ -425,7 +426,7 @@ describe("H2: receipts are bound to the exact delivery, connection and a valid k
       ),
     };
     let s = await signed({}, "ac-dev-1", unbound);
-    expect(await verifyReceipt(s.r, s.ex, unbound, T0)).toEqual({
+    expect(await verifyReceipt(s.r, s.ex, unbound, T0, s.ctx)).toEqual({
       ok: false,
       reason: "ack_key_not_bound_to_connection",
     });
@@ -436,12 +437,12 @@ describe("H2: receipts are bound to the exact delivery, connection and a valid k
       ),
     };
     s = await signed({}, "ac-dev-1", suspended);
-    expect(await verifyReceipt(s.r, s.ex, suspended, T0)).toEqual({
+    expect(await verifyReceipt(s.r, s.ex, suspended, T0, s.ctx)).toEqual({
       ok: false,
       reason: "ack_connection_inactive",
     });
     s = await signed({ issued_at: T0 + 3600 }, "ac-dev-1", reg);
-    expect(await verifyReceipt(s.r, s.ex, reg, T0)).toEqual({
+    expect(await verifyReceipt(s.r, s.ex, reg, T0, s.ctx)).toEqual({
       ok: false,
       reason: "ack_issued_in_future",
     });

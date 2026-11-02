@@ -26,6 +26,11 @@ trap cleanup EXIT
 "${PSQL[@]}" -c "CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN BYPASSRLS;
   CREATE SCHEMA vault; CREATE TABLE vault.decrypted_secrets (name text PRIMARY KEY, decrypted_secret text NOT NULL);
   REVOKE ALL ON SCHEMA vault FROM PUBLIC;"
+# Hosted Supabase grants new tables, sequences and functions to the API roles by default; the
+# proposal must revoke them itself rather than rely on a clean cluster.
+"${PSQL[@]}" -c "ALTER DEFAULT PRIVILEGES GRANT EXECUTE ON FUNCTIONS TO anon, authenticated, service_role;
+  ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO anon, authenticated, service_role;
+  ALTER DEFAULT PRIVILEGES GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;"
 "${PSQL[@]}" -f "$SQL_FILE" >/dev/null 2>&1 || { "${PSQL[@]}" -f "$SQL_FILE"; exit 1; }
 # Apply twice: the proposal must be idempotent.
 "${PSQL[@]}" -f "$SQL_FILE" >/dev/null 2>&1 || { echo "FAIL  second apply is not idempotent"; exit 1; }
@@ -134,14 +139,13 @@ check "no rtgip function is executable by PUBLIC, anon, authenticated or service
    AND NOT EXISTS (SELECT 1 FROM pg_proc q, aclexplode(q.proacl) a WHERE q.pronamespace = n.oid AND a.grantee = 0)"
 check "each duty role can execute exactly its own functions and nothing else" \
   "WITH want(role, fn) AS (VALUES ('rtgip_outbox_writer','outbox_enqueue'),('rtgip_dispatcher','outbox_claim'),('rtgip_dispatcher','outbox_advance'),
-     ('rtgip_dispatcher','outbox_fail'),('rtgip_inbox_receiver','claim_nonce'),('rtgip_inbox_receiver','inbox_receive'),
-     ('rtgip_inbox_receiver','inbox_quarantine'),('rtgip_operator','purge_expired_nonces')),
+     ('rtgip_dispatcher','outbox_fail'),('rtgip_inbox_receiver','inbox_admit'),('rtgip_operator','purge_expired_nonces')),
    got AS (SELECT r AS role, p.proname AS fn FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace,
      unnest(ARRAY['rtgip_outbox_writer','rtgip_dispatcher','rtgip_inbox_receiver','rtgip_operator']) r
      WHERE n.nspname = 'rtgip' AND has_function_privilege(r, p.oid, 'EXECUTE'))
    SELECT NOT EXISTS (SELECT * FROM want EXCEPT SELECT * FROM got) AND NOT EXISTS (SELECT * FROM got EXCEPT SELECT * FROM want)"
 check "every rtgip function pins an empty search_path; every callable one is SECURITY DEFINER" \
-  "SELECT bool_and(p.proconfig @> ARRAY['search_path=\"\"']) AND bool_and(p.prosecdef OR p.prorettype = 'trigger'::regtype OR p.proname IN ('local_app','watermark_key'))
+  "SELECT bool_and(p.proconfig @> ARRAY['search_path=\"\"']) AND bool_and(p.prosecdef OR p.prorettype = 'trigger'::regtype OR p.proname IN ('local_app','watermark_key','canonical_json','derive_event_id','ct_equal','deliverable_reason'))
    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'rtgip'"
 check "no duty role can write any rtgip table directly" \
   "SELECT bool_and(NOT has_table_privilege(r, c.oid, 'INSERT') AND NOT has_table_privilege(r, c.oid, 'UPDATE') AND NOT has_table_privilege(r, c.oid, 'DELETE'))
@@ -151,7 +155,15 @@ check "no duty role can write any rtgip table directly" \
 expect_error "the dispatcher cannot read the outbox table directly" "$(as rtgip_dispatcher "SELECT count(*) FROM rtgip.outbox")" "permission denied"
 expect_error "the dispatcher cannot enqueue" "$(as rtgip_dispatcher "SELECT rtgip.outbox_enqueue('{}')")" "permission denied"
 expect_error "the outbox writer cannot advance" "$(as rtgip_outbox_writer "$ADV(gen_random_uuid(), 'w', '{}', '')")" "permission denied"
-expect_error "the outbox writer cannot receive" "$(as rtgip_outbox_writer "SELECT * FROM rtgip.inbox_receive('{}', 'autocurb')")" "permission denied"
+expect_error "the outbox writer cannot admit inbound deliveries" "$(as rtgip_outbox_writer "SELECT * FROM rtgip.inbox_admit('{}', '{}')")" "permission denied"
+expect_error "the inbox receiver cannot call the inbox engine directly (no admission bypass)" "$(as rtgip_inbox_receiver "SELECT * FROM rtgip.inbox_receive('{}', 'autocurb')")" "permission denied"
+expect_error "the inbox receiver cannot claim nonces directly" "$(as rtgip_inbox_receiver "SELECT rtgip.claim_nonce('k', 'nonce_direct_0123456789', repeat('a',64), now())")" "permission denied"
+expect_error "the inbox receiver cannot write inbox rows directly" "$(as rtgip_inbox_receiver "INSERT INTO rtgip.inbox (tenant_id, origin_app, event_id, wm_key, revision, payload_sha256, outcome, envelope) VALUES ('t','autolabels',gen_random_uuid(),'k',1,repeat('a',64),'applied','{}')")" "permission denied"
+expect_error "the inbox receiver cannot write admissions directly" "$(as rtgip_inbox_receiver "INSERT INTO rtgip.admissions (key_id, nonce, body_sha256, event_id, connection_id, signer, outcome) VALUES ('k','n',repeat('a',64),gen_random_uuid(),'c','gateway','applied')")" "permission denied"
+expect_error "service_role cannot call inbox_admit" "$(as service_role "SELECT * FROM rtgip.inbox_admit('{}', '{}')")" "permission denied"
+expect_error "authenticated cannot call inbox_admit" "$(as authenticated "SELECT * FROM rtgip.inbox_admit('{}', '{}')")" "permission denied"
+check "the route catalog is loaded for the six three-app routes only" \
+  "SELECT count(DISTINCT route) = 6 AND NOT bool_or(route LIKE '%autofilm%') FROM rtgip.event_catalog"
 expect_error "the inbox receiver cannot advance outbox rows" "$(as rtgip_inbox_receiver "$ADV(gen_random_uuid(), 'w', '{}', '')")" "permission denied"
 expect_error "the operator cannot change outbox rows" "$(as rtgip_operator "UPDATE rtgip.outbox SET state = 'pending'")" "permission denied"
 expect_error "the operator cannot read Vault" "$(as rtgip_operator "SELECT * FROM vault.decrypted_secrets")" "permission denied"
@@ -173,6 +185,8 @@ expect_error "a mismatched route is refused" \
 
 echo "== C2: receipt verification and the transition table (cross-language vectors)"
 "${PSQL[@]}" -c "$(as rtgip_dispatcher "SELECT count(*) FROM rtgip.outbox_claim('w1', 10, 300)")" >/dev/null
+# The committed vectors were signed at 2026-01-01; this attempt is recorded as starting then.
+"${PSQL[@]}" -c "UPDATE rtgip.outbox SET attempt_started_at = to_timestamp(1767225600) WHERE event_id = $FIXID"
 V() { echo "(SELECT signing_text FROM rtgip_test.vec('$1')), (SELECT signature FROM rtgip_test.vec('$1'))"; }
 R() { echo "(SELECT signing_text FROM rtgip_test.receipt($1)), (SELECT signature FROM rtgip_test.receipt($1))"; }
 D() { "${PSQL[@]}" -c "$(as rtgip_dispatcher "$1")" 2>&1; }
@@ -202,6 +216,18 @@ expect_value "a key not bound to the pinned connection is refused" "$(as rtgip_d
 "${PSQL[@]}" -c "UPDATE rtgip.signing_keys SET connection_ids = (SELECT ARRAY(SELECT jsonb_array_elements_text(k->'connection_ids')) FROM rtgip_test.fix, jsonb_array_elements(doc->'keys') k WHERE k->>'key_id' = 'gw-dev-1') WHERE key_id = 'gw-dev-1';
   UPDATE rtgip.connections SET status = 'suspended'"
 expect_value "a receipt on a suspended connection is refused" "$(as rtgip_dispatcher "$ADV($FIXID, 'w1', $(V gateway_admission:admitted))")" "rejected:ack_connection_inactive"
+"${PSQL[@]}" -c "UPDATE rtgip.connections SET status = 'active', producer_enabled = false"
+expect_value "a receipt after the producer side was disabled is refused" "$(as rtgip_dispatcher "$ADV($FIXID, 'w1', $(V gateway_admission:admitted))")" "rejected:ack_producer_disabled"
+"${PSQL[@]}" -c "UPDATE rtgip.connections SET producer_enabled = true, reader_enabled = false"
+expect_value "a receipt after the reader side was disabled is refused" "$(as rtgip_dispatcher "$ADV($FIXID, 'w1', $(V gateway_admission:admitted))")" "rejected:ack_reader_disabled"
+"${PSQL[@]}" -c "UPDATE rtgip.connections SET reader_enabled = true, event_types = array_remove(event_types, (SELECT (doc#>>'{event,body}')::jsonb->>'event_type' FROM rtgip_test.fix))"
+expect_value "a receipt after the event type grant was removed is refused" "$(as rtgip_dispatcher "$ADV($FIXID, 'w1', $(V gateway_admission:admitted))")" "rejected:ack_event_not_granted"
+"${PSQL[@]}" -c "UPDATE rtgip.connections SET event_types = event_types || (SELECT (doc#>>'{event,body}')::jsonb->>'event_type' FROM rtgip_test.fix), purposes = '{media_reference}'"
+expect_value "a receipt after the purpose grant was removed is refused" "$(as rtgip_dispatcher "$ADV($FIXID, 'w1', $(V gateway_admission:admitted))")" "rejected:ack_purpose_not_granted"
+"${PSQL[@]}" -c "UPDATE rtgip.connections c SET purposes = ARRAY(SELECT jsonb_array_elements_text(x->'purposes')) FROM rtgip_test.fix, jsonb_array_elements(doc->'connections') x WHERE x->>'connection_id' = c.connection_id;
+  UPDATE rtgip.outbox SET attempt_started_at = now() WHERE event_id = $FIXID"
+expect_value "a receipt issued before the current attempt started (old receipt replay) is refused" "$(as rtgip_dispatcher "$ADV($FIXID, 'w1', $(V gateway_admission:admitted))")" "rejected:ack_predates_attempt"
+"${PSQL[@]}" -c "UPDATE rtgip.outbox SET attempt_started_at = to_timestamp(1767225600) WHERE event_id = $FIXID; UPDATE rtgip.connections SET status = 'suspended'"
 "${PSQL[@]}" -c "UPDATE rtgip.connections SET status = 'active', rooftop_ids = '{rf-nw-02}'"
 expect_value "a connection that no longer grants the rooftop is refused" "$(as rtgip_dispatcher "$ADV($FIXID, 'w1', $(V gateway_admission:admitted))")" "rejected:ack_connection_mismatch"
 "${PSQL[@]}" -c "UPDATE rtgip.connections SET rooftop_ids = '{rf-nw-01}'; DELETE FROM vault.decrypted_secrets WHERE name = 'rtgip:gw-dev-1'"
@@ -209,7 +235,7 @@ expect_value "a key whose Vault secret is missing fails closed" "$(as rtgip_disp
 "${PSQL[@]}" -c "INSERT INTO vault.decrypted_secrets SELECT k->>'secret_ref', k->>'dev_secret' FROM rtgip_test.fix, jsonb_array_elements(doc->'keys') k WHERE k->>'key_id' = 'gw-dev-1'"
 check "no rejected receipt changed state or was stored; each rejection is audited" \
   "SELECT (SELECT state FROM rtgip.outbox WHERE event_id = $FIXID) = 'in_flight' AND NOT EXISTS (SELECT 1 FROM rtgip.receipts)
-     AND (SELECT count(*) FROM rtgip.audit_log WHERE action = 'receipt_rejected') >= 20"
+     AND (SELECT count(*) FROM rtgip.audit_log WHERE action = 'receipt_rejected') >= 25"
 expect_value "the TypeScript-signed Gateway admission verifies in SQL" "$(as rtgip_dispatcher "$ADV($FIXID, 'w1', $(V gateway_admission:admitted))")" "gateway_admitted"
 expect_value "replaying the admission is an illegal transition" "$(as rtgip_dispatcher "$ADV($FIXID, 'w1', $(V gateway_admission:admitted))")" "rejected:illegal_transition:gateway_admitted:gateway_admission"
 expect_value "consumer_commit cannot skip target_inbox" "$(as rtgip_dispatcher "$ADV($FIXID, 'w1', $(V consumer_commit:applied))")" "rejected:illegal_transition:gateway_admitted:consumer_commit"
@@ -242,13 +268,21 @@ expect_value "a duplicate of a committed event may be committed with its origina
 
 echo "== C1 in the inbox: duplicates of held or quarantined events are never committed"
 "${PSQL[@]}" -c "UPDATE rtgip.delivery_config SET local_app = 'autocurb'"
-"${PSQL[@]}" -c "$(as rtgip_inbox_receiver "SELECT rtgip.inbox_quarantine(rtgip_test.env(rtgip_test.uuid_for('iq'), 'agg-iq', 1, NULL), 'unknown_episode')")" >/dev/null
-expect_value "redelivery of a quarantined event repeats quarantined, committed=false" "$(as rtgip_inbox_receiver "SELECT rtgip_test.receive1(rtgip_test.env(rtgip_test.uuid_for('iq'), 'agg-iq', 1, NULL))")" "quarantined|duplicate_of:quarantined|false"
-"${PSQL[@]}" -c "$(as rtgip_inbox_receiver "SELECT rtgip_test.receive1(rtgip_test.env(rtgip_test.uuid_for('ih'), 'agg-ih', 2, 1))")" >/dev/null
-expect_value "redelivery of a held event repeats held, committed=false" "$(as rtgip_inbox_receiver "SELECT rtgip_test.receive1(rtgip_test.env(rtgip_test.uuid_for('ih'), 'agg-ih', 2, 1))")" "held|duplicate_of:held|false"
-"${PSQL[@]}" -c "$(as rtgip_inbox_receiver "SELECT rtgip_test.receive1(rtgip_test.env(rtgip_test.uuid_for('ia'), 'agg-ia', 1, NULL))")" >/dev/null
-expect_value "redelivery of an applied event is a committed duplicate" "$(as rtgip_inbox_receiver "SELECT rtgip_test.receive1(rtgip_test.env(rtgip_test.uuid_for('ia'), 'agg-ia', 1, NULL))")" "duplicate|duplicate_of:applied|true"
-expect_error "an inbox for another app refuses delivery" "$(as rtgip_inbox_receiver "SELECT rtgip_test.receive1(rtgip_test.env(gen_random_uuid(), 'agg-x', 1, NULL, repeat('a',64), 'autoframe'))")" "wrong_destination"
+# Inbox engine (internal; reached only through inbox_admit, here called as its owner).
+expect_value "a consumer rejection records the event as quarantined" "SELECT outcome || '|' || reason || '|' || committed FROM rtgip.inbox_receive(rtgip_test.env(rtgip_test.uuid_for('iq'), 'agg-iq', 1, NULL), 'autocurb', rtgip_test.uuid_for('iq'), 'consumer_reject:unknown_episode')" "quarantined|consumer_reject:unknown_episode|false"
+expect_value "redelivery of a quarantined event repeats quarantined, committed=false" "SELECT rtgip_test.receive1(rtgip_test.env(rtgip_test.uuid_for('iq'), 'agg-iq', 1, NULL))" "quarantined|duplicate_of:quarantined|false"
+check "a consumer rejection does not move the watermark" "SELECT NOT EXISTS (SELECT 1 FROM rtgip.watermarks WHERE wm_key LIKE '%|agg-iq|%')"
+"${PSQL[@]}" -c "SELECT rtgip_test.receive1(rtgip_test.env(rtgip_test.uuid_for('ih'), 'agg-ih', 2, 1))" >/dev/null
+expect_value "redelivery of a held event repeats held, committed=false" "SELECT rtgip_test.receive1(rtgip_test.env(rtgip_test.uuid_for('ih'), 'agg-ih', 2, 1))" "held|duplicate_of:held|false"
+"${PSQL[@]}" -c "SELECT rtgip_test.receive1(rtgip_test.env(rtgip_test.uuid_for('ia'), 'agg-ia', 1, NULL))" >/dev/null
+expect_value "redelivery of an applied event is a committed duplicate carrying its original outcome" "SELECT outcome || '|' || committed || '|' || committed_outcome FROM rtgip.inbox_receive(rtgip_test.env(rtgip_test.uuid_for('ia'), 'agg-ia', 1, NULL), 'autocurb')" "duplicate|true|applied"
+expect_error "an inbox for another app refuses delivery" "SELECT rtgip_test.receive1(rtgip_test.env(gen_random_uuid(), 'agg-x', 1, NULL, repeat('a',64), 'autoframe'))" "wrong_destination"
+"${PSQL[@]}" -c "SELECT rtgip_test.receive1(rtgip_test.env(rtgip_test.uuid_for('rj1'), 'agg-rj', 1, NULL))" >/dev/null
+"${PSQL[@]}" -c "SELECT rtgip_test.receive1(rtgip_test.env(rtgip_test.uuid_for('rj3'), 'agg-rj', 3, 2))" >/dev/null
+expect_value "a released successor whose effect failed is quarantined and stops the release chain" \
+  "SELECT string_agg(outcome, ',' ORDER BY outcome) FROM rtgip.inbox_receive(rtgip_test.env(rtgip_test.uuid_for('rj2'), 'agg-rj', 2, 1), 'autocurb', rtgip_test.uuid_for('rj2'), 'consumer_reject:x')" "quarantined"
+check "after the rejected revision the watermark stays put and its successor stays held" \
+  "SELECT (SELECT revision FROM rtgip.watermarks WHERE wm_key LIKE '%|agg-rj|%') = 1 AND (SELECT outcome FROM rtgip.inbox WHERE event_id = rtgip_test.uuid_for('rj3')) = 'held'"
 check "watermarks are scoped by route, instance and episode" \
   "SELECT bool_and(wm_key LIKE 'tnt-syn-northwind|rf-nw-01|autolabels->autocurb|autolabels|inventory|episode|%|inst-syn-0001|ep-syn-0001-1') FROM rtgip.watermarks"
 
@@ -271,9 +305,9 @@ wait "$CRASH_PID" || true
 check "a crash after both writes persists neither" \
   "SELECT NOT EXISTS (SELECT 1 FROM rtgip_test.listings WHERE id = 'lst-4') AND NOT EXISTS (SELECT 1 FROM rtgip.outbox WHERE event_id = rtgip_test.uuid_for('atom-4'))"
 
-echo "== concurrency (as rtgip_inbox_receiver): 20 sessions deliver the same event"
+echo "== inbox engine concurrency (engine called as its owner; admission-level concurrency runs in pg_integration.sh): 20 sessions deliver the same event"
 "${PSQL[@]}" -c "UPDATE rtgip.delivery_config SET local_app = 'autocurb'"
-RX() { "${PSQL[@]}" -c "SET ROLE rtgip_inbox_receiver; $1"; }
+RX() { "${PSQL[@]}" -c "$1"; }
 for i in $(seq 1 20); do RX "SELECT rtgip_test.deliver(rtgip_test.env(rtgip_test.uuid_for('same'), 'agg-same', 1, NULL))" >/dev/null & done; wait
 check "exactly one effect for one event under 20 concurrent sessions" \
   "SELECT count(*) = 1 FROM rtgip_test.effects WHERE event_id = rtgip_test.uuid_for('same')"
@@ -299,13 +333,13 @@ check "watermark at 10, nothing held" \
 
 echo "== stale and conflicting duplicates"
 check "stale revision is recorded and not applied" \
-  "SET ROLE rtgip_inbox_receiver; SELECT rtgip_test.deliver(rtgip_test.env(rtgip_test.uuid_for('stale'), 'agg-ord', 4, 3)) = 'stale_ignored' AND (SELECT count(*) FROM rtgip_test.effects WHERE agg='agg-ord') = 10"
+  "SELECT rtgip_test.deliver(rtgip_test.env(rtgip_test.uuid_for('stale'), 'agg-ord', 4, 3)) = 'stale_ignored' AND (SELECT count(*) FROM rtgip_test.effects WHERE agg='agg-ord') = 10"
 OUT=$(RX "SELECT rtgip_test.deliver(rtgip_test.env(rtgip_test.uuid_for('same'), 'agg-same', 1, NULL, repeat('f',64)))")
 check "conflicting duplicate is quarantined, original kept" \
   "SELECT '$OUT' = 'quarantined' AND (SELECT count(*) FROM rtgip.inbox_conflicts) = 1 AND (SELECT count(*) FROM rtgip_test.effects WHERE agg='agg-same') = 1"
 
 echo "== crash before commit (backend terminated mid-transaction)"
-("${PSQL[@]}" -c "SET application_name = 'crash_a'; SET ROLE rtgip_inbox_receiver; BEGIN; SELECT rtgip_test.deliver(rtgip_test.env(rtgip_test.uuid_for('crash'), 'agg-crash', 1, NULL)); SELECT pg_sleep(10); COMMIT;" >/dev/null 2>&1 || true) &
+("${PSQL[@]}" -c "SET application_name = 'crash_a'; BEGIN; SELECT rtgip_test.deliver(rtgip_test.env(rtgip_test.uuid_for('crash'), 'agg-crash', 1, NULL)); SELECT pg_sleep(10); COMMIT;" >/dev/null 2>&1 || true) &
 CRASH_PID=$!
 for _ in $(seq 1 50); do
   [ "$("${PSQL[@]}" -c "SELECT count(*) FROM pg_stat_activity WHERE application_name = 'crash_a' AND wait_event = 'PgSleep'")" = "1" ] && break; sleep 0.1
@@ -336,6 +370,20 @@ check "identical outbox enqueue is a no-op duplicate" \
 OWNER=$("${PSQL[@]}" -c "SELECT lease_owner FROM rtgip.outbox WHERE event_id = rtgip_test.uuid_for('ob2')")
 expect_value "dead letter after the attempt limit" "$(as rtgip_dispatcher "SELECT rtgip.outbox_fail(rtgip_test.uuid_for('ob2'), '$OWNER', 'http_503', 5, 1)")" "dead_letter"
 check "the dead-lettered row is retained" "SELECT state = 'dead_letter' FROM rtgip.outbox WHERE event_id = rtgip_test.uuid_for('ob2')"
+
+echo "== pause: a connection that is not deliverable is never leased and never dead-letters"
+"${PSQL[@]}" -c "SET ROLE rtgip_test_app; SELECT rtgip.outbox_enqueue(rtgip_test.body('pause-1'))" >/dev/null
+"${PSQL[@]}" -c "UPDATE rtgip.connections SET status = 'suspended' WHERE connection_id = (SELECT connection_id FROM rtgip.outbox WHERE event_id = rtgip_test.uuid_for('pause-1'))"
+check "a suspended connection's rows are not leased" "$(as rtgip_dispatcher "SELECT NOT EXISTS (SELECT 1 FROM rtgip.outbox_claim('pw', 1000, 300) WHERE event_id = rtgip_test.uuid_for('pause-1'))")"
+check "the paused row spent no attempt" "SELECT attempts = 0 AND state = 'pending' FROM rtgip.outbox WHERE event_id = rtgip_test.uuid_for('pause-1')"
+"${PSQL[@]}" -c "UPDATE rtgip.connections SET status = 'active' WHERE connection_id = (SELECT connection_id FROM rtgip.outbox WHERE event_id = rtgip_test.uuid_for('pause-1'))"
+"${PSQL[@]}" -c "$(as rtgip_dispatcher "SELECT count(*) FROM rtgip.outbox_claim('pw', 1000, 300)")" >/dev/null
+"${PSQL[@]}" -c "UPDATE rtgip.connections SET reader_enabled = false WHERE connection_id = (SELECT connection_id FROM rtgip.outbox WHERE event_id = rtgip_test.uuid_for('pause-1'))"
+expect_value "a failure after the grant was lost mid-attempt pauses instead of dead-lettering (max_attempts 1)" \
+  "$(as rtgip_dispatcher "SELECT rtgip.outbox_fail(rtgip_test.uuid_for('pause-1'), 'pw', 'ack_reader_disabled', 5, 1)")" "retry_wait"
+check "the attempt was given back and the pause is audited" \
+  "SELECT o.attempts = 0 AND EXISTS (SELECT 1 FROM rtgip.audit_log a WHERE a.event_id = o.event_id AND a.action = 'pause:retry_wait' AND a.detail->>'paused_by' = 'reader_disabled') FROM rtgip.outbox o WHERE o.event_id = rtgip_test.uuid_for('pause-1')"
+"${PSQL[@]}" -c "UPDATE rtgip.connections SET reader_enabled = true"
 
 echo "== immutability, transport pin, browser roles"
 expect_error "audit log rejects UPDATE" "UPDATE rtgip.audit_log SET actor = 'x'" "append-only"

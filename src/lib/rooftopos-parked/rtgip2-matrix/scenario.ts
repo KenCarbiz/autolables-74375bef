@@ -8,6 +8,7 @@ import type * as F from "../rtgip2-autoframe/producer.ts";
 
 export const AT = "2027-01-15T15:00:00Z";
 export const STAFF = "44444444-4444-4444-8444-444444444444";
+export const OWNER = "77777777-7777-4777-8777-777777777777";
 export const SUB = "55555555-5555-4555-8555-555555555555";
 export const DEALERSHIP = "dlr-syn-northwind";
 
@@ -34,7 +35,7 @@ export const soldMilestone: L.CustodyMilestoneRecord = {
 
 const T = (m: number) => `2027-01-15T14:${String(m).padStart(2, "0")}:00Z`;
 const led = (id: string, field: C.LedgerRow["field"], from: string | null, to: string, at: string, sub = SUB): C.LedgerRow => ({
-  id, submission_id: sub, dealership_id: DEALERSHIP, field, from_value: from, to_value: to, actor_user_id: STAFF, written_by: "db_trigger", at,
+  id, submission_id: sub, dealership_id: DEALERSHIP, field, from_value: from, to_value: to, actor_user_id: STAFF, actor_roles: ["gm"], written_by: "db_trigger", at,
 });
 
 export const curbRecords = (status: "appraisal_completed" | "deal_finalized" | "purchase_complete", over: Partial<C.CurbSourceRecords> = {}, sub = SUB): C.CurbSourceRecords => {
@@ -49,7 +50,7 @@ export const curbRecords = (status: "appraisal_completed" | "deal_finalized" | "
     ledger.push(led(`led-${sub.slice(0, 4)}-5`, "progress_status", "check_request_submitted", "purchase_complete", T(5), sub));
   }
   return {
-    submission: { id: sub, dealership_id: DEALERSHIP, vin: VIN, progress_status: status, acv_value: 1_850_000, appraisal_finalized: true, check_request_done: status === "purchase_complete" },
+    submission: { id: sub, dealership_id: DEALERSHIP, vin: VIN, progress_status: status, acv_confirmed: true, appraisal_finalized: true, check_request_done: status === "purchase_complete" },
     ledger, instance_ref: INSTANCE, episode_ref: EPISODE,
     ownership_evidence_refs: ["doc:title-syn-1"], condition_evidence_refs: ["doc:cond-syn-1"],
     ...over,

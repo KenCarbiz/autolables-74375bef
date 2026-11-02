@@ -18,7 +18,7 @@ import * as C from "../rtgip2-autocurb/producer.ts";
 import { curbConsumer, emptyCurbProjection, type CurbProjection } from "../rtgip2-autocurb/consumer.ts";
 import * as F from "../rtgip2-autoframe/producer.ts";
 import { emptyFrameProjection, frameConsumer, type FrameProjection } from "../rtgip2-autoframe/consumer.ts";
-import { AT, STAFF, MEDIA, approval, cmeta, curbRecords, curbScope, firstEpisode, frameRecords, frameScope, inst, meta, revocation, revocationRecords, scope, soldMilestone } from "./scenario.ts";
+import { AT, STAFF, OWNER, MEDIA, approval, cmeta, curbRecords, curbScope, firstEpisode, frameRecords, frameScope, inst, meta, revocation, revocationRecords, scope, soldMilestone } from "./scenario.ts";
 
 const results: Record<string, Record<string, string>> = {};
 const record = (route: string, check: string, outcome: string) => { (results[route] ??= {})[check] = outcome; };
@@ -102,7 +102,7 @@ describe("six-direction end-to-end exchange (positive path)", () => {
     expect(() => F.mediaApproved(approval(1), frameScope(2), frameRecords(1, "af-evt-1", [], { status: "revoked" }), ["autolabels"])).toThrow("media_not_currently_approved");
     // Consumer side: a higher-revision approval without an audited reinstatement is quarantined.
     const priorRevoke = revocationRecords(2).approvals;
-    const forged = await F.mediaApproved(approval(3), frameScope(2), { ...frameRecords(3, "af-evt-3", priorRevoke), reinstatements: [{ audit_id: "aud-x", tenant_id: TENANT, media_id: MEDIA, revoked_approval_id: "ap-syn-rv-2", actor: STAFF }] }, ["autolabels", "autocurb"]);
+    const forged = await F.mediaApproved(approval(3), frameScope(2), { ...frameRecords(3, "af-evt-3", priorRevoke), reinstatements: [{ audit_id: "aud-x", tenant_id: TENANT, media_id: MEDIA, revoked_approval_id: "ap-syn-rv-2", actor: OWNER, actor_roles: ["owner"] }] }, ["autolabels", "autocurb"]);
     const stripped = await Promise.all(forged.map(async (f) => {
       const { reinstatement_audit_ref: _r, ...payload } = f.envelope.payload;
       const { payload_sha256: _p, ...rest } = { ...f.envelope, payload };

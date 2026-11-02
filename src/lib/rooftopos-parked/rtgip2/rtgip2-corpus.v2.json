@@ -323,7 +323,7 @@
             "dealership_id": "dlr-syn-northwind",
             "vin": "1HGCM82633A004352",
             "progress_status": "appraisal_completed",
-            "acv_value": 1850000,
+            "acv_confirmed": true,
             "appraisal_finalized": true,
             "check_request_done": false
           },
@@ -336,6 +336,7 @@
               "from_value": "inspection_completed",
               "to_value": "appraisal_completed",
               "actor_user_id": "44444444-4444-4444-8444-444444444444",
+              "actor_roles": ["gm"],
               "written_by": "db_trigger",
               "at": "2027-01-15T14:01:00Z"
             },
@@ -347,6 +348,7 @@
               "from_value": "false",
               "to_value": "true",
               "actor_user_id": "44444444-4444-4444-8444-444444444444",
+              "actor_roles": ["gm"],
               "written_by": "db_trigger",
               "at": "2027-01-15T14:02:00Z"
             }
@@ -394,7 +396,7 @@
             "dealership_id": "dlr-syn-northwind",
             "vin": "1HGCM82633A004352",
             "progress_status": "appraisal_completed",
-            "acv_value": 1850000,
+            "acv_confirmed": true,
             "appraisal_finalized": true,
             "check_request_done": false
           },
@@ -407,6 +409,7 @@
               "from_value": "inspection_completed",
               "to_value": "appraisal_completed",
               "actor_user_id": "44444444-4444-4444-8444-444444444444",
+              "actor_roles": ["gm"],
               "written_by": "db_trigger",
               "at": "2027-01-15T14:01:00Z"
             },
@@ -418,6 +421,7 @@
               "from_value": "false",
               "to_value": "true",
               "actor_user_id": "44444444-4444-4444-8444-444444444444",
+              "actor_roles": ["gm"],
               "written_by": "db_trigger",
               "at": "2027-01-15T14:02:00Z"
             }
@@ -465,7 +469,7 @@
             "dealership_id": "dlr-syn-northwind",
             "vin": "1HGCM82633A004352",
             "progress_status": "deal_finalized",
-            "acv_value": 1850000,
+            "acv_confirmed": true,
             "appraisal_finalized": true,
             "check_request_done": false
           },
@@ -478,6 +482,7 @@
               "from_value": "inspection_completed",
               "to_value": "appraisal_completed",
               "actor_user_id": "44444444-4444-4444-8444-444444444444",
+              "actor_roles": ["gm"],
               "written_by": "db_trigger",
               "at": "2027-01-15T14:01:00Z"
             },
@@ -489,6 +494,7 @@
               "from_value": "false",
               "to_value": "true",
               "actor_user_id": "44444444-4444-4444-8444-444444444444",
+              "actor_roles": ["gm"],
               "written_by": "db_trigger",
               "at": "2027-01-15T14:02:00Z"
             },
@@ -500,6 +506,7 @@
               "from_value": "appraisal_completed",
               "to_value": "deal_finalized",
               "actor_user_id": "44444444-4444-4444-8444-444444444444",
+              "actor_roles": ["gm"],
               "written_by": "db_trigger",
               "at": "2027-01-15T14:03:00Z"
             }
@@ -547,7 +554,7 @@
             "dealership_id": "dlr-syn-northwind",
             "vin": "1HGCM82633A004352",
             "progress_status": "purchase_complete",
-            "acv_value": 1850000,
+            "acv_confirmed": true,
             "appraisal_finalized": true,
             "check_request_done": true
           },
@@ -560,6 +567,7 @@
               "from_value": "inspection_completed",
               "to_value": "appraisal_completed",
               "actor_user_id": "44444444-4444-4444-8444-444444444444",
+              "actor_roles": ["gm"],
               "written_by": "db_trigger",
               "at": "2027-01-15T14:01:00Z"
             },
@@ -571,6 +579,7 @@
               "from_value": "false",
               "to_value": "true",
               "actor_user_id": "44444444-4444-4444-8444-444444444444",
+              "actor_roles": ["gm"],
               "written_by": "db_trigger",
               "at": "2027-01-15T14:02:00Z"
             },
@@ -582,6 +591,7 @@
               "from_value": "appraisal_completed",
               "to_value": "deal_finalized",
               "actor_user_id": "44444444-4444-4444-8444-444444444444",
+              "actor_roles": ["gm"],
               "written_by": "db_trigger",
               "at": "2027-01-15T14:03:00Z"
             },
@@ -593,6 +603,7 @@
               "from_value": "deal_finalized",
               "to_value": "check_request_submitted",
               "actor_user_id": "44444444-4444-4444-8444-444444444444",
+              "actor_roles": ["gm"],
               "written_by": "db_trigger",
               "at": "2027-01-15T14:04:00Z"
             },
@@ -604,6 +615,7 @@
               "from_value": "false",
               "to_value": "true",
               "actor_user_id": "44444444-4444-4444-8444-444444444444",
+              "actor_roles": ["gm"],
               "written_by": "db_trigger",
               "at": "2027-01-15T14:04:00Z"
             },
@@ -615,6 +627,7 @@
               "from_value": "check_request_submitted",
               "to_value": "purchase_complete",
               "actor_user_id": "44444444-4444-4444-8444-444444444444",
+              "actor_roles": ["gm"],
               "written_by": "db_trigger",
               "at": "2027-01-15T14:05:00Z"
             }
@@ -665,7 +678,7 @@
             "dealership_id": "dlr-syn-northwind",
             "vin": "1HGCM82633A004352",
             "progress_status": "purchase_complete",
-            "acv_value": 1850000,
+            "acv_confirmed": true,
             "appraisal_finalized": true,
             "check_request_done": true
           },
@@ -678,6 +691,7 @@
               "from_value": "inspection_completed",
               "to_value": "appraisal_completed",
               "actor_user_id": "44444444-4444-4444-8444-444444444444",
+              "actor_roles": ["gm"],
               "written_by": "db_trigger",
               "at": "2027-01-15T14:01:00Z"
             },
@@ -689,6 +703,7 @@
               "from_value": "false",
               "to_value": "true",
               "actor_user_id": "44444444-4444-4444-8444-444444444444",
+              "actor_roles": ["gm"],
               "written_by": "db_trigger",
               "at": "2027-01-15T14:02:00Z"
             },
@@ -700,6 +715,7 @@
               "from_value": "appraisal_completed",
               "to_value": "deal_finalized",
               "actor_user_id": "44444444-4444-4444-8444-444444444444",
+              "actor_roles": ["gm"],
               "written_by": "db_trigger",
               "at": "2027-01-15T14:03:00Z"
             },
@@ -711,6 +727,7 @@
               "from_value": "deal_finalized",
               "to_value": "check_request_submitted",
               "actor_user_id": "44444444-4444-4444-8444-444444444444",
+              "actor_roles": ["gm"],
               "written_by": "db_trigger",
               "at": "2027-01-15T14:04:00Z"
             },
@@ -722,6 +739,7 @@
               "from_value": "false",
               "to_value": "true",
               "actor_user_id": "44444444-4444-4444-8444-444444444444",
+              "actor_roles": ["gm"],
               "written_by": "db_trigger",
               "at": "2027-01-15T14:04:00Z"
             },
@@ -733,6 +751,7 @@
               "from_value": "check_request_submitted",
               "to_value": "purchase_complete",
               "actor_user_id": "44444444-4444-4444-8444-444444444444",
+              "actor_roles": ["gm"],
               "written_by": "db_trigger",
               "at": "2027-01-15T14:05:00Z"
             }

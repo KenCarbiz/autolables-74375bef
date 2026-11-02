@@ -7,7 +7,7 @@
     },
     "rtgip2/delivery.ts": {
       "origin": "shared core (byte-identical in all three repos)",
-      "sha256": "0842819a97a19aa24e856456a442910ecfa349c033572d35be0cd3ac52352e2b"
+      "sha256": "6d0100f85f03b99b2621e142cb1de2c9da58c9abe853a4acace542a1928ab9b4"
     },
     "rtgip2/harness.ts": {
       "origin": "shared core (byte-identical in all three repos)",
@@ -21,9 +21,17 @@
       "origin": "shared core (byte-identical in all three repos)",
       "sha256": "cf53cb274a5274465042f412ac7e8f0bb40087bb7becea2156913c355871170d"
     },
+    "rtgip2/admission.ts": {
+      "origin": "shared core (byte-identical in all three repos)",
+      "sha256": "91a5b0d59145f4d948e08a56d0e8d26295067718c98ef1b21bbfd65087307bf2"
+    },
     "rtgip2/rtgip2-corpus.v2.json": {
       "origin": "shared core (byte-identical in all three repos)",
-      "sha256": "91d63fb3e2a4daf08ae1b71efae8c82cc12db30005a7fd4ae4163dd82b26aeac"
+      "sha256": "9a95e5a0f72e2d1f220546ca7c7ff6b23c9f101e5737c9843adf739625d8658d"
+    },
+    "rtgip2/rtgip2-gateway-contract.v1.json": {
+      "origin": "shared core (byte-identical in all three repos)",
+      "sha256": "89c9a46effd6f740e7cffc7176492163e3b5cf2e38a9d5142781cff27a72eff8"
     },
     "denylist.ts": {
       "origin": "KenCarbiz/hartecash-2edb8fec:src/lib/rooftopos/denylist.ts",
@@ -31,7 +39,7 @@
     },
     "rtgip2-autocurb/producer.ts": {
       "origin": "KenCarbiz/hartecash-2edb8fec:src/lib/rooftopos/rtgip2-autocurb/producer.ts",
-      "sha256": "bfb560097306045c6593227445eb925ed38a3f273593486fa58992ffe759a58e"
+      "sha256": "dc6587e901b5b358f7f7486035b68c6c8b4fb786ff86d4fb9d81bf5cf132d048"
     },
     "rtgip2-autocurb/consumer.ts": {
       "origin": "KenCarbiz/hartecash-2edb8fec:src/lib/rooftopos/rtgip2-autocurb/consumer.ts",
@@ -39,7 +47,7 @@
     },
     "rtgip2-autoframe/producer.ts": {
       "origin": "KenCarbiz/showroom-photo-polish:src/lib/af/rtgip2-autoframe/producer.ts",
-      "sha256": "afaffa820aee7f56fbed642f3472d20b9c69090a0955e0b4b7bcc23d5cb70ede"
+      "sha256": "1f69565a2bb12630be41006b83ec6c05d2ccd1fa77ee59a1340761a02c3206a1"
     },
     "rtgip2-autoframe/consumer.ts": {
       "origin": "KenCarbiz/showroom-photo-polish:src/lib/af/rtgip2-autoframe/consumer.ts",

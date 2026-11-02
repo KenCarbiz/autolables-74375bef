@@ -13,7 +13,10 @@ import {
   PROTOCOL,
   type AppId,
   type EnvelopeV2,
+  type EventType,
+  type Purpose,
   type Registry,
+  type ServiceConnection,
   type ServiceKey,
   type Signer,
   type VerifiedDelivery,
@@ -71,6 +74,20 @@ export interface ReceiptExpectation {
   issuer: Signer;
 }
 
+/** What the receipt is checked against besides its own fields: the grant and the attempt. */
+export interface ReceiptContext {
+  event_type: EventType;
+  purpose: Purpose;
+  /** Unix seconds the current attempt started. A receipt issued earlier belongs to another attempt. */
+  attempt_started_at: number;
+}
+
+export const receiptContext = (e: EnvelopeV2, attempt_started_at: number): ReceiptContext => ({
+  event_type: e.event_type,
+  purpose: e.purpose,
+  attempt_started_at,
+});
+
 export function expectReceipt(
   e: EnvelopeV2,
   connection_id: string,
@@ -88,6 +105,42 @@ export function expectReceipt(
     payload_sha256: e.payload_sha256,
     issuer: kind === "gateway_admission" ? "gateway" : e.target_app,
   };
+}
+
+/**
+ * Receipt and dispatch policy (identical in rtgip_v2_delivery.proposed.sql). A connection is
+ * deliverable only while it is active, both sides are enabled and it still grants the
+ * rooftop, event type and purpose. Losing any of these after admission and before the
+ * acknowledgment pauses the row: receipts for it are refused, it is not re-leased and its
+ * attempt is not counted, so it cannot dead-letter while paused. When the grant returns, the
+ * redelivery reaches the target inbox as a duplicate and the original committed outcome
+ * completes it, so the consumer effect still happens exactly once.
+ */
+export function deliverableReason(
+  conn: ServiceConnection | undefined,
+  f: {
+    source_app: string;
+    target_app: string;
+    tenant_id: string;
+    rooftop_id: string;
+    event_type: string;
+    purpose: string;
+  },
+): string | null {
+  if (
+    !conn ||
+    conn.source_app !== f.source_app ||
+    conn.target_app !== f.target_app ||
+    conn.tenant_id !== f.tenant_id ||
+    !conn.rooftop_ids.includes(f.rooftop_id)
+  )
+    return "connection_mismatch";
+  if (conn.status !== "active") return "connection_inactive";
+  if (!conn.producer_enabled) return "producer_disabled";
+  if (!conn.reader_enabled) return "reader_disabled";
+  if (!(conn.event_types as readonly string[]).includes(f.event_type)) return "event_not_granted";
+  if (!(conn.purposes as readonly string[]).includes(f.purpose)) return "purpose_not_granted";
+  return null;
 }
 
 /** The exact bytes a receipt signature covers (also what the SQL verifier recomputes). */
@@ -122,13 +175,16 @@ const BOUND_FIELDS = [
  * difference in event, route, tenant, rooftop, connection or payload hash, on an outcome
  * the receipt kind may not carry, and on a key that is unknown, of another dialect,
  * revoked, outside its validity window, not owned by the issuer or not bound to the
- * connection. The connection itself must still be active and grant the rooftop.
+ * connection. The connection must still be deliverable (deliverableReason), and the receipt
+ * must have been issued during the attempt it acknowledges: a receipt older than the
+ * attempt start (less clock skew) is a replay from an earlier attempt.
  */
 export async function verifyReceipt(
   r: Receipt | undefined,
   expect: ReceiptExpectation,
   reg: Registry,
   nowSec: number,
+  ctx: ReceiptContext,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   if (!r) return { ok: false, reason: "ack_missing" };
   if (r.protocol !== PROTOCOL || r.kind !== expect.kind)
@@ -140,6 +196,8 @@ export async function verifyReceipt(
     return { ok: false, reason: "ack_outcome_not_allowed" };
   if (!Number.isSafeInteger(r.issued_at) || r.issued_at > nowSec + MAX_SKEW_SECONDS)
     return { ok: false, reason: "ack_issued_in_future" };
+  if (r.issued_at < ctx.attempt_started_at - MAX_SKEW_SECONDS)
+    return { ok: false, reason: "ack_predates_attempt" };
   const key = reg.keys.find((k) => k.key_id === r.key_id);
   if (!key || key.owner !== r.issuer) return { ok: false, reason: "ack_bad_key" };
   if (key.dialect !== PROTOCOL) return { ok: false, reason: "ack_key_dialect_mismatch" };
@@ -149,15 +207,8 @@ export async function verifyReceipt(
   if (!key.connection_ids.includes(r.connection_id))
     return { ok: false, reason: "ack_key_not_bound_to_connection" };
   const conn = reg.connections.find((c) => c.connection_id === r.connection_id);
-  if (
-    !conn ||
-    conn.source_app !== r.source_app ||
-    conn.target_app !== r.target_app ||
-    conn.tenant_id !== r.tenant_id ||
-    !conn.rooftop_ids.includes(r.rooftop_id)
-  )
-    return { ok: false, reason: "ack_connection_mismatch" };
-  if (conn.status !== "active") return { ok: false, reason: "ack_connection_inactive" };
+  const why = deliverableReason(conn, { ...r, event_type: ctx.event_type, purpose: ctx.purpose });
+  if (why) return { ok: false, reason: `ack_${why}` };
   const { signature, ...rest } = r;
   if (typeof signature !== "string") return { ok: false, reason: "ack_bad_signature" };
   const expected = await hmacHex(key.secret, RECEIPT_DOMAIN + receiptSigningJson(rest));
@@ -202,6 +253,7 @@ export interface OutboxRow {
   next_attempt_at: number;
   lease_owner: string | null;
   lease_until: number;
+  attempt_started_at: number;
   last_error: string | null;
   receipts: Receipt[];
 }
@@ -255,6 +307,7 @@ export class MemoryOutbox<S> {
         next_attempt_at: now,
         lease_owner: null,
         lease_until: 0,
+        attempt_started_at: 0,
         last_error: null,
         receipts: [],
       });
@@ -271,16 +324,21 @@ export class MemoryOutbox<S> {
     r.state = to;
   }
 
-  /** Lease due rows to one worker. Mirrors SELECT ... FOR UPDATE SKIP LOCKED. */
-  claim(worker: string, now: number, limit: number, leaseSec = 60): OutboxRow[] {
+  /**
+   * Lease due rows to one worker. Mirrors SELECT ... FOR UPDATE SKIP LOCKED. With a registry,
+   * rows whose connection is not deliverable stay paused and are not leased (as in SQL).
+   */
+  claim(worker: string, now: number, limit: number, leaseSec = 60, reg?: Registry): OutboxRow[] {
     const out: OutboxRow[] = [];
     for (const r of this.rows.values()) {
       if (out.length >= limit) break;
       const due = (r.state === "pending" || r.state === "retry_wait") && r.next_attempt_at <= now;
       const expired = r.state === "in_flight" && r.lease_until <= now;
       if (!due && !expired) continue;
+      if (reg && "reason" in authorize(r.envelope, reg)) continue;
       r.lease_owner = worker;
       r.lease_until = now + leaseSec;
+      r.attempt_started_at = now;
       r.attempts += 1;
       this.move(r, "in_flight", now, `claimed_by:${worker}`);
       out.push(r);
@@ -304,30 +362,36 @@ export class MemoryOutbox<S> {
   ): Promise<OutboxState> {
     if (r.lease_owner !== worker || r.state !== "in_flight") return r.state;
     const az = authorize(r.envelope, reg);
-    if ("reason" in az) return this.fail(r, `authorization:${az.reason}`, now, rand);
+    if ("reason" in az) return this.pause(r, `authorization:${az.reason}`, now);
     const conn = az.connection.connection_id;
     let res: TransportResult;
     try {
       res = await transport(r);
     } catch (err) {
-      return this.fail(r, `transport:${(err as Error).message}`, now, rand);
+      return this.settle(r, reg, `transport:${(err as Error).message}`, now, rand);
     }
     if (res.http_status < 200 || res.http_status >= 300)
-      return this.fail(r, `http_${res.http_status}`, now, rand);
+      return this.settle(r, reg, `http_${res.http_status}`, now, rand);
     const find = (k: ReceiptKind) => res.receipts?.find((x) => x.kind === k);
     const check = (k: ReceiptKind) =>
-      verifyReceipt(find(k), expectReceipt(r.envelope, conn, k), reg, now);
+      verifyReceipt(
+        find(k),
+        expectReceipt(r.envelope, conn, k),
+        reg,
+        now,
+        receiptContext(r.envelope, r.attempt_started_at),
+      );
     const adm = await check("gateway_admission");
-    if ("reason" in adm) return this.fail(r, adm.reason, now, rand);
+    if ("reason" in adm) return this.settle(r, reg, adm.reason, now, rand);
     r.receipts.push(find("gateway_admission")!);
     this.move(r, "gateway_admitted", now, "admission_verified");
     const inbox = find("target_inbox");
     const inboxOk = await check("target_inbox");
-    if ("reason" in inboxOk) return this.fail(r, inboxOk.reason, now, rand);
+    if ("reason" in inboxOk) return this.settle(r, reg, inboxOk.reason, now, rand);
     r.receipts.push(inbox!);
     const commit = find("consumer_commit");
     if (inbox!.outcome === "quarantined") {
-      if (commit) return this.fail(r, "ack_commit_contradicts_inbox", now, rand);
+      if (commit) return this.settle(r, reg, "ack_commit_contradicts_inbox", now, rand);
       this.release(r);
       this.move(r, "target_quarantined", now, "target_quarantined");
       return r.state;
@@ -335,13 +399,13 @@ export class MemoryOutbox<S> {
     this.move(r, "target_persisted", now, `inbox:${inbox!.outcome}`);
     if (inbox!.outcome === "held") {
       // Held at target: no effect exists yet, so no commit may be accepted. Retry later.
-      if (commit) return this.fail(r, "ack_commit_contradicts_inbox", now, rand);
-      return this.fail(r, "target_held_awaiting_predecessor", now, rand);
+      if (commit) return this.settle(r, reg, "ack_commit_contradicts_inbox", now, rand);
+      return this.settle(r, reg, "target_held_awaiting_predecessor", now, rand);
     }
     const commitOk = await check("consumer_commit");
-    if ("reason" in commitOk) return this.fail(r, commitOk.reason, now, rand);
+    if ("reason" in commitOk) return this.settle(r, reg, commitOk.reason, now, rand);
     if (inbox!.outcome !== "duplicate" && commit!.outcome !== inbox!.outcome)
-      return this.fail(r, "ack_commit_contradicts_inbox", now, rand);
+      return this.settle(r, reg, "ack_commit_contradicts_inbox", now, rand);
     r.receipts.push(commit!);
     this.release(r);
     this.move(r, "consumer_committed", now, `commit:${commit!.outcome}`);
@@ -351,6 +415,29 @@ export class MemoryOutbox<S> {
   private release(r: OutboxRow) {
     r.lease_owner = null;
     r.lease_until = 0;
+  }
+
+  /** A failure while the connection is not deliverable is a pause, as in SQL outbox_fail. */
+  private settle(
+    r: OutboxRow,
+    reg: Registry,
+    reason: string,
+    now: number,
+    rand?: () => number,
+  ): OutboxState {
+    return "reason" in authorize(r.envelope, reg)
+      ? this.pause(r, reason, now)
+      : this.fail(r, reason, now, rand);
+  }
+
+  /** Permission lost: wait without spending the attempt (SQL: claim skips the row). */
+  private pause(r: OutboxRow, reason: string, now: number): OutboxState {
+    r.last_error = reason;
+    r.attempts = Math.max(0, r.attempts - 1);
+    this.release(r);
+    r.next_attempt_at = now + RETRY.baseSec;
+    this.move(r, "retry_wait", now, `paused:${reason}`);
+    return r.state;
   }
 
   private fail(r: OutboxRow, reason: string, now: number, rand?: () => number): OutboxState {

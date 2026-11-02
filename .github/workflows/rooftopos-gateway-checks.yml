@@ -5,6 +5,8 @@ on:
     paths:
       - 'src/lib/rooftopos-parked/**'
       - 'supabase/proposed/rtgip_v2_delivery.proposed.sql'
+      - 'supabase/proposed/rtgip_source_readers.proposed.sql'
+      - 'supabase/proposed/20261109000000_vehicle_history_foundation.sql'
       - 'supabase/tests/rtgip/**'
       - 'supabase/functions/_shared/integrations/envelope.ts'
       - '.github/workflows/rooftopos-gateway-checks.yml'
@@ -60,3 +62,18 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run against a disposable local cluster (no Supabase connection)
         run: bash supabase/tests/rtgip/pg_concurrency.sh
+
+  rtgip_pg_integration:
+    name: rtgip/2 admission and AutoLabels source readers on real Postgres (full history replay, throwaway cluster)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: TypeScript admission boundary + inbox_admit, Gateway contract cases, PR #46 readers (no Supabase connection)
+        run: bash supabase/tests/rtgip/pg_integration.sh

@@ -10,10 +10,15 @@
 -- granted only to one NOLOGIN role per duty. A deployment grants one role to one login.
 --   rtgip_outbox_writer   outbox_enqueue (inside the business transaction)
 --   rtgip_dispatcher      outbox_claim, outbox_advance, outbox_fail
---   rtgip_inbox_receiver  claim_nonce, inbox_receive, inbox_quarantine
+--   rtgip_inbox_receiver  inbox_admit only (verified inbound admission, see below)
 --   rtgip_operator        read-only SELECT on the ledger, purge_expired_nonces
 -- Receipt secrets are read from Supabase Vault (vault.decrypted_secrets) by name; they are
 -- never stored in rtgip tables and never returned.
+-- Inbound admission is verified here, not trusted from the caller: inbox_admit takes the raw
+-- Gateway headers and body bytes, recomputes the HMAC, timestamp window, nonce claim,
+-- canonical form, scope, payload hash, derived event id, route catalog, source authority,
+-- destination, purpose and the connection grant before the inbox engine runs. The engine
+-- (inbox_receive) and the nonce table are not executable by any login role.
 
 CREATE SCHEMA IF NOT EXISTS extensions;
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
@@ -94,6 +99,8 @@ CREATE TABLE IF NOT EXISTS rtgip.outbox (
   next_attempt_at timestamptz NOT NULL DEFAULT now(),
   lease_owner text,
   lease_until timestamptz,
+  -- Start of the current attempt. A receipt issued before it (less skew) is refused.
+  attempt_started_at timestamptz,
   last_error text,
   created_at timestamptz NOT NULL DEFAULT now()
 );
@@ -141,6 +148,61 @@ CREATE TABLE IF NOT EXISTS rtgip.inbox_conflicts (
   received_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (tenant_id, origin_app, event_id, payload_sha256)
 );
+
+-- One row per verified inbound delivery (Gateway key + nonce). Written only by inbox_admit,
+-- after every check passed, in the same transaction as the inbox decision and the effect.
+CREATE TABLE IF NOT EXISTS rtgip.admissions (
+  id bigserial PRIMARY KEY,
+  key_id text NOT NULL,
+  nonce text NOT NULL,
+  body_sha256 text NOT NULL CHECK (body_sha256 ~ '^[0-9a-f]{64}$'),
+  event_id uuid NOT NULL,
+  connection_id text NOT NULL REFERENCES rtgip.connections(connection_id),
+  signer text NOT NULL,
+  outcome text NOT NULL,
+  consumer_reject text,
+  admitted_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS admissions_event_idx ON rtgip.admissions (event_id);
+
+-- Protocol catalog (route, event type, owner, purposes, schema versions) and the forbidden
+-- key list, generated from rtgip2/protocol.ts. A Vitest check fails if they drift.
+CREATE TABLE IF NOT EXISTS rtgip.event_catalog (
+  route text NOT NULL,
+  event_type text NOT NULL,
+  owner text NOT NULL,
+  purposes text[] NOT NULL,
+  schema_versions integer[] NOT NULL,
+  PRIMARY KEY (route, event_type)
+);
+CREATE TABLE IF NOT EXISTS rtgip.forbidden_keys (key text PRIMARY KEY);
+-- BEGIN GENERATED rtgip catalog (rtgip2-matrix/sql-catalog.gen.test.ts; do not edit by hand)
+DELETE FROM rtgip.event_catalog;
+INSERT INTO rtgip.event_catalog (route, event_type, owner, purposes, schema_versions) VALUES
+  ('autolabels->autocurb', 'vehicle.identity_registered', 'autolabels', '{inventory_sync}', '{2}'),
+  ('autolabels->autocurb', 'inventory.status_changed', 'autolabels', '{inventory_sync}', '{2}'),
+  ('autolabels->autocurb', 'custody.episode_opened', 'autolabels', '{custody_evidence}', '{2}'),
+  ('autolabels->autocurb', 'custody.episode_closed', 'autolabels', '{custody_evidence}', '{2}'),
+  ('autolabels->autocurb', 'sale.milestone_recorded', 'autolabels', '{custody_evidence}', '{2}'),
+  ('autolabels->autocurb', 'listing.price_published', 'autolabels', '{inventory_sync}', '{2}'),
+  ('autocurb->autolabels', 'appraisal.completed', 'autocurb', '{acquisition_evidence}', '{2}'),
+  ('autocurb->autolabels', 'acquisition.milestone_recorded', 'autocurb', '{acquisition_evidence}', '{2}'),
+  ('autocurb->autolabels', 'acquisition.purchase_completed', 'autocurb', '{acquisition_evidence,custody_evidence}', '{2}'),
+  ('autolabels->autoframe', 'vehicle.identity_registered', 'autolabels', '{inventory_sync}', '{2}'),
+  ('autolabels->autoframe', 'inventory.status_changed', 'autolabels', '{inventory_sync}', '{2}'),
+  ('autolabels->autoframe', 'custody.episode_opened', 'autolabels', '{custody_evidence}', '{2}'),
+  ('autolabels->autoframe', 'custody.episode_closed', 'autolabels', '{custody_evidence}', '{2}'),
+  ('autolabels->autoframe', 'sale.milestone_recorded', 'autolabels', '{custody_evidence}', '{2}'),
+  ('autolabels->autoframe', 'listing.availability_changed', 'autolabels', '{inventory_sync}', '{2}'),
+  ('autoframe->autolabels', 'media.approved', 'autoframe', '{media_reference}', '{2}'),
+  ('autoframe->autolabels', 'media.revoked', 'autoframe', '{media_reference}', '{2}'),
+  ('autocurb->autoframe', 'appraisal.completed', 'autocurb', '{acquisition_evidence}', '{2}'),
+  ('autocurb->autoframe', 'acquisition.purchase_completed', 'autocurb', '{acquisition_evidence}', '{2}'),
+  ('autoframe->autocurb', 'media.approved', 'autoframe', '{media_reference}', '{2}'),
+  ('autoframe->autocurb', 'media.revoked', 'autoframe', '{media_reference}', '{2}');
+DELETE FROM rtgip.forbidden_keys;
+INSERT INTO rtgip.forbidden_keys (key) VALUES ('access_token'), ('acv'), ('acv_cents'), ('acv_value'), ('address'), ('amount_financed'), ('appraised_acv'), ('appraised_value'), ('apr'), ('base64'), ('blob'), ('bytes'), ('check_amount'), ('city'), ('cost'), ('current_offer'), ('customer_id'), ('customer_name'), ('data_uri'), ('date_of_birth'), ('dealer_cost'), ('dl_number'), ('dob'), ('down_payment'), ('drivers_license'), ('email'), ('estimated_offer'), ('estimated_offer_high'), ('estimated_offer_low'), ('final_offer'), ('finance_amount'), ('first_name'), ('full_name'), ('gross_profit'), ('holdback'), ('image_bytes'), ('image_url'), ('invoice_price'), ('last_name'), ('lead_id'), ('lien_amount'), ('mobile'), ('monthly_payment'), ('name'), ('offer_amount'), ('offer_price'), ('offered_price'), ('pack'), ('payoff_amount'), ('phone'), ('phone_e164'), ('photo_url'), ('postal_code'), ('public_url'), ('purchase_amount'), ('purchase_price'), ('recon_cost'), ('reserve'), ('signed_url'), ('ssn'), ('street'), ('submission_id'), ('token'), ('trade_profit'), ('unit_cost'), ('url'), ('zip');
+-- END GENERATED rtgip catalog
 
 CREATE TABLE IF NOT EXISTS rtgip.watermarks (
   wm_key text PRIMARY KEY,
@@ -209,7 +271,75 @@ LANGUAGE sql IMMUTABLE SET search_path = '' AS $$
   ], '|', '')
 $$;
 
+
+-- Canonical JSON exactly as canonicalize() in rtgip2/protocol.ts for the value space the
+-- protocol allows: keys sorted by code point, no whitespace, safe integers only, strings
+-- escaped as JSON.stringify does. Non-ASCII keys, floats and out-of-range integers raise,
+-- so anything the TypeScript side would not reproduce byte for byte fails closed.
+CREATE OR REPLACE FUNCTION rtgip.canonical_json(j jsonb) RETURNS text
+LANGUAGE plpgsql IMMUTABLE SET search_path = '' AS $$
+DECLARE t text := jsonb_typeof(j); out text;
+BEGIN
+  IF t = 'object' THEN
+    IF EXISTS (SELECT 1 FROM jsonb_object_keys(j) k WHERE k !~ '^[ -~]*$') THEN RAISE EXCEPTION 'body_not_canonical'; END IF;
+    SELECT '{' || coalesce(string_agg(to_jsonb(x.key)::text || ':' || rtgip.canonical_json(x.value), ',' ORDER BY x.key COLLATE "C"), '') || '}'
+      INTO out FROM jsonb_each(j) x;
+    RETURN out;
+  ELSIF t = 'array' THEN
+    SELECT '[' || coalesce(string_agg(rtgip.canonical_json(x.value), ',' ORDER BY x.ord), '') || ']'
+      INTO out FROM jsonb_array_elements(j) WITH ORDINALITY x(value, ord);
+    RETURN out;
+  ELSIF t = 'number' THEN
+    IF j::text !~ '^-?(0|[1-9][0-9]{0,15})$' OR abs(j::text::numeric) > 9007199254740991 THEN RAISE EXCEPTION 'body_not_canonical'; END IF;
+    RETURN j::text;
+  END IF;
+  RETURN j::text;
+END $$;
+
+-- deriveEventId() in rtgip2/protocol.ts: SHA-256 over the canonical scope array, UUID layout.
+CREATE OR REPLACE FUNCTION rtgip.derive_event_id(e jsonb) RETURNS text
+LANGUAGE plpgsql IMMUTABLE SET search_path = '' AS $$
+DECLARE h text;
+BEGIN
+  h := encode(extensions.digest(convert_to(rtgip.canonical_json(jsonb_build_array('rtgip/2-event/v2',
+    e->'source_app', e->'tenant_id', e->'rooftop_id', e#>'{vehicle,instance_id}', e#>'{vehicle,episode_id}',
+    e#>'{origin,event_id}', e->'route')), 'UTF8'), 'sha256'), 'hex');
+  RETURN substr(h, 1, 8) || '-' || substr(h, 9, 4) || '-5' || substr(h, 14, 3) || '-'
+    || to_hex((('x' || lpad(substr(h, 17, 1), 8, '0'))::bit(32)::integer & 3) | 8) || substr(h, 18, 3) || '-' || substr(h, 21, 12);
+END $$;
+
+-- Compare two MACs without an early exit on the first differing byte.
+CREATE OR REPLACE FUNCTION rtgip.ct_equal(a text, b text) RETURNS boolean
+LANGUAGE plpgsql IMMUTABLE SET search_path = '' AS $$
+DECLARE ba bytea; bb bytea; d integer; n integer;
+BEGIN
+  IF a IS NULL OR b IS NULL THEN RETURN false; END IF;
+  ba := convert_to(a, 'UTF8'); bb := convert_to(b, 'UTF8');
+  d := length(ba) # length(bb); n := greatest(length(ba), length(bb));
+  FOR i IN 0 .. n - 1 LOOP
+    d := d | ((CASE WHEN i < length(ba) THEN get_byte(ba, i) ELSE 0 END) # (CASE WHEN i < length(bb) THEN get_byte(bb, i) ELSE 0 END));
+  END LOOP;
+  RETURN d = 0;
+END $$;
+
+-- deliverableReason() in rtgip2/delivery.ts. NULL means the connection may carry this event now.
+CREATE OR REPLACE FUNCTION rtgip.deliverable_reason(p_connection_id text, p_envelope jsonb) RETURNS text
+LANGUAGE sql STABLE SET search_path = '' AS $$
+  SELECT CASE
+    WHEN c.connection_id IS NULL OR c.source_app IS DISTINCT FROM p_envelope->>'source_app'
+      OR c.target_app IS DISTINCT FROM p_envelope->>'target_app' OR c.tenant_id IS DISTINCT FROM p_envelope->>'tenant_id'
+      OR NOT coalesce((p_envelope->>'rooftop_id') = ANY (c.rooftop_ids), false) THEN 'connection_mismatch'
+    WHEN c.status <> 'active' THEN 'connection_inactive'
+    WHEN NOT c.producer_enabled THEN 'producer_disabled'
+    WHEN NOT c.reader_enabled THEN 'reader_disabled'
+    WHEN NOT coalesce((p_envelope->>'event_type') = ANY (c.event_types), false) THEN 'event_not_granted'
+    WHEN NOT coalesce((p_envelope->>'purpose') = ANY (c.purposes), false) THEN 'purpose_not_granted'
+  END
+  FROM (SELECT 1) one LEFT JOIN rtgip.connections c ON c.connection_id = p_connection_id
+$$;
+
 -- Nonce claim: 'claimed' | 'exact_retry' | 'conflict'. Safe under concurrent sessions.
+-- Internal: reachable only through inbox_admit, after the delivery MAC has verified.
 CREATE OR REPLACE FUNCTION rtgip.claim_nonce(p_key_id text, p_nonce text, p_sha text, p_expires_at timestamptz)
 RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE v_sha text;
@@ -257,7 +387,9 @@ BEGIN
 END $$;
 
 -- Lease due rows. SKIP LOCKED lets concurrent workers partition the queue. A row whose
--- lease expired mid-delivery is re-leased as a new attempt.
+-- lease expired mid-delivery is re-leased as a new attempt. A row whose connection is not
+-- deliverable right now (suspended, revoked, a side disabled, grant narrowed) stays paused:
+-- it is not leased and spends no attempt.
 CREATE OR REPLACE FUNCTION rtgip.outbox_claim(p_worker text, p_limit integer, p_lease_seconds integer)
 RETURNS SETOF rtgip.outbox LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 BEGIN
@@ -267,15 +399,16 @@ BEGIN
   RETURN QUERY
   WITH due AS (
     SELECT o.event_id FROM rtgip.outbox o
-    WHERE (o.state IN ('pending','retry_wait') AND o.next_attempt_at <= now())
-       OR (o.state IN ('in_flight','gateway_admitted','target_persisted') AND o.lease_until <= now())
+    WHERE ((o.state IN ('pending','retry_wait') AND o.next_attempt_at <= now())
+        OR (o.state IN ('in_flight','gateway_admitted','target_persisted') AND o.lease_until <= now()))
+      AND rtgip.deliverable_reason(o.connection_id, o.envelope) IS NULL
     ORDER BY o.next_attempt_at, o.event_id
     LIMIT p_limit
     FOR UPDATE SKIP LOCKED
   )
   UPDATE rtgip.outbox o SET state = 'in_flight', lease_owner = p_worker,
     lease_until = now() + make_interval(secs => p_lease_seconds), attempts = o.attempts + 1,
-    last_inbox_outcome = NULL
+    attempt_started_at = now(), last_inbox_outcome = NULL
   FROM due WHERE o.event_id = due.event_id
   RETURNING o.*;
 END $$;
@@ -283,7 +416,8 @@ END $$;
 -- Advance only on a receipt this function verifies itself: HMAC over the exact signed
 -- bytes with the issuer's Vault secret, every bound field equal to the outbox row and its
 -- pinned connection, a key owned by the issuer, of dialect rtgip/2, not revoked, inside its
--- validity window and bound to the connection, an outcome the receipt kind may carry, and a
+-- validity window and bound to the connection, an outcome the receipt kind may carry, a
+-- connection that is still deliverable, an issue time inside the current attempt, and a
 -- legal transition from the row's current state. Returns the new state, 'held' (receipt
 -- recorded, row not advanced; the worker then calls outbox_fail), or 'rejected:<reason>'
 -- (nothing changes except an audit entry).
@@ -291,9 +425,9 @@ DROP FUNCTION IF EXISTS rtgip.outbox_advance(uuid, text, text, jsonb);
 CREATE OR REPLACE FUNCTION rtgip.outbox_advance(p_event_id uuid, p_worker text, p_signing_text text, p_signature text)
 RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE
-  o rtgip.outbox%ROWTYPE; k rtgip.signing_keys%ROWTYPE; c rtgip.connections%ROWTYPE;
+  o rtgip.outbox%ROWTYPE; k rtgip.signing_keys%ROWTYPE;
   r jsonb; want jsonb; f text; v_kind text; v_outcome text; v_issuer text; v_iat bigint;
-  v_secret text; v_mac text; v_to text;
+  v_secret text; v_mac text; v_to text; v_why text;
   fields constant text[] := ARRAY['event_id','route','source_app','target_app','tenant_id','rooftop_id','connection_id','payload_sha256'];
   shape constant text[] := ARRAY['connection_id','event_id','issued_at','issuer','key_id','kind','outcome','payload_sha256','protocol','rooftop_id','route','source_app','target_app','tenant_id'];
 BEGIN
@@ -327,22 +461,21 @@ BEGIN
     IF jsonb_typeof(r->'issued_at') IS DISTINCT FROM 'number' OR (r->'issued_at')::text !~ '^[0-9]{1,12}$' THEN RAISE EXCEPTION 'ack_malformed'; END IF;
     v_iat := (r->>'issued_at')::bigint;
     IF to_timestamp(v_iat) > now() + interval '300 seconds' THEN RAISE EXCEPTION 'ack_issued_in_future'; END IF;
+    IF o.attempt_started_at IS NULL OR to_timestamp(v_iat) < o.attempt_started_at - interval '300 seconds' THEN
+      RAISE EXCEPTION 'ack_predates_attempt';
+    END IF;
     SELECT * INTO k FROM rtgip.signing_keys WHERE key_id = r->>'key_id';
     IF NOT FOUND OR k.owner <> v_issuer THEN RAISE EXCEPTION 'ack_bad_key'; END IF;
     IF k.dialect <> 'rtgip/2' THEN RAISE EXCEPTION 'ack_key_dialect_mismatch'; END IF;
     IF k.status = 'revoked' THEN RAISE EXCEPTION 'ack_key_revoked'; END IF;
     IF to_timestamp(v_iat) < k.not_before OR to_timestamp(v_iat) > k.not_after THEN RAISE EXCEPTION 'ack_key_outside_validity'; END IF;
     IF NOT (o.connection_id = ANY (k.connection_ids)) THEN RAISE EXCEPTION 'ack_key_not_bound_to_connection'; END IF;
-    SELECT * INTO c FROM rtgip.connections WHERE connection_id = o.connection_id;
-    IF NOT FOUND OR c.source_app <> o.envelope->>'source_app' OR c.target_app <> o.envelope->>'target_app'
-       OR c.tenant_id <> o.tenant_id OR NOT ((o.envelope->>'rooftop_id') = ANY (c.rooftop_ids)) THEN
-      RAISE EXCEPTION 'ack_connection_mismatch';
-    END IF;
-    IF c.status <> 'active' THEN RAISE EXCEPTION 'ack_connection_inactive'; END IF;
+    v_why := rtgip.deliverable_reason(o.connection_id, o.envelope);
+    IF v_why IS NOT NULL THEN RAISE EXCEPTION 'ack_%', v_why; END IF;
     SELECT s.decrypted_secret INTO v_secret FROM vault.decrypted_secrets s WHERE s.name = k.secret_ref;
     IF v_secret IS NULL OR v_secret = '' THEN RAISE EXCEPTION 'ack_key_secret_unavailable'; END IF;
     v_mac := encode(extensions.hmac(convert_to('rtgip/2-receipt' || chr(10) || p_signing_text, 'UTF8'), convert_to(v_secret, 'UTF8'), 'sha256'), 'hex');
-    IF p_signature IS NULL OR p_signature !~ '^[0-9a-f]{64}$' OR v_mac <> p_signature THEN RAISE EXCEPTION 'ack_bad_signature'; END IF;
+    IF p_signature IS NULL OR p_signature !~ '^[0-9a-f]{64}$' OR NOT rtgip.ct_equal(v_mac, p_signature) THEN RAISE EXCEPTION 'ack_bad_signature'; END IF;
 
     IF v_kind = 'gateway_admission' THEN
       IF o.state <> 'in_flight' THEN RAISE EXCEPTION 'illegal_transition:%:%', o.state, v_kind; END IF;
@@ -375,31 +508,41 @@ BEGIN
   END;
 END $$;
 
+-- A failure while the connection is not deliverable is a pause: the attempt is given back
+-- and the row cannot dead-letter until the grant returns (same rule as MemoryOutbox).
 CREATE OR REPLACE FUNCTION rtgip.outbox_fail(p_event_id uuid, p_worker text, p_reason text, p_backoff_seconds integer, p_max_attempts integer)
 RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
-DECLARE v_state text;
+DECLARE v_state text; v_why text;
 BEGIN
+  SELECT rtgip.deliverable_reason(o.connection_id, o.envelope) INTO v_why FROM rtgip.outbox o WHERE o.event_id = p_event_id;
   UPDATE rtgip.outbox SET
-    state = CASE WHEN attempts >= p_max_attempts THEN 'dead_letter' ELSE 'retry_wait' END,
+    state = CASE WHEN v_why IS NULL AND attempts >= p_max_attempts THEN 'dead_letter' ELSE 'retry_wait' END,
+    attempts = CASE WHEN v_why IS NULL THEN attempts ELSE greatest(0, attempts - 1) END,
     next_attempt_at = now() + make_interval(secs => greatest(1, p_backoff_seconds)),
     lease_owner = NULL, lease_until = NULL, last_error = left(p_reason, 200)
   WHERE event_id = p_event_id AND lease_owner = p_worker
     AND state IN ('in_flight','gateway_admitted','target_persisted')
   RETURNING state INTO v_state;
   IF v_state IS NOT NULL THEN
-    INSERT INTO rtgip.audit_log (actor, action, event_id, detail) VALUES (p_worker, 'fail:' || v_state, p_event_id, jsonb_build_object('reason', left(p_reason, 200)));
+    INSERT INTO rtgip.audit_log (actor, action, event_id, detail)
+    VALUES (p_worker, CASE WHEN v_why IS NULL THEN 'fail:' ELSE 'pause:' END || v_state, p_event_id,
+            jsonb_build_object('reason', left(p_reason, 200), 'paused_by', v_why));
   END IF;
   RETURN v_state;
 END $$;
 
--- Receive one verified envelope. Returns every event that became 'applied' in revision
--- order (the received one plus any held successors it unblocked). The caller applies each
--- effect in the SAME transaction; any error rolls back the inbox rows too. A duplicate of a
--- held or quarantined event repeats that outcome with committed = false, so the caller can
--- never issue a consumer_commit receipt for it.
+-- Inbox engine. Internal: no login role can execute it; only inbox_admit calls it, after
+-- full verification. Returns every event that became 'applied' in revision order (the
+-- received one plus any held successors it unblocked). The caller applies each effect in
+-- the SAME transaction; any error rolls back the inbox rows too. A duplicate of a held or
+-- quarantined event repeats that outcome with committed = false, so no consumer_commit
+-- receipt can be issued for it. p_reject_event marks the event whose consumer effect failed
+-- in a rolled-back first pass: it is recorded as quarantined instead of applied, and the
+-- watermark does not move past it.
 DROP FUNCTION IF EXISTS rtgip.inbox_receive(jsonb, text);
-CREATE OR REPLACE FUNCTION rtgip.inbox_receive(p_envelope jsonb, p_receiver text)
-RETURNS TABLE (event_id uuid, outcome text, reason text, committed boolean, envelope jsonb)
+DROP FUNCTION IF EXISTS rtgip.inbox_receive(jsonb, text, uuid, text);
+CREATE OR REPLACE FUNCTION rtgip.inbox_receive(p_envelope jsonb, p_receiver text, p_reject_event uuid DEFAULT NULL, p_reject_reason text DEFAULT NULL)
+RETURNS TABLE (event_id uuid, outcome text, reason text, committed boolean, committed_outcome text, envelope jsonb)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 #variable_conflict use_column
 DECLARE
@@ -410,6 +553,7 @@ DECLARE
   v_rev bigint := (p_envelope#>>'{aggregate,revision}')::bigint;
   v_prev bigint := (p_envelope#>>'{aggregate,prev_revision}')::bigint;
   v_wm text := rtgip.watermark_key(p_envelope);
+  v_rej text := left(coalesce(p_reject_reason, 'consumer_reject'), 200);
   v_mark bigint;
   v_prior rtgip.inbox%ROWTYPE;
   v_next rtgip.inbox%ROWTYPE;
@@ -425,11 +569,12 @@ BEGIN
     IF v_prior.payload_sha256 <> v_sha THEN
       INSERT INTO rtgip.inbox_conflicts (tenant_id, origin_app, event_id, payload_sha256, envelope)
       VALUES (v_tenant, v_origin, v_id, v_sha, p_envelope) ON CONFLICT DO NOTHING;
-      RETURN QUERY SELECT v_id, 'quarantined'::text, 'conflicting_duplicate'::text, false, p_envelope;
+      RETURN QUERY SELECT v_id, 'quarantined'::text, 'conflicting_duplicate'::text, false, NULL::text, p_envelope;
     ELSIF v_prior.outcome IN ('held','quarantined') THEN
-      RETURN QUERY SELECT v_id, v_prior.outcome, ('duplicate_of:' || v_prior.outcome)::text, false, p_envelope;
+      RETURN QUERY SELECT v_id, v_prior.outcome, ('duplicate_of:' || v_prior.outcome)::text, false, NULL::text, p_envelope;
     ELSE
-      RETURN QUERY SELECT v_id, 'duplicate'::text, ('duplicate_of:' || v_prior.outcome)::text, v_prior.committed_at IS NOT NULL, p_envelope;
+      RETURN QUERY SELECT v_id, 'duplicate'::text, ('duplicate_of:' || v_prior.outcome)::text, v_prior.committed_at IS NOT NULL,
+        CASE WHEN v_prior.committed_at IS NOT NULL THEN v_prior.outcome END, p_envelope;
     END IF;
     RETURN;
   END IF;
@@ -437,45 +582,195 @@ BEGIN
   SELECT w.revision INTO v_mark FROM rtgip.watermarks w WHERE w.wm_key = v_wm;
   IF v_mark IS NOT NULL AND v_rev <= v_mark THEN
     INSERT INTO rtgip.inbox VALUES (v_tenant, v_origin, v_id, v_wm, v_rev, v_prev, v_sha, 'stale_ignored', 'watermark:' || v_mark, p_envelope, now(), now());
-    RETURN QUERY SELECT v_id, 'stale_ignored'::text, ('watermark:' || v_mark)::text, true, p_envelope;
+    RETURN QUERY SELECT v_id, 'stale_ignored'::text, ('watermark:' || v_mark)::text, true, 'stale_ignored'::text, p_envelope;
     RETURN;
   END IF;
   IF v_prev IS DISTINCT FROM v_mark THEN
     INSERT INTO rtgip.inbox VALUES (v_tenant, v_origin, v_id, v_wm, v_rev, v_prev, v_sha, 'held', 'awaiting_revision:' || coalesce(v_prev::text, 'null'), p_envelope, now(), NULL);
-    RETURN QUERY SELECT v_id, 'held'::text, ('awaiting_revision:' || coalesce(v_prev::text, 'null'))::text, false, p_envelope;
+    RETURN QUERY SELECT v_id, 'held'::text, ('awaiting_revision:' || coalesce(v_prev::text, 'null'))::text, false, NULL::text, p_envelope;
+    RETURN;
+  END IF;
+  IF v_id = p_reject_event THEN
+    INSERT INTO rtgip.inbox VALUES (v_tenant, v_origin, v_id, v_wm, v_rev, v_prev, v_sha, 'quarantined', v_rej, p_envelope, now(), NULL);
+    INSERT INTO rtgip.audit_log (actor, action, event_id, detail) VALUES ('inbox', 'quarantined', v_id, jsonb_build_object('reason', v_rej));
+    RETURN QUERY SELECT v_id, 'quarantined'::text, v_rej, false, NULL::text, p_envelope;
     RETURN;
   END IF;
 
   INSERT INTO rtgip.inbox VALUES (v_tenant, v_origin, v_id, v_wm, v_rev, v_prev, v_sha, 'applied', NULL, p_envelope, now(), now());
   INSERT INTO rtgip.watermarks AS w (wm_key, revision) VALUES (v_wm, v_rev)
     ON CONFLICT (wm_key) DO UPDATE SET revision = EXCLUDED.revision, updated_at = now();
-  RETURN QUERY SELECT v_id, 'applied'::text, NULL::text, true, p_envelope;
+  RETURN QUERY SELECT v_id, 'applied'::text, NULL::text, true, 'applied'::text, p_envelope;
 
   LOOP
     SELECT * INTO v_next FROM rtgip.inbox i WHERE i.wm_key = v_wm AND i.outcome = 'held' AND i.prev_revision = v_rev
       ORDER BY i.received_at LIMIT 1;
     EXIT WHEN NOT FOUND;
+    IF v_next.event_id = p_reject_event THEN
+      UPDATE rtgip.inbox i SET outcome = 'quarantined', reason = v_rej
+        WHERE i.tenant_id = v_next.tenant_id AND i.origin_app = v_next.origin_app AND i.event_id = v_next.event_id;
+      INSERT INTO rtgip.audit_log (actor, action, event_id, detail) VALUES ('inbox', 'quarantined', v_next.event_id, jsonb_build_object('reason', v_rej));
+      RETURN QUERY SELECT v_next.event_id, 'quarantined'::text, v_rej, false, NULL::text, v_next.envelope;
+      EXIT;
+    END IF;
     UPDATE rtgip.inbox i SET outcome = 'applied', reason = NULL, committed_at = now()
       WHERE i.tenant_id = v_next.tenant_id AND i.origin_app = v_next.origin_app AND i.event_id = v_next.event_id;
     v_rev := v_next.revision;
     UPDATE rtgip.watermarks w SET revision = v_rev, updated_at = now() WHERE w.wm_key = v_wm;
-    RETURN QUERY SELECT v_next.event_id, 'applied'::text, 'released_from_hold'::text, true, v_next.envelope;
+    RETURN QUERY SELECT v_next.event_id, 'applied'::text, 'released_from_hold'::text, true, 'applied'::text, v_next.envelope;
   END LOOP;
 END $$;
 
--- Consumer-level rejection after inbox_receive said 'applied' (e.g. unknown episode):
--- the caller rolls back to a savepoint and records the quarantine instead.
-CREATE OR REPLACE FUNCTION rtgip.inbox_quarantine(p_envelope jsonb, p_reason text)
-RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DROP FUNCTION IF EXISTS rtgip.inbox_quarantine(jsonb, text);
+
+-- Verified inbound admission: the ONLY inbound entry point granted to any role. The caller
+-- passes the Gateway's rtgip-* headers and the exact body bytes; nothing about the delivery
+-- is taken on trust. Order mirrors verifyDelivery() in rtgip2/protocol.ts:
+--   1. headers, key (rtgip/2, not revoked, in validity, owned by the Gateway signer),
+--      timestamp window, size, and the HMAC over the exact bytes with the Vault secret;
+--   2. the nonce claim (only after the MAC matched, so a forgery cannot burn a nonce;
+--      an exact retry of the same bytes is allowed, any other reuse is refused);
+--   3. canonical bytes, exact field set, scope header, payload hash, derived event id,
+--      destination (this database's app), route catalog, source authority, purpose,
+--      schema version, forbidden keys and link-like values, and the connection grant
+--      (active, both sides enabled, rooftop, event type, purpose, key bound to it);
+--   4. the admission row and the inbox decision, in the caller's transaction.
+-- A refusal returns one row with outcome 'rejected' and its reason, changes nothing but the
+-- nonce claim (from step 2 on) and an audit entry, and never reaches the inbox.
+-- p_consumer_reject {"event_id", "reason"} is the second pass after the caller rolled back
+-- to a savepoint because a consumer effect failed: the same delivery is verified again from
+-- scratch and that event is recorded as quarantined. It must name an event this delivery
+-- actually reaches, or the call raises.
+DROP FUNCTION IF EXISTS rtgip.inbox_admit(jsonb, text, jsonb);
+CREATE OR REPLACE FUNCTION rtgip.inbox_admit(p_headers jsonb, p_body text, p_consumer_reject jsonb DEFAULT NULL)
+RETURNS TABLE (admission_id bigint, event_id uuid, outcome text, reason text, committed boolean, committed_outcome text, connection_id text, envelope jsonb)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+#variable_conflict use_column
+DECLARE
+  v_local text := rtgip.local_app();
+  h_key text := left(p_headers->>'rtgip-key-id', 128);
+  h_signer text := p_headers->>'rtgip-signer';
+  h_ts text := p_headers->>'rtgip-timestamp';
+  h_nonce text := p_headers->>'rtgip-nonce';
+  h_scope text := p_headers->>'rtgip-scope';
+  h_sig text := p_headers->>'rtgip-signature';
+  k rtgip.signing_keys%ROWTYPE; cat rtgip.event_catalog%ROWTYPE;
+  e jsonb; v_secret text; v_sha text; v_claim text; v_conn text; v_n integer; v_why text;
+  v_adm bigint; v_rej_event uuid; v_rej_reason text; v_first text; v_rej_seen boolean := false; rec record;
+  shape constant text[] := ARRAY['aggregate','causation_id','classification','correlation_id','emitted_at','event_id','event_type',
+    'occurred_at','origin','payload','payload_sha256','protocol','purpose','rooftop_id','route','schema_version','source_app','target_app','tenant_id','vehicle'];
 BEGIN
-  IF rtgip.local_app() IS NULL OR p_envelope->>'target_app' IS DISTINCT FROM rtgip.local_app() THEN RAISE EXCEPTION 'receiver_not_local_app'; END IF;
-  INSERT INTO rtgip.inbox (tenant_id, origin_app, event_id, wm_key, revision, prev_revision, payload_sha256, outcome, reason, envelope)
-  VALUES (p_envelope->>'tenant_id', p_envelope#>>'{origin,app}', (p_envelope->>'event_id')::uuid, 'quarantine',
-          (p_envelope#>>'{aggregate,revision}')::bigint, (p_envelope#>>'{aggregate,prev_revision}')::bigint,
-          p_envelope->>'payload_sha256', 'quarantined', left(p_reason, 200), p_envelope)
-  ON CONFLICT DO NOTHING;
+  BEGIN
+    IF v_local IS NULL THEN RAISE EXCEPTION 'receiver_not_local_app'; END IF;
+    IF jsonb_typeof(p_headers) IS DISTINCT FROM 'object' OR p_headers->>'rtgip-protocol' IS DISTINCT FROM 'rtgip/2' THEN RAISE EXCEPTION 'protocol_mismatch'; END IF;
+    IF h_key IS NULL OR h_signer IS NULL OR h_ts IS NULL OR h_nonce IS NULL OR h_scope IS NULL OR h_sig IS NULL THEN RAISE EXCEPTION 'missing_headers'; END IF;
+    IF left(h_sig, 7) <> 'rtgip2=' THEN RAISE EXCEPTION 'protocol_mismatch'; END IF;
+    IF h_nonce !~ '^[A-Za-z0-9_-]{16,128}$' THEN RAISE EXCEPTION 'invalid_nonce'; END IF;
+    SELECT * INTO k FROM rtgip.signing_keys sk WHERE sk.key_id = h_key;
+    IF NOT FOUND THEN RAISE EXCEPTION 'unknown_key'; END IF;
+    IF k.dialect <> 'rtgip/2' THEN RAISE EXCEPTION 'key_dialect_mismatch'; END IF;
+    IF k.status = 'revoked' THEN RAISE EXCEPTION 'key_revoked'; END IF;
+    IF now() < k.not_before OR now() > k.not_after THEN RAISE EXCEPTION 'key_outside_validity'; END IF;
+    IF k.owner <> h_signer THEN RAISE EXCEPTION 'signer_key_mismatch'; END IF;
+    IF h_signer <> 'gateway' THEN RAISE EXCEPTION 'signer_not_gateway'; END IF;
+    IF h_ts !~ '^[0-9]{1,12}$' OR abs(extract(epoch FROM now()) - h_ts::bigint) > 300 THEN RAISE EXCEPTION 'timestamp_out_of_window'; END IF;
+    IF p_body IS NULL OR octet_length(convert_to(p_body, 'UTF8')) > 65536 THEN RAISE EXCEPTION 'body_too_large'; END IF;
+    v_sha := encode(extensions.digest(convert_to(p_body, 'UTF8'), 'sha256'), 'hex');
+    SELECT s.decrypted_secret INTO v_secret FROM vault.decrypted_secrets s WHERE s.name = k.secret_ref;
+    IF v_secret IS NULL OR v_secret = '' THEN RAISE EXCEPTION 'key_secret_unavailable'; END IF;
+    IF NOT rtgip.ct_equal('rtgip2=' || encode(extensions.hmac(convert_to(array_to_string(
+         ARRAY['rtgip/2', h_key, k.owner, h_ts, h_nonce, h_scope, v_sha], chr(10)), 'UTF8'), convert_to(v_secret, 'UTF8'), 'sha256'), 'hex'), h_sig) THEN
+      RAISE EXCEPTION 'bad_signature';
+    END IF;
+  EXCEPTION WHEN raise_exception OR invalid_text_representation OR numeric_value_out_of_range THEN
+    INSERT INTO rtgip.audit_log (actor, action, detail)
+    VALUES ('inbox', 'admission_rejected', jsonb_build_object('stage', 'signature', 'reason', SQLERRM, 'key_id', h_key));
+    RETURN QUERY SELECT NULL::bigint, NULL::uuid, 'rejected'::text, SQLERRM::text, false, NULL::text, NULL::text, NULL::jsonb;
+    RETURN;
+  END;
+
+  v_claim := rtgip.claim_nonce(h_key, h_nonce, v_sha, to_timestamp(h_ts::bigint + 900));
+  IF v_claim = 'conflict' THEN
+    INSERT INTO rtgip.audit_log (actor, action, detail)
+    VALUES ('inbox', 'admission_rejected', jsonb_build_object('stage', 'nonce', 'reason', 'nonce_reused', 'key_id', h_key));
+    RETURN QUERY SELECT NULL::bigint, NULL::uuid, 'rejected'::text, 'nonce_reused'::text, false, NULL::text, NULL::text, NULL::jsonb;
+    RETURN;
+  END IF;
+
+  BEGIN
+    BEGIN e := p_body::jsonb; EXCEPTION WHEN others THEN RAISE EXCEPTION 'malformed_json'; END;
+    IF jsonb_typeof(e) IS DISTINCT FROM 'object' THEN RAISE EXCEPTION 'invalid_envelope:not_an_object'; END IF;
+    IF rtgip.canonical_json(e) <> p_body THEN RAISE EXCEPTION 'body_not_canonical'; END IF;
+    IF (SELECT array_agg(x ORDER BY x COLLATE "C") FROM jsonb_object_keys(e) x) IS DISTINCT FROM shape THEN RAISE EXCEPTION 'invalid_envelope:fields'; END IF;
+    IF e->>'protocol' IS DISTINCT FROM 'rtgip/2' THEN RAISE EXCEPTION 'protocol_mismatch'; END IF;
+    IF jsonb_typeof(e->'schema_version') IS DISTINCT FROM 'number' OR jsonb_typeof(e->'payload') IS DISTINCT FROM 'object'
+       OR EXISTS (SELECT 1 FROM unnest(ARRAY[e->'event_id', e->'event_type', e->'source_app', e->'target_app', e->'route', e->'purpose',
+            e->'tenant_id', e->'rooftop_id', e->'payload_sha256', e#>'{vehicle,instance_id}', e#>'{vehicle,episode_id}', e#>'{origin,event_id}']) v
+          WHERE jsonb_typeof(v) IS DISTINCT FROM 'string') THEN
+      RAISE EXCEPTION 'invalid_envelope:identity';
+    END IF;
+    IF h_scope IS DISTINCT FROM array_to_string(ARRAY[e->>'source_app', e->>'target_app', e->>'tenant_id', e->>'rooftop_id',
+         e->>'event_type', e->>'schema_version', e->>'purpose', e->>'event_id'], ';') THEN
+      RAISE EXCEPTION 'scope_mismatch';
+    END IF;
+    IF encode(extensions.digest(convert_to(rtgip.canonical_json(e->'payload'), 'UTF8'), 'sha256'), 'hex') IS DISTINCT FROM e->>'payload_sha256' THEN
+      RAISE EXCEPTION 'payload_hash_mismatch';
+    END IF;
+    IF rtgip.derive_event_id(e) IS DISTINCT FROM e->>'event_id' THEN RAISE EXCEPTION 'event_id_not_derived'; END IF;
+    IF e->>'target_app' IS DISTINCT FROM v_local THEN RAISE EXCEPTION 'wrong_destination'; END IF;
+    IF e->>'route' IS DISTINCT FROM (e->>'source_app') || '->' || (e->>'target_app') THEN RAISE EXCEPTION 'unknown_route'; END IF;
+    IF e->>'source_app' = 'autofilm' OR e->>'target_app' = 'autofilm' THEN RAISE EXCEPTION 'route_reserved'; END IF;
+    SELECT * INTO cat FROM rtgip.event_catalog ec WHERE ec.route = e->>'route' AND ec.event_type = e->>'event_type';
+    IF NOT FOUND THEN RAISE EXCEPTION 'event_not_on_route'; END IF;
+    IF cat.owner <> e->>'source_app' THEN RAISE EXCEPTION 'not_source_authority'; END IF;
+    IF NOT ((e->>'purpose') = ANY (cat.purposes)) THEN RAISE EXCEPTION 'purpose_not_allowed'; END IF;
+    IF NOT ((e->'schema_version')::text ~ '^[0-9]{1,6}$' AND (e->>'schema_version')::integer = ANY (cat.schema_versions)) THEN
+      RAISE EXCEPTION 'unsupported_schema_version';
+    END IF;
+    IF EXISTS (SELECT 1 FROM jsonb_path_query(e, 'lax $.**') v
+               WHERE (jsonb_typeof(v) = 'object' AND EXISTS (SELECT 1 FROM jsonb_object_keys(v) kk JOIN rtgip.forbidden_keys fk ON fk.key = lower(kk)))
+                  OR (jsonb_typeof(v) = 'string' AND (v #>> '{}') ~* '^(https?:|data:|blob:|ftp:)')) THEN
+      RAISE EXCEPTION 'invalid_envelope:sensitive_content';
+    END IF;
+    SELECT min(c.connection_id), count(*) INTO v_conn, v_n FROM rtgip.connections c
+      WHERE c.source_app = e->>'source_app' AND c.target_app = e->>'target_app' AND c.tenant_id = e->>'tenant_id' AND c.status = 'active';
+    IF v_n = 0 THEN
+      IF EXISTS (SELECT 1 FROM rtgip.connections c WHERE c.source_app = e->>'source_app' AND c.target_app = e->>'target_app' AND c.tenant_id = e->>'tenant_id') THEN
+        RAISE EXCEPTION 'connection_revoked';
+      END IF;
+      RAISE EXCEPTION 'no_connection_for_tenant';
+    END IF;
+    IF v_n > 1 THEN RAISE EXCEPTION 'ambiguous_connection'; END IF;
+    v_why := rtgip.deliverable_reason(v_conn, e);
+    IF v_why = 'connection_mismatch' THEN RAISE EXCEPTION 'rooftop_not_granted'; END IF;
+    IF v_why IS NOT NULL THEN RAISE EXCEPTION '%', v_why; END IF;
+    IF NOT (v_conn = ANY (k.connection_ids)) THEN RAISE EXCEPTION 'key_not_bound_to_connection'; END IF;
+    IF p_consumer_reject IS NOT NULL THEN
+      BEGIN v_rej_event := (p_consumer_reject->>'event_id')::uuid; EXCEPTION WHEN others THEN v_rej_event := NULL; END;
+      v_rej_reason := left(p_consumer_reject->>'reason', 180);
+      IF v_rej_event IS NULL OR v_rej_reason IS NULL OR v_rej_reason = '' THEN RAISE EXCEPTION 'invalid_consumer_reject'; END IF;
+    END IF;
+  EXCEPTION WHEN raise_exception OR invalid_text_representation OR numeric_value_out_of_range THEN
+    INSERT INTO rtgip.audit_log (actor, action, detail)
+    VALUES ('inbox', 'admission_rejected', jsonb_build_object('stage', 'envelope', 'reason', SQLERRM, 'key_id', h_key, 'body_sha256', v_sha));
+    RETURN QUERY SELECT NULL::bigint, NULL::uuid, 'rejected'::text, SQLERRM::text, false, NULL::text, NULL::text, NULL::jsonb;
+    RETURN;
+  END;
+
+  v_adm := nextval(pg_get_serial_sequence('rtgip.admissions', 'id'));
+  FOR rec IN SELECT * FROM rtgip.inbox_receive(e, v_local, v_rej_event, CASE WHEN v_rej_reason IS NOT NULL THEN 'consumer_reject:' || v_rej_reason END) LOOP
+    v_first := coalesce(v_first, rec.outcome);
+    IF rec.event_id = v_rej_event AND rec.outcome = 'quarantined' THEN v_rej_seen := true; END IF;
+    admission_id := v_adm; event_id := rec.event_id; outcome := rec.outcome; reason := rec.reason;
+    committed := rec.committed; committed_outcome := rec.committed_outcome; connection_id := v_conn; envelope := rec.envelope;
+    RETURN NEXT;
+  END LOOP;
+  IF v_rej_event IS NOT NULL AND NOT v_rej_seen THEN RAISE EXCEPTION 'consumer_reject_not_applicable'; END IF;
+  INSERT INTO rtgip.admissions (id, key_id, nonce, body_sha256, event_id, connection_id, signer, outcome, consumer_reject)
+  VALUES (v_adm, h_key, h_nonce, v_sha, (e->>'event_id')::uuid, v_conn, h_signer, v_first, v_rej_reason);
   INSERT INTO rtgip.audit_log (actor, action, event_id, detail)
-  VALUES ('inbox', 'quarantined', (p_envelope->>'event_id')::uuid, jsonb_build_object('reason', left(p_reason, 200)));
+  VALUES ('inbox', 'admitted:' || v_first, (e->>'event_id')::uuid,
+          jsonb_build_object('admission_id', v_adm, 'connection_id', v_conn, 'key_id', h_key, 'nonce_claim', v_claim));
 END $$;
 
 -- Only expired nonce claims are ever purged; inbox, outbox, receipts and audit are retained.
@@ -490,7 +785,8 @@ $$;
 DO $$
 DECLARE t text; r text;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['delivery_config','connections','signing_keys','nonce_claims','outbox','receipts','inbox','inbox_conflicts','watermarks','audit_log'] LOOP
+  FOREACH t IN ARRAY ARRAY['delivery_config','connections','signing_keys','nonce_claims','outbox','receipts','inbox','inbox_conflicts',
+                           'admissions','event_catalog','forbidden_keys','watermarks','audit_log'] LOOP
     EXECUTE format('ALTER TABLE rtgip.%I ENABLE ROW LEVEL SECURITY', t);
   END LOOP;
   EXECUTE 'REVOKE ALL ON ALL TABLES IN SCHEMA rtgip FROM PUBLIC';
@@ -512,17 +808,15 @@ GRANT EXECUTE ON FUNCTION rtgip.outbox_enqueue(text) TO rtgip_outbox_writer;
 GRANT EXECUTE ON FUNCTION rtgip.outbox_claim(text, integer, integer) TO rtgip_dispatcher;
 GRANT EXECUTE ON FUNCTION rtgip.outbox_advance(uuid, text, text, text) TO rtgip_dispatcher;
 GRANT EXECUTE ON FUNCTION rtgip.outbox_fail(uuid, text, text, integer, integer) TO rtgip_dispatcher;
-GRANT EXECUTE ON FUNCTION rtgip.claim_nonce(text, text, text, timestamptz) TO rtgip_inbox_receiver;
-GRANT EXECUTE ON FUNCTION rtgip.inbox_receive(jsonb, text) TO rtgip_inbox_receiver;
-GRANT EXECUTE ON FUNCTION rtgip.inbox_quarantine(jsonb, text) TO rtgip_inbox_receiver;
+GRANT EXECUTE ON FUNCTION rtgip.inbox_admit(jsonb, text, jsonb) TO rtgip_inbox_receiver;
 GRANT EXECUTE ON FUNCTION rtgip.purge_expired_nonces() TO rtgip_operator;
 GRANT SELECT ON rtgip.connections, rtgip.signing_keys, rtgip.outbox, rtgip.receipts, rtgip.inbox,
-  rtgip.inbox_conflicts, rtgip.watermarks, rtgip.audit_log TO rtgip_operator;
+  rtgip.inbox_conflicts, rtgip.admissions, rtgip.watermarks, rtgip.audit_log TO rtgip_operator;
 
 DO $$
 DECLARE t text;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['connections','signing_keys','outbox','receipts','inbox','inbox_conflicts','watermarks','audit_log'] LOOP
+  FOREACH t IN ARRAY ARRAY['connections','signing_keys','outbox','receipts','inbox','inbox_conflicts','admissions','watermarks','audit_log'] LOOP
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'rtgip' AND tablename = t AND policyname = 'operator_read') THEN
       EXECUTE format('CREATE POLICY operator_read ON rtgip.%I FOR SELECT TO rtgip_operator USING (true)', t);
     END IF;

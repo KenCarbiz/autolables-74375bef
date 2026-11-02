@@ -81,13 +81,17 @@ export interface ApprovalRow {
   aggregate_revision: number;
   source_event_id: string | null;
 }
-/** An audited reinstatement after a revocation (audit_log action 'media.reinstated'). */
+/**
+ * An audited reinstatement after a revocation: the audit_log row public.reinstate_media writes
+ * (action 'media.reinstated'), with the roles the actor held in the tenant at that moment.
+ */
 export interface ReinstatementRow {
   audit_id: string;
   tenant_id: string;
   media_id: string;
   revoked_approval_id: string;
   actor: string;
+  actor_roles: readonly string[];
 }
 
 export interface FrameApprovalRecords {
@@ -185,6 +189,10 @@ export function mediaApproved(
         x.revoked_approval_id === last.id && x.media_id === m.id && x.tenant_id === m.tenant_id,
     );
     if (!rs) throw new FrameProducerError("revoked_media_requires_reinstatement");
+    // Same rule as public.reinstate_media: an owner, and never the person who revoked it.
+    if (!Array.isArray(rs.actor_roles) || !rs.actor_roles.includes("owner"))
+      throw new FrameProducerError("reinstatement_not_authorized");
+    if (rs.actor === last.actor) throw new FrameProducerError("reinstatement_by_revoker");
     reinstatement = rs.audit_id;
   }
   const episode = scope.episode_map[v.episode_id];

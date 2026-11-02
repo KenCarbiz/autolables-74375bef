@@ -17,7 +17,13 @@ export interface LabelsInstance {
   instance_id: string;
   episode_id: string;
   episode_state: "open" | "closed";
-  stock_number: string;
+  /** From the episode's listing; null until the vehicle has one. */
+  stock_number: string | null;
+}
+
+function stockOf(inst: LabelsInstance): string {
+  if (!inst.stock_number) throw new LabelsProducerError("stock_number_unknown");
+  return inst.stock_number;
 }
 
 export interface FactMeta {
@@ -47,13 +53,13 @@ function fact(scope: LabelsServerScope, inst: LabelsInstance, type: EventType, m
 }
 
 export function identityRegistered(scope: LabelsServerScope, inst: LabelsInstance, decoded: { year: number; make: string; model: string; trim: string | null; registered_at: string }, meta: FactMeta, targets: readonly AppId[]) {
-  return produceFor(fact(scope, inst, "vehicle.identity_registered", meta, { stock_number: inst.stock_number, ...decoded }), targets);
+  return produceFor(fact(scope, inst, "vehicle.identity_registered", meta, { stock_number: stockOf(inst), ...decoded }), targets);
 }
 
 export function inventoryStatusChanged(scope: LabelsServerScope, inst: LabelsInstance, status: string, changed_at: string, meta: FactMeta, targets: readonly AppId[]) {
   // A closed (sold/archived) episode can never report an active inventory status again.
   if (inst.episode_state === "closed" && !CLOSED_STATUSES.has(status)) throw new LabelsProducerError("closed_episode_cannot_reactivate");
-  return produceFor(fact(scope, inst, "inventory.status_changed", meta, { status, stock_number: inst.stock_number, changed_at }), targets);
+  return produceFor(fact(scope, inst, "inventory.status_changed", meta, { status, stock_number: stockOf(inst), changed_at }), targets);
 }
 
 export function listingAvailabilityChanged(scope: LabelsServerScope, inst: LabelsInstance, available: boolean, passport_ref: string | null, changed_at: string, meta: FactMeta, targets: readonly AppId[]) {

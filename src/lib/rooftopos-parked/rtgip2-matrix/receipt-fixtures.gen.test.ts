@@ -9,7 +9,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import corpus from "../rtgip2/rtgip2-corpus.v2.json";
 import { sha256Hex, type EnvelopeV2, type Registry } from "../rtgip2/protocol.ts";
-import { receiptSigningJson, signReceipt, verifyReceipt, expectReceipt, watermarkKey, type ReceiptKind } from "../rtgip2/delivery.ts";
+import { receiptSigningJson, signReceipt, verifyReceipt, expectReceipt, receiptContext, watermarkKey, type ReceiptKind } from "../rtgip2/delivery.ts";
 import { connId, keyOf, syntheticRegistry } from "../rtgip2/fixtures.ts";
 
 const ISSUED_AT = 1_767_225_600; // 2026-01-01T00:00:00Z, in the past for any real clock
@@ -27,7 +27,7 @@ it("receipt vectors for the SQL verifier are reproducible and verify in TypeScri
     const issuer = kind === "gateway_admission" ? "gateway" : env.target_app;
     const key = keyOf(reg, issuer === "gateway" ? "gw-dev-1" : "ac-dev-1");
     const r = await signReceipt({ ...expectReceipt(env, conn, kind), protocol: "rtgip/2", outcome: outcome as never, issued_at: ISSUED_AT }, key);
-    expect(await verifyReceipt(r, expectReceipt(env, conn, kind), reg, ISSUED_AT)).toEqual({ ok: true });
+    expect(await verifyReceipt(r, expectReceipt(env, conn, kind), reg, ISSUED_AT, receiptContext(env, ISSUED_AT))).toEqual({ ok: true });
     const { signature, ...rest } = r;
     return { name: `${kind}:${outcome}`, signing_text: receiptSigningJson(rest), signature };
   };
