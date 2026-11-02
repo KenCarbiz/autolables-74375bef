@@ -143,6 +143,9 @@ BEGIN
   EXCEPTION WHEN unique_violation THEN blocked := true; END;
   IF NOT blocked THEN RAISE EXCEPTION 'FAIL: second active instance of one VIN in one tenant was allowed'; END IF;
 
+  -- Fixture shortcut: with the vehicle-history guard installed, custody columns move only
+  -- inside the milestone RPCs, so the fixture sets the same transaction-local marker.
+  PERFORM set_config('vehicle_history.custody_writer', 'on', true);
   UPDATE public.vehicle_instances SET status = 'disposed', disposition = 'retail_sale', disposed_at = now()
     WHERE tenant_id = ta AND vin = '1HGCM82633A004352' AND status = 'active';
   INSERT INTO public.vehicle_instances (tenant_id, vin, acquisition_channel) VALUES (ta, '1HGCM82633A004352', 'trade');

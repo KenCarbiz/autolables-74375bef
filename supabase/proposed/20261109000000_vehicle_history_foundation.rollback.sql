@@ -27,7 +27,7 @@ DECLARE f text;
 BEGIN
   FOREACH f IN ARRAY ARRAY[
     'public.vehicle_history_set_setting(text, uuid, text, jsonb, integer, text)',
-    'public.vehicle_history_record_milestone(uuid, text, timestamptz, text, text, text, text, uuid, uuid)',
+    'public.vehicle_history_record_milestone(uuid, text, timestamptz, text, text, text, text, uuid, uuid, text, bigint)',
     'public.vehicle_history_flag_reappearance(uuid, uuid, text, uuid, text, text)',
     'public.vehicle_history_resolve_reappearance(uuid, text, text)',
     'public.vehicle_history_grant_access(uuid, text, uuid, text, uuid, text, text, text[], text, timestamptz, timestamptz)',

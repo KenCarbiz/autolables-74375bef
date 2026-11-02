@@ -99,6 +99,74 @@ CREATE TABLE IF NOT EXISTS public.vehicle_custody_milestones (
 CREATE INDEX IF NOT EXISTS vehicle_custody_milestones_instance_idx
   ON public.vehicle_custody_milestones (instance_id, occurred_at);
 
+-- Delivered custody is terminal. A pre-delivery cancellation is 'sale_voided'; a sale
+-- unwound after delivery is 'post_delivery_unwind', which records the fact without
+-- leaving 'delivered' and routes the returning car to a reviewed new episode.
+ALTER TABLE public.vehicle_custody_milestones
+  ADD COLUMN IF NOT EXISTS idempotency_key text,
+  ADD COLUMN IF NOT EXISTS source_revision bigint,
+  -- Append order. created_at is the transaction time, so it cannot order rows written together.
+  ADD COLUMN IF NOT EXISTS seq bigint GENERATED ALWAYS AS IDENTITY;
+ALTER TABLE public.vehicle_custody_milestones DROP CONSTRAINT IF EXISTS vehicle_custody_milestones_milestone_check;
+ALTER TABLE public.vehicle_custody_milestones ADD CONSTRAINT vehicle_custody_milestones_milestone_check CHECK (milestone IN (
+  'sold','awaiting_delivery','delivered','sale_voided','delivery_corrected','post_delivery_unwind',
+  'transferred_out','archived','restored'));
+ALTER TABLE public.vehicle_custody_milestones DROP CONSTRAINT IF EXISTS vehicle_custody_milestones_correction_ref_check;
+ALTER TABLE public.vehicle_custody_milestones ADD CONSTRAINT vehicle_custody_milestones_correction_ref_check CHECK (
+  milestone NOT IN ('sale_voided','delivery_corrected','post_delivery_unwind')
+  OR (corrects_id IS NOT NULL AND reason IS NOT NULL AND length(trim(reason)) >= 5));
+ALTER TABLE public.vehicle_custody_milestones DROP CONSTRAINT IF EXISTS vehicle_custody_milestones_revision_check;
+ALTER TABLE public.vehicle_custody_milestones ADD CONSTRAINT vehicle_custody_milestones_revision_check CHECK (
+  source_revision IS NULL OR (source_revision >= 1 AND source_ref IS NOT NULL));
+-- A milestone is corrected at most once; later corrections chain off the latest one.
+CREATE UNIQUE INDEX IF NOT EXISTS vehicle_custody_milestones_corrected_once
+  ON public.vehicle_custody_milestones (corrects_id) WHERE corrects_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS vehicle_custody_milestones_idempotency_key
+  ON public.vehicle_custody_milestones (tenant_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
+CREATE INDEX IF NOT EXISTS vehicle_custody_milestones_source_rev_idx
+  ON public.vehicle_custody_milestones (tenant_id, source, source_ref, source_revision) WHERE source_revision IS NOT NULL;
+
+-- Every write path (RPCs, service_role, privileged app code) passes through this guard:
+-- terminal custody never changes, a disposed episode never reopens, identity and the
+-- predecessor link never move, and custody columns change only inside the milestone or
+-- reappearance RPCs (transaction-local marker). Defense in depth, not a substitute for grants.
+CREATE OR REPLACE FUNCTION public.vehicle_instances_custody_guard()
+RETURNS trigger LANGUAGE plpgsql SET search_path = '' AS $$
+DECLARE p public.vehicle_instances%ROWTYPE;
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.previous_instance_id IS NOT NULL THEN
+      SELECT * INTO p FROM public.vehicle_instances WHERE id = NEW.previous_instance_id;
+      IF NOT FOUND OR p.tenant_id <> NEW.tenant_id OR p.vin <> NEW.vin OR p.status <> 'disposed' THEN
+        RAISE EXCEPTION 'invalid_predecessor_episode';
+      END IF;
+    END IF;
+    RETURN NEW;
+  END IF;
+  IF NEW.tenant_id IS DISTINCT FROM OLD.tenant_id OR NEW.vin IS DISTINCT FROM OLD.vin
+     OR NEW.previous_instance_id IS DISTINCT FROM OLD.previous_instance_id
+     OR NEW.opened_reason IS DISTINCT FROM OLD.opened_reason
+     OR (OLD.store_id IS NOT NULL AND NEW.store_id IS DISTINCT FROM OLD.store_id) THEN
+    RAISE EXCEPTION 'episode_identity_immutable';
+  END IF;
+  IF OLD.custody_state IN ('delivered','transferred_out')
+     AND (NEW.custody_state IS DISTINCT FROM OLD.custody_state OR NEW.status IS DISTINCT FROM OLD.status) THEN
+    RAISE EXCEPTION 'terminal_custody: % episode cannot change state', OLD.custody_state;
+  END IF;
+  IF OLD.status <> 'active' AND NEW.status IS DISTINCT FROM OLD.status THEN
+    RAISE EXCEPTION 'terminal_custody: % episode cannot reopen', OLD.status;
+  END IF;
+  IF (NEW.custody_state IS DISTINCT FROM OLD.custody_state OR NEW.status IS DISTINCT FROM OLD.status
+      OR NEW.disposed_at IS DISTINCT FROM OLD.disposed_at OR NEW.disposition IS DISTINCT FROM OLD.disposition)
+     AND COALESCE(current_setting('vehicle_history.custody_writer', true), '') <> 'on' THEN
+    RAISE EXCEPTION 'custody_write_requires_rpc';
+  END IF;
+  RETURN NEW;
+END; $$;
+DROP TRIGGER IF EXISTS vehicle_instances_custody_guard ON public.vehicle_instances;
+CREATE TRIGGER vehicle_instances_custody_guard BEFORE INSERT OR UPDATE ON public.vehicle_instances
+  FOR EACH ROW EXECUTE FUNCTION public.vehicle_instances_custody_guard();
+
 CREATE OR REPLACE FUNCTION public.vehicle_history_append_only()
 RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
@@ -526,6 +594,8 @@ BEGIN
 END; $$;
 
 -- ── 10. Lifecycle milestones ───────────────────────────────────────────────
+-- delivered and transferred_out are terminal: only correction records that keep the
+-- state may follow them. sale_voided is the pre-delivery cancellation only.
 CREATE OR REPLACE FUNCTION public.vehicle_history_next_state(p_from text, p_milestone text)
 RETURNS text LANGUAGE sql IMMUTABLE SET search_path = '' AS $$
   SELECT CASE
@@ -534,65 +604,149 @@ RETURNS text LANGUAGE sql IMMUTABLE SET search_path = '' AS $$
     WHEN p_from = 'in_stock'          AND p_milestone = 'archived'          THEN 'archived'
     WHEN p_from = 'sold'              AND p_milestone = 'awaiting_delivery' THEN 'awaiting_delivery'
     WHEN p_from IN ('sold','awaiting_delivery') AND p_milestone = 'delivered' THEN 'delivered'
-    WHEN p_from IN ('sold','awaiting_delivery','delivered') AND p_milestone = 'sale_voided' THEN 'in_stock'
+    WHEN p_from IN ('sold','awaiting_delivery') AND p_milestone = 'sale_voided' THEN 'in_stock'
     WHEN p_from = 'delivered'         AND p_milestone = 'delivery_corrected' THEN 'delivered'
+    WHEN p_from = 'delivered'         AND p_milestone = 'post_delivery_unwind' THEN 'delivered'
     WHEN p_from = 'archived'          AND p_milestone = 'restored'          THEN 'in_stock'
     ELSE NULL
   END;
 $$;
 
+DROP FUNCTION IF EXISTS public.vehicle_history_record_milestone(uuid, text, timestamptz, text, text, text, text, uuid, uuid);
 CREATE OR REPLACE FUNCTION public.vehicle_history_record_milestone(
   p_instance_id uuid, p_milestone text, p_occurred_at timestamptz, p_occurred_tz text,
   p_source text, p_source_ref text, p_reason text, p_corrects_id uuid DEFAULT NULL,
-  p_causation_event_id uuid DEFAULT NULL
+  p_causation_event_id uuid DEFAULT NULL, p_idempotency_key text DEFAULT NULL,
+  p_source_revision bigint DEFAULT NULL
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE
   i public.vehicle_instances%ROWTYPE;
+  dup public.vehicle_custody_milestones%ROWTYPE;
+  tgt public.vehicle_custody_milestones%ROWTYPE;
+  v_actor uuid := (SELECT auth.uid());
+  v_service boolean := public.vehicle_history_is_service();
+  v_correction boolean := p_milestone IN ('sale_voided','delivery_corrected','post_delivery_unwind');
   v_next text;
   v_id uuid;
   v_event text;
+  v_last_at timestamptz;
   c record;
 BEGIN
   SELECT * INTO i FROM public.vehicle_instances WHERE id = p_instance_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'unknown_instance'; END IF;
-  IF NOT (public.vehicle_history_is_manager(i.tenant_id) OR public.vehicle_history_is_service()) THEN
+  IF NOT (public.vehicle_history_is_manager(i.tenant_id) OR v_service) THEN
     RAISE EXCEPTION 'not_authorized';
   END IF;
+
+  -- Same source event again: return the recorded result, change nothing, emit nothing.
+  IF p_idempotency_key IS NOT NULL THEN
+    SELECT * INTO dup FROM public.vehicle_custody_milestones
+     WHERE tenant_id = i.tenant_id AND idempotency_key = p_idempotency_key;
+    IF FOUND THEN
+      IF dup.instance_id = i.id AND dup.milestone = p_milestone AND dup.source = p_source
+         AND dup.corrects_id IS NOT DISTINCT FROM p_corrects_id AND dup.source_ref IS NOT DISTINCT FROM p_source_ref
+         AND dup.source_revision IS NOT DISTINCT FROM p_source_revision THEN
+        RETURN jsonb_build_object('milestone_id', dup.id, 'custody_state', i.custody_state, 'duplicate', true);
+      END IF;
+      RAISE EXCEPTION 'idempotency_key_conflict';
+    END IF;
+  END IF;
+
   IF public.vehicle_history_flag(i.tenant_id, i.store_id, 'lifecycle.emergency_hold') THEN
     RAISE EXCEPTION 'emergency_hold';
   END IF;
   IF p_occurred_at IS NULL OR p_occurred_at > now() + interval '5 minutes' THEN RAISE EXCEPTION 'invalid_occurred_at'; END IF;
-  IF p_milestone IN ('sale_voided','delivery_corrected','restored') AND (p_reason IS NULL OR length(trim(p_reason)) < 5) THEN
+  IF p_source IS NULL THEN RAISE EXCEPTION 'source_required'; END IF;
+  IF (v_correction OR p_milestone = 'restored') AND (p_reason IS NULL OR length(trim(p_reason)) < 5) THEN
     RAISE EXCEPTION 'reason_required';
   END IF;
-  IF p_corrects_id IS NOT NULL AND NOT EXISTS (
-    SELECT 1 FROM public.vehicle_custody_milestones m WHERE m.id = p_corrects_id AND m.instance_id = i.id) THEN
-    RAISE EXCEPTION 'corrects_unknown_milestone';
+
+  IF i.custody_state IN ('delivered','transferred_out') AND p_milestone NOT IN ('delivery_corrected','post_delivery_unwind') THEN
+    RAISE EXCEPTION 'delivered_is_terminal: % episode accepts only corrections, got %', i.custody_state, p_milestone;
+  END IF;
+
+  IF v_correction THEN
+    IF p_corrects_id IS NULL THEN RAISE EXCEPTION 'correction_reference_required'; END IF;
+    -- A person must own a correction, or a service write must cite the inbound event that caused it.
+    IF v_actor IS NULL AND NOT (v_service AND p_causation_event_id IS NOT NULL) THEN
+      RAISE EXCEPTION 'correction_actor_required';
+    END IF;
+    -- Unwinding a delivered sale is a human manager decision.
+    IF p_milestone = 'post_delivery_unwind' AND (v_actor IS NULL OR NOT public.vehicle_history_is_manager(i.tenant_id)) THEN
+      RAISE EXCEPTION 'post_delivery_unwind_requires_manager';
+    END IF;
+    SELECT * INTO tgt FROM public.vehicle_custody_milestones m WHERE m.id = p_corrects_id AND m.instance_id = i.id;
+    IF NOT FOUND THEN RAISE EXCEPTION 'corrects_unknown_milestone'; END IF;
+    IF EXISTS (SELECT 1 FROM public.vehicle_custody_milestones m WHERE m.corrects_id = tgt.id) THEN
+      RAISE EXCEPTION 'already_corrected';
+    END IF;
+    IF p_milestone = 'sale_voided' THEN
+      IF tgt.milestone <> 'sold' OR EXISTS (SELECT 1 FROM public.vehicle_custody_milestones m
+          WHERE m.instance_id = i.id AND m.milestone = 'sold' AND m.seq > tgt.seq) THEN
+        RAISE EXCEPTION 'sale_voided_must_correct_current_sale';
+      END IF;
+    ELSIF tgt.milestone NOT IN ('delivered','delivery_corrected') OR EXISTS (SELECT 1 FROM public.vehicle_custody_milestones m
+          WHERE m.instance_id = i.id AND m.milestone IN ('delivered','delivery_corrected') AND m.seq > tgt.seq) THEN
+      RAISE EXCEPTION 'correction_must_target_current_delivery';
+    END IF;
+  ELSIF p_corrects_id IS NOT NULL THEN
+    RAISE EXCEPTION 'corrects_only_on_correction_milestones';
+  END IF;
+
+  -- Out-of-order automated input cannot move custody: per-source revisions only go up,
+  -- and a forward milestone from an automated source cannot predate the episode's last one.
+  IF p_source_revision IS NOT NULL THEN
+    IF p_source_ref IS NULL THEN RAISE EXCEPTION 'source_ref_required_with_revision'; END IF;
+    IF EXISTS (SELECT 1 FROM public.vehicle_custody_milestones m
+                WHERE m.tenant_id = i.tenant_id AND m.source = p_source AND m.source_ref = p_source_ref
+                  AND m.source_revision >= p_source_revision) THEN
+      RAISE EXCEPTION 'stale_source_revision';
+    END IF;
+  END IF;
+  IF NOT v_correction AND p_source IN ('dms','autocurb','integration') THEN
+    SELECT max(m.occurred_at) INTO v_last_at FROM public.vehicle_custody_milestones m WHERE m.instance_id = i.id;
+    IF v_last_at IS NOT NULL AND p_occurred_at < v_last_at THEN RAISE EXCEPTION 'stale_occurred_at'; END IF;
   END IF;
 
   v_next := public.vehicle_history_next_state(i.custody_state, p_milestone);
   IF v_next IS NULL THEN RAISE EXCEPTION 'invalid_transition: % -> %', i.custody_state, p_milestone; END IF;
 
   INSERT INTO public.vehicle_custody_milestones (tenant_id, instance_id, vin, milestone, from_state, to_state,
-      occurred_at, occurred_tz, source, source_ref, confirmed_by, corrects_id, reason, causation_event_id)
+      occurred_at, occurred_tz, source, source_ref, confirmed_by, corrects_id, reason, causation_event_id,
+      idempotency_key, source_revision)
   VALUES (i.tenant_id, i.id, i.vin, p_milestone, i.custody_state, v_next, p_occurred_at, p_occurred_tz,
-      p_source, p_source_ref, (SELECT auth.uid()), p_corrects_id, p_reason, p_causation_event_id)
+      p_source, p_source_ref, v_actor, p_corrects_id, p_reason, p_causation_event_id,
+      p_idempotency_key, p_source_revision)
   RETURNING id INTO v_id;
 
+  PERFORM set_config('vehicle_history.custody_writer', 'on', true);
   UPDATE public.vehicle_instances SET
     custody_state = v_next,
     status = CASE WHEN v_next IN ('delivered','transferred_out') THEN 'disposed' ELSE 'active' END,
     disposed_at = CASE WHEN v_next IN ('delivered','transferred_out') THEN COALESCE(
       CASE WHEN p_milestone = 'delivery_corrected' THEN p_occurred_at END, disposed_at, p_occurred_at)
       WHEN v_next = 'in_stock' THEN NULL ELSE disposed_at END,
-    disposition = CASE WHEN v_next = 'delivered' THEN 'retail_sale' WHEN v_next = 'transferred_out' THEN 'transfer'
+    disposition = CASE WHEN p_milestone = 'post_delivery_unwind' THEN 'return'
+      WHEN v_next = 'delivered' THEN 'retail_sale' WHEN v_next = 'transferred_out' THEN 'transfer'
       WHEN v_next = 'in_stock' THEN NULL ELSE disposition END
   WHERE id = i.id;
+  PERFORM set_config('vehicle_history.custody_writer', '', true);
+
+  -- The car coming back after an unwind gets a reviewed new episode, never this one.
+  IF p_milestone = 'post_delivery_unwind' THEN
+    INSERT INTO public.vehicle_reappearance_reviews (tenant_id, store_id, vin, prior_instance_id, prior_custody_state,
+        detected_source, detected_ref)
+    VALUES (i.tenant_id, i.store_id, i.vin, i.id, 'delivered', 'post_delivery_unwind', v_id::text)
+    ON CONFLICT (tenant_id, vin) WHERE status = 'open' DO NOTHING;
+  END IF;
 
   PERFORM public.vehicle_history_audit_write(i.tenant_id, 'custody.' || p_milestone, 'vehicle_instance', i.id::text, p_reason,
-    jsonb_build_object('custody_state', i.custody_state), jsonb_build_object('custody_state', v_next, 'milestone_id', v_id));
+    jsonb_build_object('custody_state', i.custody_state),
+    jsonb_build_object('custody_state', v_next, 'milestone_id', v_id, 'corrects_id', p_corrects_id, 'source', p_source,
+      'source_ref', p_source_ref, 'causation_event_id', p_causation_event_id));
 
   -- Transactional outbox: the event exists if and only if the milestone does.
+  -- post_delivery_unwind has no catalogued wire event yet; it stays AutoLabels-local.
   v_event := CASE p_milestone WHEN 'sold' THEN 'autolabels.vehicle.sold' WHEN 'delivered' THEN 'autolabels.vehicle.delivered'
     WHEN 'sale_voided' THEN 'autolabels.vehicle.sale_voided' WHEN 'archived' THEN 'autolabels.vehicle.archived' END;
   IF v_event IS NOT NULL AND public.vehicle_history_flag(i.tenant_id, i.store_id, 'integration.outbound_capture_enabled') THEN
@@ -662,10 +816,14 @@ BEGIN
   IF r.prior_instance_id IS NOT NULL THEN
     SELECT * INTO p FROM public.vehicle_instances WHERE id = r.prior_instance_id FOR UPDATE;
   END IF;
+  -- Reopening or replacing custody is a reviewed human decision, never an automated one.
+  IF p_decision IN ('restore_episode','new_episode') AND (SELECT auth.uid()) IS NULL THEN
+    RAISE EXCEPTION 'reviewer_required';
+  END IF;
 
   IF p_decision = 'restore_episode' THEN
     -- Only an archived episode can be restored. A delivered car coming back is a new episode.
-    IF p.id IS NULL OR p.custody_state <> 'archived' THEN RAISE EXCEPTION 'restore_requires_archived_episode'; END IF;
+    IF p.id IS NULL OR p.custody_state <> 'archived' OR p.status <> 'active' THEN RAISE EXCEPTION 'restore_requires_archived_episode'; END IF;
     PERFORM public.vehicle_history_record_milestone(p.id, 'restored', now(), NULL, 'feed_review', r.id::text, p_reason);
     v_new := p.id;
   ELSIF p_decision = 'new_episode' THEN
@@ -675,8 +833,10 @@ BEGIN
     END IF;
     IF p.id IS NOT NULL AND p.status = 'active' THEN
       -- Close the archived episode as-is; its history stays attached to it.
+      PERFORM set_config('vehicle_history.custody_writer', 'on', true);
       UPDATE public.vehicle_instances SET status = 'disposed', disposition = COALESCE(disposition, 'cancelled')
        WHERE id = p.id;
+      PERFORM set_config('vehicle_history.custody_writer', '', true);
     END IF;
     INSERT INTO public.vehicle_instances (tenant_id, vin, store_id, acquired_at, opened_reason, previous_instance_id, custody_state, status)
     VALUES (r.tenant_id, r.vin, r.store_id, NULL, 'reacquisition', p.id, 'in_stock', 'active')
@@ -1203,7 +1363,7 @@ BEGIN
     'public.vehicle_history_is_manager(uuid)',
     'public.vehicle_history_effective_setting(uuid, uuid, text)',
     'public.vehicle_history_set_setting(text, uuid, text, jsonb, integer, text)',
-    'public.vehicle_history_record_milestone(uuid, text, timestamptz, text, text, text, text, uuid, uuid)',
+    'public.vehicle_history_record_milestone(uuid, text, timestamptz, text, text, text, text, uuid, uuid, text, bigint)',
     'public.vehicle_history_flag_reappearance(uuid, uuid, text, uuid, text, text)',
     'public.vehicle_history_resolve_reappearance(uuid, text, text)',
     'public.vehicle_history_grant_access(uuid, text, uuid, text, uuid, text, text, text[], text, timestamptz, timestamptz)',

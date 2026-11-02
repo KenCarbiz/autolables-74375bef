@@ -23,7 +23,7 @@ INSERT INTO public.tenant_members (tenant_id, user_id, role, accepted_at)
 INSERT INTO public.user_roles (user_id, role) SELECT plat, 'admin' FROM _ids;
 
 -- Synthetic VINs with valid check digits.
-INSERT INTO public.vehicles (vin) VALUES ('1HGCM82633A004352'), ('1M8GDM9AXKP042788'), ('JH4KA7561PC008269');
+INSERT INTO public.vehicles (vin) VALUES ('1HGCM82633A004352'), ('1M8GDM9AXKP042788'), ('JH4KA7561PC008269'), ('5YJSA1E27HF000337');
 INSERT INTO public.integration_connections (id, tenant_id, app, display_name, status, adapter, external_rooftop_ref)
   SELECT conn_a, tenant_a, 'autofilm', 'A film', 'active', 'autofilm.v1', 'af-vh-a' FROM _ids;
 INSERT INTO public.integration_connections (id, tenant_id, app, display_name, status, adapter, external_rooftop_ref)
@@ -181,6 +181,14 @@ DECLARE t uuid; prior uuid; rv uuid; r jsonb; n_ms int; newi public.vehicle_inst
 BEGIN
   SELECT tenant_a INTO t FROM _ids;
   SELECT id INTO prior FROM public.vehicle_instances WHERE tenant_id = t AND vin = '1HGCM82633A004352';
+  rv := public.vehicle_history_flag_reappearance(t, NULL, '1HGCM82633A004352', NULL, 'feed_snapshot', 'snap-0');
+  BEGIN
+    PERFORM public.vehicle_history_resolve_reappearance(rv, 'new_episode', 'automated decision attempt');
+    RAISE EXCEPTION 'FAIL: service role opened an episode without a reviewer';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM NOT LIKE 'reviewer_required%' THEN RAISE; END IF;
+  END;
+  DELETE FROM public.vehicle_reappearance_reviews WHERE id = rv;
+  PERFORM set_config('request.jwt.claims', (SELECT json_build_object('sub', mgr_a, 'role', 'service_role')::text FROM _ids), true);
   SELECT count(*) INTO n_ms FROM public.vehicle_custody_milestones WHERE instance_id = prior;
   rv := public.vehicle_history_flag_reappearance(t, NULL, '1hgcm82633a004352', NULL, 'feed_snapshot', 'snap-1');
   IF rv IS NULL THEN RAISE EXCEPTION 'FAIL: reappearance not flagged'; END IF;
@@ -209,6 +217,7 @@ BEGIN
     RAISE EXCEPTION 'FAIL: service evidence lost on reacquisition';
   END IF;
   RAISE NOTICE 'PASS: reacquisition opens a new linked episode; prior deal milestones and service evidence unchanged';
+  PERFORM set_config('request.jwt.claims', '', true);
 END $$;
 
 -- S6. Archived episode reappears: only an explicit restore brings it back.
@@ -216,6 +225,7 @@ DO $$
 DECLARE t uuid; inst uuid; rv uuid; r jsonb;
 BEGIN
   SELECT tenant_a INTO t FROM _ids;
+  PERFORM set_config('request.jwt.claims', (SELECT json_build_object('sub', mgr_a, 'role', 'service_role')::text FROM _ids), true);
   INSERT INTO public.vehicle_instances (tenant_id, vin) VALUES (t, '1M8GDM9AXKP042788') RETURNING id INTO inst;
   PERFORM public.vehicle_history_record_milestone(inst, 'archived', now() - interval '3 days', NULL, 'staff', NULL, 'left feed');
   rv := public.vehicle_history_flag_reappearance(t, NULL, '1M8GDM9AXKP042788', NULL, 'feed_snapshot', 'snap-3');
@@ -227,26 +237,35 @@ BEGIN
     RAISE EXCEPTION 'FAIL: restore did not reopen the same episode';
   END IF;
   RAISE NOTICE 'PASS: archived reappearance stays put until a reviewer restores the same episode';
+  PERFORM set_config('request.jwt.claims', '', true);
 END $$;
 
--- S7. Void and correction append; history rows cannot be edited.
+-- S7. Pre-delivery void returns to stock; delivered is terminal; corrections append.
 DO $$
-DECLARE t uuid; inst uuid; d uuid; r jsonb;
+DECLARE t uuid; inst uuid; d uuid; sold1 uuid; r jsonb;
 BEGIN
   SELECT tenant_a INTO t FROM _ids;
+  PERFORM set_config('request.jwt.claims', (SELECT json_build_object('sub', mgr_a, 'role', 'service_role')::text FROM _ids), true);
   SELECT id INTO inst FROM public.vehicle_instances WHERE tenant_id = t AND vin = '1M8GDM9AXKP042788';
-  PERFORM public.vehicle_history_record_milestone(inst, 'sold', now() - interval '2 days', NULL, 'staff', 'deal-2', NULL);
-  r := public.vehicle_history_record_milestone(inst, 'delivered', now() - interval '1 day', NULL, 'staff', 'deal-2', NULL);
+  sold1 := (public.vehicle_history_record_milestone(inst, 'sold', now() - interval '3 days', NULL, 'staff', 'deal-2', NULL)->>'milestone_id')::uuid;
+  PERFORM public.vehicle_history_record_milestone(inst, 'sale_voided', now() - interval '70 hours', NULL, 'staff', 'deal-2', 'financing fell through', sold1);
+  IF (SELECT custody_state FROM public.vehicle_instances WHERE id = inst) <> 'in_stock' THEN RAISE EXCEPTION 'FAIL: pre-delivery void did not return to stock'; END IF;
+  PERFORM public.vehicle_history_record_milestone(inst, 'sold', now() - interval '2 days', NULL, 'staff', 'deal-3', NULL);
+  r := public.vehicle_history_record_milestone(inst, 'delivered', now() - interval '1 day', NULL, 'staff', 'deal-3', NULL);
   d := (r->>'milestone_id')::uuid;
   BEGIN
-    PERFORM public.vehicle_history_record_milestone(inst, 'delivery_corrected', now() - interval '30 hours', NULL, 'staff', 'deal-2', NULL, d);
+    PERFORM public.vehicle_history_record_milestone(inst, 'delivery_corrected', now() - interval '30 hours', NULL, 'staff', 'deal-3', NULL, d);
     RAISE EXCEPTION 'FAIL: correction without reason accepted';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM NOT LIKE 'reason_required%' THEN RAISE; END IF;
   END;
-  PERFORM public.vehicle_history_record_milestone(inst, 'delivery_corrected', now() - interval '30 hours', NULL, 'staff', 'deal-2', 'date keyed wrong', d);
-  PERFORM public.vehicle_history_record_milestone(inst, 'sale_voided', now(), NULL, 'staff', 'deal-2', 'financing fell through');
-  IF (SELECT count(*) FROM public.vehicle_custody_milestones WHERE instance_id = inst) <> 6 THEN RAISE EXCEPTION 'FAIL: milestones not appended'; END IF;
-  IF (SELECT custody_state FROM public.vehicle_instances WHERE id = inst) <> 'in_stock' THEN RAISE EXCEPTION 'FAIL: void did not return to stock'; END IF;
+  PERFORM public.vehicle_history_record_milestone(inst, 'delivery_corrected', now() - interval '30 hours', NULL, 'staff', 'deal-3', 'date keyed wrong', d);
+  BEGIN
+    PERFORM public.vehicle_history_record_milestone(inst, 'sale_voided', now(), NULL, 'staff', 'deal-3', 'late void after delivery', sold1);
+    RAISE EXCEPTION 'FAIL: delivered episode accepted a sale void';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM NOT LIKE 'delivered_is_terminal%' THEN RAISE; END IF;
+  END;
+  IF (SELECT count(*) FROM public.vehicle_custody_milestones WHERE instance_id = inst) <> 7 THEN RAISE EXCEPTION 'FAIL: milestones not appended'; END IF;
+  IF (SELECT custody_state FROM public.vehicle_instances WHERE id = inst) <> 'delivered' THEN RAISE EXCEPTION 'FAIL: delivered state lost'; END IF;
   BEGIN
     UPDATE public.vehicle_custody_milestones SET reason = 'x' WHERE id = d;
     RAISE EXCEPTION 'FAIL: milestone edited';
@@ -257,7 +276,8 @@ BEGIN
     RAISE EXCEPTION 'FAIL: episode with history deleted';
   EXCEPTION WHEN foreign_key_violation THEN NULL;
   END;
-  RAISE NOTICE 'PASS: correction and void append audited rows; history is append-only and episodes cannot be deleted';
+  PERFORM set_config('request.jwt.claims', '', true);
+  RAISE NOTICE 'PASS: pre-delivery void returns to stock; delivered stays terminal; corrections append; history is append-only';
 END $$;
 
 -- S8. Repairs: authorization is not completion; declined stays in history.
@@ -358,15 +378,15 @@ END $$;
 
 -- S11. Transactional outbox and echo guard.
 DO $$
-DECLARE t uuid; inst uuid; before int; cause uuid;
+DECLARE t uuid; inst uuid; before int; cause uuid; s1 uuid; s2 uuid;
 BEGIN
   SELECT tenant_a INTO t FROM _ids;
-  SELECT id INTO inst FROM public.vehicle_instances WHERE tenant_id = t AND vin = '1M8GDM9AXKP042788';
+  INSERT INTO public.vehicle_instances (tenant_id, vin) VALUES (t, '5YJSA1E27HF000337') RETURNING id INTO inst;
   SELECT count(*) INTO before FROM public.integration_outbox WHERE tenant_id = t;
-  PERFORM public.vehicle_history_record_milestone(inst, 'sold', now(), NULL, 'staff', NULL, NULL);
+  s1 := (public.vehicle_history_record_milestone(inst, 'sold', now() - interval '1 hour', NULL, 'staff', NULL, NULL)->>'milestone_id')::uuid;
   IF (SELECT count(*) FROM public.integration_outbox WHERE tenant_id = t) <> before THEN RAISE EXCEPTION 'FAIL: outbox written while capture is off'; END IF;
   PERFORM public.vehicle_history_set_setting('platform', NULL, 'integration.outbound_capture_enabled', 'true', 0, 'synthetic capture on');
-  PERFORM public.vehicle_history_record_milestone(inst, 'awaiting_delivery', now(), NULL, 'staff', NULL, NULL);
+  PERFORM public.vehicle_history_record_milestone(inst, 'awaiting_delivery', now() - interval '50 minutes', NULL, 'staff', NULL, NULL);
   IF (SELECT count(*) FROM public.integration_outbox WHERE tenant_id = t) <> before THEN RAISE EXCEPTION 'FAIL: non-catalog milestone emitted'; END IF;
   BEGIN
     PERFORM public.vehicle_history_record_milestone(inst, 'archived', now(), NULL, 'staff', NULL, NULL);
@@ -374,9 +394,12 @@ BEGIN
   END;
   IF (SELECT count(*) FROM public.integration_outbox WHERE tenant_id = t) <> before THEN RAISE EXCEPTION 'FAIL: failed change left an outbox row'; END IF;
   SELECT event_id INTO cause FROM public.integration_inbox WHERE connection_id = (SELECT conn_a FROM _ids) LIMIT 1;
-  PERFORM public.vehicle_history_record_milestone(inst, 'delivered', now(), NULL, 'integration', NULL, NULL, NULL, cause);
+  PERFORM public.vehicle_history_record_milestone(inst, 'sale_voided', now() - interval '40 minutes', NULL, 'integration', 'dms-deal-9', 'deal cancelled upstream', s1, cause);
   IF (SELECT count(*) FROM public.integration_outbox WHERE tenant_id = t) <> before THEN RAISE EXCEPTION 'FAIL: echoed back to the causing app'; END IF;
-  PERFORM public.vehicle_history_record_milestone(inst, 'sale_voided', now(), NULL, 'staff', NULL, 'synthetic unwind');
+  s2 := (public.vehicle_history_record_milestone(inst, 'sold', now() - interval '30 minutes', NULL, 'staff', NULL, NULL)->>'milestone_id')::uuid;
+  PERFORM set_config('request.jwt.claims', (SELECT json_build_object('sub', mgr_a, 'role', 'service_role')::text FROM _ids), true);
+  PERFORM public.vehicle_history_record_milestone(inst, 'sale_voided', now() - interval '20 minutes', NULL, 'staff', NULL, 'synthetic unwind', s2);
+  PERFORM set_config('request.jwt.claims', '', true);
   IF (SELECT count(*) FROM public.integration_outbox WHERE tenant_id = t AND event_type = 'autolabels.vehicle.sale_voided') <> 1 THEN
     RAISE EXCEPTION 'FAIL: sale_voided not captured';
   END IF;

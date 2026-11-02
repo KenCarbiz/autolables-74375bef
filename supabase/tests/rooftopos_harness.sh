@@ -82,7 +82,7 @@ record "legacy feed hardening migration, second apply (must be clean)" "$([ $? =
 diff -q <(grep -v "restrict" "$LOGS/lfschema1.sql") <(grep -v "restrict" "$LOGS/lfschema2.sql") >/dev/null
 record "legacy feed schema identical after second apply" "$([ $? = 0 ] && echo PASS || echo FAIL)" "$LOGS/lfschema2.sql"
 
-for t in rooftopos_spine_rls rooftopos_apply_sql vehicle_history_sql legacy_feeds_sql; do
+for t in rooftopos_spine_rls rooftopos_apply_sql vehicle_history_sql vehicle_history_lifecycle_sql legacy_feeds_sql; do
   "${SCRATCH[@]}" -f "$ROOT/supabase/tests/$t.sql" >"$LOGS/$t.log" 2>&1
   rc=$?
   passes=$(grep -c "NOTICE:  PASS" "$LOGS/$t.log")
