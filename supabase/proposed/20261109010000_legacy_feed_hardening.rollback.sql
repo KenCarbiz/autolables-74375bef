@@ -1,8 +1,10 @@
 -- Rollback for 20261109010000_legacy_feed_hardening.sql. PROPOSED, NOT APPLIED.
--- Keeps every row (bindings, receipts, and the widened connections.app check). Re-opens the
--- legacy shared-secret format for every tenant and removes client entry points. Nothing is dropped.
-
-UPDATE public.legacy_feed_bindings SET legacy_unsigned = 'allowed' WHERE legacy_unsigned <> 'allowed';
+-- Safety rollback (permission hardening only). Keep every binding, receipt, connection,
+-- and each tenant's existing legacy_unsigned cutover decision. NEVER globally re-enable
+-- shared-secret authentication on dealers already restricted to signed requests.
+-- A tenant-specific emergency fallback is a separate, time-boxed security exception
+-- requiring operator approval, exact tenant/feed/provider scope and an audit trail.
+-- This file does not undo signed authentication or change live feed switches.
 
 REVOKE ALL ON public.legacy_feed_bindings FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON public.legacy_feed_receipts FROM PUBLIC, anon, authenticated;

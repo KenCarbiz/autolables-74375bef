@@ -109,11 +109,28 @@ canexec=$("${PSQL[@]}" -d scratch -Atc "select has_function_privilege('authentic
 held=$("${PSQL[@]}" -d scratch -Atc "select public.vehicle_history_flag(gen_random_uuid(), null, 'integration.apply_paused')")
 record "vehicle history rollback: data kept ($kept), client execute ($canexec), apply paused ($held)" "$([ $rc = 0 ] && [ "$kept" = 1 ] && [ "$canexec" = f ] && [ "$held" = t ] && echo PASS || echo FAIL)" "$LOGS/vh_rollback.log"
 
+# Regression: a rollback must not reopen an existing signed-only dealer.
+# Fixed synthetic tenants live in this disposable scratch database only.
+"${SCRATCH[@]}" -c "
+INSERT INTO public.tenants (id, name, slug) VALUES
+  ('91910000-0000-4000-8000-000000000001','Rollback Synthetic Allowed','lf-rollback-allowed'),
+  ('91910000-0000-4000-8000-000000000002','Rollback Synthetic Signed Only','lf-rollback-rejected');
+INSERT INTO public.legacy_feed_bindings (tenant_id, feed, legacy_unsigned) VALUES
+  ('91910000-0000-4000-8000-000000000001','autofilm_feed','allowed'),
+  ('91910000-0000-4000-8000-000000000002','autofilm_feed','rejected');" >"$LOGS/lf_rollback_fixture.log" 2>&1
+seed_rc=$?
+pre_flags=$("${PSQL[@]}" -d scratch -Atc "SELECT string_agg(legacy_unsigned,',' ORDER BY tenant_id) FROM public.legacy_feed_bindings WHERE tenant_id IN ('91910000-0000-4000-8000-000000000001','91910000-0000-4000-8000-000000000002')")
+record "legacy rollback synthetic per-tenant state seeded ($pre_flags)" "$([ "$seed_rc" = 0 ] && [ "$pre_flags" = 'allowed,rejected' ] && echo PASS || echo FAIL)" "$LOGS/lf_rollback_fixture.log"
+
 "${SCRATCH[@]}" -f "$ROOT/supabase/proposed/20261109010000_legacy_feed_hardening.rollback.sql" >"$LOGS/lf_rollback.log" 2>&1
 rc=$?
 lfkept=$("${PSQL[@]}" -d scratch -Atc "select (select count(*) from public.legacy_feed_bindings) || '/' || (select count(*) from public.legacy_feed_receipts)")
 lfexec=$("${PSQL[@]}" -d scratch -Atc "select has_function_privilege('authenticated', 'public.legacy_feed_claim_request(uuid, text, text, text)', 'execute')")
-record "legacy feed rollback: bindings/receipts kept ($lfkept), client execute ($lfexec)" "$([ $rc = 0 ] && [ "$lfexec" = f ] && echo PASS || echo FAIL)" "$LOGS/lf_rollback.log"
+post_flags=$("${PSQL[@]}" -d scratch -Atc "SELECT string_agg(legacy_unsigned,',' ORDER BY tenant_id) FROM public.legacy_feed_bindings WHERE tenant_id IN ('91910000-0000-4000-8000-000000000001','91910000-0000-4000-8000-000000000002')")
+unsigned_rejected=$("${PSQL[@]}" -d scratch -Atc "SELECT public.legacy_feed_legacy_allowed('91910000-0000-4000-8000-000000000002','autofilm_feed',NULL)")
+unsigned_allowed=$("${PSQL[@]}" -d scratch -Atc "SELECT public.legacy_feed_legacy_allowed('91910000-0000-4000-8000-000000000001','autofilm_feed',NULL)")
+record "legacy feed rollback: bindings/receipts kept ($lfkept), client execute ($lfexec)" "$([ "$rc" = 0 ] && [ "$lfexec" = f ] && echo PASS || echo FAIL)" "$LOGS/lf_rollback.log"
+record "fail-closed rollback preserves dealer auth flags ($pre_flags -> $post_flags), signed-only remains blocked ($unsigned_rejected), allowed unchanged ($unsigned_allowed)" "$([ "$rc" = 0 ] && [ "$pre_flags" = 'allowed,rejected' ] && [ "$post_flags" = "$pre_flags" ] && [ "$unsigned_rejected" = f ] && [ "$unsigned_allowed" = t ] && echo PASS || echo FAIL)" "$LOGS/lf_rollback.log"
 
 if [ "${SKIP_PUBLIC_VIEW:-0}" != "1" ] && command -v deno >/dev/null 2>&1; then
   for wf in 1 0; do

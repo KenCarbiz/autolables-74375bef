@@ -30,7 +30,7 @@ Nothing in this document has been done in production. Every step below needs its
 |---|---|---|---|---|
 | 1 | `supabase/proposed/20261030000000_rooftopos_spine.sql` | `tenants`, `tenant_members`, `vehicle_listings`, Vault | No existing objects with the spine table names; `update_updated_at_column()` exists | Not merging/applying is the rollback; once applied, the spine is inert until env flag + direction flags |
 | 2 | `supabase/proposed/20261109000000_vehicle_history_foundation.sql` | #1, `user_roles`, `dealer_stores` (drizzle 0006), `vehicle_files` | #1 applied; no rows in `inspection_evidence`/`repair_items` violating the new anchor CHECK (empty today) | `20261109000000_vehicle_history_foundation.rollback.sql`: platform holds on, client EXECUTE revoked, all data kept |
-| 3 | `supabase/proposed/20261109010000_legacy_feed_hardening.sql` | #1, #2 | #1 and #2 applied | `.rollback.sql`: every dealer back to legacy `allowed`, client EXECUTE revoked, bindings/receipts kept |
+| 3 | `supabase/proposed/20261109010000_legacy_feed_hardening.sql` | #1, #2 | #1 and #2 applied | `.rollback.sql`: preserves each dealer's signed-only (`legacy_unsigned = 'rejected'`) decision, revokes browser privileges and keeps bindings/receipts; never globally re-enables shared secrets |
 
 Drizzle journal numbering: production is at 0017 (memory). If these go through Lovable's migration tool they need the next free numbers at the time (0018+ today), checked against open branches. They must not be placed in `supabase/migrations/` before approval.
 
