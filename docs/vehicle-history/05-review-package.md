@@ -132,7 +132,7 @@ The unsigned shared-secret format keeps working by default, with header `X-AutoL
 4. Verify.
 5. Set `legacy_unsigned = 'rejected'` for that dealer. The legacy format then returns 401 `legacy_auth_retired` for that dealer only.
 
-Rollback is setting it back to `allowed`; nothing is deleted. Full detail is in `04-legacy-feed-transition.md`. Before the migration is applied, the legacy check fails open, so today's callers are unaffected.
+The proposed rollback **does not** revert `legacy_unsigned` to `allowed`: it preserves per-dealer signed-only cutovers and revokes browser privileges. Re-enabling an unsigned shared secret for an individual tenant/feed/provider would be a separately approved, time-boxed and audited security exception, never a mass rollback. Full detail is in `04-legacy-feed-transition.md`. Before the migration is applied, existing legacy callers are unaffected.
 
 ### Who produces these calls
 
@@ -237,7 +237,7 @@ The `test` job reports separately and is linked from the PR. CI runs the repo's 
 |---|---|---|---|
 | 1 | `supabase/proposed/20261030000000_rooftopos_spine.sql` (from PR #36) | `tenants`, `tenant_members`, `vehicle_listings`, Vault | Not applying it; once applied it is inert until the env flag and direction flags are set |
 | 2 | `supabase/proposed/20261109000000_vehicle_history_foundation.sql` | 1, `user_roles`, `dealer_stores`, `vehicle_files` | `.rollback.sql`: platform holds on, client EXECUTE revoked, data kept |
-| 3 | `supabase/proposed/20261109010000_legacy_feed_hardening.sql` | 1, 2 (`vehicle_history_flag_reappearance`) | `.rollback.sql`: every dealer back to legacy `allowed`, client EXECUTE revoked, bindings and receipts kept |
+| 3 | `supabase/proposed/20261109010000_legacy_feed_hardening.sql` | 1, 2 (`vehicle_history_flag_reappearance`) | `.rollback.sql`: preserve dealer cutover decisions (`rejected` stays rejected), revoke browser EXECUTE, retain bindings and receipts |
 
 **PR #36:**
 
