@@ -10,6 +10,10 @@ import { catalogProductForUrl, requestDedupeKey } from "./marketcheck/catalogKey
 import { readQuotaHeaders } from "./marketcheck/responseSemantics.ts";
 
 export const MARKETCHECK_ACCOUNT_REF = "marketcheck_primary";
+// Sent with every admission (migration 0018). The database records it per
+// caller, so Launch Control can prove which deployed code is calling, and a
+// launch plan names the version its callers must run.
+export const PROVIDER_GATE_VERSION = "launch-2026-11-02";
 
 // deno-lint-ignore no-explicit-any
 type RpcClient = { rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: any; error: any }> };
@@ -53,10 +57,14 @@ export async function admitProviderCall(admin: RpcClient | null | undefined, a: 
     if (!store.admitted) return { admitted: false, eventId: null, monthCalls: null, cap: null, reserve: null, reason: "store_policy" };
   }
   try {
-    const { data, error } = await admin.rpc("provider_call_admit", {
+    // provider_call_admit_v2 applies the MarketCheck launch gate (switch,
+    // emergency stop, approved callers and tenants, canary ceiling, tripwires)
+    // before the budget. The old provider_call_admit refuses MarketCheck.
+    const { data, error } = await admin.rpc("provider_call_admit_v2", {
       p_provider: provider,
       p_product: product,
       p_caller: a.caller,
+      p_gate_version: PROVIDER_GATE_VERSION,
       p_essential: a.essential === true,
       p_tenant_id: a.tenantId ?? null,
       p_vin: a.vin ?? null,
@@ -145,8 +153,8 @@ export async function recordProviderCall(
 // The account-wide coordinator (migration 0007): one atomic reservation per
 // request across every key on the account, with the protected reserve,
 // priority floors, dollar cap, rate limit, deduplication and the
-// billing-uncertain hold. Tolerates only the coordinator not existing yet;
-// any other failure refuses the call.
+// billing-uncertain hold. Fails closed: a missing coordinator, an error, an
+// unreadable answer or a launch-gate refusal all mean no call.
 export async function reserveAccountQuota(admin: RpcClient, a: AdmitArgs, eventId: number | null): Promise<{ reserved: boolean; requestId?: string; reason?: string }> {
   try {
     const dedupe = await requestDedupeKey(a.url, a.vin);
@@ -171,7 +179,8 @@ export async function reserveAccountQuota(admin: RpcClient, a: AdmitArgs, eventI
     });
     if (error) {
       const code = String((error as { code?: string }).code ?? "");
-      if (code === "PGRST202" || code === "42883") return { reserved: true, reason: "coordinator_not_installed" };
+      if (code === "PGRST202" || code === "42883") return { reserved: false, reason: "coordinator_not_installed" };
+      if (/launch_gate_closed/.test(String((error as { message?: string }).message ?? ""))) return { reserved: false, reason: "launch_gate_closed" };
       return { reserved: false, reason: "coordinator_unavailable" };
     }
     const d = (data ?? {}) as { reserved?: unknown; request_id?: unknown; reason?: unknown };
@@ -186,9 +195,7 @@ export async function reserveAccountQuota(admin: RpcClient, a: AdmitArgs, eventI
 // store's Files.com inventory is admitted only under that store's approved
 // policy: feed-only, paused, budget-blocked, unapproved products and exhausted
 // limits all refuse. A VIN with no store record is legacy tenant inventory and
-// is unaffected. The one tolerated failure is the gate not existing yet (the
-// migration that creates it also creates every store record, so nothing can
-// be store-owned without it); any other failure refuses the call.
+// is unaffected. Fails closed: a missing gate or any failure refuses the call.
 export async function admitStoreEnrichment(admin: RpcClient, a: AdmitArgs, product: string): Promise<{ admitted: boolean; reason?: string }> {
   try {
     const { data, error } = await admin.rpc("store_enrichment_admit", {
@@ -198,7 +205,10 @@ export async function admitStoreEnrichment(admin: RpcClient, a: AdmitArgs, produ
     });
     if (error) {
       const code = String((error as { code?: string }).code ?? "");
-      if (code === "PGRST202" || code === "42883") return { admitted: true, reason: "store_gate_not_installed" };
+      if (code === "PGRST202" || code === "42883") {
+        console.warn(`store enrichment gate not installed (${a.caller}): refused`);
+        return { admitted: false, reason: "store_gate_not_installed" };
+      }
       console.warn(`store enrichment gate unavailable (${a.caller}): refused`);
       return { admitted: false, reason: "gate_unavailable" };
     }

@@ -7,7 +7,7 @@ const URL_WITH_KEY = "https://api.marketcheck.com/v2/search/car/active?api_key=S
 const rpcAnswer = (answer: { data?: unknown; error?: unknown } | Error) => {
   const rpc = vi.fn(async (fn: string) => {
     if (fn === "provider_reserve") return { data: { reserved: true, request_id: "r1" }, error: null };
-    if (fn !== "provider_call_admit") return { data: null, error: null };
+    if (fn !== "provider_call_admit_v2") return { data: null, error: null };
     if (answer instanceof Error) throw answer;
     return { data: answer.data ?? null, error: answer.error ?? null };
   });
