@@ -1,0 +1,33 @@
+name: Legacy feed rollback security guard (isolated code only)
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/proposed/20261109010000_legacy_feed_hardening.rollback.sql'
+      - 'supabase/tests/rooftopos_harness.sh'
+      - 'scripts/test-legacy-rollback-guard.mjs'
+      - 'docs/vehicle-history/**'
+      - '.github/workflows/legacy-feed-rollback-guard.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fail_closed_rollback:
+    name: Fail-closed rollback syntax and security assertions
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Shell syntax for reproducible scratch harness
+        run: bash -n supabase/tests/rooftopos_harness.sh
+      - name: Static fail-closed rollback security tests
+        run: node --test scripts/test-legacy-rollback-guard.mjs
+      - name: Explicitly report scope
+        run: |
+          echo "Code-only guard. No database was accessed."
+          echo "Full scratch PostgreSQL integration harness remains a separate approval gate."
