@@ -62,6 +62,7 @@ export const MILESTONE_LABELS: Readonly<Record<string, string>> = {
   delivered: "Delivered to customer",
   sale_voided: "Sale voided",
   delivery_corrected: "Delivery date corrected",
+  post_delivery_unwind: "Sale unwound after delivery",
   transferred_out: "Transferred out",
   archived: "Archived",
   restored: "Restored from archive",
@@ -71,7 +72,7 @@ export const milestoneLabel = (m: string | null | undefined): string => (m && MI
 
 export type LifecycleLane = "Inventory" | "Service" | "Ownership";
 
-const OWNERSHIP_MILESTONES = new Set(["sold", "awaiting_delivery", "delivered", "sale_voided", "delivery_corrected", "transferred_out"]);
+const OWNERSHIP_MILESTONES = new Set(["sold", "awaiting_delivery", "delivered", "sale_voided", "delivery_corrected", "post_delivery_unwind", "transferred_out"]);
 
 export const laneForMilestone = (m: string): LifecycleLane => (OWNERSHIP_MILESTONES.has(m) ? "Ownership" : "Inventory");
 

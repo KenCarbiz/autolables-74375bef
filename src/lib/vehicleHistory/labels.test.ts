@@ -50,6 +50,8 @@ describe("custody and milestone labels", () => {
     expect(laneForMilestone("sold")).toBe("Ownership");
     expect(laneForMilestone("archived")).toBe("Inventory");
     expect(laneForMilestone("restored")).toBe("Inventory");
+    expect(laneForMilestone("post_delivery_unwind")).toBe("Ownership");
+    expect(milestoneLabel("post_delivery_unwind")).toBe("Sale unwound after delivery");
     expect(milestoneLabel("delivered")).toBe("Delivered to customer");
     expect(milestoneLabel("x")).toBe("Unknown event");
     expect(openedReasonLabel("reacquisition")).toBe("Reacquired");
