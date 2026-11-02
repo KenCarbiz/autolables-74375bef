@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'src/lib/rooftopos-parked/**'
+      - 'supabase/proposed/rtgip_v2_delivery.proposed.sql'
+      - 'supabase/tests/rtgip/**'
       - 'supabase/functions/_shared/integrations/envelope.ts'
       - '.github/workflows/rooftopos-gateway-checks.yml'
   workflow_dispatch:
@@ -41,3 +43,12 @@ jobs:
         run: npx tsc --noEmit -p tsconfig.app.json
       - name: Production artifact build (no publish)
         run: npm run build
+
+  rtgip_sql:
+    name: rtgip/2 proposed SQL - real Postgres concurrency and crash tests (throwaway cluster)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run against a disposable local cluster (no Supabase connection)
+        run: bash supabase/tests/rtgip/pg_concurrency.sh
