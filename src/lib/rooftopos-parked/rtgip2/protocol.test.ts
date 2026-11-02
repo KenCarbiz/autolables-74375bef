@@ -299,6 +299,29 @@ describe("rtgip/2 negative security matrix", () => {
     expect(atWrongTarget).toEqual({ ok: false, reason: "wrong_destination" });
   });
 
+  it("refuses text PostgreSQL jsonb cannot store (U+0000, lone surrogates) anywhere in the envelope", () => {
+    const e = draftEnvelope("autolabels", "autocurb", "inventory.status_changed");
+    const bad = ["a\u0000b", "\uD800", "x\uDC00", "\uDFFFy"];
+    for (const t of bad) {
+      expect(validateEnvelope({ ...e, correlation_id: t })).toEqual({
+        ok: false,
+        errors: ["invalid_unicode"],
+      });
+      expect(validateEnvelope({ ...e, payload: { note: t } })).toEqual({
+        ok: false,
+        errors: ["invalid_unicode"],
+      });
+      expect(validateEnvelope({ ...e, payload: { [t]: 1 } })).toEqual({
+        ok: false,
+        errors: ["invalid_unicode"],
+      });
+    }
+    expect(validateEnvelope({ ...e, payload: { note: ["\uD83D\uDE97"] } })).not.toEqual({
+      ok: false,
+      errors: ["invalid_unicode"],
+    });
+  });
+
   it("rejects unsupported schema versions and event types", async () => {
     const r = reg();
     const e = {

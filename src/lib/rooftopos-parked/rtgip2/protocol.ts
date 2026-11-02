@@ -704,10 +704,22 @@ function checkField(spec: FieldSpec, v: unknown, path: string, errs: string[]): 
 type Loose<K extends string> = { [P in K]?: unknown };
 type LooseEnvelope = Loose<(typeof ENVELOPE_KEYS)[number]>;
 
+// PostgreSQL jsonb cannot store U+0000 or a lone surrogate, so an envelope carrying one would
+// fail at the inbox insert and retry into a dead letter instead of being refused at the edge.
+const UNSTORABLE = /\u0000|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+function hasUnstorableText(v: unknown): boolean {
+  if (typeof v === "string") return UNSTORABLE.test(v);
+  if (Array.isArray(v)) return v.some(hasUnstorableText);
+  if (isObj(v))
+    return Object.entries(v).some(([k, x]) => UNSTORABLE.test(k) || hasUnstorableText(x));
+  return false;
+}
+
 export function validateEnvelope(
   input: unknown,
 ): { ok: true; envelope: EnvelopeV2 } | { ok: false; errors: string[] } {
   if (!isObj(input)) return { ok: false, errors: ["not_an_object"] };
+  if (hasUnstorableText(input)) return { ok: false, errors: ["invalid_unicode"] };
   const e = input as LooseEnvelope;
   const errs: string[] = [];
   for (const k of Object.keys(e))

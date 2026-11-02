@@ -11,7 +11,7 @@
 --   rtgip_outbox_writer   outbox_enqueue (inside the business transaction)
 --   rtgip_dispatcher      outbox_claim, outbox_advance, outbox_fail
 --   rtgip_inbox_receiver  inbox_admit only (verified inbound admission, see below)
---   rtgip_operator        read-only SELECT on the ledger, purge_expired_nonces
+--   rtgip_operator        read-only SELECT on the ledger, purge_expired_nonces, outbox_redrive
 -- Receipt secrets are read from Supabase Vault (vault.decrypted_secrets) by name; they are
 -- never stored in rtgip tables and never returned.
 -- Inbound admission is verified here, not trusted from the caller: inbox_admit takes the raw
@@ -237,6 +237,11 @@ BEGIN
      OR NEW.envelope <> OLD.envelope OR NEW.connection_id <> OLD.connection_id
      OR NEW.route <> OLD.route OR NEW.tenant_id <> OLD.tenant_id THEN
     RAISE EXCEPTION 'outbox_row_immutable';
+  END IF;
+  -- The one way out of dead_letter is rtgip.outbox_redrive (operator, reason, audited).
+  IF OLD.state = 'dead_letter' AND NEW.state = 'retry_wait' AND NEW.attempts = 0
+     AND current_setting('rtgip.redrive', true) = 'on' THEN
+    RETURN NEW;
   END IF;
   IF NEW.state <> OLD.state AND NOT (
     (OLD.state IN ('pending','retry_wait') AND NEW.state = 'in_flight') OR
@@ -566,7 +571,8 @@ BEGIN
 
   SELECT * INTO v_prior FROM rtgip.inbox i WHERE i.tenant_id = v_tenant AND i.origin_app = v_origin AND i.event_id = v_id;
   IF FOUND THEN
-    IF v_prior.payload_sha256 <> v_sha THEN
+    -- The whole envelope is immutable under its event id, not just the payload.
+    IF v_prior.payload_sha256 <> v_sha OR v_prior.envelope <> p_envelope THEN
       INSERT INTO rtgip.inbox_conflicts (tenant_id, origin_app, event_id, payload_sha256, envelope)
       VALUES (v_tenant, v_origin, v_id, v_sha, p_envelope) ON CONFLICT DO NOTHING;
       RETURN QUERY SELECT v_id, 'quarantined'::text, 'conflicting_duplicate'::text, false, NULL::text, p_envelope;
@@ -780,6 +786,29 @@ LANGUAGE sql SECURITY DEFINER SET search_path = '' AS $$
   SELECT count(*)::integer FROM d;
 $$;
 
+-- Operator redrive of a dead-lettered row: an explicit, reasoned, audited return to the queue.
+-- The row keeps its event, body, receipts and audit history; only the retry counters reset. A
+-- row whose connection is not deliverable stays dead until the grant returns.
+CREATE OR REPLACE FUNCTION rtgip.outbox_redrive(p_event_id uuid, p_operator text, p_reason text)
+RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE o rtgip.outbox%ROWTYPE; v_why text;
+BEGIN
+  IF p_operator IS NULL OR p_operator = '' THEN RAISE EXCEPTION 'operator_required'; END IF;
+  IF p_reason IS NULL OR length(trim(p_reason)) < 10 THEN RAISE EXCEPTION 'reason_required'; END IF;
+  SELECT * INTO o FROM rtgip.outbox WHERE event_id = p_event_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'unknown_event'; END IF;
+  IF o.state <> 'dead_letter' THEN RAISE EXCEPTION 'not_dead_lettered:%', o.state; END IF;
+  v_why := rtgip.deliverable_reason(o.connection_id, o.envelope);
+  IF v_why IS NOT NULL THEN RAISE EXCEPTION 'not_deliverable:%', v_why; END IF;
+  PERFORM set_config('rtgip.redrive', 'on', true);
+  UPDATE rtgip.outbox SET state = 'retry_wait', attempts = 0, next_attempt_at = now(), lease_owner = NULL, lease_until = NULL
+   WHERE event_id = p_event_id;
+  PERFORM set_config('rtgip.redrive', 'off', true);
+  INSERT INTO rtgip.audit_log (actor, action, event_id, detail)
+  VALUES (p_operator, 'redrive', p_event_id, jsonb_build_object('reason', left(p_reason, 200), 'prior_attempts', o.attempts, 'last_error', o.last_error));
+  RETURN 'retry_wait';
+END $$;
+
 -- Deny by default, then grant one duty per role. Tables are reachable only through the
 -- functions above, except read-only SELECT for the operator role.
 DO $$
@@ -810,6 +839,7 @@ GRANT EXECUTE ON FUNCTION rtgip.outbox_advance(uuid, text, text, text) TO rtgip_
 GRANT EXECUTE ON FUNCTION rtgip.outbox_fail(uuid, text, text, integer, integer) TO rtgip_dispatcher;
 GRANT EXECUTE ON FUNCTION rtgip.inbox_admit(jsonb, text, jsonb) TO rtgip_inbox_receiver;
 GRANT EXECUTE ON FUNCTION rtgip.purge_expired_nonces() TO rtgip_operator;
+GRANT EXECUTE ON FUNCTION rtgip.outbox_redrive(uuid, text, text) TO rtgip_operator;
 GRANT SELECT ON rtgip.connections, rtgip.signing_keys, rtgip.outbox, rtgip.receipts, rtgip.inbox,
   rtgip.inbox_conflicts, rtgip.admissions, rtgip.watermarks, rtgip.audit_log TO rtgip_operator;
 
