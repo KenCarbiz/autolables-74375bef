@@ -121,10 +121,14 @@ key on retries.
 
 ## Rollback
 
-Set `legacy_unsigned` back to `'allowed'` on the binding (or run the `.rollback.sql`, which does
-it for every binding and revokes client access). Nothing is deleted: bindings, receipts and
-the widened `integration_connections.app` check all stay. If the migration is not applied, the
-legacy `legacy_feed_legacy_allowed` check fails open and legacy callers are unaffected.
+**Fail-closed rollback:** running the proposed `.rollback.sql` revokes browser privileges
+and preserves every existing `legacy_unsigned` value, including dealers already switched
+to `'rejected'`. It neither deletes receipts/bindings nor changes the widened
+`integration_connections.app` check. **Never globally switch dealers back to unsigned
+shared secrets** as part of rollback. If a single dealer genuinely needs a temporary
+legacy exception, approve and audit that exact tenant/feed/provider separately, with an
+expiry and a signed-mode recovery plan. This is a security downgrade, not a routine
+rollback. If the migration was never applied, existing legacy callers are unchanged.
 
 ## Who must change (not implemented, not verified here)
 
