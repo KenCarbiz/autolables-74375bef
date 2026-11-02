@@ -45,8 +45,12 @@ psql_on $P $D -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS pgcrypto WIT
   ALTER DATABASE $D SET search_path = \"\$user\", public, extensions" >/dev/null
 for f in $(ls "$WORK"/sb/migrations/*.sql | grep -v rooftopos_spine); do psql_on $P $D -f "$f" >/dev/null 2>>"$WORK/history.err" || true; done
 psql_on $P $D -v ON_ERROR_STOP=1 -f "$WORK/sb/proposed/20261030000000_rooftopos_spine.sql" >/dev/null 2>&1
-psql_on $P $D -c "CREATE TABLE IF NOT EXISTS public.dealer_stores (id uuid PRIMARY KEY, tenant_id uuid NOT NULL)" >/dev/null 2>&1
-psql_on $P $D -v ON_ERROR_STOP=1 -f "$WORK/sb/proposed/20261109000000_vehicle_history_foundation.sql" >/dev/null 2>&1
+# Stand-in for drizzle 0006 (dealer_stores.status, vehicle_listings.owning_store_id), as in pg_integration.sh.
+psql_on $P $D -v ON_ERROR_STOP=1 -c "CREATE TABLE IF NOT EXISTS public.dealer_stores (id uuid PRIMARY KEY, tenant_id uuid NOT NULL);
+  ALTER TABLE public.dealer_stores ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'active';
+  ALTER TABLE public.vehicle_listings ADD COLUMN IF NOT EXISTS owning_store_id uuid" >/dev/null
+psql_on $P $D -v ON_ERROR_STOP=1 -f "$WORK/sb/proposed/20261109000000_vehicle_history_foundation.sql" >/dev/null 2>&1 \
+  || { psql_on $P $D -v ON_ERROR_STOP=1 -f "$WORK/sb/proposed/20261109000000_vehicle_history_foundation.sql"; exit 1; }
 psql_on $P $D -c "$GRANTS" >/dev/null
 apply_twice $P $D "$WORK/sb/proposed/rtgip_v2_delivery.proposed.sql"
 apply_twice $P $D "$WORK/sb/proposed/rtgip_source_readers.proposed.sql"

@@ -35,7 +35,7 @@ const run = describe.runIf(!!URLS.autolabels && !!URLS.gateway);
 
 const tenant = randomUUID();
 const otherTenant = randomUUID();
-const ids = { ep: randomUUID(), listing: randomUUID(), file: randomUUID() };
+const ids = { ep: randomUUID(), listing: randomUUID(), file: randomUUID(), store: randomUUID(), mapper: randomUUID() };
 let reg: Registry;
 const db = {} as Record<App | "gateway", Sql>;
 const faults: Record<App, Faults> = { autolabels: noFaults(), autocurb: noFaults(), autoframe: noFaults() };
@@ -58,7 +58,7 @@ const labelsReader: SourceDb = {
   call: (fn, args) =>
     db.autolabels.begin(async (tx) => {
       await tx.unsafe("SET LOCAL ROLE rtgip_source_reader; SET LOCAL transaction_read_only = on");
-      return (await tx.unsafe(`SELECT rtgip_src.${fn}($1::uuid, $2::uuid) AS v`, args))[0]!.v as unknown;
+      return (await tx.unsafe(`SELECT rtgip_src.${fn}($1::uuid, $2::text, $3::uuid) AS v`, args))[0]!.v as unknown;
     }) as Promise<unknown>,
 };
 const effects = async (app: App, id: string) => Number((await db[app]`SELECT count(*)::int AS c FROM rtgip_stage.effects WHERE event_id = ${id}`)[0]!.c);
@@ -113,9 +113,11 @@ run("local four-node staging over HTTP and committed transactions", () => {
       await tx`INSERT INTO public.tenants (id, name, slug) VALUES (${tenant}, 'Staging Synthetic', ${"stg-" + tenant}), (${otherTenant}, 'Staging Other', ${"stg-o-" + otherTenant})`;
       await tx`INSERT INTO public.vehicles (vin) VALUES (${VIN}) ON CONFLICT DO NOTHING`;
       await tx`INSERT INTO public.vehicle_files (id, tenant_id, vin, stock_number) VALUES (${ids.file}, ${tenant}, ${VIN}, 'STG1001')`;
-      await tx`INSERT INTO public.vehicle_listings (id, store_id, tenant_id, vin, slug, vehicle_file_id) VALUES (${ids.listing}, ${randomUUID()}, ${tenant}, ${VIN}, ${"stg-" + ids.listing}, ${ids.file})`;
-      await tx`INSERT INTO public.vehicle_instances (id, tenant_id, vin, status, custody_state, opened_reason, listing_id)
-        VALUES (${ids.ep}, ${tenant}, ${VIN}, 'active', 'in_stock', 'initial', ${ids.listing})`;
+      await tx`INSERT INTO public.dealer_stores (id, tenant_id) VALUES (${ids.store}, ${tenant})`;
+      await tx`INSERT INTO rtgip_src.rooftop_stores (tenant_id, rooftop_id, store_id, mapped_by, reason) VALUES (${tenant}, ${ROOFTOP}, ${ids.store}, ${ids.mapper}, 'staging synthetic mapping')`;
+      await tx`INSERT INTO public.vehicle_listings (id, store_id, owning_store_id, tenant_id, vin, slug, vehicle_file_id) VALUES (${ids.listing}, ${randomUUID()}, ${ids.store}, ${tenant}, ${VIN}, ${"stg-" + ids.listing}, ${ids.file})`;
+      await tx`INSERT INTO public.vehicle_instances (id, tenant_id, vin, store_id, status, custody_state, opened_reason, listing_id)
+        VALUES (${ids.ep}, ${tenant}, ${VIN}, ${ids.store}, 'active', 'in_stock', 'initial', ${ids.listing})`;
     });
     const labelsSeed: LabelsProjection = emptyLabelsProjection();
     labelsSeed.instances[ids.ep] = { tenant_id: tenant, rooftop_id: ROOFTOP, vin: VIN, episodes: { [ids.ep]: { state: "open", opened_reason: "acquisition" } }, service_visits: {} } as LabelsProjection["instances"][string];
@@ -138,7 +140,7 @@ run("local four-node staging over HTTP and committed transactions", () => {
     const { inst } = await readEpisodeHistory(labelsReader, scope(), ids.ep);
     expect(inst).toMatchObject({ instance_id: ids.ep, episode_id: ids.ep, stock_number: "STG1001" });
     const idn = await L.identityRegistered(scope(), inst, { year: 2024, make: "Synthetic", model: "Sedan", trim: null, registered_at: AT }, labelsMeta("al-id-1", ids.ep), ["autocurb", "autoframe"]);
-    const ep = await publishEpisodeOpened(labelsReader, scope(), ids.ep, { opened_at: AT }, labelsMeta("al-ep-1", ids.ep), ["autocurb", "autoframe"]);
+    const ep = await publishEpisodeOpened(labelsReader, scope(), ids.ep, {}, { correlation_id: "corr-stg", emitted_at: AT, prev_revision: null }, ["autocurb", "autoframe"]);
     // Identity must be committed before the episode that refers to it: the outbox does not order
     // across aggregates, and a consumer quarantines an episode for an instance it has not seen.
     expect(await enqueue(db.autolabels, idn)).toEqual(["enqueued", "enqueued"]);
