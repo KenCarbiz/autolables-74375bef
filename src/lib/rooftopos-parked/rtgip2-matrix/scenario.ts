@@ -11,6 +11,7 @@ export const STAFF = "44444444-4444-4444-8444-444444444444";
 export const OWNER = "77777777-7777-4777-8777-777777777777";
 export const SUB = "55555555-5555-4555-8555-555555555555";
 export const DEALERSHIP = "dlr-syn-northwind";
+export const STORE = "5a000000-0000-4000-8000-00000000000a";
 
 export const scope = { tenant_id: TENANT, rooftop_id: ROOFTOP, scope_verified_server_side: true as const };
 export const curbScope = { ...scope, dealership_id: DEALERSHIP };
@@ -36,6 +37,7 @@ export const soldMilestone: L.CustodyMilestoneRecord = {
 const T = (m: number) => `2027-01-15T14:${String(m).padStart(2, "0")}:00Z`;
 const led = (id: string, field: C.LedgerRow["field"], from: string | null, to: string, at: string, sub = SUB): C.LedgerRow => ({
   id, submission_id: sub, dealership_id: DEALERSHIP, field, from_value: from, to_value: to, actor_user_id: STAFF, actor_roles: ["gm"], written_by: "db_trigger", at,
+  actor_kind: "user", attested_service: null,
 });
 
 export const curbRecords = (status: "appraisal_completed" | "deal_finalized" | "purchase_complete", over: Partial<C.CurbSourceRecords> = {}, sub = SUB): C.CurbSourceRecords => {
@@ -45,13 +47,16 @@ export const curbRecords = (status: "appraisal_completed" | "deal_finalized" | "
   ];
   if (status !== "appraisal_completed") ledger.push(led(`led-${sub.slice(0, 4)}-3`, "progress_status", "appraisal_completed", "deal_finalized", T(3), sub));
   if (status === "purchase_complete") {
-    ledger.push(led(`led-${sub.slice(0, 4)}-4`, "progress_status", "deal_finalized", "check_request_submitted", T(4), sub));
+    ledger.push(led(`led-${sub.slice(0, 4)}-3-title`, "progress_status", "deal_finalized", "title_ownership_verified", T(3), sub));
+    ledger.push(led(`led-${sub.slice(0, 4)}-4`, "progress_status", "title_ownership_verified", "check_request_submitted", T(4), sub));
     ledger.push(led(`led-${sub.slice(0, 4)}-6`, "check_request_done", "false", "true", T(4), sub));
     ledger.push(led(`led-${sub.slice(0, 4)}-5`, "progress_status", "check_request_submitted", "purchase_complete", T(5), sub));
   }
   return {
-    submission: { id: sub, dealership_id: DEALERSHIP, vin: VIN, progress_status: status, acv_confirmed: true, appraisal_finalized: true, check_request_done: status === "purchase_complete" },
+    submission: { id: sub, dealership_id: DEALERSHIP, vin: VIN, progress_status: status, acv_confirmed: true, appraisal_finalized: true, check_request_done: status === "purchase_complete", store_location_id: STORE },
     ledger, instance_ref: INSTANCE, episode_ref: EPISODE,
+    rooftop_binding: { tenant_id: TENANT, rooftop_id: ROOFTOP },
+    custody_evidence: status === "purchase_complete" ? { ref: "cus:00000000-0000-4000-8000-0000000000c1", at: T(5), actor_user_id: STAFF, actor_roles: ["gm"], actor_kind: "user" } : null,
     ownership_evidence_refs: ["doc:title-syn-1"], condition_evidence_refs: ["doc:cond-syn-1"],
     ...over,
   };
