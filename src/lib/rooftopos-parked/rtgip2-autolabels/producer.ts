@@ -106,6 +106,7 @@ export interface CustodyMilestoneRecord {
     | "delivered"
     | "sale_voided"
     | "delivery_corrected"
+    | "post_delivery_unwind"
     | "transferred_out"
     | "archived"
     | "restored";
