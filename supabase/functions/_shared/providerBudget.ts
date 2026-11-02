@@ -58,8 +58,9 @@ export async function admitProviderCall(admin: RpcClient | null | undefined, a: 
   }
   try {
     // provider_call_admit_v2 applies the MarketCheck launch gate (switch,
-    // emergency stop, approved callers and tenants, canary ceiling, tripwires)
-    // before the budget. The old provider_call_admit refuses MarketCheck.
+    // emergency stop, exact gate version, approved caller and product, one
+    // server-verified rooftop, canary ceiling, tripwires) before the budget.
+    // The old provider_call_admit refuses MarketCheck.
     const { data, error } = await admin.rpc("provider_call_admit_v2", {
       p_provider: provider,
       p_product: product,
@@ -69,6 +70,12 @@ export async function admitProviderCall(admin: RpcClient | null | undefined, a: 
       p_tenant_id: a.tenantId ?? null,
       p_vin: a.vin ?? null,
       p_estimated_cost_usd: a.estimatedCostUsd !== undefined ? a.estimatedCostUsd : provider === "marketcheck" ? MC_CALL_PRICE_USD[product] ?? null : null,
+      // The rooftop is resolved by the database from the VIN; a VIN-less
+      // request (syndication, dealer lookups) must name its store, which the
+      // database verifies against the tenant. The catalog product is what a
+      // launch plan approves.
+      p_store_id: a.storeId ?? null,
+      p_catalog_product: provider === "marketcheck" ? catalogProductForUrl(a.url) : null,
     });
     if (error) {
       console.warn(`provider budget gate unavailable (${a.caller}): refused: ${String(error.message || error).slice(0, 200)}`);

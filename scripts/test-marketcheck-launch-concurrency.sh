@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Concurrency checks for the MarketCheck launch gate, on the scratch database
 # left by test-marketcheck-launch-sql.sh: 40 sessions race for a 10-call canary
-# (exactly 10 admitted), and 12 sessions race to activate (exactly one wins).
+# (exactly 10 admitted), 12 sessions race to activate (exactly one wins), and
+# 12 sessions race to add the same rooftop (exactly one wins).
 set -euo pipefail
 DB="${TEST_DB:-marketcheck_launch_test}"
 case "$DB" in *prod*|postgres) echo "refusing database name $DB" >&2; exit 2;; esac
@@ -12,11 +13,12 @@ HARTE="3f0f97f5-4151-4e32-88ef-e2d6fc5a3142"
 $P -c "UPDATE marketcheck_launch_plans SET canary_max_calls = 10, hourly_call_ceiling = 1000, daily_call_ceiling = 5000, error_tripwire_per_hour = 1000 WHERE version = 1;
        UPDATE provider_call_budgets SET monthly_call_cap = 5000 WHERE provider = 'marketcheck';
        UPDATE provider_call_events SET at = at - interval '3 days' WHERE provider = 'marketcheck';
+       UPDATE store_enrichment_policies SET mode = 'enrichment' WHERE store_id = '45cdc1e0-7e88-4b44-9d07-27369d74ab21';
        UPDATE marketcheck_launch_control SET state = 'activating_canary', plan_version = 1, emergency_stop = false,
          active_store_ids = ARRAY['45cdc1e0-7e88-4b44-9d07-27369d74ab21']::uuid[], canary_started_at = now(), pilot_started_at = NULL WHERE id = 1;" >/dev/null
 OUT="$(mktemp -d)"
 for i in $(seq 1 40); do
-  ( $P -c "SELECT pg_sleep(random() * 0.05); SELECT admitted FROM provider_call_admit_v2('marketcheck', 'neovin', 'marketcheck-sync', 'launch-2026-11-02', false, '$HARTE', NULL, 0)" > "$OUT/$i" ) &
+  ( $P -c "SELECT pg_sleep(random() * 0.05); SELECT admitted FROM provider_call_admit_v2('marketcheck', 'neovin', 'marketcheck-specs', 'launch-2026-11-02', false, '$HARTE', '5N1AL1FWXTC358105', 0, NULL, 'neovin')" > "$OUT/$i" ) &
 done
 wait
 ADMITTED=$(cat "$OUT"/* | grep -c '^t$' || true)
@@ -40,4 +42,24 @@ rm -rf "$OUT"
 ACTIVATED=$($P -c "SELECT count(*) FROM marketcheck_launch_events WHERE action = 'activate' AND result = 'ok' AND id > $MARK")
 echo "activation race: winners=$WON audited=$ACTIVATED"
 [ "$WON" = 1 ] && [ "$ACTIVATED" = 1 ] || { echo "CONCURRENCY TEST FAILED (activation)"; exit 1; }
+
+# Expansion race: from the pilot, 12 simultaneous requests to add Harte Nissan.
+$P -c "UPDATE provider_call_events SET at = at - interval '3 days' WHERE provider = 'marketcheck';
+       UPDATE marketcheck_launch_control SET state = 'pilot_active', pilot_started_at = now() - interval '3 days', last_expanded_at = NULL,
+         active_store_ids = ARRAY['45cdc1e0-7e88-4b44-9d07-27369d74ab21']::uuid[] WHERE id = 1;
+       UPDATE store_enrichment_policies SET mode = 'feed_only' WHERE store_id = '35d5584b-93d4-4419-9a50-6daead08e7a9';
+       INSERT INTO inventory_store_snapshots (path, source_dealer_id, store_id, group_id, source_mtime, content_sha256, clean, status, applied_at)
+       VALUES ('prod/inventory/vauto/inbound/MP15397_inventory.csv', 'MP15397', '35d5584b-93d4-4419-9a50-6daead08e7a9', '79feb0ce-0214-48b4-8709-f8d94bdecb5b', now(), 'race', true, 'applied', now());" >/dev/null
+MARK=$($P -c "SELECT COALESCE(max(id), 0) FROM marketcheck_launch_events")
+OUT="$(mktemp -d)"
+for i in $(seq 1 12); do
+  ( $P -c "SELECT marketcheck_launch_expand('35d5584b-93d4-4419-9a50-6daead08e7a9', 'EXPAND')->>'ok' FROM (SELECT set_config('test.uid', '$ADMIN', false)) s" > "$OUT/$i" 2>&1 ) &
+done
+wait
+WON=$(cat "$OUT"/* | grep -c '^true$' || true)
+rm -rf "$OUT"
+EXPANDED=$($P -c "SELECT count(*) FROM marketcheck_launch_events WHERE action = 'expand' AND result = 'ok' AND id > $MARK")
+STORES=$($P -c "SELECT cardinality(active_store_ids) FROM marketcheck_launch_control")
+echo "expansion race: winners=$WON audited=$EXPANDED active_stores=$STORES"
+[ "$WON" = 1 ] && [ "$EXPANDED" = 1 ] && [ "$STORES" = 2 ] || { echo "CONCURRENCY TEST FAILED (expansion)"; exit 1; }
 echo "LAUNCH CONCURRENCY TEST PASSED"

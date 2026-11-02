@@ -26,11 +26,16 @@
 --     function deployed before this release cannot spend a MarketCheck call
 --     even if its cron is re-enabled. Other providers are unchanged.
 --   * provider_call_admit_v2 is the only path that can admit MarketCheck. It
---     checks the emergency stop, launch state, approved caller, approved
---     tenant, canary ceiling and tripwires before the existing budget.
---   * provider_reserve (the account coordinator) refuses to create a
---     reservation while the launch gate is closed (trigger on
---     provider_requests), which also covers staff AI/MCP requests.
+--     checks the emergency stop, launch state, the exact gate version the
+--     plan requires, approved caller, approved catalog product, and one
+--     server-resolved rooftop per request (the store that owns the VIN, or
+--     for VIN-less requests the named store verified against the tenant):
+--     active in the launch, identity mapped and matched, policy enabled for
+--     that product. Then the canary ceiling and tripwires, then the budget.
+--   * Every MarketCheck reservation in provider_requests passes the same
+--     gate (trigger), whatever the path: provider_reserve, staff AI/MCP or a
+--     direct insert. A REST reservation must also be bound to the unused
+--     admission event v2 granted for the same caller, product and rooftop.
 --   * The emergency stop is a column. Setting it, by RPC or by a single
 --     UPDATE from the SQL editor, refuses the next admission; no deploy and
 --     no scheduler cooperation is needed.
@@ -57,8 +62,12 @@ CREATE TABLE public.marketcheck_launch_plans (
   products text[] NOT NULL CHECK (cardinality(products) > 0),
   allowed_callers text[] NOT NULL CHECK (cardinality(allowed_callers) > 0),
   allow_staff_ai boolean NOT NULL DEFAULT false,
-  -- [{"jobname":"marketcheck-sync","schedule":"7 */4 * * *"}]: the only cron
-  -- jobs activation turns on, with the schedule it sets.
+  -- Owner-approved dollar ceiling for the whole MarketCheck account while
+  -- this plan runs. A call limit is not a dollar limit: activation copies it
+  -- to provider_accounts.monthly_usd_cap and refuses to start without it.
+  account_usd_cap numeric(10,2) CHECK (account_usd_cap IS NULL OR account_usd_cap > 0),
+  -- [{"jobname":"...","schedule":"..."}]: the only cron jobs activation turns
+  -- on, with the schedule it sets. Plan v1 turns none on.
   cron_jobs jsonb NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(cron_jobs) = 'array'),
   -- [{"store_id":..., "order":1, "min_hours_after_previous":24}] after the canary.
   rollout jsonb NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(rollout) = 'array'),
@@ -68,7 +77,8 @@ CREATE TABLE public.marketcheck_launch_plans (
   approved_by uuid,
   approved_at timestamptz,
   CHECK (hourly_call_ceiling <= daily_call_ceiling),
-  CHECK (status <> 'approved' OR (approved_by IS NOT NULL AND approved_at IS NOT NULL))
+  CHECK (status <> 'approved' OR (approved_by IS NOT NULL AND approved_at IS NOT NULL)),
+  CHECK (status = 'draft' OR account_usd_cap IS NOT NULL)
 );
 
 CREATE TABLE public.marketcheck_launch_control (
@@ -211,42 +221,118 @@ END $$;
 
 -- ── The launch gate ─────────────────────────────────────────────────────
 
--- Returns NULL when a MarketCheck call may proceed to the budget, otherwise
--- the refusal reason. Locks the control row so canary counting is exact
--- under concurrency, and pauses the launch itself when a tripwire fires.
-CREATE OR REPLACE FUNCTION public.marketcheck_launch_gate(p_caller text, p_tenant_id uuid, p_channel text DEFAULT 'rest')
-RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+-- Admission events carry the rooftop and catalog product the gate verified,
+-- and the gate version the caller ran, so a reservation can be bound to the
+-- exact admission that allowed it.
+ALTER TABLE public.provider_call_events
+  ADD COLUMN IF NOT EXISTS store_id uuid,
+  ADD COLUMN IF NOT EXISTS catalog_product text,
+  ADD COLUMN IF NOT EXISTS gate_version text;
+
+-- The one rooftop a VIN belongs to, from feed inventory and listings across
+-- every tenant. More than one distinct store is ambiguous ownership.
+CREATE OR REPLACE FUNCTION public.marketcheck_launch_vin_stores(p_vin text)
+RETURNS uuid[] LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT COALESCE(array_agg(DISTINCT x), '{}') FROM (
+    SELECT si.store_id x FROM store_inventory si WHERE si.vin = upper(trim(p_vin)) AND si.presence NOT IN ('retired','transferred')
+    UNION ALL
+    SELECT vl.owning_store_id FROM vehicle_listings vl WHERE upper(trim(vl.vin)) = upper(trim(p_vin)) AND vl.owning_store_id IS NOT NULL
+  ) q WHERE x IS NOT NULL;
+$$;
+
+-- A store's MarketCheck identity is proven only by exactly one approved feed
+-- mapping whose identity comparison matched, and whose DealerId is mapped to
+-- no other store.
+CREATE OR REPLACE FUNCTION public.marketcheck_launch_store_identity_ok(p_store_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT (SELECT count(*) FROM inventory_source_mappings m WHERE m.store_id = p_store_id AND m.status = 'approved') = 1
+     AND EXISTS (SELECT 1 FROM inventory_source_mappings m WHERE m.store_id = p_store_id AND m.status = 'approved'
+                  AND m.evidence->'approved_comparison'->>'verdict' = 'match'
+                  AND NOT EXISTS (SELECT 1 FROM inventory_source_mappings o WHERE o.status = 'approved' AND o.store_id <> m.store_id
+                                   AND o.provider = m.provider AND o.source_dealer_id = m.source_dealer_id));
+$$;
+
+-- The store's latest feed is clean: an applied snapshot within the plan's
+-- freshness window and nothing held, quarantined, rejected or failed since.
+CREATE OR REPLACE FUNCTION public.marketcheck_launch_store_feed_clean(p_store_id uuid, p_max_age_hours integer)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  WITH last AS (SELECT max(applied_at) a FROM inventory_store_snapshots WHERE store_id = p_store_id AND status = 'applied')
+  SELECT (SELECT a FROM last) IS NOT NULL AND (SELECT a FROM last) > now() - make_interval(hours => p_max_age_hours)
+     AND NOT EXISTS (SELECT 1 FROM inventory_store_snapshots s WHERE s.store_id = p_store_id
+                      AND s.status IN ('held','quarantined','rejected','failed') AND s.created_at > (SELECT a FROM last));
+$$;
+
+-- Decides one MarketCheck request. reason is NULL when it may proceed to the
+-- budget; store_id is the rooftop the server resolved for it. Every request
+-- is scoped to one rooftop: a VIN request to the single store that owns the
+-- VIN (never the caller's claim), a VIN-less request (syndication, dealer
+-- lookups, searches) to the store the caller names, verified against the
+-- tenant. A shared tenant never authorises its other rooftops.
+-- p_gate_version NULL is used only by the reservation guard, which proves the
+-- version through the admission event instead. p_exclude_event keeps the
+-- admission being reserved out of the ceiling counts.
+CREATE OR REPLACE FUNCTION public.marketcheck_launch_gate(
+  p_caller text, p_tenant_id uuid, p_channel text, p_store_id uuid, p_product text, p_vin text,
+  p_gate_version text DEFAULT NULL, p_exclude_event bigint DEFAULT NULL,
+  OUT reason text, OUT store_id uuid)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
-  c marketcheck_launch_control%ROWTYPE; p marketcheck_launch_plans%ROWTYPE;
-  v_tenants uuid[]; v_n integer; v_trip text;
+  c marketcheck_launch_control%ROWTYPE; p marketcheck_launch_plans%ROWTYPE; s dealer_stores%ROWTYPE; pol store_enrichment_policies%ROWTYPE;
+  v_vin text := NULLIF(upper(trim(COALESCE(p_vin, ''))), ''); v_stores uuid[]; v_store uuid; v_billing text; v_n integer; v_trip text;
 BEGIN
   SELECT * INTO c FROM marketcheck_launch_control WHERE id = 1 FOR UPDATE;
-  IF NOT FOUND THEN RETURN 'launch_control_missing'; END IF;
-  IF c.emergency_stop THEN RETURN 'emergency_stop'; END IF;
-  IF NOT marketcheck_launch_is_active_state(c.state) THEN RETURN 'launch_inactive'; END IF;
+  IF NOT FOUND THEN reason := 'launch_control_missing'; RETURN; END IF;
+  IF c.emergency_stop THEN reason := 'emergency_stop'; RETURN; END IF;
+  IF NOT marketcheck_launch_is_active_state(c.state) THEN reason := 'launch_inactive'; RETURN; END IF;
   SELECT * INTO p FROM marketcheck_launch_plans WHERE version = c.plan_version AND status = 'approved';
-  IF NOT FOUND THEN RETURN 'launch_plan_missing'; END IF;
-  IF p_channel <> 'rest' AND NOT p.allow_staff_ai THEN RETURN 'launch_staff_ai_not_approved'; END IF;
-  IF p_channel = 'rest' AND NOT (p_caller = ANY (p.allowed_callers)) THEN RETURN 'launch_caller_not_approved'; END IF;
-  SELECT array_agg(DISTINCT tenant_id) INTO v_tenants FROM dealer_stores WHERE id = ANY (c.active_store_ids) AND status = 'active';
-  IF p_tenant_id IS NULL OR v_tenants IS NULL OR NOT (p_tenant_id = ANY (v_tenants)) THEN RETURN 'launch_tenant_not_approved'; END IF;
+  IF NOT FOUND THEN reason := 'launch_plan_missing'; RETURN; END IF;
+  IF p_gate_version IS NOT NULL AND p_gate_version <> p.required_gate_version THEN reason := 'launch_gate_version_mismatch'; RETURN; END IF;
+  IF p_channel <> 'rest' AND NOT p.allow_staff_ai THEN reason := 'launch_staff_ai_not_approved'; RETURN; END IF;
+  IF p_channel = 'rest' AND NOT (p_caller = ANY (p.allowed_callers)) THEN reason := 'launch_caller_not_approved'; RETURN; END IF;
+  IF p_product IS NULL OR NOT (p_product = ANY (p.products)) THEN reason := 'launch_product_not_approved'; RETURN; END IF;
+  SELECT billing_product INTO v_billing FROM provider_product_catalog WHERE account_ref = 'marketcheck_primary' AND product_key = p_product;
+  IF v_billing IS NULL THEN reason := 'launch_product_not_in_catalog'; RETURN; END IF;
+  IF p_tenant_id IS NULL THEN reason := 'launch_tenant_required'; RETURN; END IF;
+
+  -- Rooftop scope, resolved server-side.
+  IF v_vin IS NOT NULL THEN
+    v_stores := marketcheck_launch_vin_stores(v_vin);
+    IF cardinality(v_stores) = 0 THEN reason := 'launch_vin_not_store_inventory'; RETURN; END IF;
+    IF cardinality(v_stores) > 1 THEN reason := 'launch_vin_ownership_ambiguous'; RETURN; END IF;
+    v_store := v_stores[1];
+    IF p_store_id IS NOT NULL AND p_store_id <> v_store THEN reason := 'launch_store_mismatch'; RETURN; END IF;
+  ELSE
+    IF p_store_id IS NULL THEN reason := 'launch_store_required'; RETURN; END IF;
+    v_store := p_store_id;
+  END IF;
+  SELECT * INTO s FROM dealer_stores WHERE id = v_store;
+  IF NOT FOUND OR s.tenant_id IS DISTINCT FROM p_tenant_id THEN reason := 'launch_store_tenant_mismatch'; RETURN; END IF;
+  IF NOT (v_store = ANY (c.active_store_ids)) THEN reason := 'launch_store_not_active'; RETURN; END IF;
+  IF s.status <> 'active' OR s.feed_import_paused THEN reason := 'launch_store_feed_not_live'; RETURN; END IF;
+  IF NOT marketcheck_launch_store_identity_ok(v_store) THEN reason := 'launch_store_identity_unverified'; RETURN; END IF;
+  SELECT * INTO pol FROM store_enrichment_policies sp WHERE sp.store_id = v_store;
+  IF pol.store_id IS NULL OR pol.mode <> 'enrichment' OR pol.mc_rooftop_verified_at IS NULL OR pol.credential_ref IS NULL THEN
+    reason := 'launch_store_policy_not_ready'; RETURN;
+  END IF;
+  IF NOT (v_billing = ANY (pol.allowed_products)) THEN reason := 'launch_store_product_not_allowed'; RETURN; END IF;
+  store_id := v_store;
 
   -- Tripwires. Any one pauses the launch; nothing resumes it automatically.
   IF c.state = 'activating_canary' THEN
     SELECT count(*) INTO v_n FROM provider_call_events
-     WHERE provider = 'marketcheck' AND at >= c.canary_started_at AND outcome <> 'budget_denied';
+     WHERE provider = 'marketcheck' AND at >= c.canary_started_at AND outcome <> 'budget_denied' AND id IS DISTINCT FROM p_exclude_event;
     IF v_n >= p.canary_max_calls THEN v_trip := 'canary_ceiling_reached';
     ELSIF now() > c.canary_started_at + make_interval(hours => p.canary_window_hours) THEN v_trip := 'canary_window_elapsed';
     END IF;
   END IF;
   IF v_trip IS NULL THEN
     SELECT count(*) INTO v_n FROM provider_call_events
-     WHERE provider = 'marketcheck' AND at > now() - interval '1 hour' AND outcome <> 'budget_denied';
+     WHERE provider = 'marketcheck' AND at > now() - interval '1 hour' AND outcome <> 'budget_denied' AND id IS DISTINCT FROM p_exclude_event;
     IF v_n >= p.hourly_call_ceiling THEN v_trip := 'hourly_ceiling'; END IF;
   END IF;
   IF v_trip IS NULL THEN
     SELECT count(*) INTO v_n FROM provider_call_events
-     WHERE provider = 'marketcheck' AND at > now() - interval '24 hours' AND outcome <> 'budget_denied';
+     WHERE provider = 'marketcheck' AND at > now() - interval '24 hours' AND outcome <> 'budget_denied' AND id IS DISTINCT FROM p_exclude_event;
     IF v_n >= p.daily_call_ceiling THEN v_trip := 'daily_ceiling'; END IF;
   END IF;
   IF v_trip IS NULL THEN
@@ -264,19 +350,18 @@ BEGIN
     v_trip := 'feed_paused_or_stopped';
   END IF;
   IF v_trip IS NULL AND EXISTS (
-       SELECT 1 FROM inventory_store_snapshots s
-        WHERE s.store_id = ANY (c.active_store_ids) AND s.status IN ('held','quarantined','rejected','failed')
-          AND s.created_at > COALESCE((SELECT max(a.applied_at) FROM inventory_store_snapshots a WHERE a.store_id = s.store_id AND a.status = 'applied'), '-infinity')) THEN
+       SELECT 1 FROM inventory_store_snapshots sn
+        WHERE sn.store_id = ANY (c.active_store_ids) AND sn.status IN ('held','quarantined','rejected','failed')
+          AND sn.created_at > COALESCE((SELECT max(a.applied_at) FROM inventory_store_snapshots a WHERE a.store_id = sn.store_id AND a.status = 'applied'), '-infinity')) THEN
     v_trip := 'feed_integrity_hold';
   END IF;
 
   IF v_trip IS NOT NULL THEN
     UPDATE marketcheck_launch_control SET state = 'paused', paused_reason = v_trip, paused_at = now(), updated_at = now() WHERE id = 1;
     PERFORM marketcheck_launch_log('tripwire_pause', 'ok', c.state, 'paused', c.plan_version,
-      jsonb_build_object('tripwire', v_trip, 'caller', p_caller), 'gate');
-    RETURN 'launch_paused_' || v_trip;
+      jsonb_build_object('tripwire', v_trip, 'caller', p_caller, 'store_id', v_store), 'gate');
+    reason := 'launch_paused_' || v_trip; store_id := NULL;
   END IF;
-  RETURN NULL;
 END $$;
 
 -- ── Admission: the old entry point keeps its body under a new name ───────
@@ -313,12 +398,16 @@ END $$;
 REVOKE ALL ON FUNCTION public.provider_call_admit(text, text, text, boolean, uuid, text, numeric) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.provider_call_admit(text, text, text, boolean, uuid, text, numeric) TO service_role;
 
+-- The only path that can admit MarketCheck. p_product is the billing product
+-- the budget meters; p_catalog_product is the account catalog product the
+-- plan approves, and the two must name the same catalog row.
 CREATE OR REPLACE FUNCTION public.provider_call_admit_v2(
   p_provider text, p_product text, p_caller text, p_gate_version text, p_essential boolean DEFAULT false,
-  p_tenant_id uuid DEFAULT NULL, p_vin text DEFAULT NULL, p_estimated_cost_usd numeric DEFAULT NULL
+  p_tenant_id uuid DEFAULT NULL, p_vin text DEFAULT NULL, p_estimated_cost_usd numeric DEFAULT NULL,
+  p_store_id uuid DEFAULT NULL, p_catalog_product text DEFAULT NULL
 ) RETURNS TABLE (admitted boolean, event_id bigint, month_calls integer, monthly_call_cap integer, reserve_for_essential integer, reason text)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
-DECLARE v_reason text;
+DECLARE g record; r record;
 BEGIN
   IF p_gate_version IS NULL OR length(p_gate_version) NOT BETWEEN 1 AND 40 THEN
     RETURN QUERY SELECT * FROM public.provider_call_admit_refuse(p_provider, p_product, p_caller, p_essential, p_tenant_id, p_vin, p_estimated_cost_usd, 'gate_version_missing');
@@ -326,41 +415,82 @@ BEGIN
   END IF;
   INSERT INTO public.provider_gate_heartbeats (caller, gate_version, last_seen) VALUES (left(p_caller, 80), p_gate_version, now())
   ON CONFLICT (caller) DO UPDATE SET gate_version = EXCLUDED.gate_version, last_seen = EXCLUDED.last_seen;
-  IF p_provider = 'marketcheck' THEN
-    v_reason := public.marketcheck_launch_gate(p_caller, p_tenant_id, 'rest');
-    IF v_reason IS NOT NULL THEN
-      RETURN QUERY SELECT * FROM public.provider_call_admit_refuse(p_provider, p_product, p_caller, p_essential, p_tenant_id, p_vin, p_estimated_cost_usd, v_reason);
-      RETURN;
-    END IF;
+  IF p_provider <> 'marketcheck' THEN
+    RETURN QUERY SELECT * FROM public.provider_call_admit_core(p_provider, p_product, p_caller, p_essential, p_tenant_id, p_vin, p_estimated_cost_usd);
+    RETURN;
   END IF;
-  RETURN QUERY SELECT * FROM public.provider_call_admit_core(p_provider, p_product, p_caller, p_essential, p_tenant_id, p_vin, p_estimated_cost_usd);
+  IF p_catalog_product IS NULL OR NOT EXISTS (SELECT 1 FROM public.provider_product_catalog pc WHERE pc.account_ref = 'marketcheck_primary'
+       AND pc.product_key = p_catalog_product AND pc.billing_product = p_product) THEN
+    RETURN QUERY SELECT * FROM public.provider_call_admit_refuse(p_provider, p_product, p_caller, p_essential, p_tenant_id, p_vin, p_estimated_cost_usd, 'launch_product_mismatch');
+    RETURN;
+  END IF;
+  SELECT * INTO g FROM public.marketcheck_launch_gate(p_caller, p_tenant_id, 'rest', p_store_id, p_catalog_product, p_vin, p_gate_version, NULL);
+  IF g.reason IS NOT NULL THEN
+    RETURN QUERY SELECT * FROM public.provider_call_admit_refuse(p_provider, p_product, p_caller, p_essential, p_tenant_id, p_vin, p_estimated_cost_usd, g.reason);
+    RETURN;
+  END IF;
+  SELECT * INTO r FROM public.provider_call_admit_core(p_provider, p_product, p_caller, p_essential, p_tenant_id, p_vin, p_estimated_cost_usd);
+  IF r.admitted AND r.event_id IS NOT NULL THEN
+    UPDATE public.provider_call_events SET store_id = g.store_id, catalog_product = p_catalog_product, gate_version = p_gate_version WHERE id = r.event_id;
+  END IF;
+  RETURN QUERY SELECT r.admitted, r.event_id, r.month_calls, r.monthly_call_cap, r.reserve_for_essential, r.reason;
 END $$;
-REVOKE ALL ON FUNCTION public.provider_call_admit_v2(text, text, text, text, boolean, uuid, text, numeric) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.provider_call_admit_v2(text, text, text, text, boolean, uuid, text, numeric) TO service_role;
+REVOKE ALL ON FUNCTION public.provider_call_admit_v2(text, text, text, text, boolean, uuid, text, numeric, uuid, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.provider_call_admit_v2(text, text, text, text, boolean, uuid, text, numeric, uuid, text) TO service_role;
 
--- The account coordinator cannot reserve while the gate is closed. This
--- covers any path into provider_reserve, including staff AI/MCP requests.
+-- The account coordinator reserves a MarketCheck request only under the
+-- same rooftop, product and caller rules, on every path into
+-- provider_requests (provider_reserve, staff AI/MCP, or a direct insert).
+-- A REST reservation must also be bound to the unused admission event that
+-- provider_call_admit_v2 granted for the same caller, product and rooftop in
+-- the last 10 minutes, so a reservation cannot stand in for an admission.
+-- The resolved rooftop is written onto the row.
 CREATE OR REPLACE FUNCTION public.provider_requests_launch_guard() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE v_reason text;
+DECLARE g record; e provider_call_events%ROWTYPE; v_reason text;
 BEGIN
-  IF NEW.status <> 'reserved' OR NEW.account_ref <> 'marketcheck_primary' THEN RETURN NEW; END IF;
+  IF NEW.account_ref <> 'marketcheck_primary' OR NEW.status <> 'reserved' THEN RETURN NEW; END IF;
+  IF TG_OP = 'UPDATE' AND OLD.status = 'reserved' THEN RETURN NEW; END IF;
+  IF TG_OP = 'UPDATE' THEN
+    RAISE EXCEPTION 'launch_gate_closed: launch_reservation_reopen' USING ERRCODE = 'P0001';
+  END IF;
+  SELECT CASE WHEN emergency_stop THEN 'emergency_stop' WHEN NOT marketcheck_launch_is_active_state(state) THEN 'launch_inactive' END
+    INTO v_reason FROM marketcheck_launch_control WHERE id = 1;
+  IF v_reason IS NOT NULL THEN
+    RAISE EXCEPTION 'launch_gate_closed: %', v_reason USING ERRCODE = 'P0001';
+  END IF;
   IF NEW.channel = 'rest' THEN
-    -- REST callers were already admitted by provider_call_admit_v2 in this
-    -- request; re-check only the stop and the state so a stop between the two
-    -- calls still refuses.
-    IF EXISTS (SELECT 1 FROM marketcheck_launch_control WHERE id = 1 AND (emergency_stop OR NOT marketcheck_launch_is_active_state(state))) THEN
-      v_reason := 'launch_gate_closed';
+    IF NEW.provider_event_id IS NULL THEN
+      v_reason := 'launch_reservation_unbound';
+    ELSE
+      SELECT * INTO e FROM provider_call_events WHERE id = NEW.provider_event_id;
+      IF e.id IS NULL OR e.provider <> 'marketcheck' OR e.outcome <> 'admitted' OR e.caller IS DISTINCT FROM NEW.caller
+         OR e.catalog_product IS DISTINCT FROM NEW.product_key OR e.store_id IS NULL OR e.gate_version IS NULL
+         OR e.tenant_id IS DISTINCT FROM NEW.tenant_id OR e.at < now() - interval '10 minutes'
+         OR (NEW.store_id IS NOT NULL AND NEW.store_id <> e.store_id)
+         OR upper(COALESCE(e.vin, '')) IS DISTINCT FROM upper(COALESCE(NEW.vin, '')) THEN
+        v_reason := 'launch_reservation_unbound';
+      ELSIF EXISTS (SELECT 1 FROM provider_requests r WHERE r.provider_event_id = NEW.provider_event_id
+                     AND r.status NOT IN ('refused','joined','released')) THEN
+        v_reason := 'launch_reservation_reused';
+      END IF;
+    END IF;
+    IF v_reason IS NULL THEN
+      SELECT * INTO g FROM marketcheck_launch_gate(NEW.caller, NEW.tenant_id, NEW.channel, e.store_id, NEW.product_key, NEW.vin, e.gate_version, NEW.provider_event_id);
+      v_reason := g.reason;
     END IF;
   ELSE
-    v_reason := marketcheck_launch_gate(NEW.caller, NEW.tenant_id, NEW.channel);
+    SELECT * INTO g FROM marketcheck_launch_gate(NEW.caller, NEW.tenant_id, NEW.channel, NEW.store_id, NEW.product_key, NEW.vin, NULL, NULL);
+    v_reason := g.reason;
   END IF;
   IF v_reason IS NOT NULL THEN
     RAISE EXCEPTION 'launch_gate_closed: %', v_reason USING ERRCODE = 'P0001';
   END IF;
+  NEW.store_id := g.store_id;
+  NEW.group_id := (SELECT group_id FROM dealer_stores WHERE id = g.store_id);
   RETURN NEW;
 END $$;
-CREATE TRIGGER provider_requests_launch_guard BEFORE INSERT ON public.provider_requests
+CREATE TRIGGER provider_requests_launch_guard BEFORE INSERT OR UPDATE OF status ON public.provider_requests
   FOR EACH ROW EXECUTE FUNCTION public.provider_requests_launch_guard();
 
 -- ── Budget reconciliation ───────────────────────────────────────────────
@@ -405,7 +535,7 @@ BEGIN
   v_missing := ARRAY(SELECT x FROM unnest(ARRAY[
       'public.provider_reserve(text,text,text,text,integer,uuid,uuid,text,text,numeric,boolean,bigint,integer,jsonb)',
       'public.provider_settle_event(bigint,text,integer,jsonb)', 'public.provider_reconcile_account(text,integer,integer,integer,timestamp with time zone)',
-      'public.store_enrichment_admit(uuid,text,text,text,text,numeric)', 'public.provider_call_admit_v2(text,text,text,text,boolean,uuid,text,numeric)']) x
+      'public.store_enrichment_admit(uuid,text,text,text,text,numeric)', 'public.provider_call_admit_v2(text,text,text,text,boolean,uuid,text,numeric,uuid,text)']) x
     WHERE to_regprocedure(x) IS NULL)
     || ARRAY(SELECT x FROM unnest(ARRAY['public.inventory_store_snapshots','public.inventory_source_mappings','public.store_enrichment_policies',
       'public.provider_requests','public.provider_product_catalog']) x WHERE to_regclass(x) IS NULL);
@@ -502,32 +632,71 @@ BEGIN
       'detail', jsonb_build_object('marketcheck_jobs', v_cron));
   END IF;
 
-  -- 10. Deployed gate version: every approved caller seen on the required version.
+  -- 10. Deployed gate version: every approved caller seen on the required
+  -- version, from the admission heartbeat the deployed code writes itself.
+  -- A refused admission records it too, so this needs no paid call.
   IF p.version IS NOT NULL THEN
     v_missing := ARRAY(SELECT x FROM unnest(p.allowed_callers) x WHERE NOT EXISTS (
       SELECT 1 FROM provider_gate_heartbeats h WHERE h.caller = x AND h.gate_version = p.required_gate_version AND h.last_seen > now() - interval '7 days'));
   END IF;
-  SELECT * INTO v_att FROM marketcheck_launch_checks WHERE check_key = 'edge_versions' AND verified_at > now() - interval '7 days';
   v := v || jsonb_build_object('key','edge_versions','label','Edge function versions','mandatory',true,
-    'status', CASE WHEN p.version IS NULL THEN 'unverified'
-      WHEN cardinality(v_missing) = 0 THEN 'passed'
-      WHEN v_att.status = 'passed' AND v_att.detail->>'gate_version' = p.required_gate_version THEN 'passed'
-      ELSE 'unverified' END,
-    'summary', CASE WHEN p.version IS NULL THEN 'No plan.' WHEN cardinality(v_missing) = 0 THEN format('All approved callers run gate %s.', p.required_gate_version)
-      WHEN v_att.status = 'passed' THEN v_att.summary
-      ELSE format('Not yet seen on gate %s: %s.', p.required_gate_version, array_to_string(v_missing, ', ')) END);
+    'status', CASE WHEN p.version IS NULL THEN 'unverified' WHEN cardinality(v_missing) = 0 THEN 'passed' ELSE 'unverified' END,
+    'summary', CASE WHEN p.version IS NULL THEN 'No plan.' WHEN cardinality(v_missing) = 0 THEN format('All approved callers reported gate %s in the last 7 days.', p.required_gate_version)
+      ELSE format('Not yet seen on gate %s: %s.', p.required_gate_version, array_to_string(v_missing, ', ')) END,
+    'detail', (SELECT COALESCE(jsonb_agg(to_jsonb(h)), '[]'::jsonb) FROM provider_gate_heartbeats h WHERE h.caller = ANY (COALESCE(p.allowed_callers, '{}'))));
 
-  -- 11-17. Evidence that SQL cannot compute, attested with a reference.
-  FOREACH k IN ARRAY ARRAY['credentials','quota_concurrency','sticker_templates','auto_generation','print_passport_qa','rollback_tested'] LOOP
+  -- 11. Cost controls: an owner-approved account dollar cap, verified prices
+  -- for every plan product, and a dollar cap on the canary store.
+  v_missing := ARRAY(SELECT x FROM unnest(COALESCE(p.products, '{}')) x
+    WHERE NOT EXISTS (SELECT 1 FROM provider_product_catalog pc WHERE pc.account_ref = 'marketcheck_primary' AND pc.product_key = x
+                       AND pc.rate_status = 'verified' AND pc.rate_usd IS NOT NULL));
+  v_ok := p.version IS NOT NULL AND p.account_usd_cap IS NOT NULL AND cardinality(v_missing) = 0
+          AND pol.store_id IS NOT NULL AND pol.monthly_usd_cap IS NOT NULL AND pol.monthly_usd_cap <= p.account_usd_cap;
+  v := v || jsonb_build_object('key','cost_controls','label','Dollar caps and verified pricing','mandatory',true,
+    'status', CASE WHEN p.version IS NULL THEN 'unverified' WHEN v_ok THEN 'passed' ELSE 'failed' END,
+    'summary', CASE WHEN p.version IS NULL THEN 'No plan.'
+      WHEN p.account_usd_cap IS NULL THEN 'The plan has no owner-approved account dollar cap.'
+      WHEN cardinality(v_missing) > 0 THEN 'No verified account price for: ' || array_to_string(v_missing, ', ')
+      WHEN pol.store_id IS NULL OR pol.monthly_usd_cap IS NULL THEN 'The canary store has no monthly dollar cap.'
+      WHEN pol.monthly_usd_cap > p.account_usd_cap THEN 'The canary store dollar cap is above the account cap.'
+      ELSE format('Account cap $%s; canary store cap $%s; plan products priced from the account.', p.account_usd_cap, pol.monthly_usd_cap) END,
+    'detail', jsonb_build_object('account_usd_cap', p.account_usd_cap, 'current_account_usd_cap', a.monthly_usd_cap, 'canary_store_usd_cap', pol.monthly_usd_cap,
+      'prices', (SELECT COALESCE(jsonb_object_agg(pc.product_key, jsonb_build_object('rate_usd', pc.rate_usd, 'rate_status', pc.rate_status)), '{}'::jsonb)
+                   FROM provider_product_catalog pc WHERE pc.account_ref = 'marketcheck_primary' AND pc.product_key = ANY (COALESCE(p.products, '{}')))));
+
+  -- 12. Real-data sticker generation on the canary store, from the
+  -- orchestrator's own records: a rendered document whose MSRP reconciled
+  -- and whose QR and visual QA passed, in the last 7 days.
+  v_n := 0;
+  IF p.version IS NOT NULL AND to_regclass('public.factory_sticker_records') IS NOT NULL THEN
+    EXECUTE $q$SELECT count(*) FROM factory_sticker_records r JOIN vehicle_listings vl ON vl.id = r.vehicle_id
+      WHERE vl.owning_store_id = $1 AND r.current_document_id IS NOT NULL AND r.reconciliation_status = 'MATCHED'
+        AND r.qr_identity_qa_status = 'PASS' AND r.visual_qa_status = 'PASS' AND r.updated_at > now() - interval '7 days'$q$
+      INTO v_n USING p.canary_store_id;
+  END IF;
+  v := v || jsonb_build_object('key','sticker_generation','label','Real-data sticker generation','mandatory',true,
+    'status', CASE WHEN p.version IS NULL THEN 'unverified' WHEN v_n > 0 THEN 'passed' ELSE 'failed' END,
+    'summary', CASE WHEN p.version IS NULL THEN 'No plan.' WHEN v_n > 0 THEN format('%s canary-store sticker(s) rendered with MSRP matched and QR/visual QA passed in the last 7 days.', v_n)
+      ELSE 'No canary-store sticker has rendered with MSRP matched and QR/visual QA passed in the last 7 days.' END);
+
+  -- 13. Emergency stop drill, written by marketcheck_launch_stop_drill only.
+  v_att := NULL;
+  SELECT * INTO v_att FROM marketcheck_launch_checks WHERE check_key = 'stop_drill' AND verified_at > now() - interval '7 days';
+  v := v || jsonb_build_object('key','stop_drill','label','Emergency stop drill','mandatory',true,
+    'status', COALESCE(v_att.status, 'unverified'),
+    'summary', COALESCE(v_att.summary, 'No stop drill in the last 7 days.'),
+    'detail', jsonb_build_object('verified_at', v_att.verified_at, 'verified_by', v_att.verified_by, 'boundaries', v_att.detail));
+
+  -- 14-18. Evidence that SQL cannot compute, attested with a reference.
+  FOREACH k IN ARRAY ARRAY['credentials','mcp_boundary','quota_concurrency','sticker_templates','print_passport_qa'] LOOP
     v_att := NULL;
     SELECT * INTO v_att FROM marketcheck_launch_checks WHERE check_key = k AND verified_at > now() - interval '7 days';
     v := v || jsonb_build_object('key', k, 'label', CASE k
         WHEN 'credentials' THEN 'MarketCheck account credentials'
+        WHEN 'mcp_boundary' THEN 'Outside MarketCheck access (MCP connector, other keys)'
         WHEN 'quota_concurrency' THEN 'Quota reservation concurrency'
         WHEN 'sticker_templates' THEN 'Sticker template coverage'
-        WHEN 'auto_generation' THEN 'Automatic generation'
-        WHEN 'print_passport_qa' THEN 'Print and Passport QA'
-        WHEN 'rollback_tested' THEN 'Rollback / Emergency Stop' END,
+        WHEN 'print_passport_qa' THEN 'Print and Passport QA' END,
       'mandatory', true,
       'status', COALESCE(v_att.status, 'unverified'),
       'summary', COALESCE(v_att.summary, 'No evidence recorded in the last 7 days.'),
@@ -628,11 +797,13 @@ RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE v_uid uuid := (SELECT auth.uid());
 BEGIN
   -- Platform admins attest from the screen; the probe function (service role)
-  -- records credentials and gate version only.
+  -- records credentials only.
   IF v_uid IS NULL THEN
-    IF p_check_key NOT IN ('credentials','edge_versions') THEN RAISE EXCEPTION 'platform_admin_required' USING ERRCODE = '42501'; END IF;
+    IF p_check_key <> 'credentials' THEN RAISE EXCEPTION 'platform_admin_required' USING ERRCODE = '42501'; END IF;
   ELSE PERFORM inv_require_platform_admin(); END IF;
-  IF p_check_key NOT IN ('credentials','edge_versions','quota_concurrency','sticker_templates','auto_generation','print_passport_qa','rollback_tested') THEN
+  -- Gate version, sticker generation and the stop drill are machine evidence
+  -- and cannot be attested by hand.
+  IF p_check_key NOT IN ('credentials','mcp_boundary','quota_concurrency','sticker_templates','print_passport_qa') THEN
     RAISE EXCEPTION 'unknown_check';
   END IF;
   IF p_status NOT IN ('passed','failed') OR p_summary IS NULL OR length(trim(p_summary)) < 5 THEN RAISE EXCEPTION 'invalid_attestation'; END IF;
@@ -651,11 +822,25 @@ DECLARE v_uid uuid := inv_require_platform_admin(); c marketcheck_launch_control
 BEGIN
   SELECT * INTO c FROM marketcheck_launch_control WHERE id = 1 FOR UPDATE;
   IF marketcheck_launch_is_active_state(c.state) OR c.state = 'paused' THEN RAISE EXCEPTION 'launch_in_progress'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM marketcheck_launch_plans WHERE version = p_version AND status = 'draft') THEN RAISE EXCEPTION 'plan_not_draft'; END IF;
+  IF (SELECT account_usd_cap FROM marketcheck_launch_plans WHERE version = p_version) IS NULL THEN RAISE EXCEPTION 'usd_cap_required'; END IF;
   UPDATE marketcheck_launch_plans SET status = 'retired' WHERE status = 'approved' AND version <> p_version;
   UPDATE marketcheck_launch_plans SET status = 'approved', approved_by = v_uid, approved_at = now() WHERE version = p_version AND status = 'draft';
-  IF NOT FOUND THEN RAISE EXCEPTION 'plan_not_draft'; END IF;
   PERFORM marketcheck_launch_log('approve_plan', 'ok', c.state, c.state, p_version, '{}'::jsonb);
   RETURN jsonb_build_object('ok', true, 'version', p_version);
+END $$;
+
+-- The owner's dollar ceiling for a draft plan. Approval refuses a plan
+-- without one; an approved plan's cap changes only through a new version.
+CREATE OR REPLACE FUNCTION public.marketcheck_launch_set_plan_usd_cap(p_version integer, p_usd_cap numeric)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_uid uuid := inv_require_platform_admin();
+BEGIN
+  IF p_usd_cap IS NULL OR p_usd_cap <= 0 OR p_usd_cap > 100000 THEN RAISE EXCEPTION 'invalid_usd_cap'; END IF;
+  UPDATE marketcheck_launch_plans SET account_usd_cap = round(p_usd_cap, 2) WHERE version = p_version AND status = 'draft';
+  IF NOT FOUND THEN RAISE EXCEPTION 'plan_not_draft'; END IF;
+  PERFORM marketcheck_launch_log('set_plan_usd_cap', 'ok', NULL, NULL, p_version, jsonb_build_object('account_usd_cap', round(p_usd_cap, 2)));
+  RETURN jsonb_build_object('ok', true, 'version', p_version, 'account_usd_cap', round(p_usd_cap, 2));
 END $$;
 
 -- Start MarketCheck & Inventory Intelligence. Rechecks everything server-side
@@ -694,7 +879,7 @@ BEGIN
   END IF;
 
   SELECT * INTO a FROM provider_accounts WHERE account_ref = 'marketcheck_primary';
-  SELECT to_jsonb(b) INTO v_prev_budget FROM provider_call_budgets b WHERE provider = 'marketcheck';
+  SELECT to_jsonb(b) || jsonb_build_object('account_usd_cap', a.monthly_usd_cap) INTO v_prev_budget FROM provider_call_budgets b WHERE provider = 'marketcheck';
   SELECT COALESCE(jsonb_agg(jsonb_build_object('store_id', store_id, 'mode', mode)), '[]'::jsonb) INTO v_prev_pol FROM store_enrichment_policies;
   FOR j IN SELECT * FROM jsonb_array_elements(p.cron_jobs) LOOP
     v_prev_cron := v_prev_cron || COALESCE(marketcheck_launch_cron_state(j->>'jobname'), jsonb_build_object('jobname', j->>'jobname', 'missing', true));
@@ -705,6 +890,7 @@ BEGIN
     notes = COALESCE(notes, '') || format(E'\n%s launch plan v%s activated by %s; previous row kept in marketcheck_launch_control.previous_budget.', now(), p.version, v_uid),
     updated_at = now()
   WHERE provider = 'marketcheck';
+  UPDATE provider_accounts SET monthly_usd_cap = p.account_usd_cap, updated_by = v_uid, updated_at = now() WHERE account_ref = 'marketcheck_primary';
   UPDATE store_enrichment_policies SET mode = 'enrichment', budget_blocked = false, updated_by = v_uid, updated_at = now()
    WHERE store_id = p.canary_store_id;
   FOR j IN SELECT * FROM jsonb_array_elements(p.cron_jobs) LOOP
@@ -811,16 +997,18 @@ BEGIN
 END $$;
 
 -- Add the next approved rooftop, only from PILOT ACTIVE / EXPANDING, only in
--- plan order, only after the plan's waiting period and with no tripwire.
+-- plan order, only after the plan's waiting period, and only after the
+-- rooftop's full policy, identity and latest feed are revalidated now.
 CREATE OR REPLACE FUNCTION public.marketcheck_launch_expand(p_store_id uuid, p_confirm text)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE v_uid uuid := inv_require_platform_admin(); c marketcheck_launch_control%ROWTYPE; p marketcheck_launch_plans%ROWTYPE;
-  e jsonb; v_next jsonb; pol store_enrichment_policies%ROWTYPE; v_since timestamptz;
+  v_next jsonb; pol store_enrichment_policies%ROWTYPE; s dealer_stores%ROWTYPE; v_since timestamptz; v_reason text; v_billing text[];
 BEGIN
   IF p_confirm IS DISTINCT FROM 'EXPAND' THEN RAISE EXCEPTION 'confirmation_required'; END IF;
   SELECT * INTO c FROM marketcheck_launch_control WHERE id = 1 FOR UPDATE;
-  IF c.state NOT IN ('pilot_active','expanding') THEN RETURN jsonb_build_object('ok', false, 'reason', 'not_in_pilot'); END IF;
-  SELECT * INTO p FROM marketcheck_launch_plans WHERE version = c.plan_version;
+  IF c.emergency_stop OR c.state NOT IN ('pilot_active','expanding') THEN RETURN jsonb_build_object('ok', false, 'reason', 'not_in_pilot'); END IF;
+  SELECT * INTO p FROM marketcheck_launch_plans WHERE version = c.plan_version AND status = 'approved';
+  IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'reason', 'plan_not_approved'); END IF;
   SELECT x INTO v_next FROM jsonb_array_elements(p.rollout) x
    WHERE NOT ((x->>'store_id')::uuid = ANY (c.active_store_ids)) ORDER BY (x->>'order')::int LIMIT 1;
   IF v_next IS NULL THEN RETURN jsonb_build_object('ok', false, 'reason', 'rollout_complete'); END IF;
@@ -829,12 +1017,23 @@ BEGIN
   IF now() < v_since + make_interval(hours => COALESCE((v_next->>'min_hours_after_previous')::int, 24)) THEN
     RETURN jsonb_build_object('ok', false, 'reason', 'waiting_period', 'eligible_at', v_since + make_interval(hours => COALESCE((v_next->>'min_hours_after_previous')::int, 24)));
   END IF;
+  SELECT * INTO s FROM dealer_stores WHERE id = p_store_id;
   SELECT * INTO pol FROM store_enrichment_policies WHERE store_id = p_store_id;
-  IF pol.store_id IS NULL OR pol.mc_rooftop_verified_at IS NULL OR pol.daily_request_limit <= 0 OR pol.monthly_request_cap <= 0 THEN
-    RETURN jsonb_build_object('ok', false, 'reason', 'store_policy_not_ready');
-  END IF;
-  IF EXISTS (SELECT 1 FROM dealer_stores WHERE id = p_store_id AND (status <> 'active' OR feed_import_paused)) THEN
-    RETURN jsonb_build_object('ok', false, 'reason', 'store_feed_not_live');
+  v_billing := ARRAY(SELECT pc.billing_product FROM provider_product_catalog pc WHERE pc.account_ref = 'marketcheck_primary' AND pc.product_key = ANY (p.products));
+  v_reason := CASE
+    WHEN s.id IS NULL OR s.status <> 'active' OR s.feed_import_paused THEN 'store_feed_not_live'
+    WHEN s.tenant_id IS DISTINCT FROM (SELECT tenant_id FROM dealer_stores WHERE id = p.canary_store_id) THEN 'store_outside_plan_tenant'
+    WHEN NOT marketcheck_launch_store_identity_ok(p_store_id) THEN 'store_identity_unverified'
+    WHEN pol.store_id IS NULL OR pol.mc_rooftop_verified_at IS NULL OR pol.credential_ref IS NULL THEN 'store_policy_not_ready'
+    WHEN pol.daily_request_limit <= 0 OR pol.monthly_request_cap <= 0 OR pol.daily_request_limit > p.daily_call_ceiling THEN 'store_limits_invalid'
+    WHEN pol.monthly_usd_cap IS NULL OR pol.monthly_usd_cap > p.account_usd_cap THEN 'store_usd_cap_missing'
+    WHEN cardinality(v_billing) <> cardinality(p.products) OR NOT (pol.allowed_products @> v_billing) THEN 'store_products_not_allowed'
+    WHEN NOT marketcheck_launch_store_feed_clean(p_store_id, p.feed_max_age_hours) THEN 'store_feed_not_clean'
+    WHEN EXISTS (SELECT 1 FROM inventory_feed_controls WHERE emergency_stop OR ingestion_paused) THEN 'feed_paused_or_stopped'
+    END;
+  IF v_reason IS NOT NULL THEN
+    PERFORM marketcheck_launch_log('expand', 'refused', c.state, c.state, c.plan_version, jsonb_build_object('store_id', p_store_id, 'reason', v_reason));
+    RETURN jsonb_build_object('ok', false, 'reason', v_reason);
   END IF;
   UPDATE store_enrichment_policies SET mode = 'enrichment', budget_blocked = false, updated_by = v_uid, updated_at = now() WHERE store_id = p_store_id;
   UPDATE marketcheck_launch_control SET state = 'expanding', active_store_ids = active_store_ids || p_store_id, last_expanded_at = now(),
@@ -858,6 +1057,7 @@ BEGIN
       reserve_for_essential = (c.previous_budget->>'reserve_for_essential')::int, enabled = (c.previous_budget->>'enabled')::boolean,
       notes = c.previous_budget->>'notes', updated_at = now()
     WHERE provider = 'marketcheck';
+    UPDATE provider_accounts SET monthly_usd_cap = (c.previous_budget->>'account_usd_cap')::numeric, updated_at = now() WHERE account_ref = 'marketcheck_primary';
   END IF;
   IF c.previous_policies IS NOT NULL THEN
     UPDATE store_enrichment_policies sp SET mode = COALESCE((SELECT x->>'mode' FROM jsonb_array_elements(c.previous_policies) x WHERE (x->>'store_id')::uuid = sp.store_id), 'feed_only'),
@@ -874,45 +1074,91 @@ BEGIN
   RETURN jsonb_build_object('ok', true, 'state', 'not_ready');
 END $$;
 
--- Drill: engage and release the stop while OFF, proving the path end to end
--- on the real database without opening the gate. Records evidence.
+-- Drill, only while OFF: engages the real emergency stop inside a
+-- subtransaction, then tries the real boundaries a paid call would cross:
+-- provider_call_admit_v2 for every approved caller, the pre-release
+-- provider_call_admit, provider_reserve, and a direct reservation insert. It
+-- reads the cron table while the stop holds, then rolls the subtransaction
+-- back, so nothing it did persists except the evidence row and audit event.
+-- No provider is contacted.
 CREATE OR REPLACE FUNCTION public.marketcheck_launch_stop_drill()
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE v_uid uuid := inv_require_platform_admin(); c marketcheck_launch_control%ROWTYPE; v_reason text; v_cron_before jsonb; v_cron_after jsonb;
+DECLARE
+  v_uid uuid := inv_require_platform_admin(); c marketcheck_launch_control%ROWTYPE; p marketcheck_launch_plans%ROWTYPE;
+  v_tenant uuid; v_product text; v_billing text; v_caller text; v_admit jsonb := '{}'::jsonb; v_old text; v_reserve text; v_direct text;
+  v_cron_before jsonb; v_cron_during jsonb; v_cron_after jsonb; v_flag boolean; v_ok boolean; v_detail jsonb; v_summary text;
 BEGIN
   SELECT * INTO c FROM marketcheck_launch_control WHERE id = 1 FOR UPDATE;
   IF c.state NOT IN ('not_ready','ready_to_activate') OR c.emergency_stop THEN RETURN jsonb_build_object('ok', false, 'reason', 'drill_only_when_off'); END IF;
+  SELECT * INTO p FROM marketcheck_launch_plans WHERE version = COALESCE(c.plan_version,
+    (SELECT max(version) FROM marketcheck_launch_plans WHERE status = 'approved'), (SELECT max(version) FROM marketcheck_launch_plans WHERE status = 'draft'));
+  v_product := COALESCE(p.products[1], 'neovin');
+  SELECT billing_product INTO v_billing FROM provider_product_catalog WHERE account_ref = 'marketcheck_primary' AND product_key = v_product;
+  SELECT tenant_id INTO v_tenant FROM dealer_stores WHERE id = p.canary_store_id;
   v_cron_before := marketcheck_launch_cron_jobs();
-  UPDATE marketcheck_launch_control SET emergency_stop = true, state = 'emergency_stop' WHERE id = 1;
-  v_reason := marketcheck_launch_gate('marketcheck-sync', NULL, 'rest');
+  BEGIN
+    PERFORM marketcheck_emergency_stop('stop drill (rolled back)');
+    SELECT emergency_stop INTO v_flag FROM marketcheck_launch_control WHERE id = 1;
+    FOREACH v_caller IN ARRAY COALESCE(p.allowed_callers, ARRAY['marketcheck-specs']) LOOP
+      v_admit := v_admit || jsonb_build_object(v_caller, (SELECT reason FROM provider_call_admit_v2('marketcheck', COALESCE(v_billing, 'neovin'), v_caller,
+        COALESCE(p.required_gate_version, 'drill'), true, v_tenant, NULL, 0, p.canary_store_id, v_product)));
+    END LOOP;
+    SELECT reason INTO v_old FROM provider_call_admit('marketcheck', COALESCE(v_billing, 'neovin'), 'stop-drill', true, v_tenant, NULL, 0);
+    BEGIN
+      v_reserve := 'not_refused: ' || provider_reserve('marketcheck_primary', v_product, COALESCE(p.allowed_callers[1], 'marketcheck-specs'), 'stop_drill', 1,
+        v_tenant, p.canary_store_id, NULL, 'stop-drill-' || gen_random_uuid(), 0, false, NULL, 30, '{}'::jsonb)::text;
+    EXCEPTION WHEN raise_exception THEN v_reserve := SQLERRM; END;
+    BEGIN
+      INSERT INTO provider_requests (account_ref, product_key, caller, reason, priority, channel, tenant_id, store_id, status)
+      VALUES ('marketcheck_primary', v_product, 'stop-drill', 'stop_drill', 1, 'mcp', v_tenant, p.canary_store_id, 'reserved');
+      v_direct := 'not_refused';
+    EXCEPTION WHEN raise_exception THEN v_direct := SQLERRM; END;
+    v_cron_during := marketcheck_launch_cron_jobs();
+    RAISE EXCEPTION 'stop_drill_rollback';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM <> 'stop_drill_rollback' THEN RAISE; END IF;
+  END;
   v_cron_after := marketcheck_launch_cron_jobs();
-  UPDATE marketcheck_launch_control SET emergency_stop = false, state = c.state, updated_at = now(), updated_by = v_uid WHERE id = 1;
-  IF v_reason IS DISTINCT FROM 'emergency_stop' THEN
-    PERFORM marketcheck_launch_log('stop_drill', 'failed', c.state, c.state, c.plan_version, jsonb_build_object('gate_answer', v_reason));
-    RETURN jsonb_build_object('ok', false, 'reason', 'gate_did_not_refuse', 'gate_answer', v_reason);
-  END IF;
-  PERFORM marketcheck_launch_log('stop_drill', 'ok', c.state, c.state, c.plan_version, jsonb_build_object('gate_answer', v_reason, 'marketcheck_cron', v_cron_before));
-  RETURN jsonb_build_object('ok', true, 'gate_answer', v_reason);
+  v_ok := v_flag IS TRUE
+    AND NOT EXISTS (SELECT 1 FROM jsonb_each_text(v_admit) e WHERE e.value IS DISTINCT FROM 'emergency_stop')
+    AND v_old = 'gate_upgrade_required'
+    AND v_reserve = 'launch_gate_closed: emergency_stop'
+    AND v_direct = 'launch_gate_closed: emergency_stop'
+    AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_cron_during) j WHERE (j->>'active')::boolean)
+    AND v_cron_after = v_cron_before
+    AND (SELECT state = c.state AND NOT emergency_stop FROM marketcheck_launch_control WHERE id = 1);
+  v_detail := jsonb_build_object('admission_v2', v_admit, 'admission_pre_release', v_old, 'provider_reserve', v_reserve, 'direct_reservation', v_direct,
+    'cron_before', v_cron_before, 'cron_during_stop', v_cron_during, 'cron_after', v_cron_after, 'stop_flag_set', v_flag, 'paid_calls', 0);
+  v_summary := CASE WHEN v_ok THEN format('Stop refused %s admission(s), the pre-release entry point, provider_reserve and a direct reservation; parked %s cron job(s); all restored.',
+      (SELECT count(*) FROM jsonb_object_keys(v_admit)), jsonb_array_length(v_cron_during))
+    ELSE 'The stop did not refuse at every boundary; see detail.' END;
+  INSERT INTO marketcheck_launch_checks (check_key, status, summary, evidence_ref, detail, verified_by, verified_at)
+  VALUES ('stop_drill', CASE WHEN v_ok THEN 'passed' ELSE 'failed' END, v_summary, 'marketcheck_launch_stop_drill', v_detail, v_uid, now())
+  ON CONFLICT (check_key) DO UPDATE SET status = EXCLUDED.status, summary = EXCLUDED.summary, evidence_ref = EXCLUDED.evidence_ref,
+    detail = EXCLUDED.detail, verified_by = EXCLUDED.verified_by, verified_at = EXCLUDED.verified_at;
+  PERFORM marketcheck_launch_log('stop_drill', CASE WHEN v_ok THEN 'ok' ELSE 'failed' END, c.state, c.state, p.version, v_detail);
+  RETURN jsonb_build_object('ok', v_ok, 'detail', v_detail, 'summary', v_summary);
 END $$;
 
 REVOKE ALL ON FUNCTION
   public.marketcheck_launch_log(text, text, text, text, integer, jsonb, text),
   public.marketcheck_launch_actor_is_admin(),
   public.marketcheck_launch_cron_state(text), public.marketcheck_launch_cron_set(text, text, boolean), public.marketcheck_launch_cron_jobs(),
-  public.marketcheck_launch_gate(text, uuid, text),
+  public.marketcheck_launch_gate(text, uuid, text, uuid, text, text, text, bigint),
+  public.marketcheck_launch_vin_stores(text), public.marketcheck_launch_store_identity_ok(uuid), public.marketcheck_launch_store_feed_clean(uuid, integer),
   public.marketcheck_launch_readiness(integer)
 FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.marketcheck_launch_readiness(integer) TO service_role;
 REVOKE ALL ON FUNCTION
   public.marketcheck_launch_status(), public.marketcheck_launch_record_quota(integer, integer, integer, timestamptz, text),
-  public.marketcheck_launch_attest(text, text, text, text, jsonb), public.marketcheck_launch_approve_plan(integer),
+  public.marketcheck_launch_attest(text, text, text, text, jsonb), public.marketcheck_launch_approve_plan(integer), public.marketcheck_launch_set_plan_usd_cap(integer, numeric),
   public.marketcheck_launch_activate(integer, text), public.marketcheck_emergency_stop(text), public.marketcheck_launch_release_stop(text),
   public.marketcheck_launch_pause(text), public.marketcheck_launch_resume(text), public.marketcheck_launch_expand(uuid, text),
   public.marketcheck_launch_rollback(text), public.marketcheck_launch_stop_drill()
 FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION
   public.marketcheck_launch_status(), public.marketcheck_launch_record_quota(integer, integer, integer, timestamptz, text),
-  public.marketcheck_launch_attest(text, text, text, text, jsonb), public.marketcheck_launch_approve_plan(integer),
+  public.marketcheck_launch_attest(text, text, text, text, jsonb), public.marketcheck_launch_approve_plan(integer), public.marketcheck_launch_set_plan_usd_cap(integer, numeric),
   public.marketcheck_launch_activate(integer, text), public.marketcheck_emergency_stop(text), public.marketcheck_launch_release_stop(text),
   public.marketcheck_launch_pause(text), public.marketcheck_launch_resume(text), public.marketcheck_launch_expand(uuid, text),
   public.marketcheck_launch_rollback(text), public.marketcheck_launch_stop_drill()
@@ -924,13 +1170,15 @@ INSERT INTO public.marketcheck_launch_plans (version, title, canary_store_id, ca
   daily_call_ceiling, error_tripwire_per_hour, uncertain_tripwire_per_hour, feed_max_age_hours, required_gate_version, products, allowed_callers,
   cron_jobs, rollout, notes)
 SELECT 1, 'Harte INFINITI canary, then five Harte rooftops', '45cdc1e0-7e88-4b44-9d07-27369d74ab21'::uuid, 40, 24, 15, 120, 5, 3, 9,
-  'launch-2026-11-02', ARRAY['neovin'], ARRAY['marketcheck-sync','marketcheck-specs','vehicle-enrich'],
-  '[{"jobname":"marketcheck-sync","schedule":"7 */4 * * *"}]'::jsonb,
+  'launch-2026-11-02', ARRAY['neovin'], ARRAY['marketcheck-specs'],
+  '[]'::jsonb,
   (SELECT COALESCE(jsonb_agg(jsonb_build_object('store_id', id, 'order', o, 'min_hours_after_previous', 48) ORDER BY o), '[]'::jsonb)
      FROM (VALUES ('35d5584b-93d4-4419-9a50-6daead08e7a9'::uuid, 1), ('e400e636-0909-4b36-822e-caa2b5ae7381'::uuid, 2),
                   ('12e1d831-166d-48e9-87b5-536d7c0980dc'::uuid, 3), ('17a9f6f2-29ff-4ff1-bf72-1519df10b7d5'::uuid, 4),
                   ('02b4f1ac-e15a-40a7-9c49-811fd043ef53'::uuid, 5)) v(id, o)
     WHERE EXISTS (SELECT 1 FROM public.dealer_stores s WHERE s.id = v.id)),
-  'Canary: at most 40 MarketCheck calls in 24 hours for Harte INFINITI only (feed sync plus new-vehicle NeoVIN decodes). Then pilot, then one rooftop at a time, 48 hours apart.'
+  'Canary: at most 40 NeoVIN decodes in 24 hours, Harte INFINITI vehicles only, through marketcheck-specs. Then pilot, then one rooftop at a time, 48 hours apart. '
+  || 'marketcheck-sync is not an approved caller: it pulls the syndication and dealer-directory products, which are not verified entitlements, and inventory '
+  || 'already arrives from vAuto through Files.com. Adding it needs a new plan version naming those products with verified entitlement and pricing.'
 WHERE EXISTS (SELECT 1 FROM public.dealer_stores WHERE id = '45cdc1e0-7e88-4b44-9d07-27369d74ab21')
 ON CONFLICT (version) DO NOTHING;

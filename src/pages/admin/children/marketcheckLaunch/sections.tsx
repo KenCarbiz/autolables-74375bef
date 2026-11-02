@@ -4,7 +4,7 @@ import { Button, EmptyState, InlineNote, KeyValueList, Panel, StatusText, Td, Th
 import { ICON } from "@/components/admin/v2/primitives";
 import type { Consumption, LaunchEvent, LaunchStatus, ReadinessCheck } from "@/lib/marketcheckLaunch/types";
 import {
-  CHECK_STATUS_LABEL, CHECK_STATUS_TONE, STATE_TONE, SQL_FALLBACK, isAttested, mandatoryProgress, num, periodSourceLabel, stateLabel, usd, when,
+  CHECK_STATUS_LABEL, CHECK_STATUS_TONE, STATE_TONE, SQL_FALLBACK, cronJobName, isAttested, mandatoryProgress, num, periodSourceLabel, stateLabel, usd, when,
 } from "@/lib/marketcheckLaunch/viewModel";
 
 export const Section = ({ title, description, action, children }: { title: string; description?: string; action?: ReactNode; children: ReactNode }) => (
@@ -147,7 +147,7 @@ export function ConsumptionSection({ c, onRecord }: { c: Consumption | null; onR
   );
 }
 
-export function StateSection({ status, onApprove }: { status: LaunchStatus; onApprove: () => void }) {
+export function StateSection({ status, onApprove, onSetCap }: { status: LaunchStatus; onApprove: () => void; onSetCap: () => void }) {
   const p = status.plan;
   const ctl = status.control ?? {};
   const activeNames = (p?.rollout_stores ?? []).filter((s) => s.active).map((s) => s.name);
@@ -170,8 +170,16 @@ export function StateSection({ status, onApprove }: { status: LaunchStatus; onAp
         <div className="mt-6">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-[14px] font-semibold text-adm-ink">Plan v{p.version}{p.title ? `: ${p.title}` : ""} ({p.status})</h3>
-            {p.status === "draft" && <Button size="sm" variant="outline" onClick={onApprove}>Approve plan</Button>}
+            {p.status === "draft" && (
+              <div className="flex flex-wrap items-center gap-2">
+                <Button size="sm" variant="outline" onClick={onSetCap}>Set dollar cap</Button>
+                <Button size="sm" variant="outline" disabled={p.account_usd_cap == null} onClick={onApprove}>Approve plan</Button>
+              </div>
+            )}
           </div>
+          {p.status === "draft" && p.account_usd_cap == null && (
+            <div className="mb-2"><InlineNote tone="warning" title="Approval needs an account dollar cap">Set the account dollar cap first. The plan cannot be approved without one.</InlineNote></div>
+          )}
           <PlanSummary plan={p} />
         </div>
       ) : <div className="mt-4"><InlineNote tone="warning" title="No launch plan found" /></div>}
@@ -192,8 +200,9 @@ export function PlanSummary({ plan: p }: { plan: NonNullable<LaunchStatus["plan"
         { label: "Error tripwire", value: `${num(p.error_tripwire_per_hour)} per hour` },
         { label: "Uncertain tripwire", value: `${num(p.uncertain_tripwire_per_hour)} per hour` },
         { label: "API products", value: list(p.products) },
+        { label: "Account dollar cap", value: p.account_usd_cap == null ? "Not set - required before approval" : `${usd(p.account_usd_cap)} / month` },
         { label: "Allowed callers", value: list(p.allowed_callers) },
-        { label: "Cron jobs", value: list(p.cron_jobs) },
+        { label: "Cron jobs", value: p.cron_jobs && p.cron_jobs.length ? p.cron_jobs.map(cronJobName).join(", ") : "No scheduled jobs are turned on by this plan" },
       ]} />
       <h4 className="mt-4 mb-1 text-[13px] font-semibold text-adm-ink">Rollout order</h4>
       {p.rollout_stores.length === 0 ? <p className="text-[13px] text-adm-muted">No rollout stores</p> : (

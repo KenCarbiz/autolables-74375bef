@@ -5,11 +5,11 @@ import { adminTabHref } from "@/lib/admin/sections";
 import { ChildPageFrame } from "@/components/admin/v2/AdminShell";
 import { Button, EmptyState, InlineNote, Panel, SkeletonBlock, StatusText } from "@/components/product";
 import {
-  activateLaunch, approvePlan, attestCheck, describeError, emergencyStop, expandLaunch, getLaunchStatus, pauseLaunch, recordQuota, releaseStop, resumeLaunch, rollbackLaunch, stopDrill,
+  activateLaunch, approvePlan, attestCheck, describeError, emergencyStop, expandLaunch, getLaunchStatus, pauseLaunch, recordQuota, releaseStop, resumeLaunch, rollbackLaunch, setPlanUsdCap, stopDrill,
 } from "@/lib/marketcheckLaunch/api";
 import type { FailedCheck, LaunchStatus, ReadinessCheck } from "@/lib/marketcheckLaunch/types";
 import { canExpand, canPause, canResume, canRollback, failingMandatory, nextRolloutStore, refusalText, stateLabel, STATE_TONE } from "@/lib/marketcheckLaunch/viewModel";
-import { AttestDialog, QuotaDialog, ReasonDialog, TypedConfirmDialog, type Outcome, type Perform } from "./marketcheckLaunch/dialogs";
+import { AttestDialog, QuotaDialog, ReasonDialog, TypedConfirmDialog, UsdCapDialog, type Outcome, type Perform } from "./marketcheckLaunch/dialogs";
 import { AuditSection, ConsumptionSection, PlanSummary, ReadinessSection, Section, SqlFallback, StateSection } from "./marketcheckLaunch/sections";
 
 const crumbs = [
@@ -21,7 +21,7 @@ const crumbs = [
 const TITLE = "MarketCheck Launch Control";
 const STATUS_KEY = ["mc-launch", "status"] as const;
 
-type Dialog = null | "activate" | "pause" | "resume" | "expand" | "rollback" | "stop" | "release" | "quota" | "approve";
+type Dialog = null | "activate" | "pause" | "resume" | "expand" | "rollback" | "stop" | "release" | "quota" | "approve" | "cap";
 
 export default function MarketCheckLaunchControlPage() {
   const auth = useAuth();
@@ -43,6 +43,17 @@ export default function MarketCheckLaunchControlPage() {
     await qc.invalidateQueries({ queryKey: STATUS_KEY });
     return out;
   }, [qc]);
+
+  const runDrill = async () => {
+    try {
+      const r = await stopDrill();
+      const text = r.summary || (r.ok ? "Stop drill finished" : refusalText(r.reason ?? "refused"));
+      setNotice({ tone: r.ok ? "success" : "danger", text });
+    } catch (e) {
+      setNotice({ tone: "danger", text: describeError(e) });
+    }
+    await qc.invalidateQueries({ queryKey: STATUS_KEY });
+  };
 
   if (auth.loading) return <ChildPageFrame section="integrations" crumbs={crumbs} title={TITLE}><SkeletonBlock className="h-64 w-full" /></ChildPageFrame>;
   if (!auth.isAdmin) {
@@ -84,7 +95,7 @@ export default function MarketCheckLaunchControlPage() {
           <>
             <ReadinessSection status={s} onRecord={setAttest} />
             <ConsumptionSection c={s.consumption} onRecord={() => setDialog("quota")} />
-            <StateSection status={s} onApprove={() => setDialog("approve")} />
+            <StateSection status={s} onApprove={() => setDialog("approve")} onSetCap={() => setDialog("cap")} />
             <ActivationSection
               status={s}
               failingLabels={failing.map((c) => c.label)}
@@ -99,7 +110,7 @@ export default function MarketCheckLaunchControlPage() {
             <Button variant="danger" className="!bg-adm-danger !text-white" onClick={() => setDialog("stop")}>Stop All MarketCheck Paid Calls</Button>
             {s?.emergency_stop && <Button variant="outline" onClick={() => setDialog("release")}>Release stop</Button>}
             {s && !s.emergency_stop && (
-              <Button variant="secondary" onClick={() => void perform(stopDrill, "Stop drill finished")}>Run stop drill</Button>
+              <Button variant="secondary" onClick={() => void runDrill()}>Run stop drill</Button>
             )}
           </div>
           {s?.emergency_stop && <p className="mt-2 text-[13px] text-adm-muted">Releasing the stop lands in PAUSED. It never goes live on its own.</p>}
@@ -137,6 +148,7 @@ export default function MarketCheckLaunchControlPage() {
       <TypedConfirmDialog open={dialog === "approve"} onClose={close} title="Approve launch plan" description="Approving marks this plan version as the one that can be started." word="APPROVE" confirmLabel="Approve plan" onConfirm={() => perform(() => approvePlan(s!.plan!.version), "Plan approved")}>
         {s?.plan && <PlanSummary plan={s.plan} />}
       </TypedConfirmDialog>
+      <UsdCapDialog open={dialog === "cap"} current={s?.plan?.account_usd_cap ?? null} onClose={close} onSubmit={(cap) => perform(() => setPlanUsdCap(s!.plan!.version, cap), "Account dollar cap set")} />
       <QuotaDialog open={dialog === "quota"} onClose={close} onSubmit={(f) => perform(() => recordQuota(f), "Provider figures recorded")} />
       <AttestDialog check={attest} onClose={() => setAttest(null)} onSubmit={(a) => perform(() => attestCheck(a), "Evidence recorded")} />
     </ChildPageFrame>

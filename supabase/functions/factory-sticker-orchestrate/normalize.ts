@@ -5,6 +5,7 @@
 // dealer_profiles.settings. It performs NO provider calls and invents no
 // facts: missing fields stay null and lower the confidence grade.
 import { parseYmm } from "../_shared/factorySticker/lib/ymm.ts";
+import { decideDrivetrain, splitRatingMetadata, type DrivetrainEvidence } from "../_shared/factorySticker/lib/oem/sourceCorrections.ts";
 
 import type { FactoryStickerRenderData } from "../_shared/factorySticker/render.ts";
 
@@ -20,6 +21,12 @@ export interface NormalizeResult {
   destinationCharge: number | null;
   optionsTotal: number | null;
   statedTotalMsrp: number | null;
+  /** Source values replaced under a recorded manufacturer rule, and decoder
+   *  metadata removed from the equipment list. Persisted for audit. */
+  sourceCorrections: {
+    drivetrain: { source: string | null; printed: string | null; ruleId: string; evidence: DrivetrainEvidence } | null;
+    ratingMetadataRemoved: string[];
+  };
 }
 
 const num = (v: unknown): number | null => {
@@ -133,11 +140,13 @@ export function normalizeForSticker(
   } : null;
   if (!epa) missing.push("epa_economy");
 
+  const drive = decideDrivetrain({ ...identity, source: str(mc.drivetrain) ?? str(sheet?.mechanical?.drivetrain) });
   const mechanical = {
     engine: str(mc.engine) ?? str(sheet?.mechanical?.engine),
     transmission: str(mc.transmission) ?? str(sheet?.mechanical?.transmission),
-    drivetrain: str(mc.drivetrain) ?? str(sheet?.mechanical?.drivetrain),
+    drivetrain: drive.value,
   };
+  const standard = splitRatingMetadata(catMap(sheet?.standard));
   const stockNumber = str(mc.stock_no);
 
   const s = dealerSettings as Record<string, unknown>;
@@ -175,7 +184,7 @@ export function normalizeForSticker(
       },
       packages,
       options,
-      standardEquipment: catMap(sheet?.standard),
+      standardEquipment: standard.equipment,
       keyFeatures: catMap(sheet?.key_features),
       colors,
       assembly,
@@ -194,5 +203,9 @@ export function normalizeForSticker(
     destinationCharge,
     optionsTotal,
     statedTotalMsrp,
+    sourceCorrections: {
+      drivetrain: drive.ruleId && drive.evidence ? { source: drive.sourceValue, printed: drive.value, ruleId: drive.ruleId, evidence: drive.evidence } : null,
+      ratingMetadataRemoved: standard.ratingMetadata,
+    },
   };
 }

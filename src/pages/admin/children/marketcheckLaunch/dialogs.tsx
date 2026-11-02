@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button, InlineNote } from "@/components/product";
 import { inputClass } from "../inventoryNetwork/shared";
+import { MAX_USD_CAP, validUsdCap } from "@/lib/marketcheckLaunch/viewModel";
 import type { AttestInput, FailedCheck, QuotaFigures, ReadinessCheck, AttestKey } from "@/lib/marketcheckLaunch/types";
 
 export type Outcome = { ok: true } | { ok: false; message: string; failed?: FailedCheck[] };
@@ -110,6 +111,19 @@ export function QuotaDialog({ open, onClose, onSubmit }: { open: boolean; onClos
         <label className="block text-[13px] font-semibold text-adm-ink" htmlFor="q-evidence">Evidence (required)</label>
         <textarea id="q-evidence" className={inputClass} rows={2} value={f.evidence} onChange={set("evidence")} placeholder="Where these figures were read, for example the account page and time" />
       </div>
+    </Shell>
+  );
+}
+
+export function UsdCapDialog({ open, current, onClose, onSubmit }: { open: boolean; current: number | null; onClose: () => void; onSubmit: (usdCap: number) => Promise<Outcome> }) {
+  const [raw, setRaw] = useState("");
+  const cap = validUsdCap(raw);
+  return (
+    <Shell open={open} onClose={() => { setRaw(""); onClose(); }} title="Set account dollar cap" description={`Monthly account dollar cap for this plan, greater than 0 and at most ${MAX_USD_CAP.toLocaleString()}. It is applied to the MarketCheck account when the plan is started.${current != null ? ` Current: $${current}.` : ""}`} confirmLabel="Set dollar cap" disabled={cap === null}
+      onSubmit={async () => { const r = await onSubmit(cap!); if (r.ok) setRaw(""); return r; }}>
+      <label className="block text-[13px] font-semibold text-adm-ink" htmlFor="usd-cap">Account dollar cap per month</label>
+      <input id="usd-cap" type="number" min={0} step="0.01" className={inputClass} value={raw} onChange={(e) => setRaw(e.target.value)} />
+      {raw !== "" && cap === null && <p className="text-[13px] text-adm-danger">Enter an amount greater than 0 and no more than {MAX_USD_CAP.toLocaleString()}.</p>}
     </Shell>
   );
 }

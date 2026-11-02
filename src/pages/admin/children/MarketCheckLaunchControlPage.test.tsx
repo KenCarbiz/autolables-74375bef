@@ -23,7 +23,7 @@ const START = "Start MarketCheck & Inventory Intelligence";
 const plan = {
   version: 3, title: "November pilot", status: "approved", canary_store_id: "s1", canary_store_name: "Harte Honda",
   canary_max_calls: 40, canary_window_hours: 6, hourly_call_ceiling: 15, daily_call_ceiling: 90, error_tripwire_per_hour: 4, uncertain_tripwire_per_hour: 2,
-  feed_max_age_hours: 24, required_gate_version: "g7", products: ["predict_price", "vin_decode"], allowed_callers: ["enrich-vehicle"], cron_jobs: ["mc-refresh"],
+  feed_max_age_hours: 24, required_gate_version: "g7", products: ["predict_price", "vin_decode"], allowed_callers: ["enrich-vehicle"], cron_jobs: ["mc-refresh"], account_usd_cap: 250,
   rollout_stores: [
     { store_id: "s1", name: "Harte Honda", order: 1, min_hours_after_previous: 0, active: false, policy_ready: true },
     { store_id: "s2", name: "Harte Toyota", order: 2, min_hours_after_previous: 24, active: false, policy_ready: true },
@@ -148,6 +148,74 @@ describe("MarketCheckLaunchControlPage", () => {
     expect(screen.queryByText("Passed")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: START })).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: STOP }).length).toBeGreaterThan(0);
+  });
+
+  it("shows the account dollar cap on the plan", async () => {
+    setStatus();
+    renderAdmin(<MarketCheckLaunchControlPage />, { route: ROUTE });
+    await screen.findByRole("button", { name: START });
+    expect(screen.getByText("Account dollar cap")).toBeInTheDocument();
+    expect(screen.getByText("$250.00 / month")).toBeInTheDocument();
+  });
+
+  it("says no scheduled jobs when the plan has none", async () => {
+    setStatus({ plan: { ...plan, cron_jobs: [] } });
+    renderAdmin(<MarketCheckLaunchControlPage />, { route: ROUTE });
+    await screen.findByRole("button", { name: START });
+    expect(screen.getByText("No scheduled jobs are turned on by this plan")).toBeInTheDocument();
+  });
+
+  it("disables Approve while the draft plan has no cap and sets the cap with the RPC payload", async () => {
+    setStatus({ plan: { ...plan, status: "draft", account_usd_cap: null } });
+    spyResponses.rpcs.marketcheck_launch_set_plan_usd_cap = { data: { ok: true, version: 3, account_usd_cap: 125.5 } };
+    renderAdmin(<MarketCheckLaunchControlPage />, { route: ROUTE });
+    expect(await screen.findByText("Not set - required before approval")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Approve plan" })).toBeDisabled();
+    expect(screen.getByText("Approval needs an account dollar cap")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Set dollar cap" }));
+    const dlg = await screen.findByRole("dialog");
+    const go = within(dlg).getByRole("button", { name: "Set dollar cap" });
+    const input = within(dlg).getByLabelText("Account dollar cap per month");
+    expect(go).toBeDisabled();
+    for (const bad of ["0", "-5", "100001"]) {
+      fireEvent.change(input, { target: { value: bad } });
+      expect(go).toBeDisabled();
+    }
+    fireEvent.change(input, { target: { value: "125.5" } });
+    expect(go).toBeEnabled();
+    fireEvent.click(go);
+    await waitFor(() => expect(mutations()).toEqual([{ kind: "rpc", fn: "marketcheck_launch_set_plan_usd_cap", args: { p_version: 3, p_usd_cap: 125.5 } }]));
+  });
+
+  it("enables Approve on a draft plan once a cap is set", async () => {
+    setStatus({ plan: { ...plan, status: "draft", account_usd_cap: 100 } });
+    renderAdmin(<MarketCheckLaunchControlPage />, { route: ROUTE });
+    expect(await screen.findByRole("button", { name: "Approve plan" })).toBeEnabled();
+  });
+
+  it("offers Record evidence only for hand-attested checks", async () => {
+    const keys = ["credentials", "mcp_boundary", "quota_concurrency", "sticker_templates", "print_passport_qa", "cost_controls", "sticker_generation", "stop_drill", "edge_versions"];
+    setStatus({ readiness: { checks: keys.map((k) => check(k, `Label ${k}`, "unverified")), all_mandatory_passed: false, evaluated_at: "2026-11-02T00:00:00Z", plan_version: 3 } });
+    renderAdmin(<MarketCheckLaunchControlPage />, { route: ROUTE });
+    await screen.findByText("Label cost_controls");
+    expect(screen.getAllByRole("button", { name: "Record evidence" })).toHaveLength(5);
+    for (const k of ["cost_controls", "sticker_generation", "stop_drill", "edge_versions"]) {
+      const row = screen.getByText(`Label ${k}`).closest("li")!;
+      expect(within(row).queryByRole("button", { name: "Record evidence" })).not.toBeInTheDocument();
+    }
+    const row = screen.getByText("Label mcp_boundary").closest("li")!;
+    expect(within(row).getByRole("button", { name: "Record evidence" })).toBeInTheDocument();
+  });
+
+  it("shows the drill summary on success and on failure", async () => {
+    setStatus();
+    spyResponses.rpcs.marketcheck_launch_stop_drill = { data: { ok: true, summary: "Stop refused 3 admission(s); all restored.", detail: {} } };
+    renderAdmin(<MarketCheckLaunchControlPage />, { route: ROUTE });
+    fireEvent.click(await screen.findByRole("button", { name: "Run stop drill" }));
+    expect(await screen.findByText("Stop refused 3 admission(s); all restored.")).toBeInTheDocument();
+    spyResponses.rpcs.marketcheck_launch_stop_drill = { data: { ok: false, summary: "The stop did not refuse at every boundary; see detail.", detail: {} } };
+    fireEvent.click(screen.getByRole("button", { name: "Run stop drill" }));
+    expect(await screen.findByText("The stop did not refuse at every boundary; see detail.")).toBeInTheDocument();
   });
 
   it("makes no mutation and no edge call on mount", async () => {

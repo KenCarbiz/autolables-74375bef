@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { FriendlyError, explainError } from "@/lib/inventoryNetwork/api";
-import type { ActionResult, AttestInput, LaunchStatus, QuotaFigures } from "./types";
+import type { ActionResult, AttestInput, DrillResult, LaunchStatus, QuotaFigures } from "./types";
 
 interface RawResult { data: unknown; error: { message: string } | null }
 const db = supabase as unknown as { rpc: (fn: string, args?: Record<string, unknown>) => PromiseLike<RawResult> };
@@ -16,6 +16,9 @@ export const describeError = (e: unknown): string => {
   const msg = e instanceof Error ? e.message : "";
   if (/42883|does not exist|could not find the function/i.test(msg)) return "The MarketCheck launch control update has not been applied to this project yet.";
   if (/platform_admin_required|42501|permission denied/i.test(msg)) return "Only platform administrators can use launch control.";
+  if (/usd_cap_required/i.test(msg)) return "Set an account dollar cap on this plan before approving it.";
+  if (/invalid_usd_cap/i.test(msg)) return "The dollar cap must be greater than 0 and no more than 100,000.";
+  if (/plan_not_draft/i.test(msg)) return "Only a draft plan can be changed.";
   return explainError(e);
 };
 
@@ -32,8 +35,10 @@ export const pauseLaunch = (reason: string) => call<ActionResult>("marketcheck_l
 export const resumeLaunch = (confirm: string) => call<ActionResult>("marketcheck_launch_resume", { p_confirm: confirm });
 export const expandLaunch = (storeId: string, confirm: string) => call<ActionResult>("marketcheck_launch_expand", { p_store_id: storeId, p_confirm: confirm });
 export const rollbackLaunch = (confirm: string) => call<ActionResult>("marketcheck_launch_rollback", { p_confirm: confirm });
-export const stopDrill = () => call<ActionResult>("marketcheck_launch_stop_drill");
+export const stopDrill = () => call<DrillResult>("marketcheck_launch_stop_drill");
 export const approvePlan = (version: number) => call<ActionResult>("marketcheck_launch_approve_plan", { p_version: version });
+export const setPlanUsdCap = (version: number, usdCap: number) =>
+  call<ActionResult & { version?: number; account_usd_cap?: number }>("marketcheck_launch_set_plan_usd_cap", { p_version: version, p_usd_cap: usdCap });
 export const recordQuota = (q: QuotaFigures) =>
   call<ActionResult>("marketcheck_launch_record_quota", { p_limit: q.limit, p_used: q.used, p_remaining: q.remaining, p_reset_at: q.resetAt, p_evidence: q.evidence });
 export const attestCheck = (a: AttestInput) =>

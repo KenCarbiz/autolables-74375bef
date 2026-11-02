@@ -853,6 +853,8 @@ async function orchestrateVehicle(
       qa_metadata: {
         ...(record.qa_metadata || {}),
         ...(oemOriginalUrl ? { oem_original_url: oemOriginalUrl, oem_original_classification: "ORIGINAL_OEM_DOCUMENT" } : {}),
+        // The feed's own value is kept next to any manufacturer-rule correction.
+        source_corrections: normalized.sourceCorrections,
       },
     };
 

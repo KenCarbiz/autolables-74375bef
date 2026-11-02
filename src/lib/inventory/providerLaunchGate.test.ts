@@ -21,12 +21,29 @@ describe("MarketCheck launch gate (migration 0018)", () => {
   });
 
   it("reads launch refusals as launch_gate and keeps the database's reason", async () => {
-    for (const reason of ["launch_inactive", "emergency_stop", "launch_paused_canary_ceiling_reached", "launch_tenant_not_approved", "gate_upgrade_required"]) {
+    for (const reason of ["launch_inactive", "emergency_stop", "launch_paused_canary_ceiling_reached", "launch_store_not_active", "launch_store_mismatch",
+      "launch_vin_ownership_ambiguous", "launch_store_required", "launch_product_not_approved", "launch_product_mismatch", "launch_gate_version_mismatch", "gate_upgrade_required"]) {
       const admin = client(async (fn) => (fn === "provider_call_admit_v2" ? { data: [{ admitted: false, event_id: 3, reason }], error: null } : { data: null, error: null }));
       const r = await admitProviderCall(admin, { url: MC_URL, caller: "marketcheck-sync", essential: true });
       expect(r).toMatchObject({ admitted: false, reason: "launch_gate", launchReason: reason });
       expect(admin.rpc).not.toHaveBeenCalledWith("provider_reserve", expect.anything());
     }
+  });
+
+  it("sends the catalog product and the caller's store so the database can scope the rooftop", async () => {
+    const admin = client(async (fn) => (fn === "provider_call_admit_v2" ? { data: [{ admitted: false, event_id: 4, reason: "launch_inactive" }], error: null }
+      : fn === "store_enrichment_admit" ? { data: { admitted: true }, error: null } : { data: null, error: null }));
+    await admitProviderCall(admin, { url: MC_URL, caller: "marketcheck-specs", tenantId: "t1", vin: "1HGCM82633A004352" });
+    expect(admin.rpc).toHaveBeenCalledWith("provider_call_admit_v2", expect.objectContaining({ p_catalog_product: "neovin", p_product: "neovin", p_store_id: null, p_vin: "1HGCM82633A004352" }));
+    const synd = "https://api.marketcheck.com/v2/dealerships/inventory?api_key=K&dealer_id=1";
+    await admitProviderCall(admin, { url: synd, caller: "marketcheck-sync", tenantId: "t1", storeId: "s1" });
+    expect(admin.rpc).toHaveBeenCalledWith("provider_call_admit_v2", expect.objectContaining({ p_catalog_product: "syndication", p_product: "dealer_inventory_syndication", p_store_id: "s1" }));
+  });
+
+  it("other providers send no catalog product", async () => {
+    const admin = client(async () => ({ data: [{ admitted: false, event_id: 5, reason: "monthly_cap" }], error: null }));
+    await admitProviderCall(admin, { url: "https://x.invalid/a", caller: "google-reviews", provider: "google_places", product: "place_details" });
+    expect(admin.rpc).toHaveBeenCalledWith("provider_call_admit_v2", expect.objectContaining({ p_catalog_product: null }));
   });
 
   it("an admitted row carrying a launch reason is malformed and refused", () => {

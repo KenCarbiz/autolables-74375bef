@@ -51,7 +51,8 @@ export interface LaunchPlan {
   required_gate_version: string | null;
   products: string[];
   allowed_callers: string[];
-  cron_jobs: string[];
+  cron_jobs: Array<string | { jobname?: string; [key: string]: unknown }>;
+  account_usd_cap: number | null;
   rollout_stores: RolloutStore[];
   approved_at: string | null;
 }
@@ -155,7 +156,9 @@ export type ActionResult =
   | { ok: true; state?: string; crons_parked?: number }
   | { ok: false; reason: string; failed?: FailedCheck[] };
 
-export type AttestKey = "credentials" | "edge_versions" | "quota_concurrency" | "sticker_templates" | "auto_generation" | "print_passport_qa" | "rollback_tested";
+export type AttestKey = "credentials" | "mcp_boundary" | "quota_concurrency" | "sticker_templates" | "print_passport_qa";
+
+export type DrillResult = { ok: boolean; summary?: string; reason?: string; detail?: Record<string, unknown> };
 
 export interface QuotaFigures {
   limit: number;

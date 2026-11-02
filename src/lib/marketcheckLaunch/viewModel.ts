@@ -29,7 +29,7 @@ export const stateLabel = (s: string | null | undefined): string => (s && s in S
 export const CHECK_STATUS_LABEL: Record<CheckStatus, string> = { passed: "Passed", failed: "Failed", unverified: "Unverified" };
 export const CHECK_STATUS_TONE: Record<CheckStatus, StateTone> = { passed: "success", failed: "danger", unverified: "warning" };
 
-export const ATTESTED_KEYS = ["credentials", "edge_versions", "quota_concurrency", "sticker_templates", "auto_generation", "print_passport_qa", "rollback_tested"] as const;
+export const ATTESTED_KEYS = ["credentials", "mcp_boundary", "quota_concurrency", "sticker_templates", "print_passport_qa"] as const;
 export const isAttested = (key: string): boolean => (ATTESTED_KEYS as readonly string[]).includes(key);
 
 export const failingMandatory = (checks: ReadinessCheck[] | undefined | null): ReadinessCheck[] => (checks ?? []).filter((c) => c.mandatory && c.status !== "passed");
@@ -56,6 +56,8 @@ export const REFUSAL_TEXT: Record<string, string> = {
   plan_not_approved: "The plan is not approved.",
   not_stopped: "Emergency stop is not on.",
   not_paused: "The launch is not paused.",
+  drill_only_when_off: "The stop drill only runs while the launch is off and no stop is active.",
+  usd_cap_required: "The plan has no account dollar cap yet.",
   confirm_required: "The confirmation word did not match.",
 };
 
@@ -64,6 +66,14 @@ export const refusalText = (reason: string): string => REFUSAL_TEXT[reason] ?? `
 export const num = (n: number | null | undefined): string => (n === null || n === undefined ? "Unknown" : n.toLocaleString());
 export const when = (s: string | null | undefined): string => (s ? new Date(s).toLocaleString() : "Never");
 export const usd = (n: number | null | undefined): string => (n === null || n === undefined ? "Unknown" : `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+
+export const MAX_USD_CAP = 100000;
+export const validUsdCap = (raw: string): number | null => {
+  const n = Number(raw);
+  return raw.trim() !== "" && Number.isFinite(n) && n > 0 && n <= MAX_USD_CAP ? n : null;
+};
+
+export const cronJobName = (j: string | { jobname?: string }): string => (typeof j === "string" ? j : j.jobname ?? "unnamed job");
 
 export const SQL_FALLBACK = "UPDATE public.marketcheck_launch_control SET emergency_stop = true, state = 'emergency_stop' WHERE id = 1;";
 
