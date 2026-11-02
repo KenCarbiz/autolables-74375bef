@@ -556,10 +556,14 @@ const ContactExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [method, setMethod] = useState<string | null>("text");
-  const [message, setMessage] = useState(qpAbout ? `I'd like to learn more about ${qpAbout}.` : "");
+  const contactVehicleLabel = `${listing.ymm || "vehicle"}${listing.trim ? ` ${listing.trim}` : ""}`;
+  const initialTopicDef = CONTACT_TOPICS.find((t) => t.key === topic) ?? CONTACT_TOPICS[0];
+  const [message, setMessage] = useState(qpAbout ? `I'd like to learn more about ${qpAbout}.` : initialTopicDef.placeholder(contactVehicleLabel));
+  // Once the shopper types, a topic change never overwrites their words.
+  const [messageEdited, setMessageEdited] = useState(!!qpAbout);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
-  const [errors, setErrors] = useState<{ name?: string; contact?: string; email?: string }>({});
+  const [errors, setErrors] = useState<{ name?: string; contact?: string; email?: string; message?: string }>({});
   const [started, setStarted] = useState(false);
 
   const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
@@ -584,6 +588,7 @@ const ContactExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
 
   const submit = async () => {
     const errs: typeof errors = {};
+    if (!message.trim()) errs.message = "Add a message so the dealership knows how to help.";
     if (!name.trim()) errs.name = "Enter your full name.";
     if (!email.trim() && !phone.trim()) errs.contact = "Add a phone number or email so the dealership can reach you.";
     if (email.trim() && !/^\S+@\S+\.\S+$/.test(email.trim())) errs.email = "That email doesn't look right.";
@@ -652,7 +657,7 @@ const ContactExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
             <p className="text-[13px] font-bold leading-tight truncate">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
             <p className="text-[15px] font-extrabold text-[#2563EB] leading-tight">{d.price != null ? fmt$(d.price) : ""}</p>
           </div>
-          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 shrink-0">Currently Listed</span>
+          {listing.status === "published" && <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 shrink-0">Currently Listed</span>}
         </div>
       ) : (
         <>
@@ -661,7 +666,7 @@ const ContactExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
           </div>
           <div className="flex items-start justify-between gap-2 mt-3.5">
             <p className="text-[17px] font-extrabold leading-tight">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
-            <span className="text-[10.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1 shrink-0 mt-0.5">Currently Listed</span>
+            {listing.status === "published" && <span className="text-[10.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1 shrink-0 mt-0.5">Currently Listed</span>}
           </div>
           {d.price != null && <p className="text-[26px] font-extrabold tracking-tight text-[#2563EB] mt-1">{fmt$(d.price)}</p>}
           <div className="mt-3 space-y-2 text-[12.5px] text-slate-600">
@@ -761,7 +766,7 @@ const ContactExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
             <p className="text-[12px] font-semibold text-slate-600 mb-1.5">What can we help with?</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {CONTACT_TOPICS.map(({ key, label, icon: Icon }) => (
-                <button key={key} type="button" aria-pressed={topic === key} onClick={() => { setTopic(key); markStarted(); if (!isPreview) trackFlow(listing, "contact_topic_selected", { topic: key }); }} className={`h-11 rounded-xl text-[12.5px] inline-flex items-center justify-center gap-1.5 border px-2 transition-colors ${topic === key ? "border-[#2563EB] bg-blue-50 text-[#2563EB] font-bold" : "border-slate-200 text-slate-600 font-semibold hover:border-slate-300"}`}>
+                <button key={key} type="button" aria-pressed={topic === key} onClick={() => { setTopic(key); if (!messageEdited) { const def = CONTACT_TOPICS.find((t) => t.key === key); if (def) setMessage(def.placeholder(vehicleLabel)); } markStarted(); if (!isPreview) trackFlow(listing, "contact_topic_selected", { topic: key }); }} className={`h-11 rounded-xl text-[12.5px] inline-flex items-center justify-center gap-1.5 border px-2 transition-colors ${topic === key ? "border-[#2563EB] bg-blue-50 text-[#2563EB] font-bold" : "border-slate-200 text-slate-600 font-semibold hover:border-slate-300"}`}>
                   <Icon className="w-4 h-4 shrink-0" /> <span className="truncate">{label}</span>
                 </button>
               ))}
@@ -770,12 +775,13 @@ const ContactExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
 
           <div className="mt-5 space-y-3.5" onInput={markStarted}>
             <div>
-              <label htmlFor="ct-msg" className="block text-[12px] font-semibold text-slate-600 mb-1">Message to Dealer <span className="font-normal text-slate-400">(optional)</span></label>
+              <label htmlFor="ct-msg" className="block text-[12px] font-semibold text-slate-600 mb-1">Message to Dealer *</label>
               <div className="relative">
                 <PenLine className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
-                <textarea id="ct-msg" value={message} onChange={(e) => setMessage(e.target.value.slice(0, 500))} rows={3} maxLength={500} placeholder={topicDef.placeholder(vehicleLabel)} className={`${reserveField} pl-10 border-slate-200 resize-none`} />
+                <textarea id="ct-msg" value={message} onChange={(e) => { setMessage(e.target.value.slice(0, 500)); setMessageEdited(true); }} rows={3} maxLength={500} aria-required="true" aria-invalid={!!errors.message} aria-describedby={errors.message ? "ct-msg-err" : undefined} placeholder={topicDef.placeholder(vehicleLabel)} className={`${reserveField} pl-10 ${errors.message ? "border-red-300" : "border-slate-200"} resize-none`} />
                 <span className="absolute bottom-2.5 right-3.5 text-[11px] text-slate-400">{message.length} / 500</span>
               </div>
+              {errors.message && <p id="ct-msg-err" className="text-[12px] text-red-600 mt-1">{errors.message}</p>}
             </div>
             <div>
               <label htmlFor="ct-name" className="block text-[12px] font-semibold text-slate-600 mb-1">Full Name *</label>
@@ -1524,7 +1530,7 @@ const VehiclePassportV2Detail = () => {
             <p className="text-[12px] leading-tight truncate">{d.price != null && <span className="font-bold text-[#2563EB]">{fmt$(d.price)}</span>}{d.price != null && listing.mileage != null && <span className="text-slate-400"> · </span>}{listing.mileage != null && <span className="text-slate-500 font-medium">{listing.mileage.toLocaleString()} miles</span>}</p>
           </div>
           <span className="flex-1" />
-          {def.headerPill && <span className="hidden sm:inline-flex text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1 shrink-0">{def.headerPill}</span>}
+          {def.headerPill && listing.status === "published" && <span className="hidden sm:inline-flex text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1 shrink-0">{def.headerPill}</span>}
         </div>
       </header>
 
