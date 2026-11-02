@@ -65,6 +65,12 @@ export type {
   StickerEligibilityResult,
 } from "./lib/oem/eligibility.ts";
 
+export {
+  resolveReferenceVariant,
+  REFERENCE_VARIANT_REGISTRY_VERSION,
+} from "./lib/oem/referenceVariants.ts";
+export { DISCLOSURE_VERSION } from "./lib/reproduction.ts";
+
 export async function renderFactorySticker(
   data: FactoryStickerRenderData,
   theme: FactoryStickerTheme,

@@ -5,11 +5,11 @@
   "fonts": "\"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", Arial, sans-serif | \"Arial Narrow\", \"Roboto Condensed\", Arial, sans-serif | \"Arial Narrow\", \"Roboto Condensed\", Arial, sans-serif",
   "primitivesByKind": {
     "barcode": 1,
-    "path": 49,
+    "path": 46,
     "qr": 2,
     "rect": 30,
     "rule": 11,
-    "text": 224
+    "text": 222
   },
   "fills": [
     "#0d0d0d",
@@ -63,8 +63,8 @@
   ],
   "regions": {
     "barcode": "21,517.5 227.15x23",
-    "qr": "755.5,198.4 17",
-    "qr2": "603.55,391.9 76.9",
+    "qr": "755.5,202.9 17",
+    "qr2": "601.1,396.4 81.8",
     "totalMsrp": "481,585 @18"
   },
   "headings": [
@@ -73,7 +73,6 @@
     "STANDARD EQUIPMENT",
     "EXTERIOR",
     "INTERIOR & COMFORT",
-    "SAFETY & DRIVER ASSISTANCE",
     "FACTORY OPTIONS",
     "DESTINATION & HANDLING",
     "1,435.00",
@@ -91,11 +90,12 @@
     "$4,750",
     "cost",
     "$2,650",
-    "fueleconomy.gov"
+    "fueleconomy.gov",
+    "VEHICLE PASSPORT"
   ],
   "totalBand": "$72,845.00",
   "svgDigest": [
-    "27510153",
-    "96ccba30"
+    "3a3987d3",
+    "18e6216c"
   ]
 }

@@ -32,7 +32,8 @@ describe("previewSvg", () => {
     expect(two).toContain('data-page="1"');
     expect(two).toContain('data-page="2"');
     const doc = new DOMParser().parseFromString(two, "image/svg+xml");
-    expect(Number(doc.documentElement.getAttribute("height"))).toBe(612 * 2 + 12);
+    expect(two).toContain('data-page="3"');
+    expect(Number(doc.documentElement.getAttribute("height"))).toBe(612 * 3 + 12 * 2);
   });
 
   it("is deterministic", () => {

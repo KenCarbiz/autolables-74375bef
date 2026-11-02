@@ -120,8 +120,8 @@ describe("layout: empty EPA", () => {
 describe("layout: long equipment continuation", () => {
   const model = buildRenderLayout(longEquipmentFixture(), themeFor("infiniti"));
 
-  it("produces two pages in continuation mode", () => {
-    expect(model.pages.length).toBe(2);
+  it("produces as many continuation pages as the equipment needs", () => {
+    expect(model.pages.length).toBe(3);
     expect(model.mode).toBe("CONTINUATION_REQUIRED");
   });
 
@@ -138,7 +138,8 @@ describe("layout: long equipment continuation", () => {
     const page2 = pageStrings(model, 1);
     expect(page2).toContain("FACTORY EQUIPMENT CONTINUATION");
     expect(page2).toContain(`VIN: ${VIN}`);
-    expect(page2).toContain("PAGE 2 OF 2");
+    expect(page2).toContain("PAGE 2 OF 3");
+    expect(pageStrings(model, 2)).toContain("PAGE 3 OF 3");
     expect(page2.some((s) => s.includes("belongs to the sticker on page 1"))).toBe(true);
   });
 
