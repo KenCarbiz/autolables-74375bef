@@ -35,10 +35,12 @@ echo "migration history replayed ($(grep -c 'ERROR:' "$WORK/history.err" || true
 "${PSQL[@]}" -c "ALTER DEFAULT PRIVILEGES GRANT EXECUTE ON FUNCTIONS TO anon, authenticated, service_role;
   ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO anon, authenticated, service_role;
   ALTER DEFAULT PRIVILEGES GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;" >/dev/null
-for f in rtgip_v2_delivery.proposed.sql rtgip_source_readers.proposed.sql; do
+for f in rtgip_v2_delivery.proposed.sql rtgip_source_readers.proposed.sql rtgip_labels_effects.proposed.sql; do
   "${PSQL[@]}" -v ON_ERROR_STOP=1 -f "$WORK/sb/proposed/$f" >/dev/null 2>&1 || { "${PSQL[@]}" -v ON_ERROR_STOP=1 -f "$WORK/sb/proposed/$f"; exit 1; }
   "${PSQL[@]}" -v ON_ERROR_STOP=1 -f "$WORK/sb/proposed/$f" >/dev/null 2>&1 || { echo "FAIL  $f is not idempotent"; exit 1; }
 done
-echo "Postgres $("${PSQL[@]}" -c 'SHOW server_version'): spine, PR #46 foundation, delivery ledger and source readers applied twice"
+echo "Postgres $("${PSQL[@]}" -c 'SHOW server_version'): spine, PR #46 foundation, delivery ledger, source readers and consumer effects applied twice"
+"${PSQL[@]}" -v ON_ERROR_STOP=1 -f "$WORK/sb/tests/rtgip/labels_effects_sql.sql" 2>&1 | sed -n 's/.*NOTICE:  //p'
+[ "${PIPESTATUS[0]}" = "0" ] || { echo "FAIL  labels_effects_sql.sql"; exit 1; }
 cd "$ROOT"
 RTGIP_PG_URL="postgres://postgres@127.0.0.1:$PORT/rtgip_it" npx vitest run src/lib/rooftopos-parked/rtgip2-pg
