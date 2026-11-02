@@ -31,3 +31,20 @@ jobs:
         run: |
           echo "Code-only guard. No database was accessed."
           echo "Full scratch PostgreSQL integration harness remains a separate approval gate."
+
+  scratch_postgres:
+    name: Ephemeral PostgreSQL 16 rollback and SQL regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL 16 for throwaway local cluster
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-16 postgresql-client-16
+      - name: Replay proposed migrations and verify fail-closed rollback
+        env:
+          SKIP_DENO: '1'
+          SKIP_VITEST: '1'
+          SKIP_PUBLIC_VIEW: '1'
+        run: bash supabase/tests/rooftopos_harness.sh
