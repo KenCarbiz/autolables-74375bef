@@ -1,7 +1,15 @@
 // Shared producer helper: one source fact -> one sealed envelope per authorized target route.
 import {
-  deriveEventId, EVENT_CATALOG, ProtocolError, routeFor, sealEnvelope,
-  type AppId, type EnvelopeV2, type EventType, type Purpose, type VehicleRef,
+  deriveEventId,
+  EVENT_CATALOG,
+  ProtocolError,
+  routeFor,
+  sealEnvelope,
+  type AppId,
+  type EnvelopeV2,
+  type EventType,
+  type Purpose,
+  type VehicleRef,
 } from "./protocol.ts";
 
 export interface SourceFact {
@@ -26,7 +34,10 @@ export interface SourceFact {
   purpose?: Purpose;
 }
 
-export async function produceFor(fact: SourceFact, targets: readonly AppId[]): Promise<{ target: AppId; envelope: EnvelopeV2; body: string }[]> {
+export async function produceFor(
+  fact: SourceFact,
+  targets: readonly AppId[],
+): Promise<{ target: AppId; envelope: EnvelopeV2; body: string }[]> {
   const spec = EVENT_CATALOG[fact.event_type];
   if (spec.owner !== fact.source) throw new ProtocolError("not_source_authority");
   const out: { target: AppId; envelope: EnvelopeV2; body: string }[] = [];
@@ -37,19 +48,38 @@ export async function produceFor(fact: SourceFact, targets: readonly AppId[]): P
     const purposes = route.events[fact.event_type];
     if (!purposes) throw new ProtocolError(`event_not_on_route:${route.id}`);
     const purpose = fact.purpose ?? purposes[0];
-    if (!purposes.includes(purpose)) throw new ProtocolError("purpose_not_allowed");
+    if (!purpose || !purposes.includes(purpose)) throw new ProtocolError("purpose_not_allowed");
     const event_id = await deriveEventId(fact.origin_event_id, route.id);
     const pr = fact.prev_revision;
-    const prev: number | null | undefined = pr !== null && typeof pr === "object" ? (pr as Partial<Record<AppId, number | null>>)[target] : (pr as number | null);
+    const prev: number | null | undefined =
+      pr !== null && typeof pr === "object"
+        ? (pr as Partial<Record<AppId, number | null>>)[target]
+        : (pr as number | null);
     if (prev === undefined) throw new ProtocolError(`prev_revision_missing_for:${target}`);
     const sealed = await sealEnvelope({
-      protocol: "rtgip/2", schema_version: 2, event_id, event_type: fact.event_type,
-      source_app: fact.source, target_app: target, route: route.id, purpose,
-      tenant_id: fact.tenant_id, rooftop_id: fact.rooftop_id, vehicle: fact.vehicle,
-      aggregate: { domain: spec.domain, type: spec.aggregate_type, id: fact.aggregate_id, revision: fact.revision, prev_revision: prev },
+      protocol: "rtgip/2",
+      schema_version: 2,
+      event_id,
+      event_type: fact.event_type,
+      source_app: fact.source,
+      target_app: target,
+      route: route.id,
+      purpose,
+      tenant_id: fact.tenant_id,
+      rooftop_id: fact.rooftop_id,
+      vehicle: fact.vehicle,
+      aggregate: {
+        domain: spec.domain,
+        type: spec.aggregate_type,
+        id: fact.aggregate_id,
+        revision: fact.revision,
+        prev_revision: prev,
+      },
       origin: { app: fact.source, event_id: fact.origin_event_id, revision: fact.revision },
-      correlation_id: fact.correlation_id, causation_id: fact.causation_id,
-      occurred_at: fact.occurred_at, emitted_at: fact.emitted_at,
+      correlation_id: fact.correlation_id,
+      causation_id: fact.causation_id,
+      occurred_at: fact.occurred_at,
+      emitted_at: fact.emitted_at,
       classification: spec.domain === "media" ? "shared_media_meta" : "shared_vehicle_fact",
       payload: fact.payload,
     });

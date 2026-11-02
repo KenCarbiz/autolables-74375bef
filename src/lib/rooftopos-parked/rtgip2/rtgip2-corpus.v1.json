@@ -38,10 +38,7 @@
           "occurred_at": "2027-01-15T15:00:00Z",
           "emitted_at": "2027-01-15T15:00:00Z"
         },
-        [
-          "autocurb",
-          "autoframe"
-        ]
+        ["autocurb", "autoframe"]
       ],
       "body": "{\"aggregate\":{\"domain\":\"identity\",\"id\":\"inst-syn-0001\",\"prev_revision\":null,\"revision\":1,\"type\":\"vehicle_instance\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"2e0049fc-3aca-52ab-bbb7-378b8d6e541f\",\"event_type\":\"vehicle.identity_registered\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autolabels\",\"event_id\":\"al-id-1\",\"revision\":1},\"payload\":{\"make\":\"Synthetic\",\"model\":\"Sedan\",\"registered_at\":\"2027-01-15T15:00:00Z\",\"stock_number\":\"SYN1001\",\"trim\":null,\"year\":2024},\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"protocol\":\"rtgip/2\",\"purpose\":\"inventory_sync\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"schema_version\":2,\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
       "gateway_headers": {
@@ -88,10 +85,7 @@
           "occurred_at": "2027-01-15T15:00:00Z",
           "emitted_at": "2027-01-15T15:00:00Z"
         },
-        [
-          "autocurb",
-          "autoframe"
-        ]
+        ["autocurb", "autoframe"]
       ],
       "body": "{\"aggregate\":{\"domain\":\"identity\",\"id\":\"inst-syn-0001\",\"prev_revision\":null,\"revision\":1,\"type\":\"vehicle_instance\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"2d2218b2-01d3-502f-ad47-85f10a191e86\",\"event_type\":\"vehicle.identity_registered\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autolabels\",\"event_id\":\"al-id-1\",\"revision\":1},\"payload\":{\"make\":\"Synthetic\",\"model\":\"Sedan\",\"registered_at\":\"2027-01-15T15:00:00Z\",\"stock_number\":\"SYN1001\",\"trim\":null,\"year\":2024},\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"protocol\":\"rtgip/2\",\"purpose\":\"inventory_sync\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autoframe\",\"schema_version\":2,\"source_app\":\"autolabels\",\"target_app\":\"autoframe\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
       "gateway_headers": {
@@ -136,10 +130,7 @@
           "occurred_at": "2027-01-15T15:00:00Z",
           "emitted_at": "2027-01-15T15:00:00Z"
         },
-        [
-          "autocurb",
-          "autoframe"
-        ]
+        ["autocurb", "autoframe"]
       ],
       "body": "{\"aggregate\":{\"domain\":\"custody\",\"id\":\"ep-syn-0001-1\",\"prev_revision\":null,\"revision\":1,\"type\":\"episode\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"048582b3-c0e0-57c6-80db-211e7d3f2b2d\",\"event_type\":\"custody.episode_opened\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autolabels\",\"event_id\":\"al-ep-1\",\"revision\":1},\"payload\":{\"episode_kind\":\"inventory\",\"opened_at\":\"2027-01-15T15:00:00Z\",\"opened_reason\":\"acquisition\",\"predecessor_episode_id\":null},\"payload_sha256\":\"b125ee7650fa32cdb9482c7d260fdf29a2084fd161265f8a74bcd2efa85459ec\",\"protocol\":\"rtgip/2\",\"purpose\":\"custody_evidence\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"schema_version\":2,\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
       "gateway_headers": {
@@ -184,10 +175,7 @@
           "occurred_at": "2027-01-15T15:00:00Z",
           "emitted_at": "2027-01-15T15:00:00Z"
         },
-        [
-          "autocurb",
-          "autoframe"
-        ]
+        ["autocurb", "autoframe"]
       ],
       "body": "{\"aggregate\":{\"domain\":\"custody\",\"id\":\"ep-syn-0001-1\",\"prev_revision\":null,\"revision\":1,\"type\":\"episode\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"8f9239de-69ed-5546-b824-c59395677933\",\"event_type\":\"custody.episode_opened\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autolabels\",\"event_id\":\"al-ep-1\",\"revision\":1},\"payload\":{\"episode_kind\":\"inventory\",\"opened_at\":\"2027-01-15T15:00:00Z\",\"opened_reason\":\"acquisition\",\"predecessor_episode_id\":null},\"payload_sha256\":\"b125ee7650fa32cdb9482c7d260fdf29a2084fd161265f8a74bcd2efa85459ec\",\"protocol\":\"rtgip/2\",\"purpose\":\"custody_evidence\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autoframe\",\"schema_version\":2,\"source_app\":\"autolabels\",\"target_app\":\"autoframe\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
       "gateway_headers": {
@@ -233,9 +221,7 @@
           "occurred_at": "2027-01-15T15:00:00Z",
           "emitted_at": "2027-01-15T15:00:00Z"
         },
-        [
-          "autocurb"
-        ]
+        ["autocurb"]
       ],
       "body": "{\"aggregate\":{\"domain\":\"listing\",\"id\":\"listing-syn-1\",\"prev_revision\":null,\"revision\":1,\"type\":\"listing\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"15b6db13-140e-5e3b-943d-6d956b0889de\",\"event_type\":\"listing.price_published\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autolabels\",\"event_id\":\"al-price-1\",\"revision\":1},\"payload\":{\"doc_fee_cents\":49900,\"price_context\":\"advertised\",\"published_at\":\"2027-01-15T15:00:00Z\",\"total_advertised_price_cents\":2499900,\"vehicle_selling_price_cents\":2450000},\"payload_sha256\":\"91cb5b44b0c040cfbec700c4effbf70a7a975d3505490a492276eef5f425523f\",\"protocol\":\"rtgip/2\",\"purpose\":\"inventory_sync\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"schema_version\":2,\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
       "gateway_headers": {
@@ -280,9 +266,7 @@
           "occurred_at": "2027-01-15T15:00:00Z",
           "emitted_at": "2027-01-15T15:00:00Z"
         },
-        [
-          "autoframe"
-        ]
+        ["autoframe"]
       ],
       "body": "{\"aggregate\":{\"domain\":\"listing\",\"id\":\"listing-syn-1\",\"prev_revision\":null,\"revision\":2,\"type\":\"listing\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"b71a20de-8793-543e-a798-9f00dcb330d5\",\"event_type\":\"listing.availability_changed\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autolabels\",\"event_id\":\"al-avail-1\",\"revision\":2},\"payload\":{\"available\":true,\"changed_at\":\"2027-01-15T15:00:00Z\",\"passport_ref\":\"passport-syn-1001\"},\"payload_sha256\":\"09d41e21f3b9e7ef17dab25ce68e835678811e81a71bdbf696bd27ebbf909aa8\",\"protocol\":\"rtgip/2\",\"purpose\":\"inventory_sync\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autoframe\",\"schema_version\":2,\"source_app\":\"autolabels\",\"target_app\":\"autoframe\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
       "gateway_headers": {
@@ -328,10 +312,7 @@
           "correlation_id": "corr-syn-1",
           "emitted_at": "2027-01-15T15:00:00Z"
         },
-        [
-          "autolabels",
-          "autoframe"
-        ]
+        ["autolabels", "autoframe"]
       ],
       "body": "{\"aggregate\":{\"domain\":\"appraisal\",\"id\":\"apr-syn-1\",\"prev_revision\":null,\"revision\":1,\"type\":\"appraisal\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"e3690a70-2003-57b8-96d6-d2f34a44a30b\",\"event_type\":\"appraisal.completed\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autocurb\",\"event_id\":\"ac-apr-1\",\"revision\":1},\"payload\":{\"appraisal_ref\":\"apr-syn-1\",\"audit_ref\":\"audit-apr-1\",\"finalized_at\":\"2027-01-15T15:00:00Z\",\"verified_by_ref\":\"staff-syn-7\",\"verified_state\":\"finalized\"},\"payload_sha256\":\"645c4dd08a8fb611105559ad83e562fd7d2a10528ffe9fd85018b107f145a0a2\",\"protocol\":\"rtgip/2\",\"purpose\":\"acquisition_evidence\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autocurb->autolabels\",\"schema_version\":2,\"source_app\":\"autocurb\",\"target_app\":\"autolabels\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
       "gateway_headers": {
@@ -377,10 +358,7 @@
           "correlation_id": "corr-syn-1",
           "emitted_at": "2027-01-15T15:00:00Z"
         },
-        [
-          "autolabels",
-          "autoframe"
-        ]
+        ["autolabels", "autoframe"]
       ],
       "body": "{\"aggregate\":{\"domain\":\"appraisal\",\"id\":\"apr-syn-1\",\"prev_revision\":null,\"revision\":1,\"type\":\"appraisal\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"15598d00-c9b7-5b88-b5a3-2f7626c5d703\",\"event_type\":\"appraisal.completed\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autocurb\",\"event_id\":\"ac-apr-1\",\"revision\":1},\"payload\":{\"appraisal_ref\":\"apr-syn-1\",\"audit_ref\":\"audit-apr-1\",\"finalized_at\":\"2027-01-15T15:00:00Z\",\"verified_by_ref\":\"staff-syn-7\",\"verified_state\":\"finalized\"},\"payload_sha256\":\"645c4dd08a8fb611105559ad83e562fd7d2a10528ffe9fd85018b107f145a0a2\",\"protocol\":\"rtgip/2\",\"purpose\":\"acquisition_evidence\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autocurb->autoframe\",\"schema_version\":2,\"source_app\":\"autocurb\",\"target_app\":\"autoframe\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
       "gateway_headers": {
@@ -430,9 +408,7 @@
           "correlation_id": "corr-syn-1",
           "emitted_at": "2027-01-15T15:00:00Z"
         },
-        [
-          "autolabels"
-        ]
+        ["autolabels"]
       ],
       "body": "{\"aggregate\":{\"domain\":\"acquisition\",\"id\":\"acq-apr-syn-1\",\"prev_revision\":null,\"revision\":1,\"type\":\"acquisition\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"15f89341-1c94-58f5-afa6-a7b13c39163d\",\"event_type\":\"acquisition.milestone_recorded\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autocurb\",\"event_id\":\"ac-m-1\",\"revision\":1},\"payload\":{\"audit_ref\":\"audit-m-1\",\"custody_transferred\":false,\"milestone\":\"deal_finalized\",\"recorded_at\":\"2027-01-15T15:00:00Z\"},\"payload_sha256\":\"a3144bd378f36c3d8c6072f3edb47eaa4ccc98ea52a6fd3d2ed2d682bef313a3\",\"protocol\":\"rtgip/2\",\"purpose\":\"acquisition_evidence\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autocurb->autolabels\",\"schema_version\":2,\"source_app\":\"autocurb\",\"target_app\":\"autolabels\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
       "gateway_headers": {
@@ -478,12 +454,8 @@
             "verified_by_ref": "staff-syn-7",
             "audited_at": "2027-01-15T15:00:00Z",
             "audit_ref": "audit-p-1",
-            "ownership_evidence_refs": [
-              "own-1"
-            ],
-            "condition_evidence_refs": [
-              "cond-1"
-            ]
+            "ownership_evidence_refs": ["own-1"],
+            "condition_evidence_refs": ["cond-1"]
           }
         },
         {
@@ -496,10 +468,7 @@
           "correlation_id": "corr-syn-1",
           "emitted_at": "2027-01-15T15:00:00Z"
         },
-        [
-          "autolabels",
-          "autoframe"
-        ]
+        ["autolabels", "autoframe"]
       ],
       "body": "{\"aggregate\":{\"domain\":\"acquisition\",\"id\":\"acq-apr-syn-1\",\"prev_revision\":1,\"revision\":2,\"type\":\"acquisition\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"ec5aea60-d374-5765-933b-0c5841e6006f\",\"event_type\":\"acquisition.purchase_completed\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autocurb\",\"event_id\":\"ac-pur-1\",\"revision\":2},\"payload\":{\"audit_ref\":\"audit-p-1\",\"condition_evidence_refs\":[\"cond-1\"],\"custody_at\":\"2027-01-15T15:00:00Z\",\"custody_transferred\":true,\"ownership_evidence_refs\":[\"own-1\"],\"purchase_ref\":\"pur-syn-1\",\"verified_by_ref\":\"staff-syn-7\"},\"payload_sha256\":\"fb1c1891e375a3e45b1741e6d22f4b1e849449a44f2dfc98b8df2d2543b31fa5\",\"protocol\":\"rtgip/2\",\"purpose\":\"acquisition_evidence\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autocurb->autolabels\",\"schema_version\":2,\"source_app\":\"autocurb\",\"target_app\":\"autolabels\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
       "gateway_headers": {
@@ -545,12 +514,8 @@
             "verified_by_ref": "staff-syn-7",
             "audited_at": "2027-01-15T15:00:00Z",
             "audit_ref": "audit-p-1",
-            "ownership_evidence_refs": [
-              "own-1"
-            ],
-            "condition_evidence_refs": [
-              "cond-1"
-            ]
+            "ownership_evidence_refs": ["own-1"],
+            "condition_evidence_refs": ["cond-1"]
           }
         },
         {
@@ -563,10 +528,7 @@
           "correlation_id": "corr-syn-1",
           "emitted_at": "2027-01-15T15:00:00Z"
         },
-        [
-          "autolabels",
-          "autoframe"
-        ]
+        ["autolabels", "autoframe"]
       ],
       "body": "{\"aggregate\":{\"domain\":\"acquisition\",\"id\":\"acq-apr-syn-1\",\"prev_revision\":null,\"revision\":2,\"type\":\"acquisition\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"f24aa820-e1de-56cb-b24e-512793d53fac\",\"event_type\":\"acquisition.purchase_completed\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autocurb\",\"event_id\":\"ac-pur-1\",\"revision\":2},\"payload\":{\"audit_ref\":\"audit-p-1\",\"condition_evidence_refs\":[\"cond-1\"],\"custody_at\":\"2027-01-15T15:00:00Z\",\"custody_transferred\":true,\"ownership_evidence_refs\":[\"own-1\"],\"purchase_ref\":\"pur-syn-1\",\"verified_by_ref\":\"staff-syn-7\"},\"payload_sha256\":\"fb1c1891e375a3e45b1741e6d22f4b1e849449a44f2dfc98b8df2d2543b31fa5\",\"protocol\":\"rtgip/2\",\"purpose\":\"acquisition_evidence\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autocurb->autoframe\",\"schema_version\":2,\"source_app\":\"autocurb\",\"target_app\":\"autoframe\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
       "gateway_headers": {
@@ -643,10 +605,7 @@
           "vehicle_state": "inventory",
           "prev_revision": null
         },
-        [
-          "autolabels",
-          "autocurb"
-        ]
+        ["autolabels", "autocurb"]
       ],
       "body": "{\"aggregate\":{\"domain\":\"media\",\"id\":\"med-syn-1\",\"prev_revision\":null,\"revision\":1,\"type\":\"media\"},\"causation_id\":\"appr-syn-1\",\"classification\":\"shared_media_meta\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"52b6c425-eb0c-5876-a0fa-bcf5ed3c4302\",\"event_type\":\"media.approved\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autoframe\",\"event_id\":\"af-evt-1\",\"revision\":1},\"payload\":{\"approval_audit_ref\":\"audit-af-1\",\"approved_at\":\"2027-01-15T15:00:00Z\",\"approved_by_ref\":\"mgr-syn-1\",\"content_sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"height\":1000,\"media_id\":\"med-syn-1\",\"media_order\":1,\"orientation\":\"landscape\",\"preset_key\":\"studio\",\"preset_version\":1,\"rendition_id\":\"rend-syn-1\",\"shot_type\":\"front_34\",\"storage_ref\":{\"bucket\":\"autoframe-media\",\"object_key\":\"tnt-syn-northwind/rf-nw-01/inst-syn-0001/med-syn-1/derived/studio-v1-r1.webp\"},\"width\":1500},\"payload_sha256\":\"fd0d909b8a83bcb16f25087bf899a6e7e62d89926c8485575d1127365578b1e3\",\"protocol\":\"rtgip/2\",\"purpose\":\"media_reference\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autoframe->autolabels\",\"schema_version\":2,\"source_app\":\"autoframe\",\"target_app\":\"autolabels\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
       "gateway_headers": {
@@ -723,10 +682,7 @@
           "vehicle_state": "inventory",
           "prev_revision": null
         },
-        [
-          "autolabels",
-          "autocurb"
-        ]
+        ["autolabels", "autocurb"]
       ],
       "body": "{\"aggregate\":{\"domain\":\"media\",\"id\":\"med-syn-1\",\"prev_revision\":null,\"revision\":1,\"type\":\"media\"},\"causation_id\":\"appr-syn-1\",\"classification\":\"shared_media_meta\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"4cdf2bcb-4589-5dc3-9399-3c53b2c10ee5\",\"event_type\":\"media.approved\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autoframe\",\"event_id\":\"af-evt-1\",\"revision\":1},\"payload\":{\"approval_audit_ref\":\"audit-af-1\",\"approved_at\":\"2027-01-15T15:00:00Z\",\"approved_by_ref\":\"mgr-syn-1\",\"content_sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"height\":1000,\"media_id\":\"med-syn-1\",\"media_order\":1,\"orientation\":\"landscape\",\"preset_key\":\"studio\",\"preset_version\":1,\"rendition_id\":\"rend-syn-1\",\"shot_type\":\"front_34\",\"storage_ref\":{\"bucket\":\"autoframe-media\",\"object_key\":\"tnt-syn-northwind/rf-nw-01/inst-syn-0001/med-syn-1/derived/studio-v1-r1.webp\"},\"width\":1500},\"payload_sha256\":\"fd0d909b8a83bcb16f25087bf899a6e7e62d89926c8485575d1127365578b1e3\",\"protocol\":\"rtgip/2\",\"purpose\":\"media_reference\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autoframe->autocurb\",\"schema_version\":2,\"source_app\":\"autoframe\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
       "gateway_headers": {
@@ -770,10 +726,7 @@
           "vehicle_state": "inventory",
           "prev_revision": 1
         },
-        [
-          "autolabels",
-          "autocurb"
-        ]
+        ["autolabels", "autocurb"]
       ],
       "body": "{\"aggregate\":{\"domain\":\"media\",\"id\":\"med-syn-1\",\"prev_revision\":1,\"revision\":2,\"type\":\"media\"},\"causation_id\":null,\"classification\":\"shared_media_meta\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"77ddc454-da5b-5d22-89d7-d7fae2dd966a\",\"event_type\":\"media.revoked\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autoframe\",\"event_id\":\"af-rev-2\",\"revision\":2},\"payload\":{\"media_id\":\"med-syn-1\",\"reason\":\"withdrawn\",\"revocation_audit_ref\":\"audit-rev-1\",\"revoked_at\":\"2027-01-15T15:00:00Z\"},\"payload_sha256\":\"6a1cdc5e7aa58114fc753f06374f0e6e92f86531ca998d63e40f2c65a9a90043\",\"protocol\":\"rtgip/2\",\"purpose\":\"media_reference\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autoframe->autolabels\",\"schema_version\":2,\"source_app\":\"autoframe\",\"target_app\":\"autolabels\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
       "gateway_headers": {
@@ -817,10 +770,7 @@
           "vehicle_state": "inventory",
           "prev_revision": 1
         },
-        [
-          "autolabels",
-          "autocurb"
-        ]
+        ["autolabels", "autocurb"]
       ],
       "body": "{\"aggregate\":{\"domain\":\"media\",\"id\":\"med-syn-1\",\"prev_revision\":1,\"revision\":2,\"type\":\"media\"},\"causation_id\":null,\"classification\":\"shared_media_meta\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"248399aa-5c88-5c50-88da-a2c6ca264a0c\",\"event_type\":\"media.revoked\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autoframe\",\"event_id\":\"af-rev-2\",\"revision\":2},\"payload\":{\"media_id\":\"med-syn-1\",\"reason\":\"withdrawn\",\"revocation_audit_ref\":\"audit-rev-1\",\"revoked_at\":\"2027-01-15T15:00:00Z\"},\"payload_sha256\":\"6a1cdc5e7aa58114fc753f06374f0e6e92f86531ca998d63e40f2c65a9a90043\",\"protocol\":\"rtgip/2\",\"purpose\":\"media_reference\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autoframe->autocurb\",\"schema_version\":2,\"source_app\":\"autoframe\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
       "gateway_headers": {

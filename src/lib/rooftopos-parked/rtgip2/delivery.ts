@@ -4,8 +4,16 @@
 // executable specification, not a substitute for the database transaction.
 
 import {
-  canonicalize, hmacHex, sha256Hex, timingSafeEqual, PROTOCOL,
-  type AppId, type EnvelopeV2, type ServiceKey, type Signer, type VerifiedDelivery,
+  canonicalize,
+  hmacHex,
+  sha256Hex,
+  timingSafeEqual,
+  PROTOCOL,
+  type AppId,
+  type EnvelopeV2,
+  type ServiceKey,
+  type Signer,
+  type VerifiedDelivery,
 } from "./protocol.ts";
 
 // ---------------------------------------------------------------------------
@@ -35,19 +43,26 @@ type Unsigned = Omit<Receipt, "signature" | "key_id">;
 export async function signReceipt(r: Unsigned, key: ServiceKey): Promise<Receipt> {
   if (key.owner !== r.issuer) throw new Error("receipt_issuer_key_mismatch");
   const withKey = { ...r, key_id: key.key_id };
-  return { ...withKey, signature: await hmacHex(key.secret, `rtgip/2-receipt\n${canonicalize(withKey)}`) };
+  return {
+    ...withKey,
+    signature: await hmacHex(key.secret, `rtgip/2-receipt\n${canonicalize(withKey)}`),
+  };
 }
 
 export async function verifyReceipt(
-  r: Receipt | undefined, expect: { kind: ReceiptKind; event_id: string; payload_sha256: string; issuer: Signer },
+  r: Receipt | undefined,
+  expect: { kind: ReceiptKind; event_id: string; payload_sha256: string; issuer: Signer },
   keys: readonly ServiceKey[],
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   if (!r) return { ok: false, reason: "ack_missing" };
-  if (r.protocol !== PROTOCOL || r.kind !== expect.kind) return { ok: false, reason: "ack_wrong_kind" };
-  if (r.event_id !== expect.event_id || r.payload_sha256 !== expect.payload_sha256) return { ok: false, reason: "ack_wrong_event" };
+  if (r.protocol !== PROTOCOL || r.kind !== expect.kind)
+    return { ok: false, reason: "ack_wrong_kind" };
+  if (r.event_id !== expect.event_id || r.payload_sha256 !== expect.payload_sha256)
+    return { ok: false, reason: "ack_wrong_event" };
   if (r.issuer !== expect.issuer) return { ok: false, reason: "ack_wrong_issuer" };
   const key = keys.find((k) => k.key_id === r.key_id);
-  if (!key || key.owner !== r.issuer || key.status === "revoked") return { ok: false, reason: "ack_bad_key" };
+  if (!key || key.owner !== r.issuer || key.status === "revoked")
+    return { ok: false, reason: "ack_bad_key" };
   const { signature, ...rest } = r;
   const expected = await hmacHex(key.secret, `rtgip/2-receipt\n${canonicalize(rest)}`);
   if (!timingSafeEqual(expected, signature)) return { ok: false, reason: "ack_bad_signature" };
@@ -71,9 +86,14 @@ export function backoffSeconds(attempt: number, rand: () => number = Math.random
 // ---------------------------------------------------------------------------
 
 export type OutboxState =
-  | "pending" | "in_flight" | "retry_wait"
-  | "gateway_admitted" | "target_persisted" | "consumer_committed"
-  | "target_quarantined" | "dead_letter";
+  | "pending"
+  | "in_flight"
+  | "retry_wait"
+  | "gateway_admitted"
+  | "target_persisted"
+  | "consumer_committed"
+  | "target_quarantined"
+  | "dead_letter";
 
 export interface OutboxRow {
   event_id: string;
@@ -90,28 +110,57 @@ export interface OutboxRow {
   receipts: Receipt[];
 }
 
-export class OutboxConflictError extends Error { constructor() { super("event_id_conflict"); } }
+export class OutboxConflictError extends Error {
+  constructor() {
+    super("event_id_conflict");
+  }
+}
 
-export interface TransportResult { http_status: number; receipts?: Receipt[] }
+export interface TransportResult {
+  http_status: number;
+  receipts?: Receipt[];
+}
 export type Transport = (row: OutboxRow) => Promise<TransportResult>;
 
 export class MemoryOutbox<S> {
   rows = new Map<string, OutboxRow>();
-  audit: { at: number; event_id: string; from: OutboxState | null; to: OutboxState; detail: string }[] = [];
+  audit: {
+    at: number;
+    event_id: string;
+    from: OutboxState | null;
+    to: OutboxState;
+    detail: string;
+  }[] = [];
   constructor(public state: S) {}
 
   /** Business mutation + outbox rows commit together or not at all. */
-  async transaction(fn: (draft: S, enqueue: (e: EnvelopeV2, body: string) => Promise<void>) => Promise<void> | void, now = 0): Promise<void> {
+  async transaction(
+    fn: (draft: S, enqueue: (e: EnvelopeV2, body: string) => Promise<void>) => Promise<void> | void,
+    now = 0,
+  ): Promise<void> {
     const draft = structuredClone(this.state);
     const staged = new Map(this.rows);
     const log: typeof this.audit = [];
     const enqueue = async (e: EnvelopeV2, body: string) => {
       const sha = await sha256Hex(body);
       const prior = staged.get(e.event_id);
-      if (prior) { if (prior.body_sha256 === sha) return; throw new OutboxConflictError(); }
+      if (prior) {
+        if (prior.body_sha256 === sha) return;
+        throw new OutboxConflictError();
+      }
       staged.set(e.event_id, {
-        event_id: e.event_id, route: e.route, envelope: e, body, body_sha256: sha, state: "pending",
-        attempts: 0, next_attempt_at: now, lease_owner: null, lease_until: 0, last_error: null, receipts: [],
+        event_id: e.event_id,
+        route: e.route,
+        envelope: e,
+        body,
+        body_sha256: sha,
+        state: "pending",
+        attempts: 0,
+        next_attempt_at: now,
+        lease_owner: null,
+        lease_until: 0,
+        last_error: null,
+        receipts: [],
       });
       log.push({ at: now, event_id: e.event_id, from: null, to: "pending", detail: "enqueued" });
     };
@@ -134,7 +183,9 @@ export class MemoryOutbox<S> {
       const due = (r.state === "pending" || r.state === "retry_wait") && r.next_attempt_at <= now;
       const expired = r.state === "in_flight" && r.lease_until <= now;
       if (!due && !expired) continue;
-      r.lease_owner = worker; r.lease_until = now + leaseSec; r.attempts += 1;
+      r.lease_owner = worker;
+      r.lease_until = now + leaseSec;
+      r.attempts += 1;
       this.move(r, "in_flight", now, `claimed_by:${worker}`);
       out.push(r);
     }
@@ -145,29 +196,62 @@ export class MemoryOutbox<S> {
    * Process one leased row. The row only advances when the Gateway admission receipt and
    * the target receipts verify against the exact event and payload hash.
    */
-  async deliver(r: OutboxRow, worker: string, transport: Transport, keys: readonly ServiceKey[], now: number, rand?: () => number): Promise<OutboxState> {
+  async deliver(
+    r: OutboxRow,
+    worker: string,
+    transport: Transport,
+    keys: readonly ServiceKey[],
+    now: number,
+    rand?: () => number,
+  ): Promise<OutboxState> {
     if (r.lease_owner !== worker || r.state !== "in_flight") return r.state;
     let res: TransportResult;
-    try { res = await transport(r); } catch (err) { return this.fail(r, `transport:${(err as Error).message}`, now, rand); }
-    if (res.http_status < 200 || res.http_status >= 300) return this.fail(r, `http_${res.http_status}`, now, rand);
+    try {
+      res = await transport(r);
+    } catch (err) {
+      return this.fail(r, `transport:${(err as Error).message}`, now, rand);
+    }
+    if (res.http_status < 200 || res.http_status >= 300)
+      return this.fail(r, `http_${res.http_status}`, now, rand);
     const sha = r.envelope.payload_sha256;
     const find = (k: ReceiptKind) => res.receipts?.find((x) => x.kind === k);
-    const adm = await verifyReceipt(find("gateway_admission"), { kind: "gateway_admission", event_id: r.event_id, payload_sha256: sha, issuer: "gateway" }, keys);
+    const adm = await verifyReceipt(
+      find("gateway_admission"),
+      { kind: "gateway_admission", event_id: r.event_id, payload_sha256: sha, issuer: "gateway" },
+      keys,
+    );
     if ("reason" in adm) return this.fail(r, adm.reason, now, rand);
     r.receipts.push(find("gateway_admission")!);
     this.move(r, "gateway_admitted", now, "admission_verified");
     const target = r.envelope.target_app;
     const inbox = find("target_inbox");
-    const inboxOk = await verifyReceipt(inbox, { kind: "target_inbox", event_id: r.event_id, payload_sha256: sha, issuer: target }, keys);
+    const inboxOk = await verifyReceipt(
+      inbox,
+      { kind: "target_inbox", event_id: r.event_id, payload_sha256: sha, issuer: target },
+      keys,
+    );
     if ("reason" in inboxOk) return this.fail(r, inboxOk.reason, now, rand);
     r.receipts.push(inbox!);
-    if (inbox!.outcome === "quarantined") { this.release(r); this.move(r, "target_quarantined", now, "target_quarantined"); return r.state; }
+    if (inbox!.outcome === "quarantined") {
+      this.release(r);
+      this.move(r, "target_quarantined", now, "target_quarantined");
+      return r.state;
+    }
     this.move(r, "target_persisted", now, `inbox:${inbox!.outcome}`);
     const commit = find("consumer_commit");
-    const commitOk = await verifyReceipt(commit, { kind: "consumer_commit", event_id: r.event_id, payload_sha256: sha, issuer: target }, keys);
+    const commitOk = await verifyReceipt(
+      commit,
+      { kind: "consumer_commit", event_id: r.event_id, payload_sha256: sha, issuer: target },
+      keys,
+    );
     if ("reason" in commitOk) {
       // Held or still-uncommitted at target: keep retrying; target answers idempotently.
-      return this.fail(r, inbox!.outcome === "held" ? "target_held_awaiting_predecessor" : commitOk.reason, now, rand);
+      return this.fail(
+        r,
+        inbox!.outcome === "held" ? "target_held_awaiting_predecessor" : commitOk.reason,
+        now,
+        rand,
+      );
     }
     r.receipts.push(commit!);
     this.release(r);
@@ -175,12 +259,18 @@ export class MemoryOutbox<S> {
     return r.state;
   }
 
-  private release(r: OutboxRow) { r.lease_owner = null; r.lease_until = 0; }
+  private release(r: OutboxRow) {
+    r.lease_owner = null;
+    r.lease_until = 0;
+  }
 
   private fail(r: OutboxRow, reason: string, now: number, rand?: () => number): OutboxState {
     r.last_error = reason;
     this.release(r);
-    if (r.attempts >= RETRY.maxAttempts) { this.move(r, "dead_letter", now, reason); return r.state; }
+    if (r.attempts >= RETRY.maxAttempts) {
+      this.move(r, "dead_letter", now, reason);
+      return r.state;
+    }
     r.next_attempt_at = now + backoffSeconds(r.attempts, rand);
     this.move(r, "retry_wait", now, reason);
     return r.state;
@@ -190,7 +280,8 @@ export class MemoryOutbox<S> {
   redrive(eventId: string, actor: string, now: number): boolean {
     const r = this.rows.get(eventId);
     if (!r || r.state !== "dead_letter") return false;
-    r.attempts = 0; r.next_attempt_at = now;
+    r.attempts = 0;
+    r.next_attempt_at = now;
     this.move(r, "retry_wait", now, `redrive_by:${actor}`);
     return true;
   }
@@ -212,7 +303,10 @@ export interface InboxRow {
   committed_at: number | null;
 }
 
-export type ConsumerEffect<P> = (draft: P, e: EnvelopeV2) => { ok: true } | { ok: false; reason: string };
+export type ConsumerEffect<P> = (
+  draft: P,
+  e: EnvelopeV2,
+) => { ok: true } | { ok: false; reason: string };
 
 export const inboxKey = (e: EnvelopeV2) => `${e.tenant_id}|${e.origin.app}|${e.event_id}`;
 export const watermarkKey = (e: EnvelopeV2) =>
@@ -222,14 +316,22 @@ export class MemoryInbox<P> {
   rows = new Map<string, InboxRow>();
   watermarks = new Map<string, number>();
   effectsApplied = new Map<string, number>();
-  constructor(public app: AppId, public projection: P, private effect: ConsumerEffect<P>) {}
+  constructor(
+    public app: AppId,
+    public projection: P,
+    private effect: ConsumerEffect<P>,
+  ) {}
 
   /**
    * Receive one verified delivery. Everything below happens in a single transaction:
    * inbox row, watermark, consumer effect, and draining of held successors. Any throw
    * leaves the inbox, watermark and projection exactly as they were.
    */
-  receive(d: VerifiedDelivery, now: number, crashAfterEffect = false): { outcome: InboxOutcome; reason: string | null; committed: boolean } {
+  receive(
+    d: VerifiedDelivery,
+    now: number,
+    crashAfterEffect = false,
+  ): { outcome: InboxOutcome; reason: string | null; committed: boolean } {
     const e = d.envelope;
     if (e.target_app !== this.app) throw new Error("wrong_destination");
     const key = inboxKey(e);
@@ -237,10 +339,15 @@ export class MemoryInbox<P> {
     if (prior) {
       if (prior.payload_sha256 !== e.payload_sha256) {
         const qkey = `${key}|conflict|${e.payload_sha256}`;
-        if (!this.rows.has(qkey)) this.rows.set(qkey, this.row(qkey, e, "quarantined", "conflicting_duplicate", now));
+        if (!this.rows.has(qkey))
+          this.rows.set(qkey, this.row(qkey, e, "quarantined", "conflicting_duplicate", now));
         return { outcome: "quarantined", reason: "conflicting_duplicate", committed: false };
       }
-      return { outcome: "duplicate", reason: prior.outcome, committed: prior.committed_at !== null || prior.outcome !== "held" };
+      return {
+        outcome: "duplicate",
+        reason: prior.outcome,
+        committed: prior.committed_at !== null || prior.outcome !== "held",
+      };
     }
     const draftRows = new Map(this.rows);
     const draftWm = new Map(this.watermarks);
@@ -248,15 +355,42 @@ export class MemoryInbox<P> {
     const draftFx = new Map(this.effectsApplied);
     const result = this.applyInto(e, key, now, draftRows, draftWm, draftProj, draftFx);
     if (crashAfterEffect) throw new Error("simulated_crash_before_commit");
-    this.rows = draftRows; this.watermarks = draftWm; this.projection = draftProj; this.effectsApplied = draftFx;
+    this.rows = draftRows;
+    this.watermarks = draftWm;
+    this.projection = draftProj;
+    this.effectsApplied = draftFx;
     return result;
   }
 
-  private row(key: string, e: EnvelopeV2, outcome: InboxOutcome, reason: string | null, now: number): InboxRow {
-    return { key, event_id: e.event_id, origin_app: e.origin.app, payload_sha256: e.payload_sha256, outcome, reason, envelope: e, received_at: now, committed_at: outcome === "applied" || outcome === "stale_ignored" ? now : null };
+  private row(
+    key: string,
+    e: EnvelopeV2,
+    outcome: InboxOutcome,
+    reason: string | null,
+    now: number,
+  ): InboxRow {
+    return {
+      key,
+      event_id: e.event_id,
+      origin_app: e.origin.app,
+      payload_sha256: e.payload_sha256,
+      outcome,
+      reason,
+      envelope: e,
+      received_at: now,
+      committed_at: outcome === "applied" || outcome === "stale_ignored" ? now : null,
+    };
   }
 
-  private applyInto(e: EnvelopeV2, key: string, now: number, rows: Map<string, InboxRow>, wm: Map<string, number>, proj: P, fx: Map<string, number>) {
+  private applyInto(
+    e: EnvelopeV2,
+    key: string,
+    now: number,
+    rows: Map<string, InboxRow>,
+    wm: Map<string, number>,
+    proj: P,
+    fx: Map<string, number>,
+  ) {
     const wk = watermarkKey(e);
     const mark = wm.get(wk) ?? null;
     if (mark !== null && e.aggregate.revision <= mark) {
@@ -264,8 +398,15 @@ export class MemoryInbox<P> {
       return { outcome: "stale_ignored" as const, reason: `watermark:${mark}`, committed: true };
     }
     if (e.aggregate.prev_revision !== mark) {
-      rows.set(key, this.row(key, e, "held", `awaiting_revision:${e.aggregate.prev_revision}`, now));
-      return { outcome: "held" as const, reason: `awaiting_revision:${e.aggregate.prev_revision}`, committed: false };
+      rows.set(
+        key,
+        this.row(key, e, "held", `awaiting_revision:${e.aggregate.prev_revision}`, now),
+      );
+      return {
+        outcome: "held" as const,
+        reason: `awaiting_revision:${e.aggregate.prev_revision}`,
+        committed: false,
+      };
     }
     const res = this.effect(proj, e);
     if ("reason" in res) {
@@ -287,7 +428,9 @@ export class MemoryInbox<P> {
   }
 
   /** Release a quarantined row for re-application after an operator fix (audited by caller). */
-  heldCount(): number { return [...this.rows.values()].filter((r) => r.outcome === "held").length; }
+  heldCount(): number {
+    return [...this.rows.values()].filter((r) => r.outcome === "held").length;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -306,27 +449,49 @@ export interface ReconReport {
   unacked_but_committed: string[];
 }
 
-export function reconcile(outbox: Iterable<OutboxRow>, inbox: MemoryInbox<unknown>, target: AppId): ReconReport {
+export function reconcile(
+  outbox: Iterable<OutboxRow>,
+  inbox: MemoryInbox<unknown>,
+  target: AppId,
+): ReconReport {
   const rep: ReconReport = {
-    checked: 0, missing_at_target: [], hash_mismatch: [], duplicate_effects: [], invalid_ack: [],
-    revision_gaps: [], quarantined: [], stale_ignored: [], unacked_but_committed: [],
+    checked: 0,
+    missing_at_target: [],
+    hash_mismatch: [],
+    duplicate_effects: [],
+    invalid_ack: [],
+    revision_gaps: [],
+    quarantined: [],
+    stale_ignored: [],
+    unacked_but_committed: [],
   };
   for (const r of outbox) {
     if (r.envelope.target_app !== target) continue;
     rep.checked += 1;
     const t = inbox.rows.get(inboxKey(r.envelope));
     const committedAtSource = r.state === "consumer_committed";
-    if (!t) { if (r.state !== "pending") rep.missing_at_target.push(r.event_id); if (committedAtSource) rep.invalid_ack.push(r.event_id); continue; }
+    if (!t) {
+      if (r.state !== "pending") rep.missing_at_target.push(r.event_id);
+      if (committedAtSource) rep.invalid_ack.push(r.event_id);
+      continue;
+    }
     if (t.payload_sha256 !== r.envelope.payload_sha256) rep.hash_mismatch.push(r.event_id);
     if ((inbox.effectsApplied.get(r.event_id) ?? 0) > 1) rep.duplicate_effects.push(r.event_id);
     if (t.outcome === "held") rep.revision_gaps.push(r.event_id);
     if (t.outcome === "quarantined") rep.quarantined.push(r.event_id);
     if (t.outcome === "stale_ignored") rep.stale_ignored.push(r.event_id);
-    if (committedAtSource && t.outcome !== "applied" && t.outcome !== "stale_ignored") rep.invalid_ack.push(r.event_id);
-    if (!committedAtSource && (t.outcome === "applied" || t.outcome === "stale_ignored")) rep.unacked_but_committed.push(r.event_id);
+    if (committedAtSource && t.outcome !== "applied" && t.outcome !== "stale_ignored")
+      rep.invalid_ack.push(r.event_id);
+    if (!committedAtSource && (t.outcome === "applied" || t.outcome === "stale_ignored"))
+      rep.unacked_but_committed.push(r.event_id);
   }
   for (const t of inbox.rows.values()) {
-    if (t.outcome === "quarantined" && t.reason === "conflicting_duplicate" && !rep.hash_mismatch.includes(t.event_id)) rep.hash_mismatch.push(t.event_id);
+    if (
+      t.outcome === "quarantined" &&
+      t.reason === "conflicting_duplicate" &&
+      !rep.hash_mismatch.includes(t.event_id)
+    )
+      rep.hash_mismatch.push(t.event_id);
   }
   return rep;
 }
