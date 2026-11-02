@@ -33,6 +33,7 @@ import {
   resolveRenderProfile,
   selectOemTemplate, validatePageGeometry, evaluateStickerEligibility,
   listCompatibleTemplates, validateTemplateOverride, checkRenderedCompleteness,
+  resolveReferenceVariant, REFERENCE_VARIANT_REGISTRY_VERSION, DISCLOSURE_VERSION,
 } from "../_shared/factorySticker/render.ts";
 import { parseYmm } from "../_shared/factorySticker/lib/ymm.ts";
 import { structuredSheet } from "../_shared/neovinSheet.ts";
@@ -691,10 +692,29 @@ async function orchestrateVehicle(
           ? String((mc as Record<string, unknown>).make) : null,
       ],
     });
+    // Exact reference-variant match is recorded for review and for the
+    // dedicated layouts to come; it does not change which template renders.
+    const referenceVariant = resolveReferenceVariant({
+      make,
+      modelYear: Number.isFinite(modelYearNum) ? modelYearNum : null,
+      model: normalized.data.identity.model,
+      trim: normalized.data.identity.trim,
+      drivetrain: normalized.data.mechanical?.drivetrain ?? null,
+      fuelType: normalized.data.epa?.fuelType ?? null,
+    });
     await audit(admin, tenantId, "factory_sticker.template_selected", record.id, {
       vin, template_key: selection.templateKey, status: selection.selectionStatus,
       confidence: selection.confidence, reasons: selection.reasons,
       conflicting_fields: selection.conflictingFields,
+      reference_variant: {
+        registry_version: REFERENCE_VARIANT_REGISTRY_VERSION,
+        status: referenceVariant.status,
+        key: referenceVariant.variant?.key ?? null,
+        candidates: referenceVariant.candidates,
+        rendering: referenceVariant.rendering,
+        reasons: referenceVariant.reasons,
+      },
+      disclosure_version: DISCLOSURE_VERSION,
     });
     if (selection.selectionStatus === "unsupported" || selection.selectionStatus === "conflict") {
       const code = selection.selectionStatus === "conflict"

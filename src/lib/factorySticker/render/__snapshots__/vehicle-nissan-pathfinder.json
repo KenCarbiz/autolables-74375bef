@@ -7,9 +7,9 @@
     "barcode": 1,
     "path": 55,
     "qr": 2,
-    "rect": 31,
+    "rect": 32,
     "rule": 12,
-    "text": 217
+    "text": 221
   },
   "fills": [
     "#0d0d0d",
@@ -66,9 +66,9 @@
   ],
   "regions": {
     "barcode": "21,560 227.15x23",
-    "qr": "755.5,204.8 17",
-    "qr2": "592,373.3 100",
-    "totalMsrp": "493,490.7 @11.5"
+    "qr": "755.5,209.3 17",
+    "qr2": "592,377.8 100",
+    "totalMsrp": "493,486 @11.5"
   },
   "headings": [
     "ORIGINAL FACTORY BUILD & MSRP RECORD",
@@ -98,6 +98,6 @@
   ],
   "totalBand": "$53,550.00",
   "svgDigest": [
-    "a615cc96"
+    "9a7fc079"
   ]
 }

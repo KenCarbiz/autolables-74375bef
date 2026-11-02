@@ -63,6 +63,10 @@ export function layoutToSvg(model: LayoutModel): string {
         parts.push(
           `<path transform="translate(${num(prim.x)} ${num(oy + prim.y)})" d="${esc(prim.d)}" fill="${fill}"${stroke}/>`,
         );
+      } else if (prim.kind === "image") {
+        parts.push(
+          `<image x="${num(prim.x)}" y="${num(oy + prim.y)}" width="${num(prim.w)}" height="${num(prim.h)}" preserveAspectRatio="none" href="data:image/png;base64,${prim.png}"/>`,
+        );
       } else if (prim.kind === "barcode") {
         const encoding = encodeCode128(prim.payload);
         const quiet = 10;

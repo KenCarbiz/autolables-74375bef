@@ -8,11 +8,19 @@
 // four-column standard equipment, included/optional pricing split, spec
 // grid, VIN barcode, navy total band) and a right column (EPA Fuel Economy
 // & Environment panel, Government 5-Star Safety Ratings, Vehicle Passport
-// QR, federal-label notice, AutoLabels verification box).
+// QR, AutoLabels verification box). Every page opens with the mandatory
+// reproduction banner and closes with the reproduction disclosure; the
+// federal-label notice is never printed because these are reproductions.
 
 import type { FactoryStickerData, EquipmentCategory } from "../types.ts";
 import type { OemStickerTheme } from "../oem/themes.ts";
 import { getLogoAsset } from "../oem/logoAssets.ts";
+import {
+  PASSPORT_QR_CAPTION,
+  REPRODUCTION_BANNER,
+  reproductionDisclosureLines,
+  type FactoryBuildProvenance,
+} from "../reproduction.ts";
 
 export const PAGE_WIDTH = 792;
 export const PAGE_HEIGHT = 612;
@@ -90,13 +98,26 @@ export interface PathPrimitive {
   strokeWidth?: number;
 }
 
+// Authorized raster artwork (manufacturer logos on reference-variant
+// layouts). `png` is base64 PNG data; `assetId` names the governed asset.
+export interface ImagePrimitive {
+  kind: "image";
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  png: string;
+  assetId: string;
+}
+
 export type LayoutPrimitive =
   | TextPrimitive
   | RulePrimitive
   | RectPrimitive
   | BarcodePrimitive
   | QrPrimitive
-  | PathPrimitive;
+  | PathPrimitive
+  | ImagePrimitive;
 
 export interface LayoutPage {
   primitives: LayoutPrimitive[];
@@ -123,6 +144,8 @@ export interface StickerLayoutInput {
   disclaimers: string[];
   barcodePayload: string;
   generic: boolean;
+  /** Authenticated factory-build evidence; absent means unverified. */
+  factoryBuild?: FactoryBuildProvenance | null;
 }
 
 // ── Font metrics (Helvetica / Helvetica-Bold AFM widths, units per 1000 em;
@@ -130,7 +153,7 @@ export interface StickerLayoutInput {
 // the deterministic fit logic requires.
 
 const HELV: Record<string, number> = {
-  " ": 278, "!": 278, '"': 355, "#": 556, "$": 556, "%": 889, "&": 667,
+  "\u2014": 1000, " ": 278, "!": 278, '"': 355, "#": 556, "$": 556, "%": 889, "&": 667,
   "'": 191, "(": 333, ")": 333, "*": 389, "+": 584, ",": 278, "-": 333,
   ".": 278, "/": 278, "0": 556, "1": 556, "2": 556, "3": 556, "4": 556,
   "5": 556, "6": 556, "7": 556, "8": 556, "9": 556, ":": 278, ";": 278,
@@ -145,7 +168,7 @@ const HELV: Record<string, number> = {
 };
 
 const HELV_BOLD: Record<string, number> = {
-  " ": 278, "!": 333, '"': 474, "#": 556, "$": 556, "%": 889, "&": 722,
+  "\u2014": 1000, " ": 278, "!": 333, '"': 474, "#": 556, "$": 556, "%": 889, "&": 722,
   "'": 238, "(": 333, ")": 333, "*": 389, "+": 584, ",": 278, "-": 333,
   ".": 278, "/": 278, "0": 556, "1": 556, "2": 556, "3": 556, "4": 556,
   "5": 556, "6": 556, "7": 556, "8": 556, "9": 556, ":": 333, ";": 333,
@@ -185,7 +208,7 @@ export function textBBox(t: TextPrimitive): { x0: number; x1: number; y0: number
   return { x0, x1: x0 + w, y0: t.y - t.size, y1: t.y };
 }
 
-function wrapText(str: string, font: LayoutFont, size: number, maxWidth: number): string[] {
+export function wrapText(str: string, font: LayoutFont, size: number, maxWidth: number): string[] {
   const words = str.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let line = "";
@@ -296,6 +319,7 @@ const RX = SPLIT_X + 7;
 const RW = IR - RX;
 const CONTENT_BOTTOM = PAGE_HEIGHT - PAGE_MARGIN - 5;
 const SECTION_GAP = 5;
+const BANNER_H = 9;
 
 const BLACK = "#0d0d0d";
 const EPA_TAG_BLUE = "#b7d9f1";
@@ -404,7 +428,7 @@ function familyStyle(theme: OemStickerTheme): FamilyStyle {
   return override ? { ...base, ...override } : base;
 }
 
-class Painter {
+export class Painter {
   primitives: LayoutPrimitive[] = [];
   constructor(private drawn: string[] | null) {}
 
@@ -462,11 +486,15 @@ class Painter {
       ...(strokeWidth !== undefined ? { strokeWidth } : {}),
     });
   }
+
+  image(png: string, assetId: string, x: number, y: number, w: number, h: number): void {
+    this.primitives.push({ kind: "image", png, assetId, x, y, w, h });
+  }
 }
 
 // ── Vector glyphs ─────────────────────────────────────────────────────
 
-function starPath(s: number): string {
+export function starPath(s: number): string {
   // 5-point star in an s×s box, y-down.
   const p = (a: number, r: number): [number, number] => [
     s / 2 + r * Math.sin(a), s / 2 - r * Math.cos(a),
@@ -562,6 +590,21 @@ interface BuildContext {
   compactPackages: boolean;
 }
 
+// ── Reproduction banner: first thing on every page ───────────────────
+
+function paintReproductionBanner(p: Painter): number {
+  p.rect(PAGE_MARGIN, PAGE_MARGIN, PAGE_WIDTH - 2 * PAGE_MARGIN, BANNER_H, BLACK);
+  p.text(REPRODUCTION_BANNER, PAGE_WIDTH / 2, PAGE_MARGIN + 6.7, 6.4, "bold", "#ffffff", {
+    align: "center",
+    charSpacing: 0.4,
+  });
+  return PAGE_MARGIN + BANNER_H;
+}
+
+function disclosureLines(ctx: BuildContext): string[] {
+  return [...reproductionDisclosureLines(ctx.input.factoryBuild), ...ctx.input.disclaimers];
+}
+
 // ── Top strip: factory administrative codes across the full width ─────
 
 function paintTopStrip(p: Painter, ctx: BuildContext): number {
@@ -569,7 +612,7 @@ function paintTopStrip(p: Painter, ctx: BuildContext): number {
   const v = data.vehicle;
   const f = data.factory;
   const size = 6;
-  const baseline = PAGE_MARGIN + 10.5;
+  const baseline = PAGE_MARGIN + BANNER_H + 7.5;
 
   const left: Array<[string, string]> = [];
   if (f.locationCode) left.push(["LOC", f.locationCode]);
@@ -596,7 +639,7 @@ function paintTopStrip(p: Painter, ctx: BuildContext): number {
     p.text(v.stockNumber, IR, baseline, size, "body", BLACK, { align: "right" });
   }
 
-  const ruleY = baseline + 4.5;
+  const ruleY = baseline + 3;
   p.rule(PAGE_MARGIN, ruleY, PAGE_WIDTH - 2 * PAGE_MARGIN, 1.1, BLACK);
   return ruleY + 1.1;
 }
@@ -1599,7 +1642,7 @@ function paintPassportPanel(p: Painter, y: number, ctx: BuildContext, targetH: n
     let cy = y + 9;
     p.text("VEHICLE PASSPORT", RX + RW / 2, cy, 7.5, "bold", BLACK, { align: "center", charSpacing: 0.4 });
     cy += 8;
-    p.text("Scan for verified vehicle records", RX + RW / 2, cy, 6, "body", "#4c5157", { align: "center" });
+    p.text(PASSPORT_QR_CAPTION, RX + RW / 2, cy, 6, "body", "#4c5157", { align: "center" });
     cy += 5;
     p.qr(RX + (RW - qrSize) / 2, cy, qrSize, passportUrl, BLACK);
     cy += qrSize + 8;
@@ -1621,12 +1664,7 @@ function paintPassportPanel(p: Painter, y: number, ctx: BuildContext, targetH: n
   let cy = y + 15;
   p.text(brandLine ? "VEHICLE PASSPORT" : "AUTOLABELS VEHICLE PASSPORT", RX + RW / 2, cy, 8.5, "bold", navy, { align: "center", charSpacing: 0.5 });
   cy += 9;
-  p.text(
-    brandLine
-      ? "Scan for verified vehicle details, documents & history"
-      : "Scan to view this exact vehicle's verified Passport",
-    RX + RW / 2, cy, 6.2, "body", BLACK, { align: "center" },
-  );
+  p.text(PASSPORT_QR_CAPTION, RX + RW / 2, cy, 6.2, "body", BLACK, { align: "center" });
 
   const tailH = 26;
   const qrSize = Math.min(96, Math.max(48, y + boxH - tailH - cy - 14));
@@ -1659,20 +1697,16 @@ function paintPassportPanel(p: Painter, y: number, ctx: BuildContext, targetH: n
   return y + boxH;
 }
 
-// ── Right column: verification block, federal notice, disclosure ──────
+// ── Right column: verification block and reproduction disclosure ──────
 
 function paintVerificationBlock(p: Painter, y: number, ctx: BuildContext): number {
   const { input } = ctx;
   const doc = input.data.document;
-  let cy = y + 9;
-  p.text("AUTOLABELS VIN-SPECIFIC FACTORY BUILD RECORD", RX, cy, 6.6, "bold", BLACK, { charSpacing: 0.3 });
-  cy += 7.5;
+  let cy = y + 7;
   const sourceLine = input.generic
     ? "Generated from typical factory-configuration data for this trim."
-    : "Generated from saved VIN-specific factory-build data.";
+    : "Generated from saved VIN-specific vehicle data.";
   p.text(sourceLine, RX, cy, 5.5, "body", "#4c5157");
-  cy += 6.4;
-  p.text("MSRP independently reconciled from factory component values.", RX, cy, 5.5, "body", "#4c5157");
   cy += 6.4;
   const idBits = [
     doc.documentId ? `Document ${doc.documentId.slice(0, 8).toUpperCase()}` : null,
@@ -1683,20 +1717,9 @@ function paintVerificationBlock(p: Painter, y: number, ctx: BuildContext): numbe
   return cy + 2;
 }
 
-function paintNoticeRow(p: Painter, y: number, ctx: BuildContext): number {
-  // The federal-application notice belongs only on NEW-vehicle documents.
-  if (ctx.input.data.vehicle.condition !== "NEW") return y;
-  const boxH = 24;
-  p.rect(RX, y, RW, boxH, null, BLACK, 0.9);
-  p.text("This label has been applied pursuant to Federal law.", RX + 6, y + 10, 5.5, "body", BLACK);
-  p.text("Do not remove prior to delivery to the ultimate purchaser.", RX + 6, y + 17.5, 5.5, "body", BLACK);
-  return y + boxH;
-}
-
 function paintRightFooter(p: Painter, y: number, ctx: BuildContext, pageLabel: string): number {
-  const { input } = ctx;
-  let cy = y + 8;
-  for (const disclaimer of input.disclaimers) {
+  let cy = y + 7;
+  for (const disclaimer of disclosureLines(ctx)) {
     for (const line of wrapText(disclaimer, "body", 5.5, RW)) {
       p.text(line, RX, cy, 5.5, "body", "#4c5157");
       cy += 6.3;
@@ -1783,43 +1806,94 @@ function flowColumns(
   return { leftover, usedHeight };
 }
 
+const CONTINUATION_COLS_TOP = 56 + BANNER_H;
+
+function continuationFooterHeight(ctx: BuildContext): number {
+  const fullW = PAGE_WIDTH - 2 * PAGE_MARGIN;
+  let lines = 0;
+  for (const d of disclosureLines(ctx)) lines += wrapText(d, "body", 5.5, fullW).length;
+  return lines * 6.3 + 12;
+}
+
+function continuationColumnsHeight(ctx: BuildContext): number {
+  return PAGE_HEIGHT - PAGE_MARGIN - continuationFooterHeight(ctx) - CONTINUATION_COLS_TOP;
+}
+
+function withContinuedHeading(ctx: BuildContext, entries: FlowEntry[]): FlowEntry[] {
+  return entries[0] && entries[0].heading === undefined
+    ? [{ heading: headingCase(ctx.theme, "Continued"), lines: [] }, ...entries]
+    : entries;
+}
+
+/**
+ * Splits the page-1 overflow into continuation pages. Every entry lands on
+ * some page: an entry that cannot fit an empty page is a layout failure,
+ * never a silent drop.
+ */
+function planContinuationPages(ctx: BuildContext, leftover: FlowEntry[]): FlowEntry[][] {
+  const fullW = PAGE_WIDTH - 2 * PAGE_MARGIN;
+  const colsH = continuationColumnsHeight(ctx);
+  const pages: FlowEntry[][] = [];
+  let remaining = leftover;
+  while (remaining.some((e) => e.heading === undefined)) {
+    const flow = withContinuedHeading(ctx, remaining);
+    const scratch = new Painter([]);
+    const { leftover: next } = flowColumns(scratch, flow, PAGE_MARGIN, CONTINUATION_COLS_TOP, fullW, colsH, 4, ctx);
+    const placed = flow.filter((e) => e.heading === undefined).length -
+      next.filter((e) => e.heading === undefined).length;
+    if (placed <= 0) throw new Error("layout_failed: continuation entry cannot fit an empty page");
+    pages.push(remaining);
+    remaining = next;
+  }
+  return pages;
+}
+
 function paintContinuationPage(
   drawn: string[],
   ctx: BuildContext,
-  leftover: FlowEntry[],
+  entries: FlowEntry[],
+  pageNumber: number,
+  pageCount: number,
 ): LayoutPage {
   const p = new Painter(drawn);
   const { theme, input } = ctx;
   const v = input.data.vehicle;
   const fullW = PAGE_WIDTH - 2 * PAGE_MARGIN;
+  const top = paintReproductionBanner(p);
   const nameParts = [v.year > 0 ? String(v.year) : "", v.make, v.model, v.trim ?? ""].filter(Boolean);
-  p.text(nameParts.join(" ").toUpperCase(), PAGE_MARGIN, 21, 11, "bold", BLACK);
-  p.text(`VIN: ${v.vin}`, PAGE_WIDTH - PAGE_MARGIN, 21, 7.5, "bold", BLACK, { align: "right" });
-  p.rule(PAGE_MARGIN, 25, fullW, 1, BLACK);
-  p.text(headingCase(theme, "Factory Equipment Continuation"), PAGE_MARGIN, 38, 9, "bold", BLACK, {
+  p.text(nameParts.join(" ").toUpperCase(), PAGE_MARGIN, top + 12, 11, "bold", BLACK);
+  p.text(`VIN: ${v.vin}`, PAGE_WIDTH - PAGE_MARGIN, top + 12, 7.5, "bold", BLACK, { align: "right" });
+  p.rule(PAGE_MARGIN, top + 16, fullW, 1, BLACK);
+  p.text(headingCase(theme, "Factory Equipment Continuation"), PAGE_MARGIN, top + 29, 9, "bold", BLACK, {
     charSpacing: parseEm(theme.typography.headingLetterSpacing) * 9,
   });
   p.text(
-    `Continuation of the factory build record for VIN ${v.vin}. This page belongs to the sticker on page 1 and is not valid on its own.`,
-    PAGE_MARGIN, 48, 6, "body", "#6b6f76",
+    `Continuation of the reproduction window sticker for VIN ${v.vin}. This page belongs to the sticker on page 1 and is not valid on its own.`,
+    PAGE_MARGIN, top + 39, 6, "body", "#6b6f76",
   );
-  const colsTop = 56;
-  const colsH = PAGE_HEIGHT - PAGE_MARGIN - 14 - colsTop;
-  const withContinuedHeading: FlowEntry[] =
-    leftover[0] && leftover[0].heading === undefined
-      ? [{ heading: headingCase(theme, "Continued"), lines: [] }, ...leftover]
-      : leftover;
-  flowColumns(p, withContinuedHeading, PAGE_MARGIN, colsTop, fullW, colsH, 4, ctx);
-  p.text("PAGE 2 OF 2", PAGE_WIDTH - PAGE_MARGIN, PAGE_HEIGHT - PAGE_MARGIN - 2, 5.5, "bold", "#6b6f76", { align: "right" });
+  flowColumns(
+    p, withContinuedHeading(ctx, entries), PAGE_MARGIN, CONTINUATION_COLS_TOP, fullW,
+    continuationColumnsHeight(ctx), 4, ctx,
+  );
+  let fy = PAGE_HEIGHT - PAGE_MARGIN - continuationFooterHeight(ctx) + 8;
+  for (const d of disclosureLines(ctx)) {
+    for (const line of wrapText(d, "body", 5.5, fullW)) {
+      p.text(line, PAGE_MARGIN, fy, 5.5, "body", "#4c5157");
+      fy += 6.3;
+    }
+  }
+  p.text(`PAGE ${pageNumber} OF ${pageCount}`, PAGE_WIDTH - PAGE_MARGIN, PAGE_HEIGHT - PAGE_MARGIN - 2, 5.5, "bold", "#6b6f76", { align: "right" });
   return { primitives: p.primitives };
 }
 
 // ── Validation ────────────────────────────────────────────────────────
 
-function validateModel(model: LayoutModel): void {
+export function validateModel(model: LayoutModel): void {
   const bad = (msg: string): never => {
     throw new Error(`layout invariant violated: ${msg}`);
   };
+  const W = model.width;
+  const H = model.height;
   for (const [pi, page] of model.pages.entries()) {
     for (const prim of page.primitives) {
       if (prim.kind === "text") {
@@ -1827,24 +1901,25 @@ function validateModel(model: LayoutModel): void {
         if (/\b(undefined|null|NaN)\b/.test(prim.str)) bad(`placeholder artifact ${JSON.stringify(prim.str)}`);
         if (prim.size < MIN_BODY_FONT_SIZE) bad(`font size ${prim.size} below minimum`);
         const box = textBBox(prim);
-        if (box.x0 < PAGE_MARGIN - 0.51 || box.x1 > PAGE_WIDTH - PAGE_MARGIN + 0.51 ||
-            box.y0 < PAGE_MARGIN - prim.size || box.y1 > PAGE_HEIGHT - PAGE_MARGIN + 0.51) {
+        if (box.x0 < PAGE_MARGIN - 0.51 || box.x1 > W - PAGE_MARGIN + 0.51 ||
+            box.y0 < PAGE_MARGIN - prim.size || box.y1 > H - PAGE_MARGIN + 0.51) {
           bad(`text out of bounds on page ${pi + 1}: ${JSON.stringify(prim.str)}`);
         }
       } else {
         const w = prim.kind === "qr" ? prim.size : prim.w;
         const h = prim.kind === "qr" ? prim.size : prim.h;
         if (prim.x < PAGE_MARGIN - 0.01 || prim.y < PAGE_MARGIN - 0.01 ||
-            prim.x + w > PAGE_WIDTH - PAGE_MARGIN + 0.01 || prim.y + h > PAGE_HEIGHT - PAGE_MARGIN + 0.01) {
+            prim.x + w > W - PAGE_MARGIN + 0.01 || prim.y + h > H - PAGE_MARGIN + 0.01) {
           bad(`${prim.kind} out of bounds on page ${pi + 1}`);
         }
+        if (prim.kind === "image" && !prim.png) bad(`image ${prim.assetId} with empty data`);
         if ((prim.kind === "barcode" || prim.kind === "qr") && !prim.payload) {
           bad(`${prim.kind} with empty payload`);
         }
       }
     }
   }
-  if (model.pages.length < 1 || model.pages.length > 2) bad(`page count ${model.pages.length}`);
+  if (model.pages.length < 1) bad(`page count ${model.pages.length}`);
 }
 
 // ── Assembly ──────────────────────────────────────────────────────────
@@ -1871,6 +1946,7 @@ function buildAttempt(
 
   // Outer border + column divider.
   p.rect(PAGE_MARGIN, PAGE_MARGIN, PAGE_WIDTH - 2 * PAGE_MARGIN, PAGE_HEIGHT - 2 * PAGE_MARGIN, null, BLACK, 1.8);
+  paintReproductionBanner(p);
 
   const stripBottom = paintTopStrip(p, ctx);
   p.rule(SPLIT_X, stripBottom, 1.1, PAGE_HEIGHT - PAGE_MARGIN - stripBottom, BLACK);
@@ -1921,17 +1997,17 @@ function buildAttempt(
 
   // Right column, top to bottom: regulatory panels (supporting), then the
   // Passport panel stretched over the middle, with the verification block,
-  // federal notice (new vehicles only) and disclosure pinned to the bottom.
-  const pages = leftover.length ? 2 : 1;
-  const pageLabel = pages === 2 ? "PAGE 1 OF 2 - EQUIPMENT CONTINUED ON PAGE 2" : "PAGE 1 OF 1";
-  const noticeH = measureStack([(sp, sy) => paintNoticeRow(sp, sy, ctx)]);
+  // and reproduction disclosure pinned to the bottom.
+  const continuation = leftover.length ? planContinuationPages(ctx, leftover) : [];
+  const pages = continuation.length + 1;
+  const pageLabel = pages > 1 ? `PAGE 1 OF ${pages} - EQUIPMENT CONTINUED ON PAGE 2` : "PAGE 1 OF 1";
   const footerH = measureStack([(sp, sy) => paintRightFooter(sp, sy, ctx, pageLabel)]);
   const verifyH = measureStack([(sp, sy) => paintVerificationBlock(sp, sy, ctx)]);
   let ry = paintEpaPanel(p, stripBottom + 6, ctx);
   ry = ry > stripBottom + 6 ? ry + 7 : stripBottom + 6;
   ry = paintSafetyPanel(p, ry, ctx);
   ry = ry > stripBottom + 6 ? ry + 7 : ry;
-  const bottomBlockTop = CONTENT_BOTTOM - footerH - noticeH - verifyH - 8;
+  const bottomBlockTop = CONTENT_BOTTOM - footerH - verifyH - 8;
   // Verified parts-content and warranty panels render only when their data
   // exists AND the Passport panel keeps its minimum height below them.
   // Families that place parts on the left or warranty in the pricing
@@ -1947,14 +2023,13 @@ function buildAttempt(
     }
   }
   paintPassportPanel(p, ry, ctx, bottomBlockTop - 6 - ry);
-  let by = paintVerificationBlock(p, bottomBlockTop, ctx);
-  by = paintNoticeRow(p, by + 4, ctx);
+  const by = paintVerificationBlock(p, bottomBlockTop, ctx);
   paintRightFooter(p, by, ctx, pageLabel);
 
   const layoutPages: LayoutPage[] = [{ primitives: p.primitives }];
-  if (leftover.length) {
-    layoutPages.push(paintContinuationPage(drawn, ctx, leftover));
-  }
+  continuation.forEach((entries, i) => {
+    layoutPages.push(paintContinuationPage(drawn, ctx, entries, i + 2, pages));
+  });
 
   const model: LayoutModel = {
     width: PAGE_WIDTH,
