@@ -139,7 +139,7 @@ check "no rtgip function is executable by PUBLIC, anon, authenticated or service
    AND NOT EXISTS (SELECT 1 FROM pg_proc q, aclexplode(q.proacl) a WHERE q.pronamespace = n.oid AND a.grantee = 0)"
 check "each duty role can execute exactly its own functions and nothing else" \
   "WITH want(role, fn) AS (VALUES ('rtgip_outbox_writer','outbox_enqueue'),('rtgip_dispatcher','outbox_claim'),('rtgip_dispatcher','outbox_advance'),
-     ('rtgip_dispatcher','outbox_fail'),('rtgip_inbox_receiver','inbox_admit'),('rtgip_operator','purge_expired_nonces')),
+     ('rtgip_dispatcher','outbox_fail'),('rtgip_inbox_receiver','inbox_admit'),('rtgip_operator','purge_expired_nonces'),('rtgip_operator','outbox_redrive')),
    got AS (SELECT r AS role, p.proname AS fn FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace,
      unnest(ARRAY['rtgip_outbox_writer','rtgip_dispatcher','rtgip_inbox_receiver','rtgip_operator']) r
      WHERE n.nspname = 'rtgip' AND has_function_privilege(r, p.oid, 'EXECUTE'))

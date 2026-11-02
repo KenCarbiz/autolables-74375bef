@@ -3,11 +3,11 @@
   "files": {
     "rtgip2/protocol.ts": {
       "origin": "shared core (byte-identical in all three repos)",
-      "sha256": "aa742ce374f35b90cdeb3044e280f0d9c00c30b99c3e2c5e85b81e7ccf920279"
+      "sha256": "ef5c599495dbee5e3c5cb36274c3911d50e31010f1cc03b0174289586ea10502"
     },
     "rtgip2/delivery.ts": {
       "origin": "shared core (byte-identical in all three repos)",
-      "sha256": "6d0100f85f03b99b2621e142cb1de2c9da58c9abe853a4acace542a1928ab9b4"
+      "sha256": "c61646fab77058cfe4f0cfefdb6ea38dae6a5eebf4b1f8a8bbebb22692f8b927"
     },
     "rtgip2/harness.ts": {
       "origin": "shared core (byte-identical in all three repos)",

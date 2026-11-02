@@ -314,6 +314,31 @@ describe("revision ordering", () => {
     expect(direct.outcome).toBe("quarantined");
     expect(w.inbox.projection.statuses["episode-syn-1"]).toEqual(["1:frontline"]);
   });
+  it("quarantines a changed envelope under the same event id even when the payload is identical", async () => {
+    const w = world();
+    const r1 = await ev(1, "frontline");
+    await deliverDirect(w, r1);
+    const changed = { ...r1.envelope, correlation_id: "corr-tampered" };
+    const rx = (envelope: typeof r1.envelope) =>
+      w.inbox.receive(
+        {
+          envelope,
+          body_sha256: "x",
+          key_id: "gw-dev-1",
+          signer: "gateway",
+          connection_id: "c",
+          duplicate_delivery: false,
+        },
+        w.clock.now,
+      );
+    expect(rx(changed)).toMatchObject({
+      outcome: "quarantined",
+      reason: "conflicting_duplicate",
+      committed: false,
+    });
+    expect(rx(r1.envelope)).toMatchObject({ outcome: "duplicate", committed: true });
+    expect(w.inbox.projection.statuses["episode-syn-1"]).toEqual(["1:frontline"]);
+  });
 });
 
 describe("retry, dead letter and reconciliation", () => {

@@ -110,15 +110,24 @@ export async function seedNode(sql: Sql, reg: Registry, app: App): Promise<void>
   });
 }
 
-async function readBody(req: http.IncomingMessage): Promise<string | null> {
+type BodyRead = { ok: true; body: string } | { ok: false; status: number; reason: string };
+const UTF8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+/** Bounded read, then fatal UTF-8 decoding; a byte-order mark is refused, never stripped. */
+async function readBody(req: http.IncomingMessage): Promise<BodyRead> {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const c of req) {
     size += (c as Buffer).length;
-    if (size > MAX_BODY_BYTES + 1) return null;
+    if (size > MAX_BODY_BYTES) return { ok: false, status: 413, reason: "body_too_large" };
     chunks.push(c as Buffer);
   }
-  return Buffer.concat(chunks).toString("utf8");
+  const buf = Buffer.concat(chunks);
+  if (buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf) return { ok: false, status: 400, reason: "bom_not_allowed" };
+  try {
+    return { ok: true, body: UTF8.decode(buf) };
+  } catch {
+    return { ok: false, status: 400, reason: "invalid_utf8" };
+  }
 }
 const headersOf = (req: http.IncomingMessage) =>
   Object.fromEntries(Object.entries(req.headers).map(([k, v]) => [k, Array.isArray(v) ? v.join(",") : v]));
@@ -167,8 +176,9 @@ export const noFaults = (): Faults => ({ crashInEffect: 0, dropReceipts: 0 });
 export function startTarget(app: App, sql: Sql, reg: () => Registry, effect: AdmissionEffect, faults: Faults): Promise<Server> {
   return listen(async (req, res) => {
     if (req.method !== "POST" || req.url !== "/rtgip/v2/inbound") return reply(res, 404, { reason: "not_found" });
-    const body = await readBody(req);
-    if (body === null) return reply(res, 413, { reason: "body_too_large" });
+    const read = await readBody(req);
+    if (!read.ok) return reply(res, read.status, { reason: read.reason });
+    const body = read.body;
     const r = await admitDelivery(headersOf(req), body, {
       app,
       registry: reg(),
@@ -204,12 +214,13 @@ export function startGatewayStandin(sql: Sql, reg: () => Registry, targets: () =
       VALUES (${decision}, ${reason}, ${e?.event_id ?? null}, ${e?.route ?? null}, ${keyId ?? null}, ${status})`;
   return listen(async (req, res) => {
     if (req.method !== "POST" || req.url !== "/rtgip/v2/deliver") return reply(res, 404, { reason: "not_found" });
-    const body = await readBody(req);
+    const read = await readBody(req);
     const h = headersOf(req) as Record<string, string>;
-    if (body === null) {
-      await audit("rejected", "body_too_large", 413, undefined, h["rtgip-key-id"]);
-      return reply(res, 413, { reason: "body_too_large" });
+    if (!read.ok) {
+      await audit("rejected", read.reason, read.status, undefined, h["rtgip-key-id"]);
+      return reply(res, read.status, { reason: read.reason });
     }
+    const body = read.body;
     // Legacy and reserved AutoFilm routes are refused before any verification or storage.
     if (/(^|;)autofilm(;|$)/.test(h["rtgip-scope"] ?? "")) {
       await audit("rejected", "autofilm_route_denied", 403, undefined, h["rtgip-key-id"]);

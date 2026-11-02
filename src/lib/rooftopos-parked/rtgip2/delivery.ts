@@ -529,7 +529,12 @@ export class MemoryInbox<P> {
     const key = inboxKey(e);
     const prior = this.rows.get(key);
     if (prior) {
-      if (prior.payload_sha256 !== e.payload_sha256) {
+      // The whole envelope is immutable under its event id, not just the payload: changed
+      // routing, scope, revision or correlation metadata is a conflict, never a duplicate.
+      if (
+        prior.payload_sha256 !== e.payload_sha256 ||
+        canonicalize(prior.envelope) !== canonicalize(e)
+      ) {
         const qkey = `${key}|conflict|${e.payload_sha256}`;
         if (!this.rows.has(qkey))
           this.rows.set(qkey, this.row(qkey, e, "quarantined", "conflicting_duplicate", now));
