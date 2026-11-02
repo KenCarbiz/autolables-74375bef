@@ -399,8 +399,8 @@ const InventoryCommandCenterV2 = () => {
           </div>
 
           <div className="rounded-xl border border-border bg-card">
-            <div className="hidden lg:grid grid-cols-[minmax(0,2fr)_120px_120px_minmax(0,1.4fr)_130px_90px_168px] gap-3 px-4 h-10 items-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground border-b border-border sticky top-0 z-10 bg-card rounded-t-xl">
-              <span>Vehicle</span><span>Stock / VIN</span><span>Readiness</span><span>Compliance</span><span>Price</span><span>Status</span><span className="text-right">Actions</span>
+            <div className="hidden lg:grid grid-cols-[minmax(0,2fr)_112px_minmax(0,1.6fr)_120px_168px] gap-3 px-4 h-10 items-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground border-b border-border sticky top-0 z-10 bg-card rounded-t-xl">
+              <span>Vehicle</span><span>Readiness</span><span>Compliance</span><span>Price</span><span className="text-right">Actions</span>
             </div>
             {pageRows.length === 0 ? (
               <div className="py-16 text-center text-sm text-muted-foreground">
@@ -409,7 +409,8 @@ const InventoryCommandCenterV2 = () => {
             ) : pageRows.map((r) => {
               const s = signals.get(r.id)!;
               const pct = Math.round(s.score * 100);
-              const ready: { tone: Tone; label: string } = s.published ? { tone: "ok", label: "Published" }
+              const ready: { tone: Tone; label: string } = s.published ? { tone: "ok", label: "Live" }
+                : r.status === "archived" ? { tone: "muted", label: "Archived" }
                 : s.readyToPublish ? { tone: "ok", label: "Ready" }
                 : s.blocked ? { tone: "critical", label: "Blocked" }
                 : { tone: "warn", label: `${pct}% checks` };
@@ -417,18 +418,15 @@ const InventoryCommandCenterV2 = () => {
               const canPrint = s.sticker === "present" && r.condition === "new";
               const delta = rowMarketDelta(r);
               return (
-                <div key={r.id} className="grid grid-cols-[1fr_auto] lg:grid-cols-[minmax(0,2fr)_120px_120px_minmax(0,1.4fr)_130px_90px_168px] gap-x-3 gap-y-1.5 px-4 py-2 lg:min-h-[56px] items-center border-b border-border last:border-0 hover:bg-muted/50">
+                <div key={r.id} className="grid grid-cols-[1fr_auto] lg:grid-cols-[minmax(0,2fr)_112px_minmax(0,1.6fr)_120px_168px] gap-x-3 gap-y-1.5 px-4 py-2 lg:min-h-[56px] items-center border-b border-border last:border-0 hover:bg-muted/50">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-[56px] h-[40px] rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
                       {r.hero_image_url ? <img src={r.hero_image_url} alt="" loading="lazy" className="w-full h-full object-cover" /> : <Car className="w-5 h-5 text-muted-foreground/50" aria-hidden="true" />}
                     </div>
                     <div className="min-w-0">
                       <p className="font-semibold text-[13px] truncate">{name}</p>
-                      <p className="text-[12px] text-muted-foreground truncate">{[r.condition?.toUpperCase(), r.trim].filter(Boolean).join(" · ") || "—"}</p>
+                      <p className="text-[12px] text-muted-foreground truncate">{[r.condition?.toUpperCase(), r.stock_number ? `#${r.stock_number}` : null, r.vin ? `…${r.vin.slice(-6)}` : null].filter(Boolean).join(" · ") || "—"}</p>
                     </div>
-                  </div>
-                  <div className="hidden lg:block text-[12px] font-mono leading-tight text-muted-foreground">
-                    <p>{r.stock_number || "—"}</p><p>…{(r.vin || "").slice(-6)}</p>
                   </div>
                   <div className="hidden lg:block"><Status tone={ready.tone}>{ready.label}</Status></div>
                   <div className="col-span-2 lg:col-span-1 flex flex-wrap gap-x-3 gap-y-1">
@@ -444,7 +442,6 @@ const InventoryCommandCenterV2 = () => {
                       : delta != null ? <p className="text-[12px] text-muted-foreground">{fmt$(Math.abs(delta))} {delta >= 0 ? "below" : "above"} mkt</p>
                       : <p className="text-[12px] text-muted-foreground">Not checked</p>}
                   </div>
-                  <div className="hidden lg:block">{s.published ? <Status tone="ok">Live</Status> : <Status tone="muted">{r.status === "archived" ? "Archived" : "Draft"}</Status>}</div>
                   <div className="row-start-1 col-start-2 lg:row-auto lg:col-auto flex items-center justify-end gap-1">
                     <button onClick={() => window.open(`/v/${(r.vin || r.slug).toUpperCase()}`, "_blank", "noopener")} disabled={!s.published}
                       aria-label={`View Passport for ${name}`} title={s.published ? "View public Passport" : "Not published yet"}
