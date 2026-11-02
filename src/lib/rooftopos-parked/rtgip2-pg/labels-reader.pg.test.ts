@@ -95,6 +95,81 @@ run("AutoLabels source reader over the PR #46 custody tables", () => {
     await expect(publishEpisodeOpened(reader(), scope(t), e2, { opened_at: "2026-11-02T10:00:00Z" }, meta, ["autocurb"])).rejects.toThrow("reappearance_review_unresolved");
   });
 
+  describe("canonical identity across the vehicle lifecycle (root of the predecessor chain)", () => {
+    const VIN2 = "2T1BURHE5JC123457";
+    const t = randomUUID(), mgr = randomUUID();
+    const e = { a: randomUUID(), b: randomUUID(), c: randomUUID(), arch: randomUUID(), orphan: randomUUID(), foreign: randomUUID() };
+    beforeAll(async () => {
+      await sql.begin(async (tx) => {
+        await tx`INSERT INTO public.tenants (id, name, slug) VALUES (${t}, 'Synthetic Chain', ${"rd-ch-" + t})`;
+        await tx`INSERT INTO auth.users (id, email) VALUES (${mgr}, ${"mgr-" + mgr + "@example.test"})`;
+        await tx`INSERT INTO public.tenant_members (tenant_id, user_id, role, accepted_at) VALUES (${t}, ${mgr}, 'owner', now())`;
+        await tx`INSERT INTO public.vehicles (vin) VALUES (${VIN2}) ON CONFLICT DO NOTHING`;
+        // Acquired, sold and delivered; reacquired, sold again; reacquired a second time.
+        await tx`INSERT INTO public.vehicle_instances (id, tenant_id, vin, status, custody_state, opened_reason, disposition) VALUES (${e.a}, ${t}, ${VIN2}, 'disposed', 'delivered', 'initial', 'retail_sale')`;
+        await tx`INSERT INTO public.vehicle_instances (id, tenant_id, vin, status, custody_state, opened_reason, previous_instance_id, disposition) VALUES (${e.b}, ${t}, ${VIN2}, 'disposed', 'delivered', 'reacquisition', ${e.a}, 'retail_sale')`;
+        await tx`INSERT INTO public.vehicle_instances (id, tenant_id, vin, status, custody_state, opened_reason, previous_instance_id) VALUES (${e.c}, ${t}, ${VIN2}, 'active', 'in_stock', 'reacquisition', ${e.b})`;
+      });
+    });
+
+    it("every episode of the vehicle resolves to the same instance id: the first episode", async () => {
+      for (const ep of [e.a, e.b, e.c]) {
+        const { inst } = await readEpisodeHistory(reader(), scope(t), ep);
+        expect([inst.instance_id, inst.episode_id]).toEqual([e.a, ep]);
+      }
+    });
+
+    it("a service visit on a delivered episode attaches to it and never opens a custody episode", async () => {
+      const before = (await sql`SELECT count(*)::int AS c FROM public.vehicle_instances WHERE tenant_id = ${t}`)[0]!.c;
+      await sql`INSERT INTO public.service_visits (tenant_id, vin, instance_id, source_app, source_record_id, intake_verification) VALUES (${t}, ${VIN2}, ${e.b}, 'dms', ${"ro-" + e.b}, 'verified_ro')`;
+      expect((await sql`SELECT count(*)::int AS c FROM public.vehicle_instances WHERE tenant_id = ${t}`)[0]!.c).toBe(before);
+      const { inst, history } = await readEpisodeHistory(reader(), scope(t), e.b);
+      expect([inst.instance_id, inst.episode_state, history.episode.custody_state]).toEqual([e.a, "closed", "delivered"]);
+    });
+
+    it("restore keeps the same episode and instance, only from archived, only by a manager with a reason", async () => {
+      await sql`INSERT INTO public.vehicle_instances (id, tenant_id, vin, status, custody_state, opened_reason) VALUES (${e.arch}, ${t}, ${"3VWFE21C04M000001"}, 'active', 'archived', 'initial')`
+        .catch(async () => {
+          await sql`INSERT INTO public.vehicles (vin) VALUES ('3VWFE21C04M000001') ON CONFLICT DO NOTHING`;
+          await sql`INSERT INTO public.vehicle_instances (id, tenant_id, vin, status, custody_state, opened_reason) VALUES (${e.arch}, ${t}, '3VWFE21C04M000001', 'active', 'archived', 'initial')`;
+        });
+      const review = async (prior: string, vin: string, state: string) =>
+        (await sql`INSERT INTO public.vehicle_reappearance_reviews (tenant_id, vin, prior_instance_id, prior_custody_state, detected_source, status) VALUES (${t}, ${vin}, ${prior}, ${state}, 'feed', 'open') RETURNING id`)[0]!.id as string;
+      const resolve = (id: string, decision: string, who: string | null, reason = "staff confirmed the unit never left") =>
+        sql.begin(async (tx) => {
+          if (who) await tx.unsafe(`SELECT set_config('request.jwt.claims', '{"sub":"${who}","role":"authenticated"}', true)`);
+          return (await tx`SELECT public.vehicle_history_resolve_reappearance(${id}, ${decision}, ${reason}) AS r`)[0]!.r as { instance_id: string };
+        });
+      const delivered = await review(e.c, VIN2, "in_stock");
+      await expect(resolve(delivered, "restore_episode", mgr)).rejects.toThrow(/restore_requires_archived_episode/);
+      const r = await review(e.arch, "3VWFE21C04M000001", "archived");
+      await expect(resolve(r, "restore_episode", randomUUID())).rejects.toThrow(/not_authorized/);
+      await expect(resolve(r, "restore_episode", mgr, "x")).rejects.toThrow(/reason_required/);
+      expect((await resolve(r, "restore_episode", mgr)).instance_id).toBe(e.arch);
+      const { inst } = await readEpisodeHistory(reader(), scope(t), e.arch);
+      expect([inst.instance_id, inst.episode_id]).toEqual([e.arch, e.arch]);
+      const ms = await sql`SELECT milestone FROM public.vehicle_custody_milestones WHERE instance_id = ${e.arch}`;
+      expect(ms.map((m) => m.milestone)).toContain("restored");
+    });
+
+    it("a reacquisition with no predecessor link, or a link outside the tenant and VIN, is refused instead of re-rooted", async () => {
+      const other = randomUUID();
+      await sql.begin(async (tx) => {
+        await tx`INSERT INTO public.tenants (id, name, slug) VALUES (${other}, 'Synthetic Foreign', ${"rd-fo-" + other})`;
+        await tx`INSERT INTO public.vehicle_instances (id, tenant_id, vin, status, custody_state, opened_reason) VALUES (${e.foreign}, ${other}, ${VIN2}, 'disposed', 'delivered', 'initial')`;
+        await tx`INSERT INTO public.vehicle_instances (id, tenant_id, vin, status, custody_state, opened_reason, previous_instance_id) VALUES (${e.orphan}, ${t}, ${VIN2}, 'disposed', 'archived', 'reacquisition', ${e.foreign})`;
+      });
+      await expect(readEpisodeHistory(reader(), scope(t), e.orphan)).rejects.toThrow(/instance_id/);
+      // A broken link anywhere in the VIN's history fails the whole read closed.
+      await expect(readEpisodeHistory(reader(), scope(t), e.c)).rejects.toThrow(/instance_id/);
+      const lone = randomUUID(), VIN3 = "5YJ3E1EA7KF000003";
+      await sql`INSERT INTO public.vehicles (vin) VALUES (${VIN3}) ON CONFLICT DO NOTHING`;
+      await sql`INSERT INTO public.vehicle_instances (tenant_id, vin, status, custody_state, opened_reason) VALUES (${t}, ${VIN3}, 'disposed', 'delivered', 'initial')`;
+      await sql`INSERT INTO public.vehicle_instances (id, tenant_id, vin, status, custody_state, opened_reason) VALUES (${lone}, ${t}, ${VIN3}, 'active', 'in_stock', 'reacquisition')`;
+      await expect(publishEpisodeOpened(reader(), scope(t), lone, { opened_at: "2026-11-02T10:00:00Z" }, meta, ["autocurb"])).rejects.toThrow("reacquisition_without_predecessor");
+    });
+  });
+
   it("only the source reader role can execute the readers", async () => {
     for (const role of ["authenticated", "anon", "service_role", "rtgip_inbox_receiver"])
       await expect(readEpisodeHistory(reader(role), scope(), ids.ep2)).rejects.toThrow(/permission denied/);

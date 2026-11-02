@@ -155,13 +155,16 @@ export function acquisitionMilestone(scope: CurbServerScope, r: CurbSourceRecord
 
 /**
  * Purchase complete with custody transfer. offer_accepted, deal_finalized, title verification
- * and check request are never enough. The trusted ledger must show the move to
+ * and check request are never enough. Refs are either both the AutoLabels ids linked through
+ * rtgip_link_acquisition, or both provisional acq: refs, which AutoLabels only ever turns into a
+ * reappearance review, never a custody change. The trusted ledger must show the move to
  * purchase_complete came directly from check_request_submitted, accounting must have
  * processed the check request, and ownership and condition evidence must exist.
  */
 export function purchaseCompleted(scope: CurbServerScope, r: CurbSourceRecords, meta: CurbFactMeta, targets: readonly AppId[]) {
   const s = r.submission;
   if (s.progress_status !== "purchase_complete") throw new CurbProducerError("status_not_purchase_complete");
+  if (r.instance_ref.startsWith("acq:") !== r.episode_ref.startsWith("acq:")) throw new CurbProducerError("identity_partially_linked");
   const rows = trusted(scope, r, "progress_status");
   const done = permitted(current(rows, "purchase_complete"), APPROVER_ROLES);
   if (done.from_value !== "check_request_submitted") throw new CurbProducerError("purchase_skipped_check_request");

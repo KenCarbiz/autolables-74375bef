@@ -39,7 +39,7 @@
     },
     "rtgip2-autocurb/producer.ts": {
       "origin": "KenCarbiz/hartecash-2edb8fec:src/lib/rooftopos/rtgip2-autocurb/producer.ts",
-      "sha256": "dc6587e901b5b358f7f7486035b68c6c8b4fb786ff86d4fb9d81bf5cf132d048"
+      "sha256": "baa260f7dde7b8554b05910cea0551389aeed36d17efec2f31718221550bbd68"
     },
     "rtgip2-autocurb/consumer.ts": {
       "origin": "KenCarbiz/hartecash-2edb8fec:src/lib/rooftopos/rtgip2-autocurb/consumer.ts",

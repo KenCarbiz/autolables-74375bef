@@ -77,3 +77,24 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - name: TypeScript admission boundary + inbox_admit, Gateway contract cases, PR #46 readers (no Supabase connection)
         run: bash supabase/tests/rtgip/pg_integration.sh
+
+  rtgip_local_staging:
+    name: rtgip/2 local four-node staging (four throwaway clusters, HTTP, generated keys; Gateway is a stand-in)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: Six directions over HTTP with committed transactions, failure, replay and attack cases
+        run: RTGIP_STG_REPORT=staging-report.json bash supabase/tests/rtgip/pg_staging.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rtgip-local-staging-report
+          path: staging-report.json
+          if-no-files-found: ignore

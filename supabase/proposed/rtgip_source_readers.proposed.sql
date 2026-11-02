@@ -33,7 +33,9 @@ LANGUAGE sql STABLE SET search_path = '' AS $$
         SELECT p.id, p.previous_instance_id, c.depth + 1 FROM chain c
         JOIN public.vehicle_instances p ON p.id = c.prev AND p.tenant_id = v.tenant_id AND p.vin = v.vin
         WHERE c.depth < 64)
-      SELECT id::text FROM chain ORDER BY depth DESC LIMIT 1),
+      -- A chain that ends on a link outside this tenant and VIN (or deeper than 64) has no root:
+      -- NULL, which the server reader refuses, instead of silently re-rooting the vehicle here.
+      SELECT CASE WHEN prev IS NULL THEN id::text END FROM chain ORDER BY depth DESC LIMIT 1),
     'opened_reason', v.opened_reason, 'previous_episode_id', v.previous_instance_id::text,
     'custody_state', v.custody_state,
     'status', CASE WHEN v.status = 'active' THEN 'active' ELSE 'disposed' END)
