@@ -706,12 +706,12 @@ type LooseEnvelope = Loose<(typeof ENVELOPE_KEYS)[number]>;
 
 // PostgreSQL jsonb cannot store U+0000 or a lone surrogate, so an envelope carrying one would
 // fail at the inbox insert and retry into a dead letter instead of being refused at the edge.
-const UNSTORABLE = /\u0000|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+const unstorable = (s: string) => s.includes("\u0000") || LONE_SURROGATE.test(s);
 function hasUnstorableText(v: unknown): boolean {
-  if (typeof v === "string") return UNSTORABLE.test(v);
+  if (typeof v === "string") return unstorable(v);
   if (Array.isArray(v)) return v.some(hasUnstorableText);
-  if (isObj(v))
-    return Object.entries(v).some(([k, x]) => UNSTORABLE.test(k) || hasUnstorableText(x));
+  if (isObj(v)) return Object.entries(v).some(([k, x]) => unstorable(k) || hasUnstorableText(x));
   return false;
 }
 
