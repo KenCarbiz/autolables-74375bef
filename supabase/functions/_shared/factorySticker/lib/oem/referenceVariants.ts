@@ -283,10 +283,13 @@ export function normalizeDrivetrain(raw: string | null | undefined): Drivetrain 
 export function normalizePowertrain(raw: string | null | undefined): Powertrain | null {
   const t = normalizeToken(raw);
   if (!t) return null;
-  if (/PLUGIN|PHEV/.test(t)) return "PLUG_IN_HYBRID";
+  // FuelEconomy.gov names plug-ins "Premium and Electricity" / "Regular Gas
+  // and Electricity" and gasoline grades "Premium" / "Regular" / "Midgrade".
+  if (/PLUGIN|PHEV/.test(t) || /(GAS|GASOLINE|PREMIUM|REGULAR|MIDGRADE)ANDELECTRICITY$/.test(t)) return "PLUG_IN_HYBRID";
   if (/E85|FLEXFUEL|FFV/.test(t)) return "FLEX_FUEL_E85";
   if (/HYBRID|HEV/.test(t)) return "HYBRID";
   if (/^(GAS|GASOLINE|REGULARUNLEADED|PREMIUMUNLEADED|UNLEADED|PETROL)/.test(t)) return "GASOLINE";
+  if (/^(PREMIUM|REGULAR|MIDGRADE)(GAS|GASOLINE|UNLEADED)?$/.test(t)) return "GASOLINE";
   return null;
 }
 
