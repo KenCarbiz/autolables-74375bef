@@ -135,10 +135,16 @@ export default function InventoryFeedView() {
               <h2 className="text-[16px] leading-6 font-semibold text-adm-ink">Files.com inventory network</h2>
               <p className="mt-1 text-[13px] leading-5 text-adm-muted">Manage store assignments, feed mapping and import runs. The MarketCheck sync details are below.</p>
             </div>
+            <div className="flex flex-wrap gap-2">
             <AdminLinkButton to="/admin/integrations/inventory-network" variant="outline">
               <Database className="h-4 w-4" aria-hidden="true" />
               Open inventory network
             </AdminLinkButton>
+            <AdminLinkButton to="/admin/integrations/marketcheck/launch-control" variant="outline">
+              <Database className="w-5 h-5" aria-hidden="true" />
+              MarketCheck Launch Control
+            </AdminLinkButton>
+            </div>
           </div>
         </AdminCard>
       )}
