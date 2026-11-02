@@ -115,6 +115,13 @@ ALTER TABLE public.vehicle_custody_milestones DROP CONSTRAINT IF EXISTS vehicle_
 ALTER TABLE public.vehicle_custody_milestones ADD CONSTRAINT vehicle_custody_milestones_correction_ref_check CHECK (
   milestone NOT IN ('sale_voided','delivery_corrected','post_delivery_unwind')
   OR (corrects_id IS NOT NULL AND reason IS NOT NULL AND length(trim(reason)) >= 5));
+-- The same rule at the table level, so no writer (even one bypassing the RPC) can store a
+-- void of a delivered sale or a delivery correction outside 'delivered'.
+ALTER TABLE public.vehicle_custody_milestones DROP CONSTRAINT IF EXISTS vehicle_custody_milestones_terminal_check;
+ALTER TABLE public.vehicle_custody_milestones ADD CONSTRAINT vehicle_custody_milestones_terminal_check CHECK (
+  (milestone <> 'sale_voided' OR (from_state IN ('sold','awaiting_delivery') AND to_state = 'in_stock'))
+  AND (milestone NOT IN ('delivery_corrected','post_delivery_unwind') OR (from_state = 'delivered' AND to_state = 'delivered'))
+  AND (from_state NOT IN ('delivered','transferred_out') OR to_state = from_state));
 ALTER TABLE public.vehicle_custody_milestones DROP CONSTRAINT IF EXISTS vehicle_custody_milestones_revision_check;
 ALTER TABLE public.vehicle_custody_milestones ADD CONSTRAINT vehicle_custody_milestones_revision_check CHECK (
   source_revision IS NULL OR (source_revision >= 1 AND source_ref IS NOT NULL));
@@ -632,6 +639,9 @@ DECLARE
   v_last_at timestamptz;
   c record;
 BEGIN
+  -- Exclusive partner of the shared lock the rtgip source readers take, so a fact read for
+  -- publication and its outbox row never interleave with a custody change.
+  PERFORM pg_advisory_xact_lock(hashtextextended('vehicle_history.episode:' || p_instance_id::text, 0));
   SELECT * INTO i FROM public.vehicle_instances WHERE id = p_instance_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'unknown_instance'; END IF;
   IF NOT (public.vehicle_history_is_manager(i.tenant_id) OR v_service) THEN

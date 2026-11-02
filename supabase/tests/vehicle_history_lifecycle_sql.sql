@@ -76,6 +76,9 @@ BEGIN
     'terminal_custody');
   PERFORM pg_temp.expect(format($q$UPDATE public.vehicle_instances SET disposition = NULL WHERE id = %L$q$, e), 'custody_write_requires_rpc');
   PERFORM pg_temp.expect(format($q$UPDATE public.vehicle_instances SET vin = '2HGFC2F59MH000002' WHERE id = %L$q$, e), 'episode_identity_immutable');
+  PERFORM pg_temp.expect(format($q$INSERT INTO public.vehicle_custody_milestones (tenant_id, instance_id, vin, milestone, from_state, to_state,
+    occurred_at, source, corrects_id, reason) SELECT tenant_id, id, vin, 'sale_voided', 'delivered', 'in_stock', now(), 'staff', %L, 'direct late void'
+    FROM public.vehicle_instances WHERE id = %L$q$, (SELECT sold1 FROM _e), e), 'new row for relation "vehicle_custody_milestones" violates check constraint');
   PERFORM pg_temp.as_manager();
   rv := public.vehicle_history_flag_reappearance((SELECT tenant FROM _lc), NULL, '1FTFW1E53MFA00001', NULL, 'feed_snapshot', 'snap-lc');
   PERFORM pg_temp.expect(format($q$SELECT public.vehicle_history_resolve_reappearance(%L, 'restore_episode', 'try to reuse old episode')$q$, rv),
