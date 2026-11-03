@@ -166,3 +166,38 @@ describe("GW-F6: the handler answers permanent refusals 4xx and keeps 503 for un
     expect(await call()).toEqual({ status: 503, error: "admission_not_confirmed" });
   });
 });
+
+describe("GW-F7: a nonce reused over different bytes is a permanent 401", async () => {
+  const { candidateStore } = await import("./rtgip2/store.server");
+  it("store turns the SQL nonce conflict into nonce_reused", async () => {
+    const store = candidateStore({ call: async () => { throw new Error("nonce conflict"); } }, async () => "gw-key");
+    const e = await envelopeFor("roof-a");
+    await expect(
+      store.admit({ envelope: e, connection_id: "conn-a", canonical_body: "{}", key_id: "k", nonce: "n", timestamp: 1 } as never),
+    ).rejects.toThrow("nonce_reused");
+  });
+  it("handler answers nonce_reused with 401, not a retryable 503", async () => {
+    const { createRtgip2Handler } = await import("./rtgip2/handler.server");
+    const { signEnvelope } = await import("./rtgip2/core");
+    const t = Math.floor(Date.now() / 1000);
+    const src = { ...key("autolabels", ["conn-a"]), not_before: t - 100, not_after: t + 100 };
+    const gw = { ...key("gateway", ["conn-a"]), not_before: t - 100, not_after: t + 100 };
+    const { envelope, body } = await sealEnvelope({ ...(await envelopeFor("roof-a")), event_id: "" });
+    const handler = createRtgip2Handler(
+      {
+        registry: async () => ({
+          registry: { keys: [src, gw], connections: [connection("conn-a", ["roof-a"])] },
+          mappings: [{ tenant_id: "synthetic-tenant", rooftop_id: "roof-a", source_app: "autolabels", source_store_id: "s", instance_id: "synthetic-instance", episode_id: "synthetic-episode", vin: "1HGCM82633A004352", connection_id: "conn-a", status: "active", reviewed_ref: "r" }],
+        }),
+        now: () => t,
+        admit: async () => { throw new Error("nonce_reused"); },
+        resolveSigningKey: async () => gw,
+        persistSignedEvidence: async () => {},
+      },
+      true,
+    );
+    const headers = await signEnvelope(body, envelope, src, t, "f7_nonce_000000001");
+    const res = await handler(new Request("http://localhost/f7", { method: "POST", headers: { ...headers, "content-type": "application/json" }, body }));
+    expect([res.status, ((await res.json()) as { error: string }).error]).toEqual([401, "nonce_reused"]);
+  });
+});

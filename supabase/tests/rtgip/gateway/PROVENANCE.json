@@ -697,6 +697,20 @@
           "sha256_after": "ea37972002e75716c1c230b98c4cab0d99cd1d0841d262f31a4b068466ddab61"
         }
       ]
+    },
+    {
+      "id": "GW-F7",
+      "summary": "A source nonce reused over different bytes (gw_r2_admit 'nonce conflict') is a permanent 401 nonce_reused, matching the shared core's reason, instead of a retryable 503",
+      "files": [
+        {
+          "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/handler.server.ts",
+          "sha256_after": "d2b88b0cef9dfa6dcd6b6b827f0f3e9baf8471379e960b403c5b2bd5ac402a4f"
+        },
+        {
+          "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/store.server.ts",
+          "sha256_after": "1493b39afeeae51915b9d8feb3f1a7bff8a101c76c8b67b8c0b290568f759052"
+        }
+      ]
     }
   ]
 }

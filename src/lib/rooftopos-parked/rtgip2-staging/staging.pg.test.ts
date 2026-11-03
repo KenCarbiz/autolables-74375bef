@@ -862,11 +862,9 @@ run(`${RESULT_LABEL}: four real app nodes, registry-driven, over HTTP`, () => {
     expect((await postRaw(await sigFor({ body: ok.body, scope, key: al, nonce: reused }), ok.body)).status).toBe(200);
     const other = await fresh("autolabels", "autocurb");
     const nr = await postRaw(await sigFor({ body: other.body, scope: (await signAs(other, "autolabels"))["rtgip-scope"]!, key: al, nonce: reused }), other.body);
-    // Gateway finding GW-F7: the candidate's gw_r2_admit raises "nonce conflict" and its handler answers 503
-    // admission_not_confirmed (retryable-looking) instead of a 4xx refusal. The safety property is asserted
-    // either way: nothing is admitted. The known status is pinned so a fix is noticed.
+    // GW-F7 (fixed in the vendored candidate): a nonce reused over other bytes is a permanent 401 in both modes.
     expect(await admissionConns(other.envelope.event_id)).toHaveLength(0);
-    expect([nr.status, nr.reason]).toEqual(CAND ? [503, "admission_not_confirmed"] : [401, "nonce_reused"]);
+    expect([nr.status, nr.reason]).toEqual([401, "nonce_reused"]);
     out.nonce_collision = `${nr.status} ${nr.reason}`;
     // A timestamp 299 s old is still inside the window.
     const edge = await fresh("autolabels", "autocurb");

@@ -89,6 +89,7 @@ export function createRtgip2Handler(
         const reason = err instanceof Error ? err.message : "";
         if (reason === "admission_conflict") return deny(409, reason);
         if (reason === "admission_forbidden") return deny(403, reason);
+        if (reason === "nonce_reused") return deny(401, reason);
         throw err;
       }
       if (

@@ -26,6 +26,8 @@ export function candidateStore(
         const m = err instanceof Error ? err.message : "";
         if (m === "key not authorized" || m === "mapping or connection not authorized")
           throw new Error("admission_forbidden");
+        // GW-F7: the nonce was already used over different bytes; a replay is a permanent refusal.
+        if (m === "nonce conflict") throw new Error("nonce_reused");
         throw err;
       });
       if (!result || typeof result !== "object") throw new Error("invalid_admission_response");
