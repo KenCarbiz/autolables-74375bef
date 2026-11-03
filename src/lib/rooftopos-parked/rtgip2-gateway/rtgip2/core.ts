@@ -943,9 +943,13 @@ export function authorize(e: EnvelopeV2, reg: Registry): AuthzResult {
       c.source_app === e.source_app && c.target_app === e.target_app && c.tenant_id === e.tenant_id,
   );
   if (!conns.length) return { ok: false, reason: "no_connection_for_tenant" };
-  const c = conns.find((x) => x.status === "active");
-  if (!c) return { ok: false, reason: "connection_revoked" };
-  if (!c.rooftop_ids.includes(e.rooftop_id)) return { ok: false, reason: "rooftop_not_granted" };
+  const live = conns.filter((x) => x.status === "active");
+  if (!live.length) return { ok: false, reason: "connection_revoked" };
+  // The registry exports one connection per route, tenant and rooftop; exactly one may grant it.
+  const granting = live.filter((x) => x.rooftop_ids.includes(e.rooftop_id));
+  if (!granting.length) return { ok: false, reason: "rooftop_not_granted" };
+  if (granting.length > 1) return { ok: false, reason: "ambiguous_connection" };
+  const c = granting[0]!;
   if (!c.event_types.includes(e.event_type)) return { ok: false, reason: "event_not_granted" };
   if (!c.purposes.includes(e.purpose)) return { ok: false, reason: "purpose_not_granted" };
   if (!c.producer_enabled) return { ok: false, reason: "producer_disabled" };

@@ -641,5 +641,26 @@
       "bytes": 11949
     }
   ],
-  "amendments": []
+  "amendments": [
+    {
+      "id": "GW-F2",
+      "summary": "authorize() selects the one active connection granting the envelope's rooftop and refuses an ambiguous one; identical to the shared core protocol.ts at f2c40e36",
+      "files": [
+        {
+          "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/core.ts",
+          "sha256_after": "219afd00abcf2251047de2a846151b7b28890939795fd4bb4cc2224fd3e23cad"
+        }
+      ]
+    },
+    {
+      "id": "GW-F3",
+      "summary": "verifyReceiptV2 requires the connection authorize() selected to be the receipt's expected connection",
+      "files": [
+        {
+          "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/receipt.ts",
+          "sha256_after": "c3498d6aadd02bfcec46a77fa4c92a10096d639e5dc06d6f2ead42400c8bb90e"
+        }
+      ]
+    }
+  ]
 }

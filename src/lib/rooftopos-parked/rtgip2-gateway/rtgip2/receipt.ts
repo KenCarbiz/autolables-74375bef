@@ -184,7 +184,9 @@ export async function verifyReceiptV2(
   ] as const) {
     if (r[k] !== expected[k]) throw new Error(`ack_wrong_${k}`);
   }
-  if (!authorize(e, registry).ok) throw new Error("ack_connection_not_authorized");
+  const az = authorize(e, registry);
+  if (!az.ok || az.connection.connection_id !== expect.connection_id)
+    throw new Error("ack_connection_not_authorized");
   const key = registry.keys.find((k) => k.key_id === r.key_id);
   if (
     !key ||
