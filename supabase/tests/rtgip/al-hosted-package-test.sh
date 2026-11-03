@@ -117,6 +117,17 @@ for s in "${STEPS[@]}"; do
   done
   DIG[$s]="$(fp al_h | jq_ "d['components']['$s']['digest']")"
 done
+H="$PKG/H_sandbox_exec.sql"
+SBX() { psqlq "$1" -c "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='r' AND has_table_privilege('sandbox_exec', c.oid, 'INSERT') AND c.relname ~ '^(vehicles|vehicle_.*|integration_.*|inspection_evidence|repair_item.*|acquisition_records|service_visits)$'"; }
+check "H: before H, sandbox_exec can insert into the 22 package public tables (hosted default reproduced)" "$(SBX al_h)" "22"
+check "H: the H postcondition fails before H" "$(psqlq al_h -f "$PKG/checks/H_post.sql")" "f"
+install al_h "$H"
+check "H: after H, sandbox_exec can write no package public table" "$(SBX al_h)" "0"
+check "H: the H postcondition passes" "$(psqlq al_h -f "$PKG/checks/H_post.sql")" "t"
+check "H: sandbox_exec keeps SELECT only (as Gateway GW-F11)" "$(psqlq al_h -c "SELECT has_table_privilege('sandbox_exec','public.integration_inbox','SELECT')")" "t"
+check "H: H changes no component digest" "$(digests al_h)" "$(python3 -c "import json,sys; print(json.dumps(json.loads(sys.argv[1]), sort_keys=True))" "$(for k in "${!DIG[@]}"; do echo "$k ${DIG[$k]}"; done | python3 -c "import json,sys; print(json.dumps(dict(l.split() for l in sys.stdin)))")")"
+install al_h "$H"
+check "H: re-applying H is a no-op" "$(SBX al_h)" "0"
 F1="$(fp al_h)"
 COMP="$(digests al_h)"; A1="$(acl al_h)"
 check "every component fully present" "$(echo "$F1" | jq_ "[(k, v['present'], v['total']) for k, v in sorted(d['components'].items())] == [(k, v['total'], v['total']) for k, v in sorted(d['components'].items())]")" "True"
@@ -189,6 +200,7 @@ check "re-applied after disable: same grants" "$(acl al_h)" "$A1"
 check "re-applied after disable: the consumer can apply again" "$(can al_h rtgip_labels_consumer 'rtgip_fx.labels_apply(jsonb)')" "t"
 check "re-applied after disable: rows are intact" "$(psqlq al_h -c "SELECT (SELECT count(*) FROM rtgip_src.rooftop_stores) || '/' || (SELECT count(*) FROM public.tenants) || '/' || (SELECT count(*) FROM rtgip.audit_log) || '/' || (SELECT count(*) FROM public.vehicles)")" "$ROWS_BEFORE"
 for s in "${STEPS[@]}"; do check "plan: $s post passes after the round trip" "$(rc plan al_h step "$s" post)" "0"; done
+check "H: sandbox_exec still writes no package public table after disable and re-apply" "$(psqlq al_h -f "$PKG/checks/H_post.sql")" "t"
 
 # 9. Expected values and checksums the hosted operator compares against.
 EXP="$PKG/expected-fingerprint.json"
@@ -209,6 +221,7 @@ SUMS="$(cd "$ROOT" && sha256sum supabase/proposed/20261030000000_rooftopos_spine
   supabase/hosted/autolabels/checks/R_pre.sql supabase/hosted/autolabels/checks/R_post.sql supabase/hosted/autolabels/checks/E_pre.sql supabase/hosted/autolabels/checks/E_post.sql \
   supabase/hosted/autolabels/disable/S1_disable.sql supabase/hosted/autolabels/disable/S2_disable.sql supabase/hosted/autolabels/disable/S3_disable.sql \
   supabase/hosted/autolabels/disable/D_disable.sql supabase/hosted/autolabels/disable/R_disable.sql supabase/hosted/autolabels/disable/E_disable.sql \
+  supabase/hosted/autolabels/H_sandbox_exec.sql supabase/hosted/autolabels/checks/H_post.sql \
   supabase/hosted/autolabels/apply-plan.sh supabase/tests/rtgip/al-hosted-seed.sql supabase/tests/rtgip/al-hosted-default-privileges.sql)"
 if [ "$WRITE" = 1 ]; then
   printf '%s\n' "$NEW" > "$EXP"; printf '%s\n' "$SUMS" > "$PKG/SHA256SUMS"; echo "wrote $EXP and $PKG/SHA256SUMS"
