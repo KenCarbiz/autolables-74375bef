@@ -43,10 +43,13 @@ export type LayoutFont = "heading" | "body" | "numeric" | "bold";
 export type LayoutAlign = "left" | "right" | "center";
 export type LayoutMode = "STANDARD" | "DENSE" | "REVIEW_REQUIRED";
 
+/** "list" prints one item per line; "run_in" prints each category as a comma-joined paragraph. */
+export type EquipmentMode = "list" | "run_in";
+
 export type OnePageFitReason = "one_page_fit_failed";
 
 export type LayoutFit =
-  | { ok: true; columns: number; equipmentFontPt: number }
+  | { ok: true; columns: number; equipmentFontPt: number; equipmentMode?: EquipmentMode }
   | {
     ok: false;
     reason: OnePageFitReason;
@@ -55,9 +58,12 @@ export type LayoutFit =
     detail: string;
     equipmentFontPt: number;
     columns: number;
+    equipmentMode?: EquipmentMode;
   };
 
-export const fitOk = (columns: number, equipmentFontPt: number): LayoutFit => ({ ok: true, columns, equipmentFontPt });
+export const fitOk = (columns: number, equipmentFontPt: number, equipmentMode: EquipmentMode = "list"): LayoutFit => ({
+  ok: true, columns, equipmentFontPt, equipmentMode,
+});
 
 export interface TextPrimitive {
   kind: "text";
@@ -626,7 +632,24 @@ function leaderRow(
   return Math.max(0, lines.length - 1) * step;
 }
 
+/** One drawn piece of a run-in paragraph; an item is its own token (or fragments of it). */
+export interface RunToken {
+  text: string;
+  bold: boolean;
+  x: number;
+  /** Set on the token that completes a source item, so it is recorded exactly once. */
+  item?: string;
+  /** A comma follows this token. */
+  comma: boolean;
+}
+
+export interface RunLine {
+  tokens: RunToken[];
+}
+
 interface FlowEntry {
+  /** Run-in paragraph: bold label and items joined inline, pre-wrapped to the column. */
+  paragraph?: RunLine[];
   heading?: string;
   /** Whole sanitized item text, for the printed-equipment record. */
   item?: string;
@@ -644,6 +667,8 @@ interface BuildContext {
   compactPackages: boolean;
   /** Standard-equipment column count for this attempt. */
   columns: number;
+  /** Equipment printed as run-in category paragraphs instead of one item per line. */
+  runIn?: boolean;
 }
 
 // ── Reproduction banner: first thing on every page ───────────────────
@@ -956,6 +981,13 @@ function equipmentEntries(ctx: BuildContext, colWidth: number): FlowEntry[] {
       .map((item) => sanitize(item))
       .filter((item) => item && !seen.has(item.toUpperCase()) && seen.add(item.toUpperCase()));
     if (!items.length) continue;
+    if (ctx.runIn) {
+      entries.push({
+        paragraph: runInLines(`${CATEGORY_LABELS[group.category].toUpperCase()}:`, items, density.item, colWidth),
+        lines: [],
+      });
+      continue;
+    }
     entries.push({ heading: CATEGORY_LABELS[group.category].toUpperCase(), lines: [] });
     for (const item of items) {
       const lines = wrapText(item, "body", density.item, colWidth - 7);
@@ -1050,7 +1082,7 @@ function paintStandardEquipment(
   let overflowPt = 0;
   if (leftover.length) {
     const all = flowColumns(new Painter(null), entries, 0, 0, LW, 1e6, columns, ctx).usedHeight;
-    const lines = leftover.reduce((n, e) => n + e.lines.length, 0);
+    const lines = leftover.reduce((n, e) => n + (e.paragraph ? e.paragraph.length : e.lines.length), 0);
     overflowPt = Math.max(1, Math.min(all, lines * density.itemLh / columns));
   }
 
@@ -1850,6 +1882,107 @@ function paintRightFooter(p: Painter, y: number, ctx: BuildContext, pageLabel: s
 
 // ── Column flow ───────────────────────────────────────────────────────
 
+
+/**
+ * Lays one category out as a run-in paragraph: the bold label, then every
+ * item verbatim joined by ", ". Items are never merged or reworded; an item
+ * that reaches the column edge continues on the next line.
+ */
+export function runInLines(label: string, items: string[], size: number, width: number): RunLine[] {
+  const space = measureText(" ", "body", size);
+  const comma = measureText(",", "body", size);
+  const lines: RunLine[] = [{ tokens: [] }];
+  let x = 0;
+  const cur = (): RunLine => lines[lines.length - 1];
+  const newLine = (): void => { lines.push({ tokens: [] }); x = 0; };
+  // Words flow from one line to the next; each line's share of an item is
+  // its own token, and the token that ends the item carries the item itself.
+  const flow = (text: string, bold: boolean, item: string | undefined, hasComma: boolean): void => {
+    const font = bold ? "bold" : "body";
+    const words = text.split(" ");
+    let frag = "";
+    let fragX = x;
+    const flush = (last: boolean): void => {
+      if (!frag) return;
+      cur().tokens.push({ text: frag, bold, x: fragX, item: last ? item : undefined, comma: last && hasComma });
+      x = fragX + measureText(frag, font, size) + (last && hasComma ? comma : 0) + space;
+      frag = "";
+    };
+    words.forEach((w, i) => {
+      const lastWord = i === words.length - 1;
+      const tail = lastWord && hasComma ? comma : 0;
+      const candidate = frag ? `${frag} ${w}` : w;
+      const startX = frag ? fragX : x;
+      if (startX + measureText(candidate, font, size) + tail > width && (frag || cur().tokens.length)) {
+        flush(false);
+        newLine();
+        frag = w;
+        fragX = 0;
+      } else {
+        if (!frag) fragX = x;
+        frag = candidate;
+      }
+    });
+    flush(true);
+  };
+  flow(label, true, undefined, false);
+  items.forEach((item, i) => flow(item, false, item, i < items.length - 1));
+  return lines;
+}
+
+function flowRunIn(
+  p: Painter,
+  entries: FlowEntry[],
+  x0: number,
+  y0: number,
+  totalWidth: number,
+  height: number,
+  columns: number,
+  ctx: BuildContext,
+): { leftover: FlowEntry[]; usedHeight: number; placedItems: string[] } {
+  const { density } = ctx;
+  const gap = EQUIPMENT_COLUMN_GAP;
+  const colW = (totalWidth - gap * (columns - 1)) / columns;
+  const placedItems: string[] = [];
+  const PARA_GAP = 2.5;
+  let col = 0;
+  let cy = y0;
+  let usedHeight = 0;
+  let idx = 0;
+  let lineIdx = 0;
+  while (idx < entries.length) {
+    const lines = entries[idx].paragraph ?? [];
+    if (lineIdx >= lines.length) { idx++; lineIdx = 0; continue; }
+    const gapBefore = cy === y0 ? 0 : (lineIdx === 0 ? PARA_GAP : 0);
+    const remaining = lines.length - lineIdx;
+    const keep = lineIdx === 0 ? Math.min(2, remaining) : 1;
+    if (cy + gapBefore + keep * density.itemLh > y0 + height) {
+      col++;
+      cy = y0;
+      if (col >= columns) break;
+      continue;
+    }
+    cy += gapBefore + density.itemLh;
+    const cx = x0 + col * (colW + gap);
+    for (const t of lines[lineIdx].tokens) {
+      p.text(t.text, cx + t.x, cy, density.item, t.bold ? "bold" : "body", BLACK);
+      if (t.comma) {
+        p.text(",", cx + t.x + measureText(t.text, "body", density.item), cy, density.item, "body", BLACK);
+      }
+      if (t.item) placedItems.push(t.item);
+    }
+    usedHeight = Math.max(usedHeight, cy - y0);
+    lineIdx++;
+  }
+  const leftover: FlowEntry[] = [];
+  if (idx < entries.length) {
+    const rest = entries[idx].paragraph ?? [];
+    if (lineIdx < rest.length) leftover.push({ ...entries[idx], paragraph: rest.slice(lineIdx) });
+    for (let i = idx + 1; i < entries.length; i++) leftover.push(entries[i]);
+  }
+  return { leftover, usedHeight, placedItems };
+}
+
 function flowColumns(
   p: Painter,
   entries: FlowEntry[],
@@ -1860,6 +1993,7 @@ function flowColumns(
   columns: number,
   ctx: BuildContext,
 ): { leftover: FlowEntry[]; usedHeight: number; placedItems: string[] } {
+  if (ctx.runIn) return flowRunIn(p, entries, x0, y0, totalWidth, height, columns, ctx);
   const { density } = ctx;
   const gap = EQUIPMENT_COLUMN_GAP;
   const placedItems: string[] = [];
@@ -2004,8 +2138,9 @@ function buildAttempt(
   columns: number,
   compactPackages: boolean,
   force = false,
+  runIn = false,
 ): AttemptResult | null {
-  const ctx: BuildContext = { input, theme, density, compactPackages, columns };
+  const ctx: BuildContext = { input, theme, density, compactPackages, columns, runIn };
   const drawn: string[] = [];
   const p = new Painter(drawn);
 
@@ -2107,7 +2242,7 @@ function buildAttempt(
       body: theme.typography.bodyFont,
       numeric: theme.typography.numericFont,
     },
-    fit: fitOk(columns, density.item),
+    fit: fitOk(columns, density.item, runIn ? "run_in" : "list"),
   };
   if (!force) validateModel(model);
   return { model, overflowPt };
@@ -2133,13 +2268,26 @@ export function buildStickerLayout(input: StickerLayoutInput, theme: OemStickerT
       }
     }
   }
-  // Nothing fits on one page at the validated minimum. Report the tightest
-  // configuration as a review-required fit failure; no second page exists.
+  // One item per line cannot fit at the floor. Each category then prints as
+  // a run-in paragraph: same items, verbatim, once each, joined inline.
+  for (const density of GENERIC_DENSITY_LADDER) {
+    for (const columns of candidateColumns(theme)) {
+      for (const compactPackages of [false, true]) {
+        const attempt = buildAttempt(input, theme, density, columns, compactPackages, false, true);
+        if (attempt) return attempt.model;
+      }
+    }
+  }
+  // Nothing fits on one page at the validated minimum. Report the tighter of
+  // the two floor configurations as a review-required fit failure.
   const columns = Math.max(...candidateColumns(theme));
-  const floor = buildAttempt(input, theme, DENSITY_MINIMUM, columns, true, true);
+  const floorList = buildAttempt(input, theme, DENSITY_MINIMUM, columns, true, true, false);
+  const floorRunIn = buildAttempt(input, theme, DENSITY_MINIMUM, columns, true, true, true);
+  const floor = floorRunIn && floorList && floorRunIn.overflowPt < floorList.overflowPt ? floorRunIn : floorList;
   const overflowPt = floor ? Math.round(floor.overflowPt * 10) / 10 : 0;
   const base = floor?.model;
   if (!base) throw new Error("layout_failed: floor attempt produced no model");
+  const mode = base.fit.ok ? base.fit.equipmentMode ?? "list" : "list";
   return {
     ...base,
     mode: "REVIEW_REQUIRED",
@@ -2149,7 +2297,8 @@ export function buildStickerLayout(input: StickerLayoutInput, theme: OemStickerT
       overflowPt,
       equipmentFontPt: DENSITY_MINIMUM.item,
       columns,
-      detail: `verified content does not fit one readable page at ${DENSITY_MINIMUM.item}pt equipment text in ${columns} columns (about ${overflowPt}pt over); an approved one-page layout adjustment is required`,
+      equipmentMode: mode,
+      detail: `verified content does not fit one readable page at ${DENSITY_MINIMUM.item}pt equipment text, even as run-in category paragraphs, in ${columns} columns (about ${overflowPt}pt over); an approved one-page layout adjustment is required`,
     },
   };
 }

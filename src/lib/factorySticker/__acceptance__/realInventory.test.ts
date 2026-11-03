@@ -554,6 +554,7 @@ describe("complete builds are held for an approved one-page layout adjustment, n
     expect(fit.overflowPt).toBeGreaterThan(0);
     expect(fit.equipmentFontPt).toBeGreaterThanOrEqual(5.5);
     expect(fit.detail).toContain("approved one-page layout adjustment");
+    expect(fit.detail).toContain("run-in");
     expect(o.rendered.pdfBytes.byteLength).toBe(0);
     expect(o.rendered.previewSvg).toBe("");
     expect(o.model.pages).toHaveLength(1);
@@ -746,6 +747,40 @@ describe("coverage across the inventory", () => {
     writeFileSync(join(dir, "make-fuel-coverage.json"), JSON.stringify(makeRows, null, 2));
     const mcols = Object.keys(makeRows[0]);
     writeFileSync(join(dir, "make-fuel-coverage.csv"), [mcols.join(","), ...makeRows.map((c) => mcols.map((k) => esc((c as Record<string, unknown>)[k])).join(","))].join("\n"));
+
+    const fullDir = join(dir, "full-build");
+    mkdirSync(fullDir, { recursive: true });
+    const cohortSeen = new Set<string>();
+    const cohorts: Array<Record<string, unknown>> = [];
+    for (const v of fx.vehicles) {
+      const o = auto.get(v.v)!;
+      if (!v.bs || o.kind === "pending_data") continue;
+      const cohort = `${v.y ?? "unidentified"}-${v.t ?? ""}`.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      if (cohortSeen.has(cohort)) continue;
+      cohortSeen.add(cohort);
+      const members = fx.vehicles.filter((x) => x.bs && `${x.y ?? "unidentified"}-${x.t ?? ""}`.toLowerCase().replace(/[^a-z0-9]+/g, "-") === cohort);
+      if (o.kind === "filed") {
+        const file = join(fullDir, `${cohort}-${v.v}.pdf`);
+        writeFileSync(file, o.rendered.pdfBytes);
+        const pdf = await PDFDocument.load(new Uint8Array(readFileSync(file)));
+        expect(pdf.getPageCount(), file).toBe(1);
+        const size = pdf.getPage(0).getSize();
+        cohorts.push({ cohort, vins: members.length, result: "pdf_written", file, pages: 1, width: Math.round(size.width), height: Math.round(size.height), smallest_equipment_font_pt: o.rendered.layout.fit.ok ? o.rendered.layout.fit.equipmentFontPt : null });
+      } else if (o.kind === "one_page_review_required") {
+        const fit = o.rendered.layout.fit;
+        const worst = Math.max(...members.map((m) => {
+          const x = auto.get(m.v);
+          return x?.kind === "one_page_review_required" && !x.rendered.layout.fit.ok ? x.rendered.layout.fit.overflowPt : 0;
+        }));
+        cohorts.push({
+          cohort, vins: members.length, result: "held_no_pdf", pages: 0,
+          equipment_mode_tried: "list then run_in", smallest_equipment_font_pt: fit.equipmentFontPt,
+          overflow_pt_this_vin: fit.ok ? 0 : fit.overflowPt, overflow_pt_worst_in_cohort: worst,
+          hold_reason: fit.ok ? "" : fit.detail,
+        });
+      }
+    }
+    writeFileSync(join(fullDir, "cohort-results.json"), JSON.stringify(cohorts, null, 2));
 
     const sampleDir = join(dir, "one-page-capability-samples");
     mkdirSync(sampleDir, { recursive: true });

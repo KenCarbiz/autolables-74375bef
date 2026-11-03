@@ -30,8 +30,10 @@ import {
   Painter,
   formatMoney,
   formatPlain,
+  measureText,
   fitOk,
   fuelCategoryLabel,
+  runInLines,
   validateModel,
   wrapText,
   type LayoutFont,
@@ -209,6 +211,28 @@ interface FlowLine {
   indent: number;
   gapBefore: number;
   heading: boolean;
+  /** Run-in line: each drawn piece with its offset in Figma units. */
+  tokens?: Array<{ text: string; font: LayoutFont; x: number; comma: boolean }>;
+  /** Items whose last piece is on this run-in line. */
+  done?: Array<{ itemId: number; item: string }>;
+}
+
+function flowRunInLines(sections: Section[], width: number, px: number): Array<{ column: 1 | 2; lines: FlowLine[] }> {
+  const size = pt(px);
+  let nextId = 0;
+  return sections.map((s, si) => {
+    const ids = new Map(s.items.map((item) => [item, nextId++]));
+    const lines: FlowLine[] = runInLines(s.spec.heading, s.items, size, u(width - 8)).map((l, li) => ({
+      text: l.tokens.map((t) => t.text).join(" "),
+      font: "body",
+      indent: 0,
+      gapBefore: li === 0 && si > 0 ? 12 : 0,
+      heading: li === 0,
+      tokens: l.tokens.map((t) => ({ text: t.text, font: t.bold ? "bold" : "body", x: t.x * 2, comma: t.comma })),
+      done: l.tokens.flatMap((t) => (t.item ? [{ itemId: ids.get(t.item)!, item: t.item }] : [])),
+    }));
+    return { column: s.spec.column, lines };
+  });
 }
 
 function flowLines(sections: Section[], width: number, px: number): Array<{ column: 1 | 2; lines: FlowLine[] }> {
@@ -317,7 +341,14 @@ function paintEquipment(p: Painter, placed: PlacedLine[], style: LetterStyle): v
   box(p, BODY_X + 524.5, COLS_TOP, 1.5, 805, INK);
   txt(p, "Standard Equipment Included at No Extra Charge", COL1_X, COLS_TOP + 76, 11, "body", { lh: style.lh });
   for (const line of placed) {
-    txt(p, line.text, line.x, line.top, style.px, line.font, { lh: style.lh });
+    if (!line.tokens) {
+      txt(p, line.text, line.x, line.top, style.px, line.font, { lh: style.lh });
+      continue;
+    }
+    for (const t of line.tokens) {
+      txt(p, t.text, line.x + t.x, line.top, style.px, t.font, { lh: style.lh });
+      if (t.comma) txt(p, ",", line.x + t.x + measureFigma(t.text, style.px), line.top, style.px, "body", { lh: style.lh });
+    }
   }
 }
 
@@ -672,8 +703,10 @@ export function buildLetterVariantLayout(
   const disclosure = [...reproductionDisclosureLines(input.layout.factoryBuild), ...input.layout.disclaimers];
   const footerTop = Math.min(DISCLOSURE_Y, 1224 - 18 - disclosureHeight(disclosure));
 
-  for (const style of LETTER_STYLES) {
-    const { placed, rest } = placeEquipment(flowLines(sections, COL1_W, style.px), style.lh);
+  const attempts = [false, true].flatMap((runIn) => LETTER_STYLES.map((style) => ({ style, runIn })));
+  for (const { style, runIn } of attempts) {
+    const blocks = runIn ? flowRunInLines(sections, COL1_W, style.px) : flowLines(sections, COL1_W, style.px);
+    const { placed, rest } = placeEquipment(blocks, style.lh);
     if (rest.length) continue;
 
     const drawn: string[] = [];
@@ -692,12 +725,12 @@ export function buildLetterVariantLayout(
     const model: LayoutModel = {
       width: PAGE_WIDTH,
       height: PAGE_HEIGHT,
-      mode: style === LETTER_STYLES[0] ? "STANDARD" : "DENSE",
+      mode: style === LETTER_STYLES[0] && !runIn ? "STANDARD" : "DENSE",
       pages: [{ primitives: p.primitives }],
       drawnStrings: drawn,
       printedEquipment: printedItems(placed),
       fontFamilies: { heading: "Helvetica-Bold", body: "Helvetica", numeric: "Courier" },
-      fit: fitOk(2, pt(style.px)),
+      fit: fitOk(2, pt(style.px), runIn ? "run_in" : "list"),
     };
     validateModel(model);
     return model;
@@ -705,9 +738,14 @@ export function buildLetterVariantLayout(
   return null;
 }
 
+const measureFigma = (text: string, px: number): number => measureText(text, "body", pt(px)) * 2;
+
 function printedItems(placed: PlacedLine[]): string[] {
   const seen = new Map<number, string>();
-  for (const l of placed) if (l.itemId !== undefined && l.item) seen.set(l.itemId, l.item);
+  for (const l of placed) {
+    if (l.itemId !== undefined && l.item) seen.set(l.itemId, l.item);
+    for (const d of l.done ?? []) seen.set(d.itemId, d.item);
+  }
   return [...seen.values()];
 }
 
