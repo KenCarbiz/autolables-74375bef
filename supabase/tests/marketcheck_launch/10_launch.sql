@@ -56,19 +56,58 @@ INSERT INTO store_inventory (store_id, group_id, vin, source_dealer_id, conditio
   (:canary, '79feb0ce-0214-48b4-8709-f8d94bdecb5b', :vin_canary, 'MP15398', 'new', 'known'),
   (:nissan, '79feb0ce-0214-48b4-8709-f8d94bdecb5b', :vin_nissan, 'MP15397', 'new', 'known'),
   (:canary, '79feb0ce-0214-48b4-8709-f8d94bdecb5b', :vin_amb, 'MP15398', 'new', 'known');
-INSERT INTO vehicle_listings (id, store_id, tenant_id, vin, owning_store_id) VALUES
-  ('00000000-0000-0000-0000-00000000c001', 'harte', :harte, :vin_canary, :canary),
-  ('00000000-0000-0000-0000-00000000c002', 'harte', :harte, :vin_amb, :nissan),
-  ('00000000-0000-0000-0000-00000000c003', 'harte', :harte, :vin_legacy, NULL);
+INSERT INTO vehicle_listings (id, store_id, tenant_id, vin, owning_store_id, condition, status, mc_attributes) VALUES
+  ('00000000-0000-0000-0000-00000000c001', 'harte', :harte, :vin_canary, :canary, 'new', 'published', '{"specs_attempts":3}'),
+  ('00000000-0000-0000-0000-00000000c002', 'harte', :harte, :vin_amb, :nissan, 'new', 'published', NULL),
+  ('00000000-0000-0000-0000-00000000c003', 'harte', :harte, :vin_legacy, NULL, 'used', 'published', NULL),
+  ('00000000-0000-0000-0000-00000000c004', 'harte', :harte, '5N1AL1FW0TC000004', :canary, 'used', 'published', NULL),
+  ('00000000-0000-0000-0000-00000000c005', 'harte', :harte, '5N1AL1FW0TC000005', :canary, 'cpo', 'published', NULL),
+  ('00000000-0000-0000-0000-00000000c006', 'harte', :harte, '5N1AL1FW0TC000006', :canary, 'new', 'published', '{"build_sheet":{"generic":false}}'),
+  ('00000000-0000-0000-0000-00000000c007', 'harte', :harte, '5N1AL1FW0TC000007', :canary, 'new', 'published', NULL),
+  ('00000000-0000-0000-0000-00000000c008', 'harte', :harte, '5N1AL1FW0TC000008', :canary, 'used', 'archived', NULL),
+  ('00000000-0000-0000-0000-00000000c009', 'harte', :harte, :vin_nissan, :nissan, 'new', 'published', NULL);
+INSERT INTO store_inventory (store_id, group_id, vin, source_dealer_id, condition, feed_price_status)
+SELECT :canary, '79feb0ce-0214-48b4-8709-f8d94bdecb5b', v, 'MP15398', 'used', 'known' FROM unnest(ARRAY['5N1AL1FW0TC000004','5N1AL1FW0TC000005','5N1AL1FW0TC000006','5N1AL1FW0TC000007']) v;
+-- 000007 already has a stored NeoVIN payload: decoded once, never paid again.
+INSERT INTO neovin_snapshots (vin, payload) VALUES ('5N1AL1FW0TC000007', '{}');
+-- The dispatcher's transport in this scratch database records each request
+-- instead of calling an edge function. No network, no provider.
+CREATE TABLE test_http (id bigserial PRIMARY KEY, fn text, body jsonb, status_code integer, response jsonb, at timestamptz DEFAULT now());
+CREATE OR REPLACE FUNCTION pg_temp.install_transport() RETURNS void LANGUAGE plpgsql AS $f$
+BEGIN
+  EXECUTE $x$CREATE OR REPLACE FUNCTION public.marketcheck_launch_transport_ready() RETURNS jsonb LANGUAGE sql STABLE AS $$ SELECT '{"ready":true,"host":"scratch"}'::jsonb $$$x$;
+  EXECUTE $x$CREATE OR REPLACE FUNCTION public.marketcheck_launch_transport(p_function text, p_body jsonb) RETURNS bigint LANGUAGE sql AS $$
+    INSERT INTO test_http (fn, body) VALUES (p_function, p_body) RETURNING id $$$x$;
+  EXECUTE $x$CREATE OR REPLACE FUNCTION public.marketcheck_launch_transport_result(p_request_id bigint) RETURNS jsonb LANGUAGE sql STABLE AS $$
+    SELECT CASE WHEN status_code IS NULL THEN NULL ELSE jsonb_build_object('status_code', status_code, 'body', response) END FROM test_http WHERE id = p_request_id $$$x$;
+END $f$;
+-- What marketcheck-specs does for one dispatched request, minus the HTTP call
+-- to MarketCheck: admission, reservation, then its answer to the dispatcher.
+CREATE OR REPLACE FUNCTION pg_temp.serve(p_req bigint, p_calls integer DEFAULT 1) RETURNS text LANGUAGE plpgsql AS $f$
+DECLARE h test_http%ROWTYPE; v text; i integer;
+BEGIN
+  SELECT * INTO h FROM test_http WHERE id = p_req;
+  FOR i IN 1..p_calls LOOP v := pg_temp.call('marketcheck-specs', (h.body->>'tenant_id')::uuid, h.body->>'vin'); END LOOP;
+  UPDATE provider_requests SET status = 'consumed', settled_at = now() WHERE status = 'reserved';
+  UPDATE test_http SET status_code = 200, response = jsonb_build_object('ok', v IN ('admitted','reserve_duplicate_in_flight'), 'endpoint', 'neovin', 'last', v) WHERE id = p_req;
+  RETURN v;
+END $f$;
 
 -- ── Applying the migration changes nothing that spends ──────────────────
 SELECT pg_temp.expect(pg_temp.state() = 'not_ready' AND NOT (SELECT emergency_stop FROM marketcheck_launch_control), 'switch starts OFF (not ready, no stop)');
 SELECT pg_temp.expect((SELECT monthly_call_cap = 0 AND reserve_for_essential = 1000 FROM provider_call_budgets WHERE provider = 'marketcheck'),
   'owner hold cap 0 kept; older 250 reserve reconciled to the coordinator 1,000');
-SELECT pg_temp.expect((SELECT status = 'draft' AND canary_store_id = :canary AND jsonb_array_length(rollout) = 5 AND account_usd_cap IS NULL FROM marketcheck_launch_plans WHERE version = 1),
-  'draft plan v1 seeded for Harte INFINITI with the five sister rooftops in order, not approved, no dollar cap yet');
-SELECT pg_temp.expect((SELECT products = ARRAY['neovin'] AND allowed_callers = ARRAY['marketcheck-specs'] AND cron_jobs = '[]'::jsonb FROM marketcheck_launch_plans WHERE version = 1),
-  'plan v1 is consistent: NeoVIN only, through marketcheck-specs only; marketcheck-sync (syndication) is not an approved caller and no cron is enabled');
+SELECT pg_temp.expect((SELECT status = 'draft' AND canary_store_id = :canary AND jsonb_array_length(rollout) = 5 AND account_usd_cap = 25 AND canary_store_usd_cap = 10
+    FROM marketcheck_launch_plans WHERE version = 1),
+  'draft plan v1 seeded for Harte INFINITI with the five sister rooftops in order, not approved, provisional $25 account / $10 canary caps');
+SELECT pg_temp.expect((SELECT products = ARRAY['neovin'] AND allowed_callers = ARRAY['marketcheck-specs']
+    AND cron_jobs = '[{"jobname":"marketcheck-launch-dispatch","schedule":"*/5 * * * *"}]'::jsonb
+    AND workload->>'caller' = 'marketcheck-specs' AND (workload->>'max_vehicles_per_store')::int * (workload->>'calls_per_vehicle')::int <= canary_max_calls
+    FROM marketcheck_launch_plans WHERE version = 1),
+  'plan v1: NeoVIN through marketcheck-specs only, the workload dispatcher is the only job it turns on, and its worst case fits the 40-call ceiling');
+SELECT pg_temp.expect((SELECT NOT active AND command = 'SELECT public.marketcheck_launch_dispatch()' FROM cron.job WHERE jobname = 'marketcheck-launch-dispatch'),
+  'the migration creates the dispatcher job OFF');
+SELECT pg_temp.expect((SELECT NOT active FROM cron.job WHERE jobname = 'marketcheck-sync'), 'marketcheck-sync stays off');
 SELECT pg_temp.expect((SELECT NOT admitted AND reason = 'gate_upgrade_required' FROM provider_call_admit('marketcheck', 'neovin', 'old-deploy', false, :harte, NULL, NULL)),
   'a function deployed before this release cannot admit a MarketCheck call');
 SELECT pg_temp.expect((SELECT NOT admitted AND reason = 'gate_upgrade_required' FROM provider_call_admit('marketcheck', 'search', 'marketcheck-sync', true, :harte, NULL, NULL)),
@@ -103,7 +142,9 @@ SELECT pg_temp.expect((marketcheck_launch_status()->>'state') = 'not_ready', 'st
 SELECT pg_temp.expect(NOT (marketcheck_launch_status()->>'activation_allowed')::boolean, 'activation is disabled');
 SELECT pg_temp.raises($$SELECT marketcheck_launch_activate(1, 'yes')$$, 'confirmation_required', 'activation needs the typed confirmation');
 SELECT pg_temp.expect((marketcheck_launch_activate(1, 'START')->>'reason') = 'plan_not_approved', 'an unapproved plan cannot be activated');
+UPDATE marketcheck_launch_plans SET account_usd_cap = NULL, canary_store_usd_cap = NULL WHERE version = 1;
 SELECT pg_temp.raises($$SELECT marketcheck_launch_approve_plan(1)$$, 'usd_cap_required', 'a plan without an owner dollar cap cannot be approved');
+UPDATE marketcheck_launch_plans SET canary_store_usd_cap = 10 WHERE version = 1;
 SELECT pg_temp.raises($$SELECT marketcheck_launch_set_plan_usd_cap(1, 0)$$, 'invalid_usd_cap', 'a zero dollar cap is refused');
 SELECT marketcheck_launch_set_plan_usd_cap(1, 25);
 SELECT marketcheck_launch_approve_plan(1);
@@ -114,8 +155,10 @@ SELECT pg_temp.expect((SELECT result = 'refused' AND detail->>'reason' = 'readin
 SELECT pg_temp.expect(pg_temp.state() = 'not_ready' AND (SELECT monthly_call_cap FROM provider_call_budgets WHERE provider = 'marketcheck') = 0,
   'a refused activation changes nothing');
 SELECT pg_temp.expect((SELECT array_agg(e->>'key' ORDER BY e->>'key') FROM jsonb_array_elements(marketcheck_launch_readiness(1)->'checks') e WHERE e->>'status' <> 'passed')
-  @> ARRAY['quota_known','entitlements','primary_feed','canary_policy','schedulers','feed_mappings','credentials','sticker_templates','cost_controls','sticker_generation','stop_drill','mcp_boundary'],
-  'quota, entitlements, feed, canary policy, scheduler, mappings, dollar caps, sticker generation, stop drill and evidence are reported as not passed');
+  @> ARRAY['quota_known','entitlements','primary_feed','canary_policy','schedulers','canary_mapping','credentials','sticker_templates','cost_controls','sticker_generation','stop_drill','mcp_boundary','workload'],
+  'quota, entitlements, feed, canary policy, scheduler, canary mapping, dollar caps, sticker generation, stop drill, workload and evidence are reported as not passed');
+SELECT pg_temp.expect((SELECT e->>'summary' FROM jsonb_array_elements(marketcheck_launch_readiness(1)->'checks') e WHERE e->>'key' = 'workload') LIKE '%transport is not installed%',
+  'without the deployment package the workload check fails: START would have no way to begin work');
 
 -- ── Bring every check to green with synthetic evidence ─────────────────
 SELECT pg_temp.expect(pg_temp.check_status('migrations') = 'passed', 'migrations check passes');
@@ -125,21 +168,35 @@ SELECT pg_temp.raises($$SELECT marketcheck_launch_record_quota(5000, 10, 4990, n
 SELECT marketcheck_launch_record_quota(5000, 10, 4990, now() + interval '20 days', 'MarketCheck account usage page, Nov 2 screenshot');
 INSERT INTO inventory_source_mappings (source_dealer_id, group_id, store_id, status, observed_identity, evidence, approved_at)
 SELECT d, '79feb0ce-0214-48b4-8709-f8d94bdecb5b', s::uuid, 'approved', '{}'::jsonb, '{"approved_comparison":{"verdict":"match"}}'::jsonb, now()
-FROM (VALUES ('MP15398', '45cdc1e0-7e88-4b44-9d07-27369d74ab21'), ('MP15397', '35d5584b-93d4-4419-9a50-6daead08e7a9'), ('MP15395', 'e400e636-0909-4b36-822e-caa2b5ae7381'),
-             ('MP15396', '12e1d831-166d-48e9-87b5-536d7c0980dc'), ('MP19635', '17a9f6f2-29ff-4ff1-bf72-1519df10b7d5'), ('MP25214', '02b4f1ac-e15a-40a7-9c49-811fd043ef53')) v(d, s);
+FROM (VALUES ('MP15398', '45cdc1e0-7e88-4b44-9d07-27369d74ab21')) v(d, s);
+-- Only Harte INFINITI is mapped, as in production: the sister rooftops'
+-- incomplete mappings are shown but never block the canary.
+SELECT pg_temp.expect(pg_temp.check_status('canary_mapping') = 'passed', 'the canary rooftop''s own verified identity passes');
+SELECT pg_temp.expect((SELECT e->>'status' = 'failed' AND NOT (e->>'mandatory')::boolean AND jsonb_array_length(e->'detail'->'stores') = 6
+    AND (SELECT count(*) FROM jsonb_array_elements(e->'detail'->'stores') x WHERE (x->>'identity_verified')::boolean) = 1
+    FROM jsonb_array_elements(marketcheck_launch_readiness(1)->'checks') e WHERE e->>'key' = 'rooftop_mappings'),
+  'all six rooftops are listed; five unverified sister rooftops are reported, not mandatory');
 INSERT INTO inventory_store_snapshots (path, source_dealer_id, store_id, group_id, source_mtime, content_sha256, clean, status, applied_at)
 VALUES ('prod/inventory/vauto/inbound/MP15398_inventory.csv', 'MP15398', :canary, '79feb0ce-0214-48b4-8709-f8d94bdecb5b', now() - interval '1 hour', 'abc', true, 'applied', now() - interval '1 hour');
 UPDATE provider_product_catalog SET verified_at = now() WHERE product_key = 'neovin';
 INSERT INTO store_enrichment_policies (store_id, mode, credential_ref, mc_rooftop_id, mc_rooftop_verified_at, allowed_products, daily_request_limit, monthly_request_cap)
 VALUES (:canary, 'paused', 'MARKETCHECK_API_KEY', 'harte-infiniti-hartford', now(), ARRAY['neovin'], 30, 600);
 UPDATE inventory_feed_controls SET ingestion_paused = false;
-INSERT INTO cron.job (jobname, schedule, command) VALUES ('files-inventory-worker', '*/10 * * * *', $c$SELECT net.http_post(url := 'https://x.supabase.co/functions/v1/files-inventory-worker')$c$);
+INSERT INTO cron.job (jobname, schedule, command) VALUES ('files-inventory-worker', '*/15 * * * *', 'SELECT public.files_inventory_worker_tick()');
+SELECT pg_temp.install_transport();
+SELECT pg_temp.expect(pg_temp.check_status('workload') = 'passed', 'with the transport installed the workload check passes');
+SELECT pg_temp.expect((SELECT (e->'detail'->>'candidates')::int = 3 FROM jsonb_array_elements(marketcheck_launch_readiness(1)->'checks') e WHERE e->>'key' = 'workload'),
+  'candidates: the three never-decoded canary vehicles (not the decoded, archived, already-stored, ambiguous or sister-store ones)');
+SELECT pg_temp.expect((SELECT array_agg(priority ORDER BY priority) FROM marketcheck_launch_workload_candidates(:canary, 'neovin', 20)) = ARRAY[1,2,3]::smallint[],
+  'new cars first, then CPO, then used; a stale attempt counter does not hide a never-asked VIN');
 -- Dollar caps: prices unverified and no store cap fail the check.
 SELECT pg_temp.expect(pg_temp.check_status('cost_controls') = 'failed', 'list-price estimates and no store dollar cap fail the cost check');
 UPDATE provider_product_catalog SET rate_usd = 0.08, rate_status = 'verified', evidence = 'MarketCheck order form (synthetic)' WHERE product_key = 'neovin';
 SELECT pg_temp.expect(pg_temp.check_status('cost_controls') = 'failed', 'verified price without a store dollar cap still fails');
 UPDATE store_enrichment_policies SET monthly_usd_cap = 50 WHERE store_id = :canary;
 SELECT pg_temp.expect(pg_temp.check_status('cost_controls') = 'failed', 'a store cap above the account cap fails');
+UPDATE store_enrichment_policies SET monthly_usd_cap = 12 WHERE store_id = :canary;
+SELECT pg_temp.expect(pg_temp.check_status('cost_controls') = 'failed', 'a store cap above the plan''s $10 canary cap fails');
 UPDATE store_enrichment_policies SET monthly_usd_cap = 10 WHERE store_id = :canary;
 SELECT pg_temp.expect(pg_temp.check_status('cost_controls') = 'passed', 'account cap, verified price and store cap pass');
 -- Real-data sticker generation is read from the orchestrator's own records.
@@ -159,13 +216,15 @@ CREATE TEMP TABLE drill_before AS SELECT (SELECT count(*) FROM provider_call_eve
 SELECT pg_temp.expect((marketcheck_launch_stop_drill()->>'ok')::boolean, 'the stop drill passes');
 SELECT pg_temp.expect((SELECT detail->'admission_v2'->>'marketcheck-specs' = 'emergency_stop' AND detail->>'admission_pre_release' = 'gate_upgrade_required'
     AND detail->>'provider_reserve' = 'launch_gate_closed: emergency_stop' AND detail->>'direct_reservation' = 'launch_gate_closed: emergency_stop'
+    AND detail->>'workload_dispatcher' = 'emergency_stop'
     FROM marketcheck_launch_checks WHERE check_key = 'stop_drill'),
-  'drill evidence: v2 admission, the pre-release entry point, provider_reserve and a direct insert all refused under the stop');
+  'drill evidence: v2 admission, the pre-release entry point, provider_reserve, a direct insert and the dispatcher all refused under the stop');
 SELECT pg_temp.expect((SELECT NOT EXISTS (SELECT 1 FROM jsonb_array_elements(detail->'cron_during_stop') j WHERE (j->>'active')::boolean)
     AND EXISTS (SELECT 1 FROM jsonb_array_elements(detail->'cron_before') j WHERE j->>'jobname' = 'specs-backfill' AND (j->>'active')::boolean)
     FROM marketcheck_launch_checks WHERE check_key = 'stop_drill'),
   'drill evidence: the active specs-backfill job was parked while the stop held');
 SELECT pg_temp.expect((SELECT pce = (SELECT count(*) FROM provider_call_events) AND pr = (SELECT count(*) FROM provider_requests)
+    AND (SELECT count(*) FROM test_http) = 0 AND (SELECT count(*) FROM marketcheck_launch_work) = 0
     AND cron = (SELECT jsonb_agg(to_jsonb(j) ORDER BY jobid) FROM cron.job j)
     AND (ctl - 'updated_at') = ((SELECT to_jsonb(c) FROM marketcheck_launch_control c) - 'updated_at') FROM drill_before),
   'the drill left no ledger rows, reservations, cron changes or switch changes behind');
@@ -175,8 +234,16 @@ SELECT pg_temp.expect((marketcheck_launch_status()->>'state') = 'ready_to_activa
 SELECT pg_temp.expect(pg_temp.state() = 'not_ready', 'readiness alone never flips the stored switch');
 
 -- ── Activate ────────────────────────────────────────────────────────────
-UPDATE marketcheck_launch_plans SET canary_max_calls = 3 WHERE version = 1;
-SELECT pg_temp.expect((marketcheck_launch_activate(1, 'START')->>'ok')::boolean, 'activation succeeds when every check passes');
+UPDATE marketcheck_launch_plans SET canary_max_calls = 4 WHERE version = 1;
+CREATE TEMP TABLE act AS SELECT marketcheck_launch_activate(1, 'START') r;
+SELECT pg_temp.expect((SELECT (r->>'ok')::boolean FROM act), 'activation succeeds when every check passes');
+SELECT pg_temp.expect((SELECT (r->>'workload_queued')::int = 3 AND (r->'first_dispatch'->>'dispatched')::int = 2 FROM act),
+  'START queues the three canary vehicles and dispatches the first batch of two at once');
+SELECT pg_temp.expect((SELECT count(*) = 2 AND bool_and(fn = 'marketcheck-specs') FROM test_http), 'two requests went to marketcheck-specs, nothing else');
+SELECT pg_temp.expect((SELECT array_agg(body->>'vin' ORDER BY id) FROM test_http) = ARRAY['5N1AL1FWXTC358105','5N1AL1FW0TC000005'], 'the new car first, then the CPO');
+SELECT pg_temp.expect((SELECT active AND schedule = '*/5 * * * *' FROM cron.job WHERE jobname = 'marketcheck-launch-dispatch'), 'the dispatcher job is on');
+SELECT pg_temp.expect((SELECT NOT active FROM cron.job WHERE jobname = 'marketcheck-sync') AND (SELECT active FROM cron.job WHERE jobname = 'specs-backfill'),
+  'syndication stays off; the existing nightly backfill is not touched (and cannot spend, below)');
 SELECT pg_temp.expect(pg_temp.state() = 'activating_canary', 'state is ACTIVATING CANARY');
 SELECT pg_temp.expect((marketcheck_launch_activate(1, 'START')->>'reason') = 'already_activating_canary', 'a second activation is refused');
 SELECT pg_temp.expect((SELECT monthly_call_cap = 5000 AND reserve_for_essential = 1000 FROM provider_call_budgets WHERE provider = 'marketcheck'), 'budget follows the account quota and reserve');
@@ -227,11 +294,14 @@ SELECT pg_temp.raises($$INSERT INTO provider_requests (account_ref, product_key,
 SELECT pg_temp.raises($$SELECT pg_temp.reserve('staff_ai')$$, 'launch_staff_ai_not_approved', 'staff AI stays off unless the plan allows it');
 SELECT pg_temp.expect((SELECT NOT admitted FROM provider_call_admit('marketcheck', 'neovin', 'marketcheck-specs', true, :harte, :vin_canary, NULL)), 'old deployments stay refused even while active');
 
--- The canary path itself.
-SELECT pg_temp.expect(pg_temp.call('marketcheck-specs', :harte, :vin_canary) = 'admitted', 'the approved caller, product and canary VIN are admitted and reserved');
+-- The canary path itself: only what the dispatcher sent can spend.
+SELECT pg_temp.expect(pg_temp.admit_reason('marketcheck-specs', :harte, '5N1AL1FW0TC000004') = 'launch_vin_not_dispatched',
+  'a canary VIN the dispatcher has not sent (a backfill, a sweep, a manual click) is refused');
+SELECT pg_temp.expect(pg_temp.admit_reason('marketcheck-specs', :harte, NULL, :canary) = 'launch_dispatch_required', 'a VIN-less request cannot spend under a workload plan');
+SELECT pg_temp.expect(pg_temp.serve(1) = 'admitted', 'marketcheck-specs serving the first dispatched VIN is admitted and reserved');
 SELECT pg_temp.expect((SELECT store_id = :canary AND catalog_product = 'neovin' AND gate_version = 'launch-2026-11-02' FROM provider_call_events WHERE outcome = 'admitted' ORDER BY id DESC LIMIT 1),
   'the admission records the server-resolved rooftop, product and gate version');
-SELECT pg_temp.expect((SELECT store_id = :canary AND group_id = '79feb0ce-0214-48b4-8709-f8d94bdecb5b' FROM provider_requests WHERE status = 'reserved' ORDER BY reserved_at DESC LIMIT 1),
+SELECT pg_temp.expect((SELECT store_id = :canary AND group_id = '79feb0ce-0214-48b4-8709-f8d94bdecb5b' FROM provider_requests ORDER BY reserved_at DESC LIMIT 1),
   'the reservation carries the server-resolved rooftop, though the caller sent none');
 SELECT pg_temp.raises($$SELECT pg_temp.reserve('rest', '3f0f97f5-4151-4e32-88ef-e2d6fc5a3142', '5N1AL1FWXTC358105', (SELECT max(id) FROM provider_call_events WHERE outcome = 'admitted'))$$,
   'launch_reservation_reused', 'an admission cannot back a second reservation');
@@ -241,12 +311,19 @@ INSERT INTO provider_requests (account_ref, product_key, caller, reason, priorit
 VALUES ('marketcheck_primary', 'neovin', 'marketcheck-specs', 'x', 1, :harte, 'refused', 'test');
 SELECT pg_temp.raises($$UPDATE provider_requests SET status = 'reserved' WHERE status = 'refused'$$,
   'launch_reservation_reopen', 'a refused reservation cannot be flipped to reserved');
-SELECT pg_temp.expect(pg_temp.call('marketcheck-specs', :harte, :vin_canary) = 'reserve_duplicate_in_flight', 'a duplicate decode for the same VIN joins the in-flight one');
-SELECT pg_temp.expect(pg_temp.call('marketcheck-specs', :harte, :vin_canary, :canary) = 'reserve_duplicate_in_flight', 'naming the correct rooftop is accepted');
-SELECT pg_temp.expect(pg_temp.admit_reason('marketcheck-specs', :harte, :vin_canary) = 'launch_paused_canary_ceiling_reached', 'the canary ceiling refuses the next call');
-SELECT pg_temp.expect(pg_temp.state() = 'paused' AND (SELECT paused_reason FROM marketcheck_launch_control) = 'canary_ceiling_reached', 'and pauses the launch for review');
+SELECT pg_temp.expect(pg_temp.call('marketcheck-specs', :harte, :vin_canary) = 'admitted', 'its second (generic) NeoVIN call is within the two-call allowance');
+SELECT pg_temp.expect(pg_temp.admit_reason('marketcheck-specs', :harte, :vin_canary) = 'launch_work_item_exhausted', 'a third call for the same vehicle is refused');
+SELECT pg_temp.expect(pg_temp.serve(2) = 'admitted', 'the second dispatched vehicle is served');
+UPDATE provider_requests SET status = 'consumed', settled_at = now() WHERE status = 'reserved';
+UPDATE test_http SET status_code = 200, response = '{"ok":true,"endpoint":"neovin"}' WHERE id = 1;
+CREATE TEMP TABLE d2 AS SELECT marketcheck_launch_dispatch() r;
+SELECT pg_temp.expect((SELECT (r->>'settled')::int = 2 AND (r->>'dispatched')::int = 0 FROM d2), 'the dispatcher settles both and sends nothing: 3 of 4 calls used, one call cannot fit a two-call vehicle');
+SELECT pg_temp.expect((SELECT count(*) FROM marketcheck_launch_work WHERE status = 'done') = 2, 'both vehicles are recorded done');
+SELECT pg_temp.expect(pg_temp.state() = 'paused' AND (SELECT paused_reason FROM marketcheck_launch_control) = 'canary_ceiling_reached',
+  'the canary pauses itself for review when the remaining ceiling cannot fit another vehicle');
 SELECT pg_temp.expect(pg_temp.admit_reason('marketcheck-specs', :harte, :vin_canary) = 'launch_inactive', 'nothing is admitted while paused');
-SELECT pg_temp.expect((SELECT count(*) FROM provider_call_events WHERE provider = 'marketcheck' AND outcome <> 'budget_denied') = 3, 'exactly the canary ceiling was admitted');
+SELECT pg_temp.expect((SELECT count(*) FROM provider_call_events WHERE provider = 'marketcheck' AND outcome <> 'budget_denied') = 3, 'exactly three calls were admitted, inside the ceiling');
+SELECT pg_temp.expect((SELECT count(*) FROM test_http) = 2, 'no further request was sent');
 
 -- Promotion needs provider usage reported after the canary started.
 UPDATE provider_accounts SET provider_reported_at = now() - interval '2 hours' WHERE account_ref = 'marketcheck_primary';
@@ -255,10 +332,13 @@ SELECT marketcheck_launch_record_quota(5000, 13, 4987, now() + interval '20 days
 SELECT pg_temp.expect((marketcheck_launch_resume('RESUME')->>'state') = 'pilot_active', 'resume after reconciliation enters PILOT ACTIVE');
 UPDATE marketcheck_launch_plans SET hourly_call_ceiling = 100, daily_call_ceiling = 200 WHERE version = 1;
 UPDATE provider_requests SET status = 'consumed', settled_at = now() WHERE status = 'reserved';
-SELECT pg_temp.expect(pg_temp.call('marketcheck-specs', :harte, :vin_canary) = 'admitted', 'pilot admits again under the daily ceiling');
+SELECT pg_temp.expect((marketcheck_launch_dispatch()->>'dispatched')::int = 1, 'in the pilot the dispatcher sends the remaining canary vehicle');
+SELECT pg_temp.expect(pg_temp.serve((SELECT max(id) FROM test_http)) = 'admitted', 'pilot admits a dispatched vehicle under the daily ceiling');
+SELECT pg_temp.expect((marketcheck_launch_dispatch()->>'dispatched')::int = 0, 'with the canary''s work all sent, nothing more is dispatched');
 
 -- Tripwire: provider errors pause the launch.
 UPDATE provider_call_events SET outcome = 'refused_rate' WHERE id IN (SELECT id FROM provider_call_events WHERE provider = 'marketcheck' AND outcome = 'admitted' ORDER BY id LIMIT 4);
+INSERT INTO provider_call_events (provider, product, caller, essential, tenant_id, outcome) VALUES ('marketcheck', 'neovin', 'marketcheck-specs', false, :harte, 'provider_error');
 INSERT INTO provider_call_events (provider, product, caller, essential, tenant_id, outcome) VALUES ('marketcheck', 'neovin', 'marketcheck-specs', false, :harte, 'provider_error');
 SELECT pg_temp.expect(pg_temp.admit_reason('marketcheck-specs', :harte, :vin_canary) = 'launch_paused_provider_errors', 'five provider errors in an hour trip the breaker');
 SELECT pg_temp.expect(pg_temp.state() = 'paused', 'and the launch pauses itself');
@@ -273,6 +353,10 @@ UPDATE inventory_store_snapshots SET status = 'superseded' WHERE content_sha256 
 SELECT pg_temp.expect((marketcheck_launch_resume('RESUME')->>'state') = 'pilot_active', 'resume once the hold is resolved');
 
 -- ── Expansion revalidates the rooftop, in plan order ────────────────────
+INSERT INTO inventory_source_mappings (source_dealer_id, group_id, store_id, status, observed_identity, evidence, approved_at)
+SELECT d, '79feb0ce-0214-48b4-8709-f8d94bdecb5b', s::uuid, 'approved', '{}'::jsonb, '{"approved_comparison":{"verdict":"match"}}'::jsonb, now()
+FROM (VALUES ('MP15397', '35d5584b-93d4-4419-9a50-6daead08e7a9'), ('MP15395', 'e400e636-0909-4b36-822e-caa2b5ae7381'),
+             ('MP15396', '12e1d831-166d-48e9-87b5-536d7c0980dc'), ('MP19635', '17a9f6f2-29ff-4ff1-bf72-1519df10b7d5'), ('MP25214', '02b4f1ac-e15a-40a7-9c49-811fd043ef53')) v(d, s);
 SELECT pg_temp.raises($$SELECT marketcheck_launch_expand('35d5584b-93d4-4419-9a50-6daead08e7a9', 'go')$$, 'confirmation_required', 'expansion needs confirmation');
 SELECT pg_temp.expect((marketcheck_launch_expand('02b4f1ac-e15a-40a7-9c49-811fd043ef53', 'EXPAND')->>'reason') = 'out_of_order', 'rooftops activate in plan order only');
 SELECT pg_temp.expect((marketcheck_launch_expand(:nissan, 'EXPAND')->>'reason') = 'waiting_period', 'the next rooftop waits out the plan period');
@@ -305,7 +389,10 @@ UPDATE inventory_source_mappings SET evidence = '{"approved_comparison":{"verdic
 SELECT pg_temp.expect((SELECT count(*) FROM marketcheck_launch_events WHERE action = 'expand' AND result = 'refused') >= 8, 'every refused expansion is audited with its reason');
 SELECT pg_temp.expect((marketcheck_launch_expand(:nissan, 'EXPAND')->>'state') = 'expanding', 'Harte Nissan joins once every check passes');
 SELECT pg_temp.expect((SELECT mode FROM store_enrichment_policies WHERE store_id = :nissan) = 'enrichment', 'its store policy is enabled');
-SELECT pg_temp.expect(pg_temp.call('marketcheck-specs', :harte, :vin_nissan) = 'admitted', 'a Harte Nissan VIN is admitted once Harte Nissan is live');
+SELECT pg_temp.expect((SELECT count(*) FROM marketcheck_launch_work WHERE store_id = :nissan AND status = 'queued') = 1, 'its expansion queued Harte Nissan''s own vehicle');
+SELECT pg_temp.expect(pg_temp.admit_reason('marketcheck-specs', :harte, :vin_nissan) = 'launch_vin_not_dispatched', 'queued is not dispatched: it cannot spend yet');
+SELECT pg_temp.expect((marketcheck_launch_dispatch()->>'dispatched')::int = 1, 'the dispatcher sends it');
+SELECT pg_temp.expect(pg_temp.serve((SELECT max(id) FROM test_http)) = 'admitted', 'a Harte Nissan VIN is admitted once Harte Nissan is live and its vehicle is dispatched');
 SELECT pg_temp.expect(pg_temp.admit_reason('marketcheck-specs', :harte, NULL, :ginf) = 'launch_store_not_active', 'George Harte INFINITI, same tenant, is still refused');
 SELECT pg_temp.expect((marketcheck_launch_expand(:ginf, 'EXPAND')->>'reason') = 'waiting_period', 'the next rooftop waits again');
 
@@ -316,6 +403,8 @@ SELECT pg_temp.expect((marketcheck_emergency_stop('test stop')->>'state') = 'eme
 SELECT pg_temp.expect(pg_temp.admit_reason('marketcheck-specs', :harte, :vin_canary) = 'emergency_stop', 'the next admission is refused');
 SELECT pg_temp.raises($$SELECT pg_temp.reserve()$$, 'launch_gate_closed: emergency_stop', 'the coordinator refuses to reserve during the stop');
 SELECT pg_temp.expect((SELECT NOT active FROM cron.job WHERE jobname = 'specs-backfill'), 'every MarketCheck-reaching cron job is parked, including ones the plan did not enable');
+SELECT pg_temp.expect((SELECT NOT active FROM cron.job WHERE jobname = 'marketcheck-launch-dispatch'), 'the workload dispatcher is parked');
+SELECT pg_temp.expect((marketcheck_launch_dispatch()->>'reason') = 'emergency_stop', 'a dispatcher run during the stop sends nothing');
 SELECT pg_temp.expect((SELECT active FROM cron.job WHERE jobname = 'title-reminders-sweep'), 'unrelated jobs are untouched');
 SELECT pg_temp.expect((SELECT bool_and(mode = 'paused') FROM store_enrichment_policies), 'store enrichment policies are paused');
 SELECT pg_temp.expect((SELECT si = (SELECT count(*) FROM store_inventory) AND snaps = (SELECT count(*) FROM inventory_store_snapshots)
@@ -344,6 +433,8 @@ SELECT pg_temp.expect((SELECT monthly_call_cap = 0 AND notes LIKE 'owner hold%' 
 SELECT pg_temp.expect((SELECT monthly_usd_cap IS NULL FROM provider_accounts WHERE account_ref = 'marketcheck_primary'), 'the account dollar cap is restored');
 SELECT pg_temp.expect((SELECT NOT active AND schedule = '7 * * * *' FROM cron.job WHERE jobname = 'marketcheck-sync'), 'marketcheck-sync is untouched');
 SELECT pg_temp.expect((SELECT mode FROM store_enrichment_policies WHERE store_id = :canary) = 'paused', 'the canary policy returns to its pre-activation mode');
+SELECT pg_temp.expect((SELECT NOT active FROM cron.job WHERE jobname = 'marketcheck-launch-dispatch'), 'the dispatcher job is OFF again');
+SELECT pg_temp.expect(NOT EXISTS (SELECT 1 FROM marketcheck_launch_work WHERE status IN ('queued','dispatched')), 'open work is cancelled; finished work is kept');
 SELECT pg_temp.expect(pg_temp.admit_reason('marketcheck-specs', :harte, :vin_canary) = 'launch_inactive', 'nothing is admitted after rollback');
 SELECT pg_temp.expect((SELECT count(*) FROM marketcheck_launch_events WHERE action IN ('activate','tripwire_pause','resume','expand','emergency_stop','release_stop','rollback','stop_drill')) >= 10,
   'every action is in the audit log');

@@ -1,4 +1,4 @@
-import type { CheckStatus, LaunchState, LaunchStatus, ReadinessCheck, RolloutStore } from "./types";
+import type { CheckStatus, LaunchState, LaunchStatus, LaunchWorkload, ReadinessCheck, RolloutStore, RooftopReadiness } from "./types";
 
 export const STATE_LABEL: Record<LaunchState, string> = {
   not_ready: "NOT READY",
@@ -81,3 +81,12 @@ export const periodSourceLabel = (src: string | null | undefined): string => {
   if (!src) return "Unknown";
   return /provider|reset/i.test(src) ? "Provider reset date" : "Assumed UTC month";
 };
+
+export const rooftopsFromReadiness = (checks: ReadinessCheck[] | undefined | null): RooftopReadiness[] => {
+  const c = (checks ?? []).find((x) => x.key === "rooftop_mappings");
+  const stores = (c?.detail as { stores?: unknown } | null | undefined)?.stores;
+  return Array.isArray(stores) ? (stores as RooftopReadiness[]) : [];
+};
+
+export const workloadLine = (w: LaunchWorkload | null | undefined): string =>
+  w ? `Up to ${w.max_vehicles_per_store} vehicles per store through ${w.function}, at most ${w.calls_per_vehicle} calls each, ${w.batch_size} at a time` : "None: starting only opens the gate";

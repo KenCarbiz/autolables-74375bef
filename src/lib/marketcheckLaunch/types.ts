@@ -53,8 +53,41 @@ export interface LaunchPlan {
   allowed_callers: string[];
   cron_jobs: Array<string | { jobname?: string; [key: string]: unknown }>;
   account_usd_cap: number | null;
+  canary_store_usd_cap?: number | null;
+  workload?: LaunchWorkload | null;
   rollout_stores: RolloutStore[];
   approved_at: string | null;
+}
+
+export interface LaunchWorkload {
+  kind?: string;
+  caller: string;
+  function: string;
+  max_vehicles_per_store: number;
+  calls_per_vehicle: number;
+  batch_size: number;
+  response_timeout_minutes: number;
+}
+
+export interface WorkloadStatus {
+  definition: LaunchWorkload | null;
+  counts: Partial<Record<"queued" | "dispatched" | "done" | "failed" | "cancelled", number>>;
+  admissions: number;
+  last_dispatch: string | null;
+}
+
+export interface RooftopReadiness {
+  store_id: string;
+  name: string;
+  role: "canary" | "expansion";
+  order: number;
+  identity_verified: boolean;
+  feed_paused: boolean;
+  store_status: string | null;
+  mapping: { source_dealer_id: string; status: string; verdict: string | null } | null;
+  feed_clean: boolean;
+  policy_ready: boolean;
+  active_in_launch: boolean;
 }
 
 export interface LaunchControl {
@@ -146,6 +179,7 @@ export interface LaunchStatus {
   plan: LaunchPlan | null;
   readiness: Readiness | null;
   consumption: Consumption | null;
+  workload?: WorkloadStatus | null;
   heartbeats: Heartbeat[];
   events: LaunchEvent[];
 }
@@ -153,7 +187,7 @@ export interface LaunchStatus {
 export interface FailedCheck { key: string; label?: string; status?: string; summary?: string | null }
 
 export type ActionResult =
-  | { ok: true; state?: string; crons_parked?: number }
+  | { ok: true; state?: string; crons_parked?: number; workload_queued?: number }
   | { ok: false; reason: string; failed?: FailedCheck[] };
 
 export type AttestKey = "credentials" | "mcp_boundary" | "quota_concurrency" | "sticker_templates" | "print_passport_qa";

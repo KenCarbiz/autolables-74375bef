@@ -165,6 +165,29 @@ describe("MarketCheckLaunchControlPage", () => {
     expect(screen.getByText("No scheduled jobs are turned on by this plan")).toBeInTheDocument();
   });
 
+  it("lists every plan rooftop, marks the canary, and shows the workload START begins", async () => {
+    const stores = [
+      { store_id: "s1", name: "Harte Honda", role: "canary", order: 0, identity_verified: true, feed_paused: false, store_status: "active", mapping: { source_dealer_id: "MP1", status: "approved", verdict: "match" }, feed_clean: true, policy_ready: true, active_in_launch: false },
+      { store_id: "s2", name: "Harte Toyota", role: "expansion", order: 1, identity_verified: false, feed_paused: true, store_status: "active", mapping: { source_dealer_id: "MP2", status: "pending", verdict: null }, feed_clean: false, policy_ready: false, active_in_launch: false },
+    ];
+    const workload = { caller: "marketcheck-specs", function: "marketcheck-specs", max_vehicles_per_store: 20, calls_per_vehicle: 2, batch_size: 2, response_timeout_minutes: 10 };
+    setStatus({
+      plan: { ...plan, workload, canary_store_usd_cap: 10 },
+      readiness: { checks: [check("migrations", "Database migrations", "passed"), { key: "rooftop_mappings", label: "All plan rooftops", mandatory: false, status: "failed", summary: "1 of 2", detail: { stores } }], all_mandatory_passed: true, evaluated_at: "2026-11-02T00:00:00Z", plan_version: 3 },
+      workload: { definition: workload, counts: { queued: 3, dispatched: 2, done: 1 }, admissions: 3, last_dispatch: null },
+    });
+    renderAdmin(<MarketCheckLaunchControlPage />, { route: ROUTE });
+    await screen.findByRole("button", { name: START });
+    const table = screen.getByRole("table", { name: "Plan rooftops" });
+    expect(within(table).getByText("Canary")).toBeInTheDocument();
+    expect(within(table).getByText("Verified (MP1)")).toBeInTheDocument();
+    expect(within(table).getByText("MP2: pending")).toBeInTheDocument();
+    expect(screen.getByText("3 queued, 2 in flight, 1 done, 0 failed")).toBeInTheDocument();
+    expect(screen.getAllByText("Up to 20 vehicles per store through marketcheck-specs, at most 2 calls each, 2 at a time").length).toBeGreaterThan(0);
+    expect(screen.getByText("$10.00 / month")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: START })).toBeEnabled();
+  });
+
   it("disables Approve while the draft plan has no cap and sets the cap with the RPC payload", async () => {
     setStatus({ plan: { ...plan, status: "draft", account_usd_cap: null } });
     spyResponses.rpcs.marketcheck_launch_set_plan_usd_cap = { data: { ok: true, version: 3, account_usd_cap: 125.5 } };

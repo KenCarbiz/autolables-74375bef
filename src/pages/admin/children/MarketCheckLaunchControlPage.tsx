@@ -10,7 +10,7 @@ import {
 import type { FailedCheck, LaunchStatus, ReadinessCheck } from "@/lib/marketcheckLaunch/types";
 import { canExpand, canPause, canResume, canRollback, failingMandatory, nextRolloutStore, refusalText, stateLabel, STATE_TONE } from "@/lib/marketcheckLaunch/viewModel";
 import { AttestDialog, QuotaDialog, ReasonDialog, TypedConfirmDialog, UsdCapDialog, type Outcome, type Perform } from "./marketcheckLaunch/dialogs";
-import { AuditSection, ConsumptionSection, PlanSummary, ReadinessSection, Section, SqlFallback, StateSection } from "./marketcheckLaunch/sections";
+import { AuditSection, ConsumptionSection, PlanSummary, ReadinessSection, RooftopsSection, Section, SqlFallback, StateSection } from "./marketcheckLaunch/sections";
 
 const crumbs = [
   { label: "Administration", href: "/admin" },
@@ -96,6 +96,7 @@ export default function MarketCheckLaunchControlPage() {
             <ReadinessSection status={s} onRecord={setAttest} />
             <ConsumptionSection c={s.consumption} onRecord={() => setDialog("quota")} />
             <StateSection status={s} onApprove={() => setDialog("approve")} onSetCap={() => setDialog("cap")} />
+            <RooftopsSection status={s} />
             <ActivationSection
               status={s}
               failingLabels={failing.map((c) => c.label)}
@@ -124,7 +125,7 @@ export default function MarketCheckLaunchControlPage() {
         open={dialog === "activate"}
         onClose={close}
         title="Start MarketCheck & Inventory Intelligence"
-        description="Review exactly what this starts. Paid MarketCheck calls begin for the canary store only."
+        description="Review exactly what this starts. Starting queues the canary store's never-decoded vehicles and sends the first batch at once; paid MarketCheck calls run for the canary store only, inside the call ceiling and dollar caps, until the canary pauses itself for review."
         word="START"
         confirmLabel="Start"
         onConfirm={() => perform(() => activateLaunch(s!.plan!.version, "START"), "MarketCheck canary started")}

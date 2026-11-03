@@ -6,6 +6,14 @@ RETURNS void LANGUAGE sql AS $$
   UPDATE cron.job SET schedule = COALESCE(alter_job.schedule, job.schedule), command = COALESCE(alter_job.command, job.command),
     active = COALESCE(alter_job.active, job.active) WHERE jobid = job_id;
 $$;
+CREATE FUNCTION cron.schedule(job_name text, schedule text, command text) RETURNS bigint LANGUAGE sql AS $$
+  INSERT INTO cron.job (jobname, schedule, command) VALUES (job_name, schedule, command) RETURNING jobid;
+$$;
+CREATE FUNCTION cron.unschedule(job_id bigint) RETURNS boolean LANGUAGE sql AS $$ DELETE FROM cron.job WHERE jobid = job_id RETURNING true $$;
+-- Production columns and tables the workload reads that the base stub lacks.
+ALTER TABLE public.vehicle_listings ADD COLUMN IF NOT EXISTS mc_attributes jsonb;
+CREATE TABLE IF NOT EXISTS public.neovin_snapshots (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id uuid, vehicle_id uuid, vin text NOT NULL,
+  payload jsonb, payload_hash text, captured_at timestamptz DEFAULT now());
 INSERT INTO cron.job (jobname, schedule, command, active) VALUES
   ('marketcheck-sync', '7 * * * *', $c$SELECT net.http_post(url := 'https://x.supabase.co/functions/v1/marketcheck-sync')$c$, false),
   ('enrich-sweep-nightly', '15 3 * * *', $c$SELECT net.http_post(url := 'https://x.supabase.co/functions/v1/enrich-sweep')$c$, false),

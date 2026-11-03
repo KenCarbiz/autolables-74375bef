@@ -66,8 +66,21 @@ CREATE TABLE public.marketcheck_launch_plans (
   -- this plan runs. A call limit is not a dollar limit: activation copies it
   -- to provider_accounts.monthly_usd_cap and refuses to start without it.
   account_usd_cap numeric(10,2) CHECK (account_usd_cap IS NULL OR account_usd_cap > 0),
+  -- Monthly dollar cap the canary store's policy must carry (at or below the
+  -- account cap). Readiness refuses a canary policy above it.
+  canary_store_usd_cap numeric(10,2) CHECK (canary_store_usd_cap IS NULL OR canary_store_usd_cap > 0),
+  -- The bounded workload START begins: which caller decodes, at most how many
+  -- vehicles per active store, at most how many paid calls per vehicle, how
+  -- many in flight at once and how long a dispatch stays valid. When set,
+  -- the gate admits a VIN only while the dispatcher has it in flight, so no
+  -- sweep, backfill or manual click can spend outside the workload.
+  workload jsonb CHECK (workload IS NULL OR (
+    jsonb_typeof(workload) = 'object' AND workload->>'caller' IS NOT NULL AND workload->>'function' ~ '^[a-z0-9-]{3,60}$'
+    AND (workload->>'max_vehicles_per_store')::int BETWEEN 1 AND 500 AND (workload->>'calls_per_vehicle')::int BETWEEN 1 AND 4
+    AND (workload->>'batch_size')::int BETWEEN 1 AND 20 AND (workload->>'response_timeout_minutes')::int BETWEEN 1 AND 60)),
   -- [{"jobname":"...","schedule":"..."}]: the only cron jobs activation turns
-  -- on, with the schedule it sets. Plan v1 turns none on.
+  -- on, with the schedule it sets. Plan v1 turns on only the workload
+  -- dispatcher, never a syndication feed or a global sweep.
   cron_jobs jsonb NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(cron_jobs) = 'array'),
   -- [{"store_id":..., "order":1, "min_hours_after_previous":24}] after the canary.
   rollout jsonb NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(rollout) = 'array'),
@@ -78,7 +91,9 @@ CREATE TABLE public.marketcheck_launch_plans (
   approved_at timestamptz,
   CHECK (hourly_call_ceiling <= daily_call_ceiling),
   CHECK (status <> 'approved' OR (approved_by IS NOT NULL AND approved_at IS NOT NULL)),
-  CHECK (status = 'draft' OR account_usd_cap IS NOT NULL)
+  CHECK (status = 'draft' OR account_usd_cap IS NOT NULL),
+  CHECK (canary_store_usd_cap IS NULL OR account_usd_cap IS NULL OR canary_store_usd_cap <= account_usd_cap),
+  CHECK (workload IS NULL OR workload->>'caller' = ANY (allowed_callers))
 );
 
 CREATE TABLE public.marketcheck_launch_control (
@@ -133,6 +148,29 @@ CREATE TABLE public.marketcheck_launch_checks (
   verified_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- The workload START begins: one row per vehicle per plan, so a VIN is
+-- queued, dispatched and decoded at most once per plan whatever runs.
+CREATE TABLE public.marketcheck_launch_work (
+  id bigserial PRIMARY KEY,
+  plan_version integer NOT NULL REFERENCES public.marketcheck_launch_plans(version),
+  store_id uuid NOT NULL,
+  tenant_id uuid NOT NULL,
+  vehicle_id uuid,
+  vin text NOT NULL CHECK (vin ~ '^[A-HJ-NPR-Z0-9]{17}$'),
+  product text NOT NULL,
+  priority smallint NOT NULL DEFAULT 3,
+  status text NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','dispatched','done','failed','cancelled')),
+  attempts integer NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 2),
+  admissions integer NOT NULL DEFAULT 0,
+  request_id bigint,
+  enqueued_at timestamptz NOT NULL DEFAULT now(),
+  dispatched_at timestamptz,
+  finished_at timestamptz,
+  result jsonb,
+  UNIQUE (plan_version, vin, product)
+);
+CREATE INDEX idx_marketcheck_launch_work_open ON public.marketcheck_launch_work (plan_version, status, priority, id);
+
 CREATE TABLE public.provider_gate_heartbeats (
   caller text PRIMARY KEY,
   gate_version text NOT NULL,
@@ -144,6 +182,9 @@ ALTER TABLE public.marketcheck_launch_control ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.marketcheck_launch_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.marketcheck_launch_checks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.provider_gate_heartbeats ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.marketcheck_launch_work ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.marketcheck_launch_work FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON SEQUENCE public.marketcheck_launch_work_id_seq FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON public.marketcheck_launch_plans, public.marketcheck_launch_control, public.marketcheck_launch_events,
   public.marketcheck_launch_checks, public.provider_gate_heartbeats FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.marketcheck_launch_plans, public.marketcheck_launch_control, public.marketcheck_launch_events,
@@ -215,7 +256,8 @@ BEGIN
   IF to_regclass('cron.job') IS NULL THEN RETURN '[]'::jsonb; END IF;
   EXECUTE $q$SELECT COALESCE(jsonb_agg(jsonb_build_object('jobid', jobid, 'jobname', jobname, 'schedule', schedule, 'active', active,
              'target', substring(command from '/functions/v1/([a-z0-9-]+)')) ORDER BY jobid), '[]'::jsonb)
-      FROM cron.job WHERE command ~ '/functions/v1/(marketcheck-[a-z-]+|enrich-sweep|vehicle-enrich|specs-backfill|market-valuation-write|crawl-advertised-prices)'$q$ INTO r;
+      FROM cron.job WHERE command ~ '/functions/v1/(marketcheck-[a-z-]+|enrich-sweep|vehicle-enrich|specs-backfill|market-valuation-write|crawl-advertised-prices)'
+         OR command ~ 'marketcheck_launch_dispatch'$q$ INTO r;
   RETURN r;
 END $$;
 
@@ -279,6 +321,7 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   c marketcheck_launch_control%ROWTYPE; p marketcheck_launch_plans%ROWTYPE; s dealer_stores%ROWTYPE; pol store_enrichment_policies%ROWTYPE;
   v_vin text := NULLIF(upper(trim(COALESCE(p_vin, ''))), ''); v_stores uuid[]; v_store uuid; v_billing text; v_n integer; v_trip text;
+  w marketcheck_launch_work%ROWTYPE;
 BEGIN
   SELECT * INTO c FROM marketcheck_launch_control WHERE id = 1 FOR UPDATE;
   IF NOT FOUND THEN reason := 'launch_control_missing'; RETURN; END IF;
@@ -361,6 +404,25 @@ BEGIN
     PERFORM marketcheck_launch_log('tripwire_pause', 'ok', c.state, 'paused', c.plan_version,
       jsonb_build_object('tripwire', v_trip, 'caller', p_caller, 'store_id', v_store), 'gate');
     reason := 'launch_paused_' || v_trip; store_id := NULL;
+    RETURN;
+  END IF;
+
+  -- A plan with a workload spends only on what its dispatcher sent: the VIN
+  -- must be in flight for this plan, product and rooftop, and within its
+  -- per-vehicle call allowance. Sweeps, backfills and manual clicks are
+  -- refused here even for the canary's own VINs.
+  IF p.workload IS NOT NULL THEN
+    IF v_vin IS NULL THEN reason := 'launch_dispatch_required'; store_id := NULL; RETURN; END IF;
+    SELECT * INTO w FROM marketcheck_launch_work mw
+     WHERE mw.plan_version = p.version AND mw.vin = v_vin AND mw.product = p_product AND mw.store_id = v_store AND mw.status = 'dispatched'
+       AND mw.dispatched_at > now() - make_interval(mins => (p.workload->>'response_timeout_minutes')::int);
+    IF w.id IS NULL THEN reason := 'launch_vin_not_dispatched'; store_id := NULL; RETURN; END IF;
+    -- An admission must leave room for itself; the reservation that follows
+    -- it is checked against the count that already includes it.
+    v_n := (p.workload->>'calls_per_vehicle')::int - (p_exclude_event IS NULL)::int;
+    IF w.admissions > v_n THEN
+      reason := 'launch_work_item_exhausted'; store_id := NULL; RETURN;
+    END IF;
   END IF;
 END $$;
 
@@ -432,6 +494,9 @@ BEGIN
   SELECT * INTO r FROM public.provider_call_admit_core(p_provider, p_product, p_caller, p_essential, p_tenant_id, p_vin, p_estimated_cost_usd);
   IF r.admitted AND r.event_id IS NOT NULL THEN
     UPDATE public.provider_call_events SET store_id = g.store_id, catalog_product = p_catalog_product, gate_version = p_gate_version WHERE id = r.event_id;
+    UPDATE public.marketcheck_launch_work SET admissions = admissions + 1
+     WHERE plan_version = (SELECT plan_version FROM public.marketcheck_launch_control WHERE id = 1)
+       AND vin = upper(trim(p_vin)) AND product = p_catalog_product AND status = 'dispatched';
   END IF;
   RETURN QUERY SELECT r.admitted, r.event_id, r.month_calls, r.monthly_call_cap, r.reserve_for_essential, r.reason;
 END $$;
@@ -492,6 +557,185 @@ BEGIN
 END $$;
 CREATE TRIGGER provider_requests_launch_guard BEFORE INSERT OR UPDATE OF status ON public.provider_requests
   FOR EACH ROW EXECUTE FUNCTION public.provider_requests_launch_guard();
+
+-- ── The workload START begins ───────────────────────────────────────────
+-- Vehicles of one rooftop that have never been decoded: no build sheet (or
+-- only a generic one never asked for its own build), no stored NeoVIN
+-- payload, no MarketCheck decode of the VIN in 90 days, and owned by that
+-- rooftop alone. The specs_attempts counter is deliberately not used: on
+-- 2026-11-01 it was stamped to the cap on vehicles that were never sent to
+-- MarketCheck (the owner hold refused every call), so it is not evidence
+-- that a VIN was asked. New cars first (stickers), then CPO, then used.
+CREATE OR REPLACE FUNCTION public.marketcheck_launch_workload_candidates(p_store_id uuid, p_product text, p_limit integer)
+RETURNS TABLE (vehicle_id uuid, tenant_id uuid, vin text, priority smallint)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  RETURN QUERY
+  SELECT vl.id, vl.tenant_id, upper(trim(vl.vin)),
+         (CASE lower(COALESCE(vl.condition, '')) WHEN 'new' THEN 1 WHEN 'cpo' THEN 2 ELSE 3 END)::smallint
+    FROM vehicle_listings vl
+   WHERE vl.owning_store_id = p_store_id
+     AND vl.tenant_id IS NOT NULL
+     AND COALESCE(vl.status, '') <> 'archived'
+     AND upper(trim(COALESCE(vl.vin, ''))) ~ '^[A-HJ-NPR-Z0-9]{17}$'
+     AND (vl.mc_attributes->'build_sheet' IS NULL OR jsonb_typeof(vl.mc_attributes->'build_sheet') = 'null'
+          OR (vl.mc_attributes->'build_sheet'->>'generic' = 'true' AND vl.mc_attributes->>'specs_strict_attempted' IS NULL))
+     AND NOT EXISTS (SELECT 1 FROM neovin_snapshots ns WHERE upper(ns.vin) = upper(trim(vl.vin)))
+     AND NOT EXISTS (SELECT 1 FROM provider_call_events e WHERE e.provider = 'marketcheck' AND upper(e.vin) = upper(trim(vl.vin))
+                      AND e.product = 'neovin' AND e.outcome <> 'budget_denied' AND e.at > now() - interval '90 days')
+     AND NOT EXISTS (SELECT 1 FROM marketcheck_launch_work w WHERE w.vin = upper(trim(vl.vin)) AND w.product = p_product
+                      AND w.status IN ('queued','dispatched','done'))
+     AND marketcheck_launch_vin_stores(vl.vin) = ARRAY[p_store_id]
+   ORDER BY 4, vl.id
+   LIMIT GREATEST(p_limit, 0);
+END $$;
+
+-- Queues one rooftop's share of the workload, at most the plan's
+-- max_vehicles_per_store over the life of the plan. Returns rows queued.
+CREATE OR REPLACE FUNCTION public.marketcheck_launch_enqueue(p_plan_version integer, p_store_id uuid)
+RETURNS integer LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE p marketcheck_launch_plans%ROWTYPE; v_product text; v_room integer; v_n integer;
+BEGIN
+  SELECT * INTO p FROM marketcheck_launch_plans WHERE version = p_plan_version;
+  IF p.workload IS NULL THEN RETURN 0; END IF;
+  v_product := p.products[1];
+  SELECT (p.workload->>'max_vehicles_per_store')::int - count(*) INTO v_room
+    FROM marketcheck_launch_work WHERE plan_version = p.version AND store_id = p_store_id AND status <> 'cancelled';
+  -- A vehicle cancelled by a rollback is queued again when the plan restarts.
+  INSERT INTO marketcheck_launch_work AS mw (plan_version, store_id, tenant_id, vehicle_id, vin, product, priority)
+  SELECT p.version, p_store_id, c.tenant_id, c.vehicle_id, c.vin, v_product, c.priority
+    FROM marketcheck_launch_workload_candidates(p_store_id, v_product, v_room) c
+  ON CONFLICT (plan_version, vin, product) DO UPDATE SET status = 'queued', attempts = 0, admissions = 0, request_id = NULL,
+    dispatched_at = NULL, finished_at = NULL, result = NULL, enqueued_at = now(), store_id = EXCLUDED.store_id
+    WHERE mw.status = 'cancelled';
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  RETURN v_n;
+END $$;
+
+-- Transport for the dispatcher. These defaults refuse: the deployment
+-- package (supabase/manual/marketcheck_launch_transport.sql) replaces them
+-- with pg_net calls that read the project URL and service key from Vault at
+-- run time, so no key is ever written into a cron command or this file.
+CREATE OR REPLACE FUNCTION public.marketcheck_launch_transport_ready() RETURNS jsonb
+LANGUAGE sql STABLE AS $$ SELECT jsonb_build_object('ready', false, 'reason', 'transport_not_installed') $$;
+CREATE OR REPLACE FUNCTION public.marketcheck_launch_transport(p_function text, p_body jsonb) RETURNS bigint
+LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'transport_not_configured'; END $$;
+CREATE OR REPLACE FUNCTION public.marketcheck_launch_transport_result(p_request_id bigint) RETURNS jsonb
+LANGUAGE sql STABLE AS $$ SELECT NULL::jsonb $$;
+
+-- Run by the marketcheck-launch-dispatch cron job (and once by START). Only
+-- while the launch is on: settles finished dispatches, then sends the next
+-- vehicles to the workload caller, never more than the canary ceiling (or
+-- the hourly and daily ceilings in the pilot) can absorb at the plan's
+-- calls-per-vehicle. A canary that runs out of work, budget or time pauses
+-- itself for review. It never contacts a provider itself: the caller it
+-- invokes still passes the full gate for every call.
+CREATE OR REPLACE FUNCTION public.marketcheck_launch_dispatch()
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  c marketcheck_launch_control%ROWTYPE; p marketcheck_launch_plans%ROWTYPE; w marketcheck_launch_work%ROWTYPE;
+  v_cpv integer; v_timeout integer; v_used integer; v_room integer; v_inflight integer; v_n integer; v_res jsonb; v_body jsonb;
+  v_sent integer := 0; v_settled integer := 0; v_pause text; v_req bigint; v_ready jsonb;
+BEGIN
+  BEGIN
+    SELECT * INTO c FROM marketcheck_launch_control WHERE id = 1 FOR UPDATE NOWAIT;
+  EXCEPTION WHEN lock_not_available THEN RETURN jsonb_build_object('ok', false, 'reason', 'busy');
+  END;
+  IF c.emergency_stop THEN RETURN jsonb_build_object('ok', false, 'reason', 'emergency_stop', 'dispatched', 0); END IF;
+  IF NOT marketcheck_launch_is_active_state(c.state) THEN RETURN jsonb_build_object('ok', false, 'reason', 'launch_inactive', 'dispatched', 0); END IF;
+  SELECT * INTO p FROM marketcheck_launch_plans WHERE version = c.plan_version AND status = 'approved';
+  IF p.version IS NULL OR p.workload IS NULL THEN RETURN jsonb_build_object('ok', false, 'reason', 'no_workload', 'dispatched', 0); END IF;
+  v_cpv := (p.workload->>'calls_per_vehicle')::int;
+  v_timeout := (p.workload->>'response_timeout_minutes')::int;
+
+  -- 1. Settle what was sent.
+  FOR w IN SELECT * FROM marketcheck_launch_work WHERE plan_version = p.version AND status = 'dispatched' ORDER BY id FOR UPDATE LOOP
+    v_res := marketcheck_launch_transport_result(w.request_id);
+    v_body := CASE WHEN jsonb_typeof(v_res->'body') = 'object' THEN v_res->'body' ELSE '{}'::jsonb END;
+    IF v_res IS NULL THEN
+      IF w.dispatched_at < now() - make_interval(mins => v_timeout) THEN
+        UPDATE marketcheck_launch_work SET status = 'failed', finished_at = now(), result = jsonb_build_object('error', 'no_response') WHERE id = w.id;
+        v_settled := v_settled + 1;
+      END IF;
+      CONTINUE;
+    END IF;
+    IF (v_res->>'status_code')::int = 200 AND v_body->>'ok' = 'true' THEN
+      UPDATE marketcheck_launch_work SET status = 'done', finished_at = now(),
+        result = jsonb_build_object('status_code', 200, 'endpoint', v_body->>'endpoint', 'admissions', w.admissions) WHERE id = w.id;
+    ELSIF (v_body->>'retryable' = 'true' OR v_res->>'status_code' IS NULL) AND w.attempts < 2 THEN
+      UPDATE marketcheck_launch_work SET status = 'queued', request_id = NULL, dispatched_at = NULL,
+        result = jsonb_build_object('retry_after', COALESCE(v_body->>'error', v_res->>'error', 'transport_error')) WHERE id = w.id;
+    ELSE
+      UPDATE marketcheck_launch_work SET status = 'failed', finished_at = now(),
+        result = jsonb_build_object('status_code', v_res->'status_code', 'error', COALESCE(v_body->>'error', v_res->>'error', 'unexpected_response')) WHERE id = w.id;
+    END IF;
+    v_settled := v_settled + 1;
+  END LOOP;
+
+  -- 2. How many more paid calls the ceilings can absorb.
+  SELECT count(*) INTO v_inflight FROM marketcheck_launch_work WHERE plan_version = p.version AND status = 'dispatched';
+  IF c.state = 'activating_canary' THEN
+    IF now() > c.canary_started_at + make_interval(hours => p.canary_window_hours) THEN v_pause := 'canary_window_elapsed'; END IF;
+    SELECT count(*) INTO v_used FROM provider_call_events
+     WHERE provider = 'marketcheck' AND at >= c.canary_started_at AND outcome <> 'budget_denied';
+    v_room := p.canary_max_calls - v_used;
+  ELSE
+    SELECT LEAST(p.hourly_call_ceiling - count(*) FILTER (WHERE at > now() - interval '1 hour'), p.daily_call_ceiling - count(*))
+      INTO v_room FROM provider_call_events WHERE provider = 'marketcheck' AND at > now() - interval '24 hours' AND outcome <> 'budget_denied';
+  END IF;
+  v_n := GREATEST(0, LEAST((p.workload->>'batch_size')::int - v_inflight, (v_room - v_inflight * v_cpv) / v_cpv));
+
+  -- 3. Send the next vehicles, each re-checked against the live rooftop scope.
+  IF v_pause IS NULL AND v_n > 0 THEN
+    v_ready := marketcheck_launch_transport_ready();
+    IF NOT COALESCE((v_ready->>'ready')::boolean, false) THEN
+      PERFORM marketcheck_launch_log('dispatch', 'failed', c.state, c.state, p.version, jsonb_build_object('reason', 'transport_not_ready', 'transport', v_ready), 'service');
+      RETURN jsonb_build_object('ok', false, 'reason', 'transport_not_ready', 'dispatched', 0, 'settled', v_settled);
+    END IF;
+    FOR w IN SELECT * FROM marketcheck_launch_work WHERE plan_version = p.version AND status = 'queued' AND store_id = ANY (c.active_store_ids)
+              ORDER BY priority, id LIMIT v_n FOR UPDATE SKIP LOCKED LOOP
+      IF marketcheck_launch_vin_stores(w.vin) <> ARRAY[w.store_id] THEN
+        UPDATE marketcheck_launch_work SET status = 'cancelled', finished_at = now(), result = jsonb_build_object('error', 'ownership_changed') WHERE id = w.id;
+        CONTINUE;
+      END IF;
+      v_req := marketcheck_launch_transport(p.workload->>'function',
+        jsonb_build_object('vin', w.vin, 'tenant_id', w.tenant_id, 'vehicle_id', w.vehicle_id, 'launch_work_id', w.id));
+      UPDATE marketcheck_launch_work SET status = 'dispatched', attempts = attempts + 1, admissions = 0, request_id = v_req, dispatched_at = now() WHERE id = w.id;
+      v_sent := v_sent + 1;
+    END LOOP;
+  END IF;
+
+  -- 4. A canary with nothing left to do, no room left or no time left stops
+  -- for review; promotion to the pilot is a separate, rechecked action.
+  IF c.state = 'activating_canary' AND v_pause IS NULL AND v_sent = 0 AND v_inflight = 0
+     AND NOT EXISTS (SELECT 1 FROM marketcheck_launch_work WHERE plan_version = p.version AND status = 'dispatched') THEN
+    IF NOT EXISTS (SELECT 1 FROM marketcheck_launch_work WHERE plan_version = p.version AND status = 'queued' AND store_id = ANY (c.active_store_ids)) THEN
+      v_pause := 'canary_workload_complete';
+    ELSIF v_room < v_cpv THEN
+      v_pause := 'canary_ceiling_reached';
+    END IF;
+  END IF;
+  IF v_pause IS NOT NULL THEN
+    UPDATE marketcheck_launch_control SET state = 'paused', paused_reason = v_pause, paused_at = now(), updated_at = now() WHERE id = 1;
+    PERFORM marketcheck_launch_log('workload_pause', 'ok', c.state, 'paused', p.version, jsonb_build_object('reason', v_pause), 'service');
+  END IF;
+  IF v_sent > 0 OR v_settled > 0 THEN
+    PERFORM marketcheck_launch_log('dispatch', 'ok', c.state, COALESCE(CASE WHEN v_pause IS NOT NULL THEN 'paused' END, c.state), p.version,
+      jsonb_build_object('dispatched', v_sent, 'settled', v_settled, 'room', v_room, 'in_flight', v_inflight), 'service');
+  END IF;
+  RETURN jsonb_build_object('ok', true, 'dispatched', v_sent, 'settled', v_settled, 'room', v_room, 'paused', v_pause);
+END $$;
+
+-- The dispatcher's schedule is created OFF. Only activation turns it on, and
+-- the emergency stop and rollback turn it off again.
+DO $$
+BEGIN
+  IF to_regclass('cron.job') IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'marketcheck-launch-dispatch') THEN
+    PERFORM cron.schedule('marketcheck-launch-dispatch', '*/5 * * * *', 'SELECT public.marketcheck_launch_dispatch()');
+    PERFORM cron.alter_job((SELECT jobid FROM cron.job WHERE jobname = 'marketcheck-launch-dispatch'), active => false);
+  END IF;
+END $$;
 
 -- ── Budget reconciliation ───────────────────────────────────────────────
 -- The older gate's essential reserve (250) and the coordinator's protected
@@ -577,17 +821,34 @@ BEGIN
     'summary', CASE WHEN p.version IS NULL THEN 'No plan products to verify.' WHEN cardinality(v_missing) = 0 THEN 'Every plan product has a verified catalog entry.'
       ELSE 'Not verified in the product catalog: ' || array_to_string(v_missing, ', ') END);
 
-  -- 6. Six rooftop feed mappings: one approved, matching mapping per active store.
-  SELECT count(*), count(*) FILTER (WHERE m.evidence->'approved_comparison'->>'verdict' = 'match')
-    INTO v_n, v_m
-    FROM inventory_source_mappings m JOIN dealer_stores s ON s.id = m.store_id
-   WHERE m.status = 'approved' AND s.status = 'active';
-  v_ok := NOT EXISTS (
-    SELECT store_id FROM inventory_source_mappings WHERE status = 'approved' GROUP BY store_id HAVING count(*) > 1
-    UNION ALL SELECT NULL FROM inventory_source_mappings WHERE status = 'approved' GROUP BY provider, source_dealer_id HAVING count(*) > 1);
-  v := v || jsonb_build_object('key','feed_mappings','label','Six rooftop feed mappings','mandatory',true,
-    'status', CASE WHEN v_n >= 6 AND v_m = v_n AND v_ok THEN 'passed' ELSE 'failed' END,
-    'summary', format('%s approved mappings to active stores, %s with a matching identity%s.', v_n, v_m, CASE WHEN v_ok THEN '' ELSE '; a store or DealerId is mapped twice' END));
+  -- 6. The canary rooftop's own feed identity. The pilot needs only this
+  -- store: sister rooftops are reported (6b) but never block it, and each
+  -- is revalidated when its own expansion is approved.
+  v_ok := p.version IS NOT NULL AND marketcheck_launch_store_identity_ok(p.canary_store_id);
+  v := v || jsonb_build_object('key','canary_mapping','label','Canary rooftop feed identity','mandatory',true,
+    'status', CASE WHEN p.version IS NULL THEN 'unverified' WHEN v_ok THEN 'passed' ELSE 'failed' END,
+    'summary', CASE WHEN p.version IS NULL THEN 'No canary store selected.'
+      WHEN v_ok THEN format('%s has exactly one approved feed mapping whose identity matched, and its DealerId is mapped to no other store.',
+        (SELECT display_name FROM dealer_stores WHERE id = p.canary_store_id))
+      ELSE 'The canary store needs exactly one approved feed mapping with a matching identity, mapped to no other store.' END);
+
+  -- 6b. All rooftops in the plan, for display. Not mandatory for the canary.
+  SELECT COALESCE(jsonb_agg(jsonb_build_object('store_id', s.id, 'name', s.display_name, 'role', CASE WHEN s.id = p.canary_store_id THEN 'canary' ELSE 'expansion' END,
+      'order', x.o, 'identity_verified', marketcheck_launch_store_identity_ok(s.id), 'feed_paused', s.feed_import_paused, 'store_status', s.status,
+      'mapping', (SELECT jsonb_build_object('source_dealer_id', m.source_dealer_id, 'status', m.status, 'verdict', m.evidence->'approved_comparison'->>'verdict')
+                    FROM inventory_source_mappings m WHERE m.store_id = s.id ORDER BY (m.status = 'approved') DESC, m.approved_at DESC NULLS LAST LIMIT 1),
+      'feed_clean', marketcheck_launch_store_feed_clean(s.id, COALESCE(p.feed_max_age_hours, 9)),
+      'policy_ready', EXISTS (SELECT 1 FROM store_enrichment_policies sp WHERE sp.store_id = s.id AND sp.mc_rooftop_verified_at IS NOT NULL AND sp.credential_ref IS NOT NULL),
+      'active_in_launch', s.id = ANY (c.active_store_ids)) ORDER BY x.o), '[]'::jsonb)
+    INTO v_detail
+    FROM (SELECT p.canary_store_id sid, 0 o UNION ALL SELECT (e->>'store_id')::uuid, (e->>'order')::int FROM jsonb_array_elements(COALESCE(p.rollout, '[]'::jsonb)) e) x
+    JOIN dealer_stores s ON s.id = x.sid;
+  SELECT count(*) FILTER (WHERE (e->>'identity_verified')::boolean), count(*) INTO v_m, v_n FROM jsonb_array_elements(v_detail) e;
+  v := v || jsonb_build_object('key','rooftop_mappings','label','All plan rooftops (expansion readiness)','mandatory',false,
+    'status', CASE WHEN v_n > 0 AND v_m = v_n THEN 'passed' ELSE 'failed' END,
+    'summary', format('%s of %s plan rooftops have a verified feed identity. Sister rooftops do not block the canary; each is revalidated at its own expansion.', v_m, v_n),
+    'detail', jsonb_build_object('stores', v_detail));
+  v_detail := NULL;
 
   -- 7. Canary store feed fresh and not held.
   IF p.version IS NOT NULL THEN
@@ -623,14 +884,39 @@ BEGIN
   ELSE
     EXECUTE $q$SELECT count(*) FROM (SELECT substring(command from '/functions/v1/([a-z0-9-]+)') t FROM cron.job WHERE active AND command ~ '/functions/v1/'
               GROUP BY 1 HAVING count(*) > 1) d$q$ INTO v_n;
-    EXECUTE $q$SELECT count(*) FROM cron.job WHERE active AND command ~ '/functions/v1/files-inventory-worker'$q$ INTO v_m;
+    EXECUTE $q$SELECT count(*) FROM cron.job WHERE active AND command ~ '(/functions/v1/files-inventory-worker|files_inventory_worker_tick)'$q$ INTO v_m;
+    EXECUTE $q$SELECT count(*) FROM cron.job WHERE command ~ 'marketcheck_launch_dispatch'$q$ INTO v_txt;
     v := v || jsonb_build_object('key','schedulers','label','Schedulers and duplicate-job checks','mandatory',true,
-      'status', CASE WHEN v_n = 0 AND v_m = 1 THEN 'passed' ELSE 'failed' END,
+      'status', CASE WHEN v_n = 0 AND v_m = 1 AND v_txt = '1' THEN 'passed' ELSE 'failed' END,
       'summary', CASE WHEN v_n > 0 THEN format('%s function(s) have more than one active cron job.', v_n)
         WHEN v_m = 0 THEN 'The Files.com inventory worker has no active schedule, so feeds are not imported on cadence.'
-        ELSE 'One feed worker schedule; no duplicate jobs.' END,
+        WHEN v_m > 1 THEN format('The Files.com inventory worker is scheduled %s times.', v_m)
+        WHEN v_txt <> '1' THEN format('Expected exactly one marketcheck-launch-dispatch job, found %s.', v_txt)
+        ELSE 'One feed worker schedule, one workload dispatcher (off until START); no duplicate jobs.' END,
       'detail', jsonb_build_object('marketcheck_jobs', v_cron));
   END IF;
+
+  -- 9b. The workload START begins: defined, its transport installed, and
+  -- real canary vehicles waiting for a first decode.
+  v_n := 0;
+  IF p.version IS NOT NULL AND p.workload IS NOT NULL THEN
+    -- Vehicles waiting for a first decode, plus the plan's own work already
+    -- queued or finished (a running or paused launch has used its candidates).
+    SELECT count(*) INTO v_n FROM marketcheck_launch_workload_candidates(p.canary_store_id, p.products[1], (p.workload->>'max_vehicles_per_store')::int);
+    v_n := v_n + (SELECT count(*) FROM marketcheck_launch_work WHERE plan_version = p.version AND store_id = p.canary_store_id AND status <> 'cancelled');
+    v_detail := marketcheck_launch_transport_ready();
+  END IF;
+  v_ok := p.workload IS NOT NULL AND COALESCE((v_detail->>'ready')::boolean, false) AND v_n > 0;
+  v := v || jsonb_build_object('key','workload','label','Canary enrichment workload','mandatory',true,
+    'status', CASE WHEN p.version IS NULL THEN 'unverified' WHEN v_ok THEN 'passed' ELSE 'failed' END,
+    'summary', CASE WHEN p.version IS NULL THEN 'No plan.'
+      WHEN p.workload IS NULL THEN 'The plan defines no workload, so START would only open the gate.'
+      WHEN NOT COALESCE((v_detail->>'ready')::boolean, false) THEN 'The dispatcher transport is not installed or its Vault secrets are missing: ' || COALESCE(v_detail->>'reason', 'unknown')
+      WHEN v_n = 0 THEN 'No canary vehicle is waiting for a first NeoVIN decode.'
+      ELSE format('START queues %s canary vehicle(s) for NeoVIN, at most %s call(s) each, %s at a time, inside the %s-call canary ceiling.',
+        v_n, p.workload->>'calls_per_vehicle', p.workload->>'batch_size', p.canary_max_calls) END,
+    'detail', jsonb_build_object('candidates', v_n, 'workload', p.workload, 'transport', v_detail));
+  v_detail := NULL;
 
   -- 10. Deployed gate version: every approved caller seen on the required
   -- version, from the admission heartbeat the deployed code writes itself.
@@ -651,7 +937,8 @@ BEGIN
     WHERE NOT EXISTS (SELECT 1 FROM provider_product_catalog pc WHERE pc.account_ref = 'marketcheck_primary' AND pc.product_key = x
                        AND pc.rate_status = 'verified' AND pc.rate_usd IS NOT NULL));
   v_ok := p.version IS NOT NULL AND p.account_usd_cap IS NOT NULL AND cardinality(v_missing) = 0
-          AND pol.store_id IS NOT NULL AND pol.monthly_usd_cap IS NOT NULL AND pol.monthly_usd_cap <= p.account_usd_cap;
+          AND pol.store_id IS NOT NULL AND pol.monthly_usd_cap IS NOT NULL AND pol.monthly_usd_cap <= p.account_usd_cap
+          AND (p.canary_store_usd_cap IS NULL OR pol.monthly_usd_cap <= p.canary_store_usd_cap);
   v := v || jsonb_build_object('key','cost_controls','label','Dollar caps and verified pricing','mandatory',true,
     'status', CASE WHEN p.version IS NULL THEN 'unverified' WHEN v_ok THEN 'passed' ELSE 'failed' END,
     'summary', CASE WHEN p.version IS NULL THEN 'No plan.'
@@ -659,8 +946,10 @@ BEGIN
       WHEN cardinality(v_missing) > 0 THEN 'No verified account price for: ' || array_to_string(v_missing, ', ')
       WHEN pol.store_id IS NULL OR pol.monthly_usd_cap IS NULL THEN 'The canary store has no monthly dollar cap.'
       WHEN pol.monthly_usd_cap > p.account_usd_cap THEN 'The canary store dollar cap is above the account cap.'
+      WHEN pol.monthly_usd_cap > p.canary_store_usd_cap THEN format('The canary store dollar cap $%s is above the plan''s $%s.', pol.monthly_usd_cap, p.canary_store_usd_cap)
       ELSE format('Account cap $%s; canary store cap $%s; plan products priced from the account.', p.account_usd_cap, pol.monthly_usd_cap) END,
     'detail', jsonb_build_object('account_usd_cap', p.account_usd_cap, 'current_account_usd_cap', a.monthly_usd_cap, 'canary_store_usd_cap', pol.monthly_usd_cap,
+      'plan_canary_store_usd_cap', p.canary_store_usd_cap,
       'prices', (SELECT COALESCE(jsonb_object_agg(pc.product_key, jsonb_build_object('rate_usd', pc.rate_usd, 'rate_status', pc.rate_status)), '{}'::jsonb)
                    FROM provider_product_catalog pc WHERE pc.account_ref = 'marketcheck_primary' AND pc.product_key = ANY (COALESCE(p.products, '{}')))));
 
@@ -770,6 +1059,10 @@ BEGIN
       'last_error', (SELECT jsonb_build_object('at', at, 'outcome', outcome, 'http_status', http_status, 'caller', caller) FROM provider_call_events
           WHERE provider = 'marketcheck' AND outcome IN ('refused_quota','refused_rate','refused_auth','provider_error','transport_error') ORDER BY at DESC LIMIT 1),
       'marketcheck_cron', marketcheck_launch_cron_jobs()),
+    'workload', jsonb_build_object('definition', p.workload,
+      'counts', (SELECT COALESCE(jsonb_object_agg(status, n), '{}'::jsonb) FROM (SELECT status, count(*) n FROM marketcheck_launch_work WHERE plan_version = p.version GROUP BY 1) q),
+      'admissions', (SELECT COALESCE(sum(admissions), 0) FROM marketcheck_launch_work WHERE plan_version = p.version),
+      'last_dispatch', (SELECT max(at) FROM marketcheck_launch_events WHERE action = 'dispatch' AND result = 'ok')),
     'heartbeats', (SELECT COALESCE(jsonb_agg(to_jsonb(h) ORDER BY h.caller), '[]'::jsonb) FROM provider_gate_heartbeats h),
     'events', (SELECT COALESCE(jsonb_agg(to_jsonb(e) ORDER BY e.at DESC), '[]'::jsonb) FROM (SELECT * FROM marketcheck_launch_events ORDER BY at DESC LIMIT 25) e));
 END $$;
@@ -850,6 +1143,7 @@ RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   v_uid uuid := inv_require_platform_admin(); c marketcheck_launch_control%ROWTYPE; p marketcheck_launch_plans%ROWTYPE;
   a provider_accounts%ROWTYPE; r jsonb; v_failed jsonb; v_prev_budget jsonb; v_prev_pol jsonb; v_prev_cron jsonb := '[]'::jsonb; j jsonb;
+  v_enq integer; v_disp jsonb;
 BEGIN
   IF p_confirm IS DISTINCT FROM 'START' THEN RAISE EXCEPTION 'confirmation_required'; END IF;
   BEGIN
@@ -894,16 +1188,26 @@ BEGIN
   UPDATE store_enrichment_policies SET mode = 'enrichment', budget_blocked = false, updated_by = v_uid, updated_at = now()
    WHERE store_id = p.canary_store_id;
   FOR j IN SELECT * FROM jsonb_array_elements(p.cron_jobs) LOOP
-    PERFORM marketcheck_launch_cron_set(j->>'jobname', j->>'schedule', true);
+    IF NOT marketcheck_launch_cron_set(j->>'jobname', j->>'schedule', true) AND to_regclass('cron.job') IS NOT NULL THEN
+      RAISE EXCEPTION 'cron_job_missing: %', j->>'jobname';
+    END IF;
   END LOOP;
   UPDATE marketcheck_launch_control SET state = 'activating_canary', plan_version = p.version, active_store_ids = ARRAY[p.canary_store_id],
     activated_at = now(), activated_by = v_uid, canary_started_at = now(), pilot_started_at = NULL, last_expanded_at = NULL, paused_reason = NULL, paused_at = NULL,
     previous_budget = v_prev_budget, previous_policies = v_prev_pol, previous_cron = v_prev_cron, updated_at = now(), updated_by = v_uid
   WHERE id = 1;
+  -- START begins the work: queue the canary's vehicles and send the first
+  -- batch now; the dispatcher job carries on every few minutes. The calls
+  -- leave only after this transaction commits.
+  v_enq := marketcheck_launch_enqueue(p.version, p.canary_store_id);
+  IF p.workload IS NOT NULL AND v_enq = 0 THEN
+    RAISE EXCEPTION 'workload_empty';
+  END IF;
   PERFORM marketcheck_launch_log('activate', 'ok', c.state, 'activating_canary', p.version,
     jsonb_build_object('canary_store_id', p.canary_store_id, 'canary_max_calls', p.canary_max_calls, 'products', p.products,
-      'callers', p.allowed_callers, 'cron_jobs', p.cron_jobs, 'readiness_evaluated_at', r->'evaluated_at'));
-  RETURN jsonb_build_object('ok', true, 'state', 'activating_canary', 'plan_version', p.version);
+      'callers', p.allowed_callers, 'cron_jobs', p.cron_jobs, 'workload_queued', v_enq, 'readiness_evaluated_at', r->'evaluated_at'));
+  v_disp := CASE WHEN p.workload IS NOT NULL THEN marketcheck_launch_dispatch() END;
+  RETURN jsonb_build_object('ok', true, 'state', 'activating_canary', 'plan_version', p.version, 'workload_queued', v_enq, 'first_dispatch', v_disp);
 END $$;
 
 -- Stop All MarketCheck Paid Calls. Usable by a platform admin from the
@@ -973,7 +1277,7 @@ BEGIN
     PERFORM marketcheck_launch_log('resume', 'refused', c.state, c.state, c.plan_version, jsonb_build_object('reason', 'readiness_failed'));
     RETURN jsonb_build_object('ok', false, 'reason', 'readiness_failed');
   END IF;
-  IF c.paused_reason IN ('canary_ceiling_reached','canary_window_elapsed') THEN
+  IF c.paused_reason IN ('canary_ceiling_reached','canary_window_elapsed','canary_workload_complete') THEN
     -- Promotion to the pilot needs the provider's own usage figures taken
     -- after the canary started, so real consumption can be compared.
     SELECT * INTO a FROM provider_accounts WHERE account_ref = 'marketcheck_primary';
@@ -1038,8 +1342,9 @@ BEGIN
   UPDATE store_enrichment_policies SET mode = 'enrichment', budget_blocked = false, updated_by = v_uid, updated_at = now() WHERE store_id = p_store_id;
   UPDATE marketcheck_launch_control SET state = 'expanding', active_store_ids = active_store_ids || p_store_id, last_expanded_at = now(),
     updated_at = now(), updated_by = v_uid WHERE id = 1;
-  PERFORM marketcheck_launch_log('expand', 'ok', c.state, 'expanding', c.plan_version, jsonb_build_object('store_id', p_store_id));
-  RETURN jsonb_build_object('ok', true, 'state', 'expanding');
+  v_reason := marketcheck_launch_enqueue(c.plan_version, p_store_id)::text;
+  PERFORM marketcheck_launch_log('expand', 'ok', c.state, 'expanding', c.plan_version, jsonb_build_object('store_id', p_store_id, 'workload_queued', v_reason::int));
+  RETURN jsonb_build_object('ok', true, 'state', 'expanding', 'workload_queued', v_reason::int);
 END $$;
 
 -- Return to the pre-activation configuration: budget row, store policy modes
@@ -1066,6 +1371,8 @@ BEGIN
   FOR j IN SELECT * FROM jsonb_array_elements(COALESCE(c.previous_cron, '[]'::jsonb)) LOOP
     IF NOT COALESCE((j->>'missing')::boolean, false) THEN PERFORM marketcheck_launch_cron_set(j->>'jobname', j->>'schedule', (j->>'active')::boolean); END IF;
   END LOOP;
+  UPDATE marketcheck_launch_work SET status = 'cancelled', finished_at = now(), result = jsonb_build_object('error', 'rolled_back')
+   WHERE status IN ('queued','dispatched');
   UPDATE marketcheck_launch_control SET state = 'not_ready', emergency_stop = false, active_store_ids = '{}', activated_at = NULL, activated_by = NULL,
     canary_started_at = NULL, pilot_started_at = NULL, last_expanded_at = NULL, paused_reason = NULL, paused_at = NULL,
     previous_budget = NULL, previous_policies = NULL, previous_cron = NULL, updated_at = now(), updated_by = v_uid WHERE id = 1;
@@ -1086,7 +1393,7 @@ RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   v_uid uuid := inv_require_platform_admin(); c marketcheck_launch_control%ROWTYPE; p marketcheck_launch_plans%ROWTYPE;
   v_tenant uuid; v_product text; v_billing text; v_caller text; v_admit jsonb := '{}'::jsonb; v_old text; v_reserve text; v_direct text;
-  v_cron_before jsonb; v_cron_during jsonb; v_cron_after jsonb; v_flag boolean; v_ok boolean; v_detail jsonb; v_summary text;
+  v_cron_before jsonb; v_cron_during jsonb; v_cron_after jsonb; v_flag boolean; v_ok boolean; v_detail jsonb; v_summary text; v_dispatch text;
 BEGIN
   SELECT * INTO c FROM marketcheck_launch_control WHERE id = 1 FOR UPDATE;
   IF c.state NOT IN ('not_ready','ready_to_activate') OR c.emergency_stop THEN RETURN jsonb_build_object('ok', false, 'reason', 'drill_only_when_off'); END IF;
@@ -1113,6 +1420,7 @@ BEGIN
       VALUES ('marketcheck_primary', v_product, 'stop-drill', 'stop_drill', 1, 'mcp', v_tenant, p.canary_store_id, 'reserved');
       v_direct := 'not_refused';
     EXCEPTION WHEN raise_exception THEN v_direct := SQLERRM; END;
+    v_dispatch := marketcheck_launch_dispatch()->>'reason';
     v_cron_during := marketcheck_launch_cron_jobs();
     RAISE EXCEPTION 'stop_drill_rollback';
   EXCEPTION WHEN raise_exception THEN
@@ -1124,12 +1432,13 @@ BEGIN
     AND v_old = 'gate_upgrade_required'
     AND v_reserve = 'launch_gate_closed: emergency_stop'
     AND v_direct = 'launch_gate_closed: emergency_stop'
+    AND v_dispatch = 'emergency_stop'
     AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_cron_during) j WHERE (j->>'active')::boolean)
     AND v_cron_after = v_cron_before
     AND (SELECT state = c.state AND NOT emergency_stop FROM marketcheck_launch_control WHERE id = 1);
-  v_detail := jsonb_build_object('admission_v2', v_admit, 'admission_pre_release', v_old, 'provider_reserve', v_reserve, 'direct_reservation', v_direct,
+  v_detail := jsonb_build_object('admission_v2', v_admit, 'admission_pre_release', v_old, 'provider_reserve', v_reserve, 'direct_reservation', v_direct, 'workload_dispatcher', v_dispatch,
     'cron_before', v_cron_before, 'cron_during_stop', v_cron_during, 'cron_after', v_cron_after, 'stop_flag_set', v_flag, 'paid_calls', 0);
-  v_summary := CASE WHEN v_ok THEN format('Stop refused %s admission(s), the pre-release entry point, provider_reserve and a direct reservation; parked %s cron job(s); all restored.',
+  v_summary := CASE WHEN v_ok THEN format('Stop refused %s admission(s), the pre-release entry point, provider_reserve, a direct reservation and the workload dispatcher; parked %s cron job(s); all restored.',
       (SELECT count(*) FROM jsonb_object_keys(v_admit)), jsonb_array_length(v_cron_during))
     ELSE 'The stop did not refuse at every boundary; see detail.' END;
   INSERT INTO marketcheck_launch_checks (check_key, status, summary, evidence_ref, detail, verified_by, verified_at)
@@ -1146,9 +1455,12 @@ REVOKE ALL ON FUNCTION
   public.marketcheck_launch_cron_state(text), public.marketcheck_launch_cron_set(text, text, boolean), public.marketcheck_launch_cron_jobs(),
   public.marketcheck_launch_gate(text, uuid, text, uuid, text, text, text, bigint),
   public.marketcheck_launch_vin_stores(text), public.marketcheck_launch_store_identity_ok(uuid), public.marketcheck_launch_store_feed_clean(uuid, integer),
-  public.marketcheck_launch_readiness(integer)
+  public.marketcheck_launch_readiness(integer),
+  public.marketcheck_launch_workload_candidates(uuid, text, integer), public.marketcheck_launch_enqueue(integer, uuid),
+  public.marketcheck_launch_transport_ready(), public.marketcheck_launch_transport(text, jsonb), public.marketcheck_launch_transport_result(bigint),
+  public.marketcheck_launch_dispatch()
 FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.marketcheck_launch_readiness(integer) TO service_role;
+GRANT EXECUTE ON FUNCTION public.marketcheck_launch_readiness(integer), public.marketcheck_launch_dispatch() TO service_role;
 REVOKE ALL ON FUNCTION
   public.marketcheck_launch_status(), public.marketcheck_launch_record_quota(integer, integer, integer, timestamptz, text),
   public.marketcheck_launch_attest(text, text, text, text, jsonb), public.marketcheck_launch_approve_plan(integer), public.marketcheck_launch_set_plan_usd_cap(integer, numeric),
@@ -1168,10 +1480,10 @@ TO authenticated, service_role;
 -- Seeded only where the Harte stores exist. Approval is a separate owner act.
 INSERT INTO public.marketcheck_launch_plans (version, title, canary_store_id, canary_max_calls, canary_window_hours, hourly_call_ceiling,
   daily_call_ceiling, error_tripwire_per_hour, uncertain_tripwire_per_hour, feed_max_age_hours, required_gate_version, products, allowed_callers,
-  cron_jobs, rollout, notes)
+  cron_jobs, rollout, notes, account_usd_cap, canary_store_usd_cap, workload)
 SELECT 1, 'Harte INFINITI canary, then five Harte rooftops', '45cdc1e0-7e88-4b44-9d07-27369d74ab21'::uuid, 40, 24, 15, 120, 5, 3, 9,
   'launch-2026-11-02', ARRAY['neovin'], ARRAY['marketcheck-specs'],
-  '[]'::jsonb,
+  '[{"jobname":"marketcheck-launch-dispatch","schedule":"*/5 * * * *"}]'::jsonb,
   (SELECT COALESCE(jsonb_agg(jsonb_build_object('store_id', id, 'order', o, 'min_hours_after_previous', 48) ORDER BY o), '[]'::jsonb)
      FROM (VALUES ('35d5584b-93d4-4419-9a50-6daead08e7a9'::uuid, 1), ('e400e636-0909-4b36-822e-caa2b5ae7381'::uuid, 2),
                   ('12e1d831-166d-48e9-87b5-536d7c0980dc'::uuid, 3), ('17a9f6f2-29ff-4ff1-bf72-1519df10b7d5'::uuid, 4),
@@ -1179,6 +1491,12 @@ SELECT 1, 'Harte INFINITI canary, then five Harte rooftops', '45cdc1e0-7e88-4b44
     WHERE EXISTS (SELECT 1 FROM public.dealer_stores s WHERE s.id = v.id)),
   'Canary: at most 40 NeoVIN decodes in 24 hours, Harte INFINITI vehicles only, through marketcheck-specs. Then pilot, then one rooftop at a time, 48 hours apart. '
   || 'marketcheck-sync is not an approved caller: it pulls the syndication and dealer-directory products, which are not verified entitlements, and inventory '
-  || 'already arrives from vAuto through Files.com. Adding it needs a new plan version naming those products with verified entitlement and pricing.'
+  || 'already arrives from vAuto through Files.com. Adding it needs a new plan version naming those products with verified entitlement and pricing. '
+  || 'START queues up to 20 never-decoded Harte INFINITI vehicles (new first) and the dispatcher sends them two at a time to marketcheck-specs; '
+  || 'at most 2 NeoVIN calls per vehicle, so 20 vehicles fit the 40-call ceiling. No global backfill or sweep can spend: the gate admits only dispatched VINs. '
+  || 'Dollar caps $25/month account and $10/month Harte INFINITI are the owner''s provisional figures (2026-11-03), not final spending authorizations '
+  || 'until account pricing, quota and outside connector access are verified.',
+  25.00, 10.00,
+  '{"kind":"neovin_decode","caller":"marketcheck-specs","function":"marketcheck-specs","max_vehicles_per_store":20,"calls_per_vehicle":2,"batch_size":2,"response_timeout_minutes":10}'::jsonb
 WHERE EXISTS (SELECT 1 FROM public.dealer_stores WHERE id = '45cdc1e0-7e88-4b44-9d07-27369d74ab21')
 ON CONFLICT (version) DO NOTHING;

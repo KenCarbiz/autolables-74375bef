@@ -4,7 +4,7 @@ import { Button, EmptyState, InlineNote, KeyValueList, Panel, StatusText, Td, Th
 import { ICON } from "@/components/admin/v2/primitives";
 import type { Consumption, LaunchEvent, LaunchStatus, ReadinessCheck } from "@/lib/marketcheckLaunch/types";
 import {
-  CHECK_STATUS_LABEL, CHECK_STATUS_TONE, STATE_TONE, SQL_FALLBACK, cronJobName, isAttested, mandatoryProgress, num, periodSourceLabel, stateLabel, usd, when,
+  CHECK_STATUS_LABEL, CHECK_STATUS_TONE, STATE_TONE, SQL_FALLBACK, cronJobName, isAttested, mandatoryProgress, num, periodSourceLabel, rooftopsFromReadiness, stateLabel, usd, when, workloadLine,
 } from "@/lib/marketcheckLaunch/viewModel";
 
 export const Section = ({ title, description, action, children }: { title: string; description?: string; action?: ReactNode; children: ReactNode }) => (
@@ -201,8 +201,10 @@ export function PlanSummary({ plan: p }: { plan: NonNullable<LaunchStatus["plan"
         { label: "Uncertain tripwire", value: `${num(p.uncertain_tripwire_per_hour)} per hour` },
         { label: "API products", value: list(p.products) },
         { label: "Account dollar cap", value: p.account_usd_cap == null ? "Not set - required before approval" : `${usd(p.account_usd_cap)} / month` },
+        { label: "Canary store dollar cap", value: p.canary_store_usd_cap == null ? "Not set" : `${usd(p.canary_store_usd_cap)} / month` },
+        { label: "Workload on start", value: workloadLine(p.workload) },
         { label: "Allowed callers", value: list(p.allowed_callers) },
-        { label: "Cron jobs", value: p.cron_jobs && p.cron_jobs.length ? p.cron_jobs.map(cronJobName).join(", ") : "No scheduled jobs are turned on by this plan" },
+        { label: "Cron jobs turned on by start", value: p.cron_jobs && p.cron_jobs.length ? p.cron_jobs.map(cronJobName).join(", ") : "No scheduled jobs are turned on by this plan" },
       ]} />
       <h4 className="mt-4 mb-1 text-[13px] font-semibold text-adm-ink">Rollout order</h4>
       {p.rollout_stores.length === 0 ? <p className="text-[13px] text-adm-muted">No rollout stores</p> : (
@@ -215,6 +217,41 @@ export function PlanSummary({ plan: p }: { plan: NonNullable<LaunchStatus["plan"
         </ol>
       )}
     </>
+  );
+}
+
+export function RooftopsSection({ status }: { status: LaunchStatus }) {
+  const rows = rooftopsFromReadiness(status.readiness?.checks);
+  const w = status.workload;
+  const n = (k: keyof NonNullable<typeof w>["counts"]) => num(w?.counts?.[k] ?? 0);
+  return (
+    <Section title="Rooftops and workload" description="The canary needs only its own rooftop. Sister rooftops are shown here and are checked again when each one is expanded.">
+      {rows.length === 0 ? <EmptyState title="No rooftops in the plan" compact /> : (
+        <WorkTable caption="Plan rooftops" minWidth={720}>
+          <thead><tr><Th>Store</Th><Th>Role</Th><Th>Feed identity</Th><Th>Feed</Th><Th>MarketCheck policy</Th><Th>In launch</Th></tr></thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.store_id}>
+                <Td>{r.name}</Td>
+                <Td>{r.role === "canary" ? "Canary" : `Expansion ${r.order}`}</Td>
+                <Td>{r.identity_verified ? `Verified (${r.mapping?.source_dealer_id ?? ""})` : r.mapping ? `${r.mapping.source_dealer_id}: ${r.mapping.status}${r.mapping.verdict ? `, ${r.mapping.verdict}` : ""}` : "No mapping"}</Td>
+                <Td>{r.feed_paused ? "Paused" : r.feed_clean ? "Fresh" : "Not fresh"}</Td>
+                <Td>{r.policy_ready ? "Ready" : "Not ready"}</Td>
+                <Td>{r.active_in_launch ? "Active" : "No"}</Td>
+              </tr>
+            ))}
+          </tbody>
+        </WorkTable>
+      )}
+      <div className="mt-4">
+        <KeyValueList divided rows={[
+          { label: "Workload", value: workloadLine(w?.definition ?? status.plan?.workload) },
+          { label: "Vehicles", value: `${n("queued")} queued, ${n("dispatched")} in flight, ${n("done")} done, ${n("failed")} failed` },
+          { label: "Calls admitted for the workload", value: num(w?.admissions ?? 0) },
+          { label: "Last dispatch", value: when(w?.last_dispatch ?? null) },
+        ]} />
+      </div>
+    </Section>
   );
 }
 

@@ -19,6 +19,8 @@ export const describeError = (e: unknown): string => {
   if (/usd_cap_required/i.test(msg)) return "Set an account dollar cap on this plan before approving it.";
   if (/invalid_usd_cap/i.test(msg)) return "The dollar cap must be greater than 0 and no more than 100,000.";
   if (/plan_not_draft/i.test(msg)) return "Only a draft plan can be changed.";
+  if (/workload_empty/i.test(msg)) return "No canary vehicle is waiting for a first decode, so starting would do nothing. Nothing was changed.";
+  if (/cron_job_missing/i.test(msg)) return "The workload dispatcher job is missing from the scheduler. Nothing was changed.";
   return explainError(e);
 };
 

@@ -28,4 +28,5 @@ CORE_AFTER=$(psql -qtA -d "$DB" -c "SELECT md5(prosrc) FROM pg_proc WHERE pronam
 echo "ok  provider_call_admit body preserved as provider_call_admit_core ($CORE_AFTER)"
 $P -d "$DB" -f supabase/tests/marketcheck_launch/10_launch.sql
 TEST_DB="$DB" bash scripts/test-marketcheck-launch-concurrency.sh
+$P -d "$DB" -f supabase/tests/marketcheck_launch/20_deploy_package.sql
 echo "MARKETCHECK LAUNCH SQL TESTS PASSED"
