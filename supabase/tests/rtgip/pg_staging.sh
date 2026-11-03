@@ -150,12 +150,13 @@ PY
 chmod a+r "$WORK/seed.json"
 
 if [ -n "${RTGIP_STG_NODES_ONLY:-}" ]; then cat "$WORK/seed.json"; exit 0; fi
-echo "four clusters up (ports $PORT_autolabels-$PORT_gateway, Postgres $(psql_on $PORT_gateway stg_gateway -c 'SHOW server_version')); nodes built from empty; registry exports drove every seed (stand-in Gateway, not acceptance)"
+echo "four clusters up (ports $PORT_autolabels-$PORT_gateway, Postgres $(psql_on $PORT_gateway stg_gateway -c 'SHOW server_version')); nodes built from empty; registry exports drove every seed (Gateway per RTGIP_STG_GATEWAY: candidate by default, standin on request)"
 cd "$ROOT"
 RTGIP_STG_AUTOLABELS="postgres://postgres@127.0.0.1:$PORT_autolabels/stg_autolabels" \
 RTGIP_STG_AUTOCURB="postgres://postgres@127.0.0.1:$PORT_autocurb/stg_autocurb" \
 RTGIP_STG_AUTOFRAME="postgres://postgres@127.0.0.1:$PORT_autoframe/stg_autoframe" \
-RTGIP_STG_GATEWAY="postgres://postgres@127.0.0.1:$PORT_gateway/stg_gateway" \
+RTGIP_STG_GATEWAY_DB="postgres://postgres@127.0.0.1:$PORT_gateway/stg_gateway" \
+RTGIP_STG_GATEWAY="${RTGIP_STG_GATEWAY:-candidate}" \
 RTGIP_STG_SEED="$WORK/seed.json" AC_REPO="$AC_REPO" AF_REPO="$AF_REPO" \
 RTGIP_STG_REPORT="${RTGIP_STG_REPORT:-}" \
   npx vitest run --reporter=verbose src/lib/rooftopos-parked/rtgip2-staging

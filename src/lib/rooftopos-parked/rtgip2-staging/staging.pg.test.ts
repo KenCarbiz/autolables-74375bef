@@ -6,6 +6,8 @@
 // app's adapter apply() inside the inbox transaction. The Gateway is a STAND-IN behind GatewayPort
 // (admit, forward, query). Every result here is "stand-in Gateway, not acceptance": isolated,
 // disposable, not hosted evidence, and not a claim about the vendored candidate.
+// RTGIP_STG_GATEWAY=candidate (default) swaps in the vendored Gateway candidate (da5118a + GW-F1..F3)
+// behind the same port; RTGIP_STG_GATEWAY=standin keeps the stand-in.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -18,10 +20,11 @@ import {
   type EnvelopeV2, type Registry, type ServiceKey,
 } from "../rtgip2/protocol.ts";
 import { labelsAdmissionEffect, labelsStagingAdapter, type StagingAdapter } from "../rtgip2-autolabels/staging-adapter.ts";
+import { CandidateGateway, bootstrapCandidateGateway } from "./candidate-gateway.ts";
 import {
   APPS, STANDIN_RESULT_LABEL, StandInGateway, adapterEffect, connect, connIdOf, dispatch, enqueue, grantSixRoutes, keyFor, makeDue, noFaults,
   nowSec, readExports, registryFrom, seedNode, startGatewayHttp, startTarget, syncAppMapping,
-  type App, type Faults, type RegistryExports, type Server, type Sql, type StandInServer,
+  type App, type Faults, type GatewayPort, type RegistryExports, type Server, type Sql, type StandInServer,
 } from "./nodes.ts";
 
 const SEED_FILE = process.env.RTGIP_STG_SEED ?? "";
@@ -29,8 +32,12 @@ const URLS = {
   autolabels: process.env.RTGIP_STG_AUTOLABELS ?? "",
   autocurb: process.env.RTGIP_STG_AUTOCURB ?? "",
   autoframe: process.env.RTGIP_STG_AUTOFRAME ?? "",
-  gateway: process.env.RTGIP_STG_GATEWAY ?? "",
+  gateway: process.env.RTGIP_STG_GATEWAY_DB ?? "",
 };
+const CAND = (process.env.RTGIP_STG_GATEWAY ?? "candidate") !== "standin";
+/** Refusal status per Gateway: the candidate (GW-F6) answers malformed 400 and not-granted 403 where the stand-in answers 401. */
+const S = (standin: number, candidate: number) => (CAND ? candidate : standin);
+const RESULT_LABEL = CAND ? "isolated four-node, actual Gateway code (da5118a + GW-F1..F3 fixes), disposable" : STANDIN_RESULT_LABEL;
 const run = describe.runIf(!!URLS.autolabels && !!URLS.gateway && !!SEED_FILE);
 const seed: Record<string, string> = SEED_FILE ? (JSON.parse(readFileSync(SEED_FILE, "utf8")) as Record<string, string>) : {};
 
@@ -40,11 +47,12 @@ const db = {} as Record<App | "gateway", Sql>;
 const faults: Record<App, Faults> = { autolabels: noFaults(), autocurb: noFaults(), autoframe: noFaults() };
 const servers = {} as Record<App, Server>;
 let gwHttp: StandInServer;
-let gwPort: StandInGateway;
+let gwPort: GatewayPort;
+let cand: CandidateGateway | undefined;
 let reg: Registry;
 let exp: RegistryExports;
 const evidence: Record<string, Record<string, unknown>> = {};
-const note = (route: string, k: string, v: unknown) => void ((evidence[route] ??= {})[k] = typeof v === "string" ? `${v} [${STANDIN_RESULT_LABEL}]` : v);
+const note = (route: string, k: string, v: unknown) => void ((evidence[route] ??= {})[k] = typeof v === "string" ? `${v} [${RESULT_LABEL}]` : v);
 
 const tenantA = () => seed.AL_SEED_TENANT!;
 const tenantB = () => seed.AL_SEED_OTHER_TENANT!;
@@ -74,6 +82,26 @@ const outboxState = async (app: App, id: string) => (await db[app]`SELECT state,
 const receiptKinds = async (app: App, id: string) =>
   (await db[app]`SELECT kind, outcome FROM rtgip.receipts WHERE event_id = ${id} ORDER BY attempt, kind`).map((r) => `${r.kind}:${r.outcome}`);
 
+/** Test control for held deliveries: the source outbox, and the candidate's dispatch table when it is in use. */
+const due = async (sql: Sql) => {
+  await makeDue(sql);
+  await cand?.makeDue();
+};
+
+/** The connections on which the Gateway admitted this event for this target. */
+async function admissionConns(eventId: string, tgt?: App): Promise<string[]> {
+  if (CAND) {
+    const r = tgt
+      ? await db.gateway`SELECT connection_id FROM gw_r2_admissions WHERE event_id = ${eventId}::uuid AND connection_id LIKE ${"%>" + tgt + ":%"}`
+      : await db.gateway`SELECT connection_id FROM gw_r2_admissions WHERE event_id = ${eventId}::uuid`;
+    return r.map((x) => x.connection_id as string);
+  }
+  const r = tgt
+    ? await db.gateway`SELECT connection_id FROM gw_standin.admissions WHERE event_id = ${eventId} AND target_app = ${tgt}`
+    : await db.gateway`SELECT connection_id FROM gw_standin.admissions WHERE event_id = ${eventId}`;
+  return r.map((x) => x.connection_id as string);
+}
+
 async function resync() {
   exp = await readExports(db.gateway);
   reg = registryFrom(exp, reg?.keys ?? []);
@@ -81,6 +109,7 @@ async function resync() {
     await seedNode(db[a], reg, a);
     await syncAppMapping(db[a], a, exp, seed.AL_SEED_MAPPER!);
   }
+  await cand?.provision();
 }
 
 async function pump(app: App, max = 10) {
@@ -90,7 +119,7 @@ async function pump(app: App, max = 10) {
     const open = await db[app]`SELECT count(*)::int AS c FROM rtgip.outbox WHERE state NOT IN ('consumer_committed','target_quarantined','dead_letter')`;
     if (open[0]!.c === 0) break;
     await gwPort.forward();
-    await makeDue(db[app]);
+    await due(db[app]);
   }
   return all;
 }
@@ -129,8 +158,7 @@ async function proveCommitted(src: App, tgt: App, p: Produced, expectRecord?: (r
   const why = JSON.stringify(await db[tgt]`SELECT outcome, reason FROM rtgip.inbox WHERE event_id = ${e.event_id}`);
   expect(ob.state, `${route} ${e.event_type}: ${why}`).toBe("consumer_committed");
   // admission
-  const gw = await db.gateway`SELECT connection_id FROM gw_standin.admissions WHERE event_id = ${e.event_id} AND target_app = ${tgt}`;
-  expect(gw).toEqual([{ connection_id: connId }]);
+  expect(await admissionConns(e.event_id, tgt)).toEqual([connId]);
   // destination inbox row
   const inbox = await db[tgt]`SELECT outcome, committed_at IS NOT NULL AS committed FROM rtgip.inbox WHERE event_id = ${e.event_id}`;
   expect(inbox).toHaveLength(1);
@@ -149,7 +177,7 @@ async function proveCommitted(src: App, tgt: App, p: Produced, expectRecord?: (r
   return { rec: rec!, receipts };
 }
 
-run(`${STANDIN_RESULT_LABEL}: four real app nodes, registry-driven, over HTTP`, () => {
+run(`${RESULT_LABEL}: four real app nodes, registry-driven, over HTTP`, () => {
   beforeAll(async () => {
     for (const k of Object.keys(URLS) as (keyof typeof URLS)[]) db[k] = connect(URLS[k]);
     await grantSixRoutes(db.gateway, tenantA(), seed.REG_OPERATOR!, seed.REG_REVIEWER!);
@@ -163,11 +191,17 @@ run(`${STANDIN_RESULT_LABEL}: four real app nodes, registry-driven, over HTTP`, 
     void labelsAdmissionEffect;
     const regFn = () => reg;
     for (const a of APPS) servers[a] = await startTarget(a, db[a], regFn, adapterEffect(adapters[a], faults[a]), faults[a]);
-    gwPort = new StandInGateway(db.gateway, {
+    const gwCtx = {
       reg: regFn,
       mappings: () => exp.mappings,
       targets: () => ({ autolabels: servers.autolabels.url, autocurb: servers.autocurb.url, autoframe: servers.autoframe.url }),
-    });
+    };
+    if (CAND) {
+      await bootstrapCandidateGateway(db.gateway);
+      cand = new CandidateGateway(db.gateway, gwCtx);
+      await cand.provision();
+      gwPort = cand;
+    } else gwPort = new StandInGateway(db.gateway, gwCtx);
     gwHttp = await startGatewayHttp(gwPort);
   });
   afterAll(async () => {
@@ -177,7 +211,7 @@ run(`${STANDIN_RESULT_LABEL}: four real app nodes, registry-driven, over HTTP`, 
     if (process.env.RTGIP_STG_REPORT)
       writeFileSync(
         process.env.RTGIP_STG_REPORT,
-        JSON.stringify({ classification: `isolated four-node, ${STANDIN_RESULT_LABEL}, disposable`, tenant_is_synthetic: true, keys_generated_at_start: reg.keys.map((k) => k.key_id), routes: evidence }, null, 2),
+        JSON.stringify({ classification: RESULT_LABEL, gateway_mode: CAND ? "candidate" : "standin", tenant_is_synthetic: true, keys_generated_at_start: reg.keys.map((k) => k.key_id), routes: evidence }, null, 2),
       );
   });
 
@@ -464,6 +498,13 @@ run(`${STANDIN_RESULT_LABEL}: four real app nodes, registry-driven, over HTTP`, 
       for (const r of await db[a]`SELECT to_jsonb(r)::text AS t FROM rtgip.receipts r`) texts.push({ where: `${a}.receipts`, text: r.t as string });
       for (const r of await db[a]`SELECT coalesce(array_to_string(receipts, E'\n'), '') AS t FROM rtgip.inbox_deliveries`) texts.push({ where: `${a}.inbox_deliveries.receipts`, text: r.t as string });
     }
+    if (CAND) {
+      for (const r of await db.gateway`SELECT a.canonical_body AS body, a.envelope::text AS e,
+          coalesce((SELECT string_agg(x.receipt::text, E'\n') FROM gw_r2_receipts x WHERE x.delivery_id = a.delivery_id), '') AS t,
+          coalesce((SELECT string_agg(u.receipt::text, E'\n') FROM gw_r2_uncommitted_receipts u WHERE u.delivery_id = a.delivery_id), '') AS u
+          FROM gw_r2_admissions a`)
+        texts.push({ where: "gateway.admissions.body", text: r.body as string }, { where: "gateway.admissions.envelope", text: r.e as string }, { where: "gateway.admissions.receipts", text: r.t as string }, { where: "gateway.admissions.uncommitted", text: r.u as string });
+    } else
     for (const r of await db.gateway`SELECT body, envelope::text AS e, admission_text, coalesce(array_to_string(target_receipts, E'\n'), '') AS t FROM gw_standin.admissions`) {
       texts.push({ where: "gateway.admissions.body", text: r.body as string }, { where: "gateway.admissions.envelope", text: r.e as string }, { where: "gateway.admissions.admission", text: r.admission_text as string }, { where: "gateway.admissions.receipts", text: r.t as string });
     }
@@ -485,13 +526,24 @@ run(`${STANDIN_RESULT_LABEL}: four real app nodes, registry-driven, over HTTP`, 
   // ---- per direction: duplicates, crash after the effect, lost acknowledgement -------------------
 
   async function replayToTarget(p: Produced, tgt: App) {
-    const stored = (await db.gateway`SELECT gateway_nonce, admission_text FROM gw_standin.admissions WHERE event_id = ${p.envelope.event_id} AND target_app = ${tgt}`)[0]!;
+    const stored = CAND
+      ? (await db.gateway`SELECT 'gwf_' || md5(random()::text) AS gateway_nonce, r.receipt::text AS admission_text FROM gw_r2_admissions a
+          JOIN gw_r2_receipts r ON r.delivery_id = a.delivery_id AND r.stage = 'gateway_admission'
+         WHERE a.event_id = ${p.envelope.event_id}::uuid AND a.connection_id LIKE ${"%>" + tgt + ":%"}`)[0]!
+      : (await db.gateway`SELECT gateway_nonce, admission_text FROM gw_standin.admissions WHERE event_id = ${p.envelope.event_id} AND target_app = ${tgt}`)[0]!;
     const hdr = {
       ...((await signEnvelope(p.body, p.envelope, keyFor(reg, "gateway"), nowSec(), stored.gateway_nonce as string)) as unknown as Record<string, string>),
       [ADMISSION_HEADER]: encodeAdmissionHeader(JSON.parse(stored.admission_text as string) as ReceiptV2),
     };
     return post(`${servers[tgt].url}/rtgip/v2/inbound`, hdr, p.body);
   }
+  /** The target receipts the Gateway holds for this delivery (canonical text, in chain order), or null when it holds none. */
+  const gatewayTargetReceipts = async (e: EnvelopeV2, tgt: App): Promise<string[] | null> => {
+    if (!CAND) return ((await db.gateway`SELECT target_receipts FROM gw_standin.admissions WHERE event_id = ${e.event_id} AND target_app = ${tgt}`)[0]!.target_receipts as string[] | null) ?? null;
+    const id = await deliveryIdentity(e, connIdOf(e.source_app, e.target_app, e.tenant_id, e.rooftop_id));
+    const rows = await db.gateway`SELECT receipt FROM gw_r2_receipts WHERE delivery_id = ${id} AND stage <> 'gateway_admission' ORDER BY CASE stage WHEN 'target_inbox' THEN 0 ELSE 1 END`;
+    return rows.length ? rows.map((r) => canonicalize(r.receipt)) : null;
+  };
   const storedAtTarget = async (tgt: App, p: Produced) => {
     const id = await deliveryIdentity(p.envelope, connIdOf(p.envelope.source_app, p.envelope.target_app, p.envelope.tenant_id, p.envelope.rooftop_id));
     return (await db[tgt]`SELECT receipts FROM rtgip.inbox_deliveries WHERE delivery_id = ${id}`)[0]?.receipts as string[] | undefined;
@@ -529,7 +581,7 @@ run(`${STANDIN_RESULT_LABEL}: four real app nodes, registry-driven, over HTTP`, 
     expect(await appliedRows(tgt, b.envelope)).toHaveLength(0);
     expect(await adapters[tgt].record(db[tgt], b.envelope)).toBeNull();
     await gwPort.forward();
-    await makeDue(db[src]);
+    await due(db[src]);
     await pump(src);
     await proveCommitted(src, tgt, b);
     expect(await appliedRows(tgt, b.envelope)).toHaveLength(1);
@@ -544,15 +596,15 @@ run(`${STANDIN_RESULT_LABEL}: four real app nodes, registry-driven, over HTTP`, 
     const committed = await appliedRows(tgt, c.envelope);
     expect(committed).toHaveLength(1);
     expect(await adapters[tgt].record(db[tgt], c.envelope)).not.toBeNull();
-    expect((await db.gateway`SELECT target_receipts FROM gw_standin.admissions WHERE event_id = ${c.envelope.event_id} AND target_app = ${tgt}`)[0]!.target_receipts).toBeNull();
+    expect(await gatewayTargetReceipts(c.envelope, tgt)).toBeNull();
     const heldBack = await storedAtTarget(tgt, c);
     expect(heldBack).toHaveLength(2);
     await gwPort.forward();
-    await makeDue(db[src]);
+    await due(db[src]);
     await pump(src);
     const done = await proveCommitted(src, tgt, c);
     expect(done.receipts.slice(1).map((r) => canonicalize(r))).toEqual(heldBack);
-    expect((await db.gateway`SELECT target_receipts FROM gw_standin.admissions WHERE event_id = ${c.envelope.event_id} AND target_app = ${tgt}`)[0]!.target_receipts).toEqual(heldBack);
+    expect(await gatewayTargetReceipts(c.envelope, tgt)).toEqual(heldBack);
     expect(await appliedRows(tgt, c.envelope)).toEqual(committed);
     note(route, "duplicate_crash_lost_ack", "duplicate: byte-identical receipts, state unchanged; crash after the effect: rolled back then applied once; lost ACK: target committed, retry returned the stored receipts, one effect");
   });
@@ -577,7 +629,7 @@ run(`${STANDIN_RESULT_LABEL}: four real app nodes, registry-driven, over HTTP`, 
       const x = await resealed(ok.envelope, (e) => ({ ...e, ...patch, origin: { ...(e.origin as object), event_id: `${ok.envelope.origin.event_id}:forged-${name}` } }));
       const r = await post(gwUrl(), await signAs(x, src), x.body);
       expect([name, r.status >= 400 && r.status < 500]).toEqual([name, true]);
-      expect(await db.gateway`SELECT 1 FROM gw_standin.admissions WHERE event_id = ${x.envelope.event_id}`).toHaveLength(0);
+      expect(await admissionConns(x.envelope.event_id)).toHaveLength(0);
       expect(await db[tgt]`SELECT 1 FROM rtgip.inbox WHERE event_id = ${x.envelope.event_id}`).toHaveLength(0);
       results[name] = `gateway ${r.status} ${r.doc.reason}`;
       if (name !== "other_tenant_same_rooftop") {
@@ -645,7 +697,7 @@ run(`${STANDIN_RESULT_LABEL}: four real app nodes, registry-driven, over HTTP`, 
       results[name] = `${r.status} ${r.doc.reason}`;
     }
     for (const e of [ok.envelope, inj.envelope]) {
-      expect(await db.gateway`SELECT 1 FROM gw_standin.admissions WHERE event_id = ${e.event_id}`).toHaveLength(0);
+      expect(await admissionConns(e.event_id)).toHaveLength(0);
       expect(await db[tgt]`SELECT 1 FROM rtgip.inbox WHERE event_id = ${e.event_id}`).toHaveLength(0);
     }
     const xr = await resealed(ok.envelope, (x) => ({ ...x, rooftop_id: ROOFTOP_B }));
@@ -662,15 +714,24 @@ run(`${STANDIN_RESULT_LABEL}: four real app nodes, registry-driven, over HTTP`, 
     expect(r1[0]).toMatchObject({ http_status: 401, reason: "key_revoked", state: "retry_wait" });
     reg = live;
     await db.autolabels`UPDATE rtgip.signing_keys SET status = 'revoked' WHERE owner = 'gateway'`;
-    await makeDue(db.autocurb);
+    await due(db.autocurb);
     const r2 = await dispatch(db.autocurb, "autocurb", reg, gwHttp.url, "w-rev");
     expect(r2[0]).toMatchObject({ action: "deliver", state: "gateway_admitted" });
-    const refused = (await db.gateway`SELECT decision, reason FROM gw_standin.audit WHERE event_id = ${a.envelope.event_id} AND decision = 'target_error' ORDER BY seq DESC LIMIT 1`)[0];
-    expect(refused?.reason).toMatch(/^db:key_revoked/);
+    let refused: { reason: string } | undefined;
+    if (CAND) {
+      const id = await deliveryIdentity(a.envelope, connIdOf("autocurb", "autolabels", a.envelope.tenant_id, a.envelope.rooftop_id));
+      const failed = await db.gateway`SELECT count(*)::int AS n FROM gw_r2_audit WHERE delivery_id = ${id} AND action = 'failed'`;
+      expect(failed[0]!.n).toBeGreaterThanOrEqual(1);
+      expect((await db.gateway`SELECT 1 FROM gw_r2_receipts WHERE delivery_id = ${id} AND stage <> 'gateway_admission'`)).toHaveLength(0);
+      refused = { reason: "db:key_revoked (candidate: forward failed, target answered 4xx)" };
+    } else {
+      refused = (await db.gateway`SELECT decision, reason FROM gw_standin.audit WHERE event_id = ${a.envelope.event_id} AND decision = 'target_error' ORDER BY seq DESC LIMIT 1`)[0] as { reason: string } | undefined;
+      expect(refused?.reason).toMatch(/^db:key_revoked/);
+    }
     expect(await appliedRows("autolabels", a.envelope)).toHaveLength(0);
     await db.autolabels`UPDATE rtgip.signing_keys SET status = 'current' WHERE owner = 'gateway'`;
     await gwPort.forward();
-    await makeDue(db.autocurb);
+    await due(db.autocurb);
     await pump("autocurb");
     expect(await appliedRows("autolabels", a.envelope)).toHaveLength(1);
     note("autocurb->autolabels", "revoked_credentials", `source key: 401 key_revoked; gateway key revoked in the target database: ${refused?.reason}; restored -> applied once`);
@@ -681,11 +742,30 @@ run(`${STANDIN_RESULT_LABEL}: four real app nodes, registry-driven, over HTTP`, 
     const unknown = randomUUID();
     const q = await resealed(ok.envelope, (x) => ({ ...x, vehicle: { ...(x.vehicle as object), instance_id: unknown, episode_id: unknown } }));
     await send("autoframe", [q]);
-    expect(await outboxState("autoframe", q.envelope.event_id)).toEqual({ state: "target_quarantined", inbox_outcome: "quarantined" });
-    await noConsumerCommit("autoframe", q.envelope.event_id);
-    expect(await appliedRows("autolabels", q.envelope)).toHaveLength(0);
-    expect(await adapters.autolabels.record(db.autolabels, q.envelope)).toBeNull();
-    expect((await db.autolabels`SELECT outcome, reason FROM rtgip.inbox WHERE event_id = ${q.envelope.event_id}`)[0]).toMatchObject({ outcome: "quarantined" });
+    const expectQuarantined = async (x: Produced) => {
+      expect(await outboxState("autoframe", x.envelope.event_id)).toEqual({ state: "target_quarantined", inbox_outcome: "quarantined" });
+      await noConsumerCommit("autoframe", x.envelope.event_id);
+      expect(await appliedRows("autolabels", x.envelope)).toHaveLength(0);
+      expect(await adapters.autolabels.record(db.autolabels, x.envelope)).toBeNull();
+      expect((await db.autolabels`SELECT outcome, reason FROM rtgip.inbox WHERE event_id = ${x.envelope.event_id}`)[0]).toMatchObject({ outcome: "quarantined" });
+    };
+    if (CAND) {
+      // The candidate admits only registered (instance, episode) pairs, so an unregistered episode never reaches the app.
+      const st = await outboxState("autoframe", q.envelope.event_id);
+      expect(st).toEqual({ state: "dead_letter", inbox_outcome: null });
+      expect((await db.autoframe`SELECT detail->>'reason' AS r FROM rtgip.audit_log WHERE event_id = ${q.envelope.event_id} AND action LIKE 'fail:%' ORDER BY id DESC LIMIT 1`)[0]!.r).toBe("ambiguous_or_unauthorized_mapping");
+      expect(await db.autolabels`SELECT 1 FROM rtgip.inbox WHERE event_id = ${q.envelope.event_id}`).toHaveLength(0);
+      expect(await admissionConns(q.envelope.event_id)).toHaveLength(0);
+      expect(await appliedRows("autolabels", q.envelope)).toHaveLength(0);
+      // An admitted event the real app still refuses (media storage key outside the rooftop scope) is quarantined at the target.
+      const bad = await resealed(ok.envelope, (x) => ({ ...x, payload: { ...(x.payload as { storage_ref: object }), storage_ref: { ...(x.payload as { storage_ref: object }).storage_ref, object_key: "other-tenant/other-rooftop/other-instance/stolen.jpg" } } }));
+      await send("autoframe", [bad]);
+      expect(await admissionConns(bad.envelope.event_id, "autolabels")).toHaveLength(1);
+      await expectQuarantined(bad);
+      note("autoframe->autolabels", "quarantine_no_commit", "candidate: unregistered episode refused at admission (dead_letter, ambiguous_or_unauthorized_mapping); admitted event with out-of-scope storage key: real AutoLabels effect refused -> target_quarantined, no consumer_commit receipt, no business record");
+      return;
+    }
+    await expectQuarantined(q);
     note("autoframe->autolabels", "quarantine_no_commit", "the real AutoLabels effect refused: target_quarantined, no consumer_commit receipt, no business record");
   });
 
@@ -719,10 +799,12 @@ run(`${STANDIN_RESULT_LABEL}: four real app nodes, registry-driven, over HTTP`, 
   const withKeys = async <T>(extra: ServiceKey[], fn: () => Promise<T>) => {
     const live = reg;
     reg = { ...live, keys: [...live.keys, ...extra] };
+    await cand?.provision();
     try {
       return await fn();
     } finally {
       reg = live;
+      await cand?.provision();
     }
   };
 
@@ -740,15 +822,15 @@ run(`${STANDIN_RESULT_LABEL}: four real app nodes, registry-driven, over HTTP`, 
       const bad8 = Buffer.concat([Buffer.from(ok.body.slice(0, -1)), Buffer.from([0xff, 0x7d])]);
       const dup = `{"tenant_id":"${ok.envelope.tenant_id}",${ok.body.slice(1)}`;
       const cases: [string, Record<string, string>, string | Buffer, number, string][] = [
-        ["wrong_prefix", await sigFor({ body: ok.body, scope, key: al, prefix: "rtgip3=" }), ok.body, 401, "protocol_mismatch"],
-        ["wrong_protocol_header", { ...(await sigFor({ body: ok.body, scope, key: al })), "rtgip-protocol": "gateway.service/1" }, ok.body, 401, "protocol_mismatch"],
+        ["wrong_prefix", await sigFor({ body: ok.body, scope, key: al, prefix: "rtgip3=" }), ok.body, S(401, 400), "protocol_mismatch"],
+        ["wrong_protocol_header", { ...(await sigFor({ body: ok.body, scope, key: al })), "rtgip-protocol": "gateway.service/1" }, ok.body, S(401, 400), "protocol_mismatch"],
         ["unknown_key", await sigFor({ body: ok.body, scope, key: { ...al, key_id: "stg-nobody" } }), ok.body, 401, "unknown_key"],
         ["wrong_dialect_key", await sigFor({ body: ok.body, scope, key: legacy }), ok.body, 401, "key_dialect_mismatch"],
         ["expired_key", await sigFor({ body: ok.body, scope, key: expired }), ok.body, 401, "key_outside_validity"],
         ["timestamp_past_window", await sigFor({ body: ok.body, scope, key: al, ts: n - 301 }), ok.body, 401, "timestamp_out_of_window"],
         ["timestamp_future_window", await sigFor({ body: ok.body, scope, key: al, ts: n + 301 }), ok.body, 401, "timestamp_out_of_window"],
-        ["non_canonical_whitespace", await sigFor({ body: ok.body.replace(":", ": "), scope, key: al }), ok.body.replace(":", ": "), 401, "body_not_canonical"],
-        ["duplicate_json_key", await sigFor({ body: dup, scope, key: al }), dup, 401, "body_not_canonical"],
+        ["non_canonical_whitespace", await sigFor({ body: ok.body.replace(":", ": "), scope, key: al }), ok.body.replace(":", ": "), S(401, 400), "body_not_canonical"],
+        ["duplicate_json_key", await sigFor({ body: dup, scope, key: al }), dup, S(401, 400), CAND ? "duplicate_key" : "body_not_canonical"],
         ["bom", await sigFor({ body: bom, scope, key: al }), bom, 400, "bom_not_allowed"],
         ["invalid_utf8", await sigFor({ body: bad8, scope, key: al }), bad8, 400, "invalid_utf8"],
         ["oversize", await sigFor({ body: "x".repeat(64 * 1024 + 1), scope, key: al }), "x".repeat(64 * 1024 + 1), 413, "body_too_large"],
@@ -760,27 +842,31 @@ run(`${STANDIN_RESULT_LABEL}: four real app nodes, registry-driven, over HTTP`, 
       }
       const { "rtgip-key-id": _k, ...noKey } = await sigFor({ body: ok.body, scope, key: al });
       const r = await postRaw(noKey, ok.body);
-      expect([r.status, r.reason]).toEqual([401, "missing_headers"]);
+      expect([r.status, r.reason]).toEqual([S(401, 400), "missing_headers"]);
       out.missing_service_identity = `${r.status} ${r.reason}`;
     });
     const forgedId = { ...ok.envelope, event_id: randomUUID() };
     const fb = canonicalize(forgedId);
     const fr = await postRaw(await sigFor({ body: fb, scope: scopeOf(forgedId), key: al }), fb);
-    expect(fr.status).toBe(401);
+    expect(fr.status).toBe(S(401, 400));
     out.event_id_not_derived = `${fr.status} ${fr.reason}`;
     const wp = await resealed(ok.envelope, (x) => ({ ...x, purpose: "service_history" }));
     const wpr = await postRaw(await sigFor({ body: wp.body, scope: scopeOf(wp.envelope), key: al }), wp.body);
-    expect(wpr.status).toBe(401);
+    expect(wpr.status).toBe(S(401, 403));
     out.unauthorized_purpose = `${wpr.status} ${wpr.reason}`;
     const wd = await resealed(ok.envelope, (x) => ({ ...x, target_app: "autoframe", route: "autolabels->autoframe" }));
     const wdr = await postRaw(await sigFor({ body: wd.body, scope: scopeOf(wd.envelope), key: al }), wd.body);
-    expect(wdr.status).toBe(401);
+    expect(wdr.status).toBe(S(401, 403));
     out.wrong_destination = `${wdr.status} ${wdr.reason}`;
     // Same nonce over other bytes: the first use is admitted, the second refused.
     expect((await postRaw(await sigFor({ body: ok.body, scope, key: al, nonce: reused }), ok.body)).status).toBe(200);
     const other = await fresh("autolabels", "autocurb");
     const nr = await postRaw(await sigFor({ body: other.body, scope: (await signAs(other, "autolabels"))["rtgip-scope"]!, key: al, nonce: reused }), other.body);
-    expect([nr.status, nr.reason]).toEqual([401, "nonce_reused"]);
+    // Gateway finding GW-F7: the candidate's gw_r2_admit raises "nonce conflict" and its handler answers 503
+    // admission_not_confirmed (retryable-looking) instead of a 4xx refusal. The safety property is asserted
+    // either way: nothing is admitted. The known status is pinned so a fix is noticed.
+    expect(await admissionConns(other.envelope.event_id)).toHaveLength(0);
+    expect([nr.status, nr.reason]).toEqual(CAND ? [503, "admission_not_confirmed"] : [401, "nonce_reused"]);
     out.nonce_collision = `${nr.status} ${nr.reason}`;
     // A timestamp 299 s old is still inside the window.
     const edge = await fresh("autolabels", "autocurb");
@@ -868,13 +954,19 @@ run(`${STANDIN_RESULT_LABEL}: four real app nodes, registry-driven, over HTTP`, 
   });
 
   it("history is preserved through every failure: append-only audits on the Gateway and the source", async () => {
-    const gw = await db.gateway`SELECT decision, count(*)::int AS c FROM gw_standin.audit GROUP BY decision ORDER BY decision`;
-    expect(gw.map((r) => r.decision)).toEqual(expect.arrayContaining(["admitted", "forwarded", "rejected", "target_error"]));
-    await expect(db.gateway`DELETE FROM gw_standin.audit`).rejects.toThrow(/append_only/);
+    if (CAND) {
+      const gw = await db.gateway`SELECT action, count(*)::int AS c FROM gw_r2_audit GROUP BY action ORDER BY action`;
+      expect(gw.map((r) => r.action)).toEqual(expect.arrayContaining(["admitted", "committed", "failed"]));
+      await expect(db.gateway`DELETE FROM gw_r2_audit`).rejects.toThrow(/immutable evidence/);
+    } else {
+      const gw = await db.gateway`SELECT decision, count(*)::int AS c FROM gw_standin.audit GROUP BY decision ORDER BY decision`;
+      expect(gw.map((r) => r.decision)).toEqual(expect.arrayContaining(["admitted", "forwarded", "rejected", "target_error"]));
+      await expect(db.gateway`DELETE FROM gw_standin.audit`).rejects.toThrow(/append_only/);
+    }
     const acts = (await db.autolabels`SELECT DISTINCT action FROM rtgip.audit_log`).map((r) => r.action as string);
     expect(acts).toEqual(expect.arrayContaining(["enqueued", "advance:gateway_admitted", "advance:consumer_committed", "receipt_rejected"]));
     expect((await db.autolabels`SELECT count(*)::int AS c FROM rtgip.receipts`)[0]!.c).toBeGreaterThan(0);
-    for (const d of Object.keys(evidence)) note(d, "audit_preserved", "gw_standin.audit append-only; rtgip.audit_log + rtgip.receipts retained");
+    for (const d of Object.keys(evidence)) note(d, "audit_preserved", `${CAND ? "gw_r2_audit" : "gw_standin.audit"} append-only; rtgip.audit_log + rtgip.receipts retained`);
   });
 
   // ---- registry revocation: last, because it removes the rooftop everything above ran on ---------------
@@ -903,7 +995,7 @@ run(`${STANDIN_RESULT_LABEL}: four real app nodes, registry-driven, over HTTP`, 
       const g = await post(gwUrl(), await signAs(p, src), p.body);
       expect(g.status).toBeGreaterThanOrEqual(400);
       expect(g.status).toBeLessThan(500);
-      expect(await db.gateway`SELECT 1 FROM gw_standin.admissions WHERE event_id = ${p.envelope.event_id}`).toHaveLength(0);
+      expect(await admissionConns(p.envelope.event_id)).toHaveLength(0);
       const d = await forwardDirect(p, tgt, undefined, { gatewayKey: keyBefore });
       const kinds = (d.doc.receipts ?? []).map((q) => `${q.kind}:${q.outcome}`);
       expect(d.status >= 400 || !kinds.some((k) => k.endsWith(":applied"))).toBe(true);
