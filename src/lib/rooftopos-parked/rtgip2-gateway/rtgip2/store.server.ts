@@ -58,6 +58,17 @@ export function candidateStore(
       if (typeof result !== "string") throw new Error("invalid_completion_response");
       return result;
     },
+    async recordUncommitted(lease: DeliveryLease, inbox: ReceiptV2): Promise<string> {
+      const result = await rpc.call("gw_r2_record_uncommitted", {
+        _id: lease.delivery_id,
+        _generation: lease.generation,
+        _token: lease.token,
+        _inbox: inbox,
+        _inbox_digest: await receiptDigest(inbox),
+      });
+      if (typeof result !== "string") throw new Error("invalid_uncommitted_response");
+      return result;
+    },
     async fail(lease: DeliveryLease): Promise<string> {
       const result = await rpc.call("gw_r2_fail", {
         _id: lease.delivery_id,

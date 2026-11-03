@@ -661,6 +661,24 @@
           "sha256_after": "c3498d6aadd02bfcec46a77fa4c92a10096d639e5dc06d6f2ead42400c8bb90e"
         }
       ]
+    },
+    {
+      "id": "GW-F1",
+      "summary": "Held and quarantined target_inbox outcomes: gw_r2_record_uncommitted stores the signed evidence in append-only gw_r2_uncommitted_receipts; quarantined sets state quarantined (redrivable), held parks target_persisted with a 30 s backoff and no attempt charge; dispatcher and store gain the optional recordUncommitted port",
+      "files": [
+        {
+          "vendored": "supabase/tests/rtgip/gateway/docs/proposals/final-execution/rtgip2.sql",
+          "sha256_after": "d3d7c0682de48474656ff39431941621dc3f23b74a45fd63088ae63433c3241e"
+        },
+        {
+          "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/dispatcher.server.ts",
+          "sha256_after": "94de3bed7b6bfd3ba5046b9901f3c3a43641d02198afc711d115ccf54935a463"
+        },
+        {
+          "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/store.server.ts",
+          "sha256_after": "e8fc18e4646aeccd7e1cd017ef4eddc79c54f4f4bcf92392068abfd04d2d8bd9"
+        }
+      ]
     }
   ]
 }

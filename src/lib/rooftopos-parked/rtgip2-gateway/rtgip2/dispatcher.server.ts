@@ -21,6 +21,8 @@ export interface DispatcherDependencies {
   send: (lease: DeliveryLease, request: ForwardRequest) => Promise<unknown[]>;
   complete: (lease: DeliveryLease, receipts: ReceiptV2[]) => Promise<string>;
   fail: (lease: DeliveryLease, reason: string) => Promise<string>;
+  /** GW-F1: stores a held or quarantined target_inbox receipt that has no commit behind it. */
+  recordUncommitted?: (lease: DeliveryLease, inbox: ReceiptV2) => Promise<string>;
 }
 export async function dispatcherStep(
   worker: string,
@@ -55,6 +57,19 @@ export async function dispatcherStep(
         ),
       };
       const received = await deps.send(lease, request);
+      if (received.length === 1 && deps.recordUncommitted) {
+        const held = await verifyReceiptV2(
+          received[0],
+          { ...expect, kind: "target_inbox" },
+          registry,
+          deps.now(),
+          [admission],
+        );
+        if (held.outcome !== "held" && held.outcome !== "quarantined")
+          throw new Error("incomplete_receipt_chain");
+        results.push(await deps.recordUncommitted(lease, held));
+        continue;
+      }
       if (received.length !== 2) throw new Error("incomplete_receipt_chain");
       const inbox = await verifyReceiptV2(
         received[0],

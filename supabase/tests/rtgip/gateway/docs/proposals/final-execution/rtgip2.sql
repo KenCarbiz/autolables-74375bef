@@ -48,7 +48,7 @@ CREATE TABLE public.gw_r2_dispatch (
  state text NOT NULL DEFAULT 'pending' CHECK(state IN('pending','leased','target_persisted','committed','quarantined','dead')),
  generation bigint NOT NULL DEFAULT 0, token uuid, worker text, lease_until timestamptz,
  attempts int NOT NULL DEFAULT 0, next_attempt_at timestamptz NOT NULL DEFAULT now(),
- last_reason text CHECK(last_reason IN('delivery_not_confirmed','authorization_changed','attempt_budget_exhausted','redriven'))
+ last_reason text CHECK(last_reason IN('delivery_not_confirmed','authorization_changed','attempt_budget_exhausted','redriven','target_held','target_quarantined'))
 );
 GRANT SELECT ON public.gw_r2_dispatch TO service_role;
 ALTER TABLE public.gw_r2_dispatch ENABLE ROW LEVEL SECURITY;
@@ -63,16 +63,25 @@ GRANT SELECT ON public.gw_r2_receipts TO service_role;
 ALTER TABLE public.gw_r2_receipts ENABLE ROW LEVEL SECURITY;
 CREATE TABLE public.gw_r2_audit (
  seq bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, at timestamptz NOT NULL DEFAULT now(),
- delivery_id text, action text NOT NULL CHECK(action IN('admitted','exact_retry','conflict','signed_admission','committed','failed','redrive')),
+ delivery_id text, action text NOT NULL CHECK(action IN('admitted','exact_retry','conflict','signed_admission','committed','failed','redrive','held','quarantined')),
  actor uuid, case_ref text, generation bigint
 );
 GRANT SELECT ON public.gw_r2_audit TO service_role;
 ALTER TABLE public.gw_r2_audit ENABLE ROW LEVEL SECURITY;
+-- GW-F1: signed target_inbox evidence for an attempt the target held or quarantined. Kept apart from
+-- gw_r2_receipts so the committed chain stays one receipt per stage.
+CREATE TABLE public.gw_r2_uncommitted_receipts (
+ digest text PRIMARY KEY, delivery_id text NOT NULL REFERENCES public.gw_r2_admissions(delivery_id),
+ generation bigint NOT NULL, outcome text NOT NULL CHECK(outcome IN('held','quarantined')),
+ receipt jsonb NOT NULL, recorded_at timestamptz NOT NULL DEFAULT now()
+);
+GRANT SELECT ON public.gw_r2_uncommitted_receipts TO service_role;
+ALTER TABLE public.gw_r2_uncommitted_receipts ENABLE ROW LEVEL SECURITY;
 
 CREATE FUNCTION public.gw_r2_append_only() RETURNS trigger LANGUAGE plpgsql SET search_path='' AS $$
 BEGIN RAISE EXCEPTION 'immutable evidence'; END $$;
 DO $$ DECLARE t text; BEGIN
- FOREACH t IN ARRAY ARRAY['gw_r2_admissions','gw_r2_nonces','gw_r2_receipts','gw_r2_audit'] LOOP
+ FOREACH t IN ARRAY ARRAY['gw_r2_admissions','gw_r2_nonces','gw_r2_receipts','gw_r2_audit','gw_r2_uncommitted_receipts'] LOOP
  EXECUTE format('CREATE TRIGGER immutable BEFORE UPDATE OR DELETE OR TRUNCATE ON public.%I FOR EACH STATEMENT EXECUTE FUNCTION public.gw_r2_append_only()',t);
  END LOOP;
 END $$;
@@ -228,6 +237,34 @@ BEGIN
  INSERT INTO gw_r2_audit(delivery_id,action,generation)VALUES(_id,'committed',_generation);
  RETURN 'committed';
 END $$;
+CREATE FUNCTION public.gw_r2_record_uncommitted(_id text,_generation bigint,_token uuid,_inbox jsonb,_inbox_digest text) RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE d gw_r2_dispatch; a gw_r2_admissions; adm gw_r2_receipts; old gw_r2_uncommitted_receipts; o text:=_inbox->>'outcome';
+BEGIN
+ SELECT * INTO d FROM gw_r2_dispatch WHERE delivery_id=_id FOR UPDATE;
+ SELECT * INTO a FROM gw_r2_admissions WHERE delivery_id=_id;
+ SELECT * INTO adm FROM gw_r2_receipts WHERE delivery_id=_id AND stage='gateway_admission';
+ PERFORM 1 FROM gw_settings WHERE id=1 FOR SHARE;
+ PERFORM 1 FROM gw_r2_connections WHERE id=a.connection_id FOR SHARE;
+ PERFORM 1 FROM gw_r2_mappings WHERE connection_id=a.connection_id AND instance_id=a.envelope#>>'{vehicle,instance_id}' AND episode_id=a.envelope#>>'{vehicle,episode_id}' FOR SHARE;
+ PERFORM 1 FROM gw_r2_keys WHERE id=_inbox->>'key_id' FOR SHARE;
+ IF d.delivery_id IS NULL OR NOT gw_r2_authorized_internal(a) THEN RETURN 'forbidden'; END IF;
+ IF d.state='quarantined' THEN
+ SELECT * INTO old FROM gw_r2_uncommitted_receipts WHERE digest=_inbox_digest AND delivery_id=_id;
+ RETURN CASE WHEN old.digest IS NOT NULL AND old.receipt=_inbox THEN 'exact_retry' ELSE 'conflict' END; END IF;
+ IF d.state NOT IN('leased','target_persisted') OR d.generation<>_generation OR d.token IS DISTINCT FROM _token OR d.lease_until<=clock_timestamp() THEN RETURN 'lost_lease'; END IF;
+ IF gw_r2_receipt_bound_internal(a,_inbox,'target_inbox') IS DISTINCT FROM true OR adm.digest IS NULL OR
+ _inbox->>'prev_receipt_sha256' IS DISTINCT FROM adm.digest OR o IS NULL OR o NOT IN('held','quarantined') THEN RETURN 'invalid_chain'; END IF;
+ INSERT INTO gw_r2_uncommitted_receipts(digest,delivery_id,generation,outcome,receipt)VALUES(_inbox_digest,_id,_generation,o,_inbox)ON CONFLICT(digest)DO NOTHING;
+ IF o='quarantined' THEN
+ UPDATE gw_r2_dispatch SET state='quarantined',token=NULL,lease_until=NULL,last_reason='target_quarantined' WHERE delivery_id=_id;
+ ELSE
+ -- A hold waits on the target's predecessor: no attempt is charged, and the lane stays blocked behind it.
+ UPDATE gw_r2_dispatch SET state='target_persisted',token=NULL,attempts=greatest(attempts-1,0),
+ lease_until=clock_timestamp()+interval '30 seconds',next_attempt_at=clock_timestamp()+interval '30 seconds',last_reason='target_held' WHERE delivery_id=_id;
+ END IF;
+ INSERT INTO gw_r2_audit(delivery_id,action,generation)VALUES(_id,o,_generation);
+ RETURN o;
+END $$;
 CREATE FUNCTION public.gw_r2_fail(_id text,_generation bigint,_token uuid) RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 DECLARE d gw_r2_dispatch;
 BEGIN
@@ -248,6 +285,6 @@ BEGIN
  INSERT INTO gw_r2_audit(delivery_id,action,actor,case_ref)VALUES(_id,'redrive',auth.uid(),_case);
 END $$;
 REVOKE ALL ON FUNCTION public.gw_r2_append_only(),public.gw_r2_route_allowed(text,text,text,text),public.gw_r2_authorized_internal(public.gw_r2_admissions),public.gw_r2_receipt_bound_internal(public.gw_r2_admissions,jsonb,text) FROM PUBLIC,anon,authenticated;
-REVOKE ALL ON FUNCTION public.gw_r2_admit(text,text,text,text,text,bigint,text),public.gw_r2_save_admission_receipt(text,jsonb,text),public.gw_r2_claim(text,int,int),public.gw_r2_complete(text,bigint,uuid,jsonb,text,jsonb,text),public.gw_r2_fail(text,bigint,uuid),public.gw_r2_redrive(text,text) FROM PUBLIC,anon,authenticated;
-GRANT EXECUTE ON FUNCTION public.gw_r2_admit(text,text,text,text,text,bigint,text),public.gw_r2_save_admission_receipt(text,jsonb,text),public.gw_r2_claim(text,int,int),public.gw_r2_complete(text,bigint,uuid,jsonb,text,jsonb,text),public.gw_r2_fail(text,bigint,uuid) TO service_role;
+REVOKE ALL ON FUNCTION public.gw_r2_admit(text,text,text,text,text,bigint,text),public.gw_r2_save_admission_receipt(text,jsonb,text),public.gw_r2_claim(text,int,int),public.gw_r2_complete(text,bigint,uuid,jsonb,text,jsonb,text),public.gw_r2_fail(text,bigint,uuid),public.gw_r2_redrive(text,text),public.gw_r2_record_uncommitted(text,bigint,uuid,jsonb,text) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.gw_r2_admit(text,text,text,text,text,bigint,text),public.gw_r2_save_admission_receipt(text,jsonb,text),public.gw_r2_claim(text,int,int),public.gw_r2_complete(text,bigint,uuid,jsonb,text,jsonb,text),public.gw_r2_fail(text,bigint,uuid),public.gw_r2_record_uncommitted(text,bigint,uuid,jsonb,text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.gw_r2_redrive(text,text) TO authenticated;
