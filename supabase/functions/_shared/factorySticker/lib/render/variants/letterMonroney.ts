@@ -19,8 +19,9 @@
 //   * EPA agency seals and the source QR are not reproduced; the QR slot
 //     carries a new Vehicle Passport QR only when a Passport URL exists
 //   * the OEM publication/phone footer is omitted until verified per OEM
-//   * equipment that does not fit continues onto as many pages as needed,
-//     each carrying the reproduction banner and disclosure
+//   * equipment is compacted down to the 5.5pt floor on the single page;
+//     content that still does not fit returns null so the generic one-page
+//     layout (or a review hold) decides, never a second page
 
 import type { FactoryStickerData, StandardEquipmentGroup } from "../../types.ts";
 import {
@@ -29,11 +30,12 @@ import {
   Painter,
   formatMoney,
   formatPlain,
+  fitOk,
+  fuelCategoryLabel,
   validateModel,
   wrapText,
   type LayoutFont,
   type LayoutModel,
-  type LayoutPage,
 } from "../layout.ts";
 import {
   EPA_BLUE,
@@ -140,6 +142,19 @@ const PRICE_BOTTOM = COLS_TOP + 750;
 const RIGHT_X = BODY_X + 836;
 const ITEM_PX = 11.4;
 const ITEM_LH = 12.2;
+
+interface LetterStyle { px: number; lh: number }
+
+// Master type first, then leading tightens to the tightest approved ratio,
+// then the size steps down to the 5.5pt equipment floor (11px at 2x).
+const LETTER_STYLES: LetterStyle[] = [
+  { px: ITEM_PX, lh: ITEM_LH },
+  { px: ITEM_PX, lh: 11.95 },
+  { px: ITEM_PX, lh: 11.7 },
+  { px: 11.2, lh: 11.9 },
+  { px: 11.2, lh: 11.7 },
+  { px: 11, lh: 11.66 },
+];
 const DISCLOSURE_Y = 1100;
 
 interface Section {
@@ -186,6 +201,9 @@ const CATEGORY_HINT: Record<StandardEquipmentGroup["category"], string> = {
 
 /** Lines a flowed equipment entry occupies: heading or wrapped item. */
 interface FlowLine {
+  /** Source item this line belongs to; every line must place for it to count. */
+  itemId?: number;
+  item?: string;
   text: string;
   font: LayoutFont;
   indent: number;
@@ -193,15 +211,17 @@ interface FlowLine {
   heading: boolean;
 }
 
-function flowLines(sections: Section[], width: number): Array<{ column: 1 | 2; lines: FlowLine[] }> {
-  const size = pt(ITEM_PX);
+function flowLines(sections: Section[], width: number, px: number): Array<{ column: 1 | 2; lines: FlowLine[] }> {
+  const size = pt(px);
+  let nextId = 0;
   return sections.map((s, si) => {
     const lines: FlowLine[] = [{
       text: s.spec.heading, font: "bold", indent: 0, gapBefore: si === 0 ? 0 : 12, heading: true,
     }];
     for (const item of s.items) {
       const wrapped = wrapText(item, "body", size, u(width - 8));
-      wrapped.forEach((text, i) => lines.push({ text, font: "body", indent: i === 0 ? 0 : 8, gapBefore: 0, heading: false }));
+      const itemId = nextId++;
+      wrapped.forEach((text, i) => lines.push({ itemId, item, text, font: "body", indent: i === 0 ? 0 : 8, gapBefore: 0, heading: false }));
     }
     return { column: s.spec.column, lines };
   });
@@ -217,7 +237,7 @@ interface PlacedLine extends FlowLine {
  * start at their master position; if column 1 overflows, its remainder
  * runs into column 2 ahead of them. Anything left continues on later pages.
  */
-function placeEquipment(blocks: Array<{ column: 1 | 2; lines: FlowLine[] }>): { placed: PlacedLine[]; rest: FlowLine[] } {
+function placeEquipment(blocks: Array<{ column: 1 | 2; lines: FlowLine[] }>, itemLh: number): { placed: PlacedLine[]; rest: FlowLine[] } {
   const placed: PlacedLine[] = [];
   const cols = [
     { x: COL1_X, top: COLS_TOP + 109, w: COL1_W },
@@ -242,14 +262,14 @@ function placeEquipment(blocks: Array<{ column: 1 | 2; lines: FlowLine[] }>): { 
     }
     const gap = y === cols[col].top ? 0 : line.gapBefore;
     // Keep a heading with its first item.
-    const need = gap + ITEM_LH * (line.heading ? 2 : 1);
+    const need = gap + itemLh * (line.heading ? 2 : 1);
     if (y + need > COL_BOTTOM) {
       if (col === 0) { col = 1; y = cols[1].top; continue; }
       break;
     }
     y += gap;
     placed.push({ ...line, x: cols[col].x + line.indent, top: y });
-    y += ITEM_LH;
+    y += itemLh;
     i++;
   }
   const rest = queue.slice(i).filter((l) => l.text !== "");
@@ -292,12 +312,12 @@ function paintHeader(p: Painter, d: FactoryStickerData, config: LetterVariantCon
   box(p, BODY_X, BODY_Y + 108, 834, 3, INK);
 }
 
-function paintEquipment(p: Painter, placed: PlacedLine[]): void {
+function paintEquipment(p: Painter, placed: PlacedLine[], style: LetterStyle): void {
   box(p, BODY_X + 267, COLS_TOP, 1.5, 775, INK);
   box(p, BODY_X + 524.5, COLS_TOP, 1.5, 805, INK);
-  txt(p, "Standard Equipment Included at No Extra Charge", COL1_X, COLS_TOP + 76, 11, "body", { lh: ITEM_LH });
+  txt(p, "Standard Equipment Included at No Extra Charge", COL1_X, COLS_TOP + 76, 11, "body", { lh: style.lh });
   for (const line of placed) {
-    txt(p, line.text, line.x, line.top, ITEM_PX, line.font, { lh: ITEM_LH });
+    txt(p, line.text, line.x, line.top, style.px, line.font, { lh: style.lh });
   }
 }
 
@@ -394,7 +414,7 @@ function paintEpa(p: Painter, d: FactoryStickerData): void {
   txt(p, "Fuel Economy and Environment", X + 47, Y + 12, 21, "bold", { color: PAPER });
   box(p, X + 435, Y + 8, 211, 32, EPA_BLUE);
   pump(p, X + 440, Y + 9, 30, INK);
-  txt(p, "Gasoline Vehicle", X + 435 + 208, Y + 17, 13, "bold", { align: "right" });
+  txt(p, fuelCategoryLabel(d.vehicle.fuelType), X + 435 + 208, Y + 17, 13, "bold", { align: "right" });
 
   if (r.epaStatus !== "VERIFIED" || r.combinedMpg === undefined) {
     for (const [i, line] of wrapFigma(
@@ -594,7 +614,7 @@ function paintOwnership(p: Painter, d: FactoryStickerData, config: LetterVariant
   }
 }
 
-function paintIdentity(p: Painter, d: FactoryStickerData): void {
+function paintIdentity(p: Painter, d: FactoryStickerData, barcodePayload: string, footerTop: number): void {
   const X = RIGHT_X + 338;
   const Y = BODY_Y + 746;
   const dealer = d.dealer;
@@ -608,7 +628,8 @@ function paintIdentity(p: Painter, d: FactoryStickerData): void {
     }
   }
   top = Math.max(top + 4, Y + 43);
-  txt(p, `VIN:  ${d.vehicle.vin}`, X, top, 15, "bold");
+  txt(p, "VIN:", X, top, 15, "bold");
+  txt(p, d.vehicle.vin, X + 42, top, 15, "bold");
   top += 22;
   const v = d.vehicle;
   const color = (label: string, name?: string, code?: string): string | null =>
@@ -625,37 +646,10 @@ function paintIdentity(p: Painter, d: FactoryStickerData): void {
       top += 11;
     }
   }
+  top += 4;
+  const barH = Math.min(34, footerTop - 6 - top);
+  if (barcodePayload && barH >= 18) p.barcode(u(X), u(top), u(300), u(barH), barcodePayload, INK);
 }
-
-function paintContinuation(
-  p: Painter, d: FactoryStickerData, displayMake: string, lines: FlowLine[], bottom: number,
-): FlowLine[] {
-  const [l1, l2] = titleLines(d, displayMake);
-  txt(p, `${l1} ${l2}`.trim().toUpperCase(), BODY_X, BODY_Y, 22, "bold");
-  txt(p, `VIN: ${d.vehicle.vin}`, BODY_X + BODY_W, BODY_Y + 4, 15, "bold", { align: "right" });
-  box(p, BODY_X, BODY_Y + 30, BODY_W, 3, INK);
-  txt(p, "STANDARD EQUIPMENT CONTINUED", BODY_X, BODY_Y + 42, 16, "bold");
-  txt(p, `Continuation of the reproduction window sticker for VIN ${d.vehicle.vin}. This page belongs to the sticker on page 1 and is not valid on its own.`, BODY_X, BODY_Y + 62, 11, "body");
-  const colW = (BODY_W - 3 * 24) / 4;
-  let col = 0;
-  let y = BODY_Y + 86;
-  let i = 0;
-  while (i < lines.length && col < 4) {
-    const line = lines[i];
-    const gap = y === BODY_Y + 86 ? 0 : line.gapBefore;
-    if (y + gap + ITEM_LH * (line.heading ? 2 : 1) > bottom) {
-      col++;
-      y = BODY_Y + 86;
-      continue;
-    }
-    y += gap;
-    txt(p, line.text, BODY_X + col * (colW + 24) + line.indent, y, ITEM_PX, line.font, { lh: ITEM_LH });
-    y += ITEM_LH;
-    i++;
-  }
-  return lines.slice(i);
-}
-
 
 /**
  * Builds the dedicated reference layout, or returns null when the content
@@ -675,56 +669,46 @@ export function buildLetterVariantLayout(
     ? input.equipmentGroups
     : d.equipment.standard.map((g) => ({ hint: CATEGORY_HINT[g.category], items: g.items }));
   const sections = assignSections(config, groups);
-  const { placed, rest } = placeEquipment(flowLines(sections, COL1_W));
   const disclosure = [...reproductionDisclosureLines(input.layout.factoryBuild), ...input.layout.disclaimers];
   const footerTop = Math.min(DISCLOSURE_Y, 1224 - 18 - disclosureHeight(disclosure));
 
-  // Plan continuation pages first so every page can say "PAGE n OF m".
-  const contBottom = footerTop - 12;
-  const plan: FlowLine[][] = [];
-  let remaining = rest;
-  while (remaining.length) {
-    const before = remaining.length;
-    const next = paintContinuation(new Painter(null), d, input.displayMake, remaining, contBottom);
-    if (next.length === before) throw new Error("layout_failed: continuation entry cannot fit an empty page");
-    plan.push(remaining.slice(0, before - next.length));
-    remaining = next;
+  for (const style of LETTER_STYLES) {
+    const { placed, rest } = placeEquipment(flowLines(sections, COL1_W, style.px), style.lh);
+    if (rest.length) continue;
+
+    const drawn: string[] = [];
+    const p = new Painter(drawn);
+    paintBanner(p, "PAGE 1 OF 1");
+    paintHeader(p, d, config, input.displayMake);
+    paintEquipment(p, placed, style);
+    paintPricing(p, d);
+    paintEpa(p, d);
+    paintSafety(p, d);
+    paintOrigin(p, d);
+    paintOwnership(p, d, config);
+    paintIdentity(p, d, input.layout.barcodePayload, footerTop);
+    paintDisclosureAt(p, disclosure, footerTop);
+
+    const model: LayoutModel = {
+      width: PAGE_WIDTH,
+      height: PAGE_HEIGHT,
+      mode: style === LETTER_STYLES[0] ? "STANDARD" : "DENSE",
+      pages: [{ primitives: p.primitives }],
+      drawnStrings: drawn,
+      printedEquipment: printedItems(placed),
+      fontFamilies: { heading: "Helvetica-Bold", body: "Helvetica", numeric: "Courier" },
+      fit: fitOk(2, pt(style.px)),
+    };
+    validateModel(model);
+    return model;
   }
-  const pageCount = plan.length + 1;
+  return null;
+}
 
-  const drawn: string[] = [];
-  const p = new Painter(drawn);
-  paintBanner(p, pageCount > 1 ? `PAGE 1 OF ${pageCount} - EQUIPMENT CONTINUED ON PAGE 2` : "PAGE 1 OF 1");
-  paintHeader(p, d, config, input.displayMake);
-  paintEquipment(p, placed);
-  paintPricing(p, d);
-  paintEpa(p, d);
-  paintSafety(p, d);
-  paintOrigin(p, d);
-  paintOwnership(p, d, config);
-  paintIdentity(p, d);
-  paintDisclosureAt(p, disclosure, footerTop);
-
-  const pages: LayoutPage[] = [{ primitives: p.primitives }];
-  plan.forEach((lines, i) => {
-    const cp = new Painter(drawn);
-    const label = `PAGE ${i + 2} OF ${pageCount}`;
-    paintBanner(cp, label);
-    paintContinuation(cp, d, input.displayMake, lines, contBottom);
-    paintDisclosureAt(cp, disclosure, footerTop);
-    pages.push({ primitives: cp.primitives });
-  });
-
-  const model: LayoutModel = {
-    width: PAGE_WIDTH,
-    height: PAGE_HEIGHT,
-    mode: pages.length > 1 ? "CONTINUATION_REQUIRED" : "STANDARD",
-    pages,
-    drawnStrings: drawn,
-    fontFamilies: { heading: "Helvetica-Bold", body: "Helvetica", numeric: "Courier" },
-  };
-  validateModel(model);
-  return model;
+function printedItems(placed: PlacedLine[]): string[] {
+  const seen = new Map<number, string>();
+  for (const l of placed) if (l.itemId !== undefined && l.item) seen.set(l.itemId, l.item);
+  return [...seen.values()];
 }
 
 function paintDisclosureAt(p: Painter, lines: string[], top: number): void {

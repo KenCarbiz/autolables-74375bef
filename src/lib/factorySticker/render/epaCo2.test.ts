@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildRenderLayout } from "./contract";
+import { adaptRenderData, resolveRenderTheme } from "./contract";
+import { buildStickerLayout } from "./layout";
 import { infinitiQx80NewFixture, themeFor } from "./__fixtures__/renderData";
+
+const buildRenderLayout = (data: Parameters<typeof adaptRenderData>[0], theme: Parameters<typeof resolveRenderTheme>[1]) =>
+  buildStickerLayout(adaptRenderData(data), resolveRenderTheme(data, theme));
 
 const co2Line = (co2: number | null | undefined, combined = 18) => {
   const data = infinitiQx80NewFixture();

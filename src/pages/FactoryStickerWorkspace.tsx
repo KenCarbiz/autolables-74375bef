@@ -542,7 +542,6 @@ export default function FactoryStickerWorkspace({
   const [loading, setLoading] = useState(!fixture);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [pageIdx, setPageIdx] = useState(0);
   const [rightTab, setRightTab] = useState<"details" | "technical">("details");
   const [showHistory, setShowHistory] = useState(false);
   const [scenario, setScenario] = useState<keyof typeof FIXTURE_SCENARIOS>("used");
@@ -615,13 +614,11 @@ export default function FactoryStickerWorkspace({
     }
   }, [renderInput]);
 
-  useEffect(() => { setPageIdx(0); }, [scenario]);
-
   const pageSvg = useMemo(() => {
     if (!model) return null;
-    const page = model.pages[Math.min(pageIdx, model.pages.length - 1)];
-    return layoutToSvg({ ...model, pages: [page] });
-  }, [model, pageIdx]);
+    if (!model.fit.ok) return null;
+    return layoutToSvg(model);
+  }, [model]);
 
   // Fixture mode has no stored QA row, so the identity checks run right here
   // against the just-built layout and are labeled as computed-now results.
@@ -631,7 +628,7 @@ export default function FactoryStickerWorkspace({
       barcode_is_vin: renderInput.data.barcodePayload === renderInput.data.vin,
       qr_is_passport: renderInput.data.passportUrl.length > 0,
       vin_drawn: model.drawnStrings.includes(renderInput.data.vin),
-      page_count_ok: model.pages.length >= 1 && model.pages.length <= 2,
+      page_count_ok: model.pages.length === 1 && model.fit.ok,
     };
   }, [fixture, model, renderInput]);
 
@@ -891,8 +888,14 @@ export default function FactoryStickerWorkspace({
                 </button>
               </div>
             )}
+            {model && !model.fit.ok && (
+              <div role="alert" className="rounded-md border border-amber-300 bg-amber-50 p-3 text-[13px] text-amber-900">
+                <div className="font-semibold">Review required: this sticker does not fit one readable page</div>
+                <div className="mt-1">{model.fit.detail} The remaining detail stays in the Vehicle Passport. Nothing is published or printed from this build.</div>
+              </div>
+            )}
             {pageSvg && !showFull && !fullscreen && data && <BuildSummarySheet data={data} stockNo={stockNo} />}
-            {pageSvg && (showFull || fullscreen) && (fullscreen || (model && model.pages.length > 1)) && <div className={`flex items-center justify-between gap-2 flex-wrap ${fullscreen ? "mb-3" : ""}`}>
+            {pageSvg && (showFull || fullscreen) && fullscreen && <div className={`flex items-center justify-between gap-2 flex-wrap ${fullscreen ? "mb-3" : ""}`}>
               <div className="flex items-center gap-1.5 flex-wrap">
                 {([
                   ["Fit", "fit"],
@@ -934,31 +937,6 @@ export default function FactoryStickerWorkspace({
                 >
                   {fullscreen ? "Exit full screen" : "Full screen"}
                 </button>
-                {model && model.pages.length > 1 && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setPageIdx((i) => Math.max(0, i - 1))}
-                      disabled={pageIdx === 0}
-                      className={`w-7 h-7 rounded-md border flex items-center justify-center disabled:opacity-40 ${fullscreen ? "bg-slate-800 text-slate-200 border-slate-600" : "border-border hover:bg-muted/40"}`}
-                      aria-label="Previous page"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <span className={`text-[11px] font-semibold tabular-nums ${fullscreen ? "text-slate-200" : "text-foreground"}`}>
-                      Page {pageIdx + 1} / {model.pages.length}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setPageIdx((i) => Math.min(model.pages.length - 1, i + 1))}
-                      disabled={pageIdx >= model.pages.length - 1}
-                      className={`w-7 h-7 rounded-md border flex items-center justify-center disabled:opacity-40 ${fullscreen ? "bg-slate-800 text-slate-200 border-slate-600" : "border-border hover:bg-muted/40"}`}
-                      aria-label="Next page"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </>
-                )}
               </div>
             </div>}
             {pageSvg && !showFull && !fullscreen ? null : pageSvg ? (

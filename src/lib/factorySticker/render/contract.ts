@@ -20,16 +20,83 @@ import { resolveReferenceVariant } from "../oem/referenceVariants.ts";
 import { VARIANT_LAYOUTS } from "./variants/index.ts";
 import { getTheme, type OemStickerTheme } from "../oem/themes.ts";
 import { resolveThemeProfile, type ResolvedThemeProfile } from "../oem/profiles.ts";
-import { buildStickerLayout, type LayoutModel, type StickerLayoutInput } from "./layout.ts";
+import { buildStickerLayout, type LayoutFit, type LayoutModel, type StickerLayoutInput } from "./layout.ts";
 import type { FactoryBuildProvenance } from "../reproduction.ts";
 import { realizePdf, type PdfLibModule } from "./toPdf.ts";
 import { layoutToSvg } from "./previewSvg.ts";
 
-// 1.1.0: mandatory reproduction banner + disclosure on every page
-// (reproduction.ts DISCLOSURE_VERSION), no federal-label notice, unlimited
-// continuation pages, proven-original-dealer-only ship-to block. Part of the
-// generation fingerprint, so existing documents regenerate as new versions.
-export const RENDERER_VERSION = "1.1.0";
+// 1.2.0: exactly one physical page for every OEM layout. No continuation
+// pages; content that cannot fit at the validated minimum sizes is a
+// review-required fit failure with no PDF. Reproduction banner + disclosure
+// (reproduction.ts DISCLOSURE_VERSION) are unchanged. Part of the generation
+// fingerprint, so existing documents regenerate as new versions.
+export const RENDERER_VERSION = "1.2.0";
+
+/**
+ * Make-wide master routing. Every vehicle of a make with verified data
+ * renders on that make's approved Figma master, not only the exact reference
+ * variant, provided the owner has approved the master and its EPA panel
+ * supports the vehicle's fuel class. An unsupported or unknown fuel class
+ * falls back to the generic one-page layout; a hybrid or PHEV panel is never
+ * printed for a gasoline car, or the reverse. The master takes title and
+ * equipment from the record, never from model-specific slots. To add a make,
+ * register its master in VARIANT_LAYOUTS and add one row here.
+ */
+export type FuelClass = "gasoline" | "hybrid" | "phev" | "ev" | "diesel";
+export type MasterApproval = "approved" | "pending_owner_approval";
+
+export interface MakeMaster {
+  variantKey: string;
+  fuel: readonly FuelClass[];
+  makeWide: boolean;
+}
+
+/**
+ * Owner approval of each Figma master. A master pending approval still
+ * builds and is tested, but no vehicle is routed to it: those vehicles use
+ * the generic one-page layout until the owner confirms.
+ */
+export const MASTER_APPROVAL: Record<string, MasterApproval> = {
+  "infiniti-2026-qx60-sport-awd": "approved",
+  "nissan-2026-pathfinder-platinum-4wd": "approved",
+  "hyundai-2026-santa-fe-hybrid-se-awd": "approved",
+  "jeep-2024-grand-cherokee-4xe-phev": "approved",
+  "ford-2025-transit-250-cargo-rwd-e85-carb": "approved",
+  "mitsubishi-2025-outlander-se-s-awc": "pending_owner_approval",
+  "chrysler-2024-pacifica-select-phev": "pending_owner_approval",
+};
+
+export const MAKE_WIDE_MASTERS: Record<string, MakeMaster> = {
+  INFINITI: { variantKey: "infiniti-2026-qx60-sport-awd", fuel: ["gasoline"], makeWide: true },
+  NISSAN: { variantKey: "nissan-2026-pathfinder-platinum-4wd", fuel: ["gasoline"], makeWide: true },
+  HYUNDAI: { variantKey: "hyundai-2026-santa-fe-hybrid-se-awd", fuel: ["hybrid"], makeWide: true },
+  JEEP: { variantKey: "jeep-2024-grand-cherokee-4xe-phev", fuel: ["phev"], makeWide: true },
+  MITSUBISHI: { variantKey: "mitsubishi-2025-outlander-se-s-awc", fuel: ["gasoline"], makeWide: true },
+  CHRYSLER: { variantKey: "chrysler-2024-pacifica-select-phev", fuel: ["phev"], makeWide: true },
+  FORD: { variantKey: "ford-2025-transit-250-cargo-rwd-e85-carb", fuel: ["gasoline"], makeWide: false },
+};
+
+/** Null when the record does not state a fuel type: such a vehicle is never routed to a master. */
+export function fuelClassOf(...types: Array<string | null | undefined>): FuelClass | null {
+  const t = types.map((x) => String(x ?? "")).join(" ").toLowerCase();
+  if (!t.trim()) return null;
+  if (/phev|plug/.test(t)) return "phev";
+  if (/electric|\bev\b|\bbev\b/.test(t) && !/gasoline|hybrid/.test(t)) return "ev";
+  if (/hybrid/.test(t)) return "hybrid";
+  if (/diesel/.test(t)) return "diesel";
+  if (/gas|flex|e85|petrol|premium|regular|unleaded/.test(t)) return "gasoline";
+  return null;
+}
+
+export function masterFor(data: {
+  identity: { make: string };
+  epa?: { fuelType?: string | null } | null;
+}): MakeMaster | null {
+  const master = MAKE_WIDE_MASTERS[data.identity.make.trim().toUpperCase()];
+  if (!master || !master.makeWide || MASTER_APPROVAL[master.variantKey] !== "approved") return null;
+  const cls = fuelClassOf(data.epa?.fuelType);
+  return cls && master.fuel.includes(cls) ? master : null;
+}
 
 export interface FactoryStickerTheme {
   oemThemeId: string;
@@ -159,6 +226,9 @@ export interface FactoryStickerRenderResult {
     /** Actual page geometry, validated against the template registry. */
     widthPt: number;
     heightPt: number;
+    /** ok:false means REVIEW_REQUIRED: pdfBytes and previewSvg are empty. */
+    fit: LayoutFit;
+    printedEquipment: string[];
   };
 }
 
@@ -455,8 +525,11 @@ function resolveVariantLayout(
     drivetrain: data.mechanical?.drivetrain ?? null,
     fuelType: data.epa?.fuelType ?? null,
   });
-  if (match.status !== "matched" || match.rendering !== "variant_layout" || !match.variant) return null;
-  const build = VARIANT_LAYOUTS[match.variant.key];
+  const exact = match.status === "matched" && match.rendering === "variant_layout" && !!match.variant;
+  const master = exact ? null : masterFor(data);
+  if (exact && MASTER_APPROVAL[match.variant!.key] !== "approved") return null;
+  if (!exact && (!master || input.generic)) return null;
+  const build = VARIANT_LAYOUTS[exact ? match.variant!.key : master!.variantKey];
   if (!build) return null;
   return build({
     layout: input,
@@ -475,23 +548,17 @@ export async function runRenderPipeline(
   pdfLib: PdfLibModule,
 ): Promise<FactoryStickerRenderResult> {
   const model = buildRenderLayout(data, theme);
-  const pdfBytes = await realizePdf(model, pdfLib);
-  // Page 1 only. layoutToSvg stacks every page vertically into one tall
-  // image, so a two-page sticker was stored as a compressed contact sheet and
-  // the Passport rendered it as the thumbnail. Every other caller already
-  // narrows to a single page; this one — the stored asset — did not.
-  //
-  // The PDF itself is untouched: View, Download and Print still serve the
-  // complete multi-page document, and the page count stays in the model.
-  const previewSvg = layoutToSvg(model.pages.length > 1 ? { ...model, pages: [model.pages[0]] } : model);
-  return {
-    pdfBytes,
-    previewSvg,
-    layout: {
-      pages: model.pages.length,
-      drawnStrings: model.drawnStrings,
-      widthPt: model.width,
-      heightPt: model.height,
-    },
+  const layout = {
+    pages: model.pages.length,
+    drawnStrings: model.drawnStrings,
+    widthPt: model.width,
+    heightPt: model.height,
+    fit: model.fit,
+    printedEquipment: model.printedEquipment,
   };
+  if (!model.fit.ok) {
+    return { pdfBytes: new Uint8Array(0), previewSvg: "", layout };
+  }
+  const pdfBytes = await realizePdf(model, pdfLib);
+  return { pdfBytes, previewSvg: layoutToSvg(model), layout };
 }

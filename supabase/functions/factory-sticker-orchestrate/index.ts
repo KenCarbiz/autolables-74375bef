@@ -812,9 +812,40 @@ async function orchestrateVehicle(
         widthPt: Number(rendered.layout?.widthPt ?? 0),
         heightPt: Number(rendered.layout?.heightPt ?? 0),
         drawnStrings: rendered.layout?.drawnStrings || [],
+        printedEquipment: rendered.layout?.printedEquipment || [],
+        fit: rendered.layout?.fit,
       },
     });
     const { qaChecks, qaPass, geometry, completeness, decision } = assessment;
+
+    // A sticker is exactly one page. Verified content that cannot fit one
+    // readable page parks the record for an approved one-page layout
+    // adjustment: no PDF exists, nothing is filed, and any document already
+    // published for this VIN stays exactly as it is.
+    if (rendered.layout?.fit && !rendered.layout.fit.ok) {
+      const reason = decision.reviewReason;
+      await setRecord(admin, record.id, {
+        ...basePatch,
+        generation_status: "REVIEW_REQUIRED",
+        review_required: true, review_reason: reason, last_error: null,
+        qa_metadata: {
+          ...(basePatch.qa_metadata as Record<string, unknown>),
+          one_page_fit: rendered.layout.fit,
+          auto_publish: {
+            policy_version: AUTO_PUBLISH_POLICY_VERSION,
+            published: false,
+            blockers: decision.blockers,
+          },
+        },
+      });
+      await audit(admin, tenantId, "factory_sticker.review_required", record.id, {
+        vin, reason, code: "one_page_review_required", fit: rendered.layout.fit,
+      });
+      return {
+        vehicle_id: vehicleId, record_id: record.id, status: "REVIEW_REQUIRED",
+        reason: "one_page_review_required", fit: rendered.layout.fit,
+      };
+    }
     const qaPatch = {
       qr_identity_qa_status: qaChecks.qr_is_canonical_passport ? "PASS" : "FAIL",
       barcode_identity_qa_status: qaChecks.barcode_is_vin ? "PASS" : "FAIL",

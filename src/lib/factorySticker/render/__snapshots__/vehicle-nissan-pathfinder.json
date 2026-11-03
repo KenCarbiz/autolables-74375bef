@@ -68,7 +68,7 @@
     "barcode": "21,560 227.15x23",
     "qr": "755.5,209.3 17",
     "qr2": "592,377.8 100",
-    "totalMsrp": "493,486 @11.5"
+    "totalMsrp": "493,427.3 @11.5"
   },
   "headings": [
     "ORIGINAL FACTORY BUILD & MSRP RECORD",
@@ -98,6 +98,6 @@
   ],
   "totalBand": "$53,550.00",
   "svgDigest": [
-    "9a7fc079"
+    "a89dec54"
   ]
 }

@@ -1,16 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { buildRenderLayout } from "./contract";
+import { adaptRenderData, resolveRenderTheme } from "./contract";
+import { buildStickerLayout } from "./layout";
 import {
   buildContentManifest,
   buildSingletonExpectations,
   checkRenderedCompleteness,
+  expectedStandardEquipment,
 } from "./completeness";
 import {
   audiQ5Fixture, buickEnvisionFixture, cadillacEscaladeFixture,
   chryslerPacificaFixture, dodgeDurangoFixture, jeepFixture,
-  landRoverSportFixture, longEquipmentFixture, porsche911Fixture,
+  landRoverSportFixture, longEquipmentFixture, porsche911Fixture, qx55ClassFixture,
   ramFixture, themeFor,
 } from "./__fixtures__/renderData";
+
+const buildRenderLayout = (data: Parameters<typeof adaptRenderData>[0], theme: Parameters<typeof resolveRenderTheme>[1]) =>
+  buildStickerLayout(adaptRenderData(data), resolveRenderTheme(data, theme));
 
 describe("content manifest", () => {
   it("requires every package member the buyer is charged for", () => {
@@ -58,7 +63,7 @@ describe("rendered completeness", () => {
     ["Jeep Wrangler", jeepFixture],
     ["Land Rover Sport", landRoverSportFixture],
     ["Porsche 911", porsche911Fixture],
-    ["Maximum equipment", longEquipmentFixture],
+    ["QX55-class equipment", qx55ClassFixture],
   ];
 
   for (const [name, fixture] of cases) {
@@ -120,10 +125,34 @@ describe("rendered completeness", () => {
     expect(report.miscounted[0].actualCount).toBe(2);
   });
 
-  it("counts content that moved to the continuation page as present", () => {
+  it("proves every standard-equipment item is printed exactly once on the single page", () => {
+    const data = qx55ClassFixture();
+    const model = buildRenderLayout(data, themeFor(null));
+    expect(model.pages.length).toBe(1);
+    const expected = expectedStandardEquipment(data);
+    expect(expected.length).toBeGreaterThan(55);
+    expect([...model.printedEquipment].sort()).toEqual([...expected].sort());
+    expect(checkRenderedCompleteness(data, model).pass).toBe(true);
+  });
+
+  it("fails an equipment item that is missing or printed twice", () => {
+    const data = qx55ClassFixture();
+    const model = buildRenderLayout(data, themeFor(null));
+    const dropped = { ...model, printedEquipment: model.printedEquipment.slice(1) };
+    const missing = checkRenderedCompleteness(data, dropped);
+    expect(missing.pass).toBe(false);
+    expect(missing.missing.some((m) => m.category === "standard_equipment")).toBe(true);
+    const doubled = { ...model, printedEquipment: [...model.printedEquipment, model.printedEquipment[0]] };
+    const twice = checkRenderedCompleteness(data, doubled);
+    expect(twice.pass).toBe(false);
+    expect(twice.miscounted.some((m) => m.actualCount === 2)).toBe(true);
+  });
+
+  it("reports content that cannot fit one page as a review-required fit failure, not a second page", () => {
     const data = longEquipmentFixture();
     const model = buildRenderLayout(data, themeFor(null));
-    expect(model.pages.length).toBeGreaterThan(1);
-    expect(checkRenderedCompleteness(data, model).pass).toBe(true);
+    expect(model.pages.length).toBe(1);
+    expect(model.fit.ok).toBe(false);
+    expect(checkRenderedCompleteness(data, model).pass).toBe(false);
   });
 });

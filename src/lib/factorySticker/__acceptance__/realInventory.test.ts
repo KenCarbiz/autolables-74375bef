@@ -7,7 +7,8 @@ import {
   publishedDocs, runOrchestrate, sha256,
   type Fixture, type FixtureVehicle, type Listing, type Outcome, type Store,
 } from "./harness";
-import { adaptRenderData } from "../render/contract";
+import { adaptRenderData, fuelClassOf, MAKE_WIDE_MASTERS, MASTER_APPROVAL, masterFor, type FuelClass } from "../render/contract";
+import { resolveReferenceVariant } from "../oem/referenceVariants";
 import { encodeQrMatrix } from "../render/qrMatrix";
 import { REPRODUCTION_BANNER, REPRODUCTION_DISCLOSURE, FACTORY_BUILD_UNVERIFIED } from "../reproduction";
 import { isRatingMetadata } from "../oem/sourceCorrections";
@@ -49,30 +50,67 @@ const foreignItems = (o: Filed): string[] => {
   return fx.dict.filter((d) => !src.has(norm(d)));
 };
 
-type LayoutClass = "dedicated" | "approved_generic" | "review_required" | "unsupported" | "no_data";
-const layoutClassOf = (o: Outcome): LayoutClass => {
+type Held = Extract<Outcome, { kind: "one_page_review_required" }>;
+type Rendered = Filed | Held;
+
+type Route = "master_make_wide" | "generic_fallback" | "no_data" | "unsupported";
+const routeOf = (o: Outcome): Route => {
   if (o.kind === "pending_data") return "no_data";
-  if (o.kind !== "filed") return "unsupported";
-  if (o.plan.selection.selectionStatus !== "selected") return "unsupported";
-  const ref = o.plan.referenceVariant;
-  if (ref.status === "matched" && ref.rendering === "variant_layout") return "dedicated";
-  if (ref.status === "review_required") return "review_required";
-  return "approved_generic";
+  if (o.kind === "ineligible" || o.kind === "selection_blocked") return "unsupported";
+  return masterFor(o.normalized.data) ? "master_make_wide" : "generic_fallback";
+};
+
+const exactVariantRoute = (o: Outcome): boolean => {
+  if (o.kind === "pending_data" || o.kind === "ineligible" || o.kind === "selection_blocked") return false;
+  const d = o.normalized.data;
+  const year = Number(d.identity.year);
+  const m = resolveReferenceVariant({
+    make: d.identity.make, modelYear: Number.isFinite(year) ? year : null, model: d.identity.model,
+    trim: d.identity.trim, drivetrain: d.mechanical?.drivetrain ?? null, fuelType: d.epa?.fuelType ?? null,
+  });
+  return m.status === "matched" && m.rendering === "variant_layout";
+};
+
+const TRIM_TO_ITEMS = 56;
+
+/**
+ * A one-page-capable subset of a VIN's own saved rows: the first rows of its
+ * verified standard equipment, nothing added. It exercises the full filing
+ * pipeline for these VINs; it is never a substitute for the complete build.
+ */
+const trimmedListing = (l: Listing): Listing => {
+  const sheet = { ...(l.mc_attributes.build_sheet as Record<string, unknown>) };
+  let left = TRIM_TO_ITEMS;
+  const standard: Record<string, string[]> = {};
+  for (const [cat, items] of Object.entries((sheet.standard ?? {}) as Record<string, string[]>)) {
+    if (left <= 0) break;
+    standard[cat] = items.slice(0, left);
+    left -= standard[cat].length;
+  }
+  return { ...l, mc_attributes: { ...l.mc_attributes, build_sheet: { ...sheet, standard, key_features: undefined } } };
 };
 
 let auto: Map<string, Outcome>;
+let trimmed: Map<string, Outcome>;
 const filedOf = (vin: string): Filed => {
-  const o = auto.get(vin);
+  const o = trimmed.get(vin);
   if (!o || o.kind !== "filed") throw new Error(`${vin} was not rendered`);
+  return o;
+};
+const heldOf = (vin: string): Held => {
+  const o = auto.get(vin);
+  if (!o || o.kind !== "one_page_review_required") throw new Error(`${vin} is not a one-page hold`);
   return o;
 };
 
 beforeAll(async () => {
   auto = new Map();
+  trimmed = new Map();
   for (const v of fx.vehicles) {
     auto.set(v.v, await runOrchestrate(buildListing(fx, v), newStore()));
+    if (v.bs) trimmed.set(v.v, await runOrchestrate(trimmedListing(buildListing(fx, v)), newStore()));
   }
-}, 240_000);
+}, 480_000);
 
 const withSheet = fx.vehicles.filter((v) => v.bs);
 const withoutSheet = fx.vehicles.filter((v) => !v.bs);
@@ -105,8 +143,17 @@ describe("pending-data vehicles are refused, not rendered from generic data", ()
   });
 });
 
-describe.each(withSheet.map((v) => [v.v, `${v.y ?? "no ymm"} ${v.t ?? ""}`.trim()]))(
-  "automatic generation %s (%s)",
+const renderable = withSheet.filter((v) => v.y && v.t);
+
+describe("the trimmed subset of every identified build renders on one page", () => {
+  it.each(renderable.map((v) => [v.v]))("%s files a one-page document", (vin) => {
+    const o = trimmed.get(vin)!;
+    expect(o.kind).toBe("filed");
+  });
+});
+
+describe.each(renderable.map((v) => [v.v, `${v.y} ${v.t}`.trim()]))(
+  "one-page generation of the verified subset %s (%s)",
   (vin) => {
     it("equipment comes only from this VIN's saved build sheet", () => {
       const o = filedOf(vin);
@@ -149,7 +196,10 @@ describe.each(withSheet.map((v) => [v.v, `${v.y ?? "no ymm"} ${v.t ?? ""}`.trim(
       expect(adapted.warranty).toBeUndefined();
       expect(adapted.factory.partsContent).toBeUndefined();
       const text = o.rendered.layout.drawnStrings.join(" ");
-      expect(text).not.toMatch(/\bstars?\b|AALA|parts content|\bNHTSA\b.*\d/i);
+      expect(text).not.toMatch(/AALA|parts content|overall rating|rollover rating/i);
+      if (/5-STAR SAFETY RATINGS/.test(text)) expect(text).toContain("Not Available");
+      const starGlyphs = o.model.pages[0].primitives.filter((p) => p.kind === "path" && p.w >= 7 && p.w <= 8 && p.h >= 7 && p.h <= 8);
+      expect(starGlyphs).toHaveLength(0);
     });
 
     it("EPA figures are the saved EPA row or absent", () => {
@@ -162,8 +212,12 @@ describe.each(withSheet.map((v) => [v.v, `${v.y ?? "no ymm"} ${v.t ?? ""}`.trim(
       }
       const epa = o.normalized.data.epa!;
       expect([epa.city, epa.highway, epa.combined, epa.annualFuelCost, epa.ghgScore, epa.fuelType, epa.co2TailpipeGpm]).toEqual(v.e);
-      expect(o.rendered.layout.drawnStrings.join(" ")).toContain(`emits ${v.e[6]} grams CO2`);
       const drawn = new Set(o.rendered.layout.drawnStrings);
+      if (masterFor(o.normalized.data)) {
+        expect(drawn.has(`$${v.e[3].toLocaleString("en-US")}`)).toBe(true);
+      } else {
+        expect(o.rendered.layout.drawnStrings.join(" ")).toContain(`emits ${v.e[6]} grams CO2`);
+      }
       expect(drawn.has(String(v.e[2]))).toBe(true);
       expect(drawn.has(String(v.e[0]))).toBe(true);
       expect(drawn.has(String(v.e[1]))).toBe(true);
@@ -198,8 +252,9 @@ describe.each(withSheet.map((v) => [v.v, `${v.y ?? "no ymm"} ${v.t ?? ""}`.trim(
       expect(o.rendered.pdfBytes.byteLength).toBeGreaterThan(5_000);
       expect(Buffer.from(o.rendered.pdfBytes.slice(0, 5)).toString("latin1")).toBe("%PDF-");
       const pdf = await PDFDocument.load(o.rendered.pdfBytes);
-      expect(pdf.getPageCount()).toBe(o.rendered.layout.pages);
-      expect(pdf.getPageCount()).toBeGreaterThan(0);
+      expect(pdf.getPageCount()).toBe(1);
+      expect(o.rendered.layout.pages).toBe(1);
+      expect(o.rendered.layout.fit.ok).toBe(true);
       const { width, height } = pdf.getPage(0).getSize();
       expect(Math.round(width)).toBe(792);
       expect(Math.round(height)).toBe(612);
@@ -225,9 +280,9 @@ describe.each(withSheet.map((v) => [v.v, `${v.y ?? "no ymm"} ${v.t ?? ""}`.trim(
       expect(o.assessment.qaChecks.vin_drawn).toBe(true);
     });
 
-    it("reproduction banner and disclosure are printed on every page", () => {
+    it("reproduction banner and disclosure are printed on the single page", () => {
       const o = filedOf(vin);
-      expect(o.model.pages.length).toBeGreaterThan(0);
+      expect(o.model.pages.length).toBe(1);
       for (let i = 0; i < o.model.pages.length; i++) {
         const text = pageText(o, i);
         expect(text, `page ${i + 1} banner`).toContain(norm(REPRODUCTION_BANNER));
@@ -259,7 +314,7 @@ describe.each(withSheet.map((v) => [v.v, `${v.y ?? "no ymm"} ${v.t ?? ""}`.trim(
 describe("document versioning and publication controls through manual generation", () => {
   const sample = (pred: (o: Filed) => boolean): FixtureVehicle[] =>
     withSheet.filter((v) => {
-      const o = auto.get(v.v);
+      const o = trimmed.get(v.v);
       return o?.kind === "filed" && pred(o);
     });
 
@@ -292,7 +347,7 @@ describe("document versioning and publication controls through manual generation
 
   it("an auto-published vehicle: manual regenerate of unchanged data is a no-op on versions", { timeout: 180_000 }, async () => {
     for (const v of sample((o) => o.autoPublish)) {
-      const listing = buildListing(fx, v);
+      const listing = trimmedListing(buildListing(fx, v));
       const store = newStore();
       const first = await runOrchestrate(listing, store) as Filed;
       expect(first.version).toBe(1);
@@ -309,8 +364,8 @@ describe("document versioning and publication controls through manual generation
     let checked = 0;
     for (const v of sample((o) => o.autoPublish)) {
       const store = newStore();
-      await runOrchestrate(buildListing(fx, v), store);
-      const second = await runOrchestrate(corrected(buildListing(fx, v)), store, {
+      await runOrchestrate(trimmedListing(buildListing(fx, v)), store);
+      const second = await runOrchestrate(corrected(trimmedListing(buildListing(fx, v))), store, {
         regeneration: { reasonCode: "vehicle_information_corrected" },
       }) as Filed;
       expect(second.version).toBe(2);
@@ -331,10 +386,10 @@ describe("document versioning and publication controls through manual generation
     expect(held.length).toBeGreaterThan(0);
     for (const v of held) {
       const store = newStore();
-      await runOrchestrate(buildListing(fx, v), store);
+      await runOrchestrate(trimmedListing(buildListing(fx, v)), store);
       expect(store.docs.map((d) => d.document_status)).toEqual(["pending_approval"]);
-      await runOrchestrate(buildListing(fx, v), store, { regeneration: { reasonCode: "pdf_or_layout_problem" } });
-      await runOrchestrate(corrected(buildListing(fx, v)), store, { regeneration: { reasonCode: "msrp_corrected" } });
+      await runOrchestrate(trimmedListing(buildListing(fx, v)), store, { regeneration: { reasonCode: "pdf_or_layout_problem" } });
+      await runOrchestrate(corrected(trimmedListing(buildListing(fx, v))), store, { regeneration: { reasonCode: "msrp_corrected" } });
       expect(publishedDocs(store)).toHaveLength(0);
       expect(store.record.generation_status).toBe("REVIEW_REQUIRED");
       expect(store.record.review_required).toBe(true);
@@ -346,10 +401,10 @@ describe("document versioning and publication controls through manual generation
   it("a human-approved v1 stays public while a held regeneration waits as v2, then v2 supersedes it", { timeout: 180_000 }, async () => {
     for (const v of sample((o) => !o.autoPublish).slice(0, 8)) {
       const store = newStore();
-      await runOrchestrate(buildListing(fx, v), store);
+      await runOrchestrate(trimmedListing(buildListing(fx, v)), store);
       approvePublish(store);
       expect(store.docs.map((d) => [d.version, d.document_status])).toEqual([[1, "published"]]);
-      const second = await runOrchestrate(corrected(buildListing(fx, v)), store, {
+      const second = await runOrchestrate(corrected(trimmedListing(buildListing(fx, v))), store, {
         regeneration: { reasonCode: "options_or_packages_corrected" },
       }) as Filed;
       expect(second.autoPublish).toBe(false);
@@ -367,8 +422,8 @@ describe("document versioning and publication controls through manual generation
     const override = { template_key: "oem-autolabels-fallback", reason: "dealer prefers neutral layout" };
     for (const v of sample((o) => o.autoPublish)) {
       const store = newStore();
-      await runOrchestrate(buildListing(fx, v), store);
-      const second = await runOrchestrate(buildListing(fx, v), store, {
+      await runOrchestrate(trimmedListing(buildListing(fx, v)), store);
+      const second = await runOrchestrate(trimmedListing(buildListing(fx, v)), store, {
         regeneration: { reasonCode: "wrong_template_selected" }, storedOverride: override,
       }) as Filed;
       expect(second.plan.appliedOverride).not.toBeNull();
@@ -384,7 +439,7 @@ describe("document versioning and publication controls through manual generation
   it("an override naming another manufacturer is discarded and the automatic decision stands", async () => {
     const v = sample((o) => o.autoPublish)[0];
     const store = newStore();
-    const o = await runOrchestrate(buildListing(fx, v), store, {
+    const o = await runOrchestrate(trimmedListing(buildListing(fx, v)), store, {
       regeneration: { reasonCode: "wrong_template_selected" },
       storedOverride: { template_key: "oem-bmw", reason: "wrong brand" },
     }) as Filed;
@@ -396,7 +451,7 @@ describe("document versioning and publication controls through manual generation
   });
 
   it("a regeneration without a recorded reason is refused", async () => {
-    const listing = buildListing(fx, withSheet[0]);
+    const listing = trimmedListing(buildListing(fx, withSheet[0]));
     await expect(runOrchestrate(listing, newStore(), { regeneration: { reasonCode: "because" } })).rejects.toThrow("reason_required");
     await expect(runOrchestrate(listing, newStore(), { regeneration: { reasonCode: "other" } })).rejects.toThrow("reason_notes_required");
     expect(REGENERATION_REASONS).toContain("msrp_corrected");
@@ -404,7 +459,7 @@ describe("document versioning and publication controls through manual generation
 });
 
 describe("missing or generic source information never becomes equipment", () => {
-  const base = (): Listing => buildListing(fx, withSheet.find((v) => v.t === "LUXE" && v.y === "2027 INFINITI QX60")!);
+  const base = (): Listing => trimmedListing(buildListing(fx, withSheet.find((v) => v.t === "LUXE" && v.y === "2027 INFINITI QX60")!));
   const strip = (l: Listing, patch: (s: Record<string, unknown>) => Record<string, unknown>): Listing => ({
     ...l,
     mc_attributes: { ...l.mc_attributes, build_sheet: patch({ ...(l.mc_attributes.build_sheet as Record<string, unknown>) }) },
@@ -479,78 +534,236 @@ describe("the orchestrator runs the code this harness runs", () => {
   });
 });
 
-describe("coverage across the inventory", () => {
-  const rows = () => fx.vehicles.map((v) => {
-    const o = auto.get(v.v)!;
-    return { v, o, cls: layoutClassOf(o) };
+describe("complete builds are held for an approved one-page layout adjustment, never compressed", () => {
+  const heldVins = renderable.map((v) => [v.v]);
+
+  it("the held set is every identified sheet-backed VIN whose verified content exceeds one readable page", () => {
+    expect(heldVins).toHaveLength(38);
+    for (const [vin] of heldVins) {
+      const o = heldOf(vin);
+      expect(o.rendered.layout.fit.ok).toBe(false);
+    }
   });
 
-  it("every vehicle lands in exactly one class and none is silently dropped", () => {
-    const counts: Record<LayoutClass, number> = { dedicated: 0, approved_generic: 0, review_required: 0, unsupported: 0, no_data: 0 };
-    for (const r of rows()) counts[r.cls]++;
+  it.each(heldVins)("%s parks REVIEW_REQUIRED with no PDF, no document and the one-page reason", async (vin) => {
+    const o = heldOf(vin);
+    const fit = o.rendered.layout.fit;
+    expect(fit.ok).toBe(false);
+    if (fit.ok) return;
+    expect(fit.reason).toBe("one_page_fit_failed");
+    expect(fit.overflowPt).toBeGreaterThan(0);
+    expect(fit.equipmentFontPt).toBeGreaterThanOrEqual(5.5);
+    expect(fit.detail).toContain("approved one-page layout adjustment");
+    expect(o.rendered.pdfBytes.byteLength).toBe(0);
+    expect(o.rendered.previewSvg).toBe("");
+    expect(o.model.pages).toHaveLength(1);
+    expect(o.autoPublish).toBe(false);
+    expect(o.assessment.decision.blockers.map((b) => b.code)).toContain("one_page_review_required");
+    const store = newStore();
+    const again = await runOrchestrate(buildListing(fx, fx.vehicles.find((v) => v.v === vin)!), store);
+    expect(again.kind).toBe("one_page_review_required");
+    expect(store.docs).toHaveLength(0);
+    expect(store.record.generation_status).toBe("REVIEW_REQUIRED");
+    expect(store.record.review_required).toBe(true);
+    expect(store.record.review_reason).toContain("one_page_review_required");
+  });
+
+  it("an existing published document stays intact when the complete build cannot fit", async () => {
+    const v = withSheet.find((x) => x.y && x.t && (trimmed.get(x.v) as Filed | undefined)?.autoPublish)!;
+    const store = newStore();
+    const first = await runOrchestrate(trimmedListing(buildListing(fx, v)), store) as Filed;
+    expect(first.autoPublish).toBe(true);
+    const before = store.docs.map((d) => [d.id, d.version, d.document_status, d.content_hash]);
+    const bytes = sha256(store.docs[0].pdfBytes);
+    const held = await runOrchestrate(buildListing(fx, v), store, { regeneration: { reasonCode: "other", reasonNotes: "full build" } });
+    expect(held.kind).toBe("one_page_review_required");
+    expect(store.docs.map((d) => [d.id, d.version, d.document_status, d.content_hash])).toEqual(before);
+    expect(sha256(store.docs[0].pdfBytes)).toBe(bytes);
+    expect(publishedDocs(store)).toHaveLength(1);
+    expect(store.record.current_document_id).toBe(first.documentId);
+    expect(store.record.review_required).toBe(true);
+  });
+
+  it("the master is attempted first and the generic layout second, and neither goes below the floor", () => {
+    for (const [vin] of heldVins) {
+      const o = heldOf(vin);
+      expect(routeOf(o)).toBe("master_make_wide");
+      const fit = o.rendered.layout.fit;
+      expect(!fit.ok && fit.equipmentFontPt).toBe(5.5);
+    }
+  });
+});
+
+describe("make-wide master routing by fuel class", () => {
+  const FUELS: Array<[FuelClass, string]> = [
+    ["gasoline", "Premium"], ["hybrid", "Hybrid"], ["phev", "Plug-in Hybrid"], ["ev", "Electricity"], ["diesel", "Diesel"],
+  ];
+  const routes = (make: string, fuelType: string) => masterFor({ identity: { make }, epa: { fuelType } });
+
+  it("classifies the EPA fuel type strings", () => {
+    for (const [cls, label] of FUELS) expect(fuelClassOf(label)).toBe(cls);
+    expect(fuelClassOf(null)).toBeNull();
+    expect(fuelClassOf("")).toBeNull();
+  });
+
+  it("routes approved make-wide masters only for the fuel classes their EPA panel supports", () => {
+    expect(routes("INFINITI", "Premium")?.variantKey).toBe("infiniti-2026-qx60-sport-awd");
+    expect(routes("Nissan", "Regular")?.variantKey).toBe("nissan-2026-pathfinder-platinum-4wd");
+    expect(routes("Hyundai", "Hybrid")?.variantKey).toBe("hyundai-2026-santa-fe-hybrid-se-awd");
+    expect(routes("Jeep", "Plug-in Hybrid")?.variantKey).toBe("jeep-2024-grand-cherokee-4xe-phev");
+    expect(routes("INFINITI", "Hybrid")).toBeNull();
+    expect(routes("INFINITI", "Electricity")).toBeNull();
+    expect(routes("Hyundai", "Regular")).toBeNull();
+    expect(routes("Jeep", "Regular")).toBeNull();
+    expect(routes("Jeep", "Hybrid")).toBeNull();
+    expect(routes("INFINITI", "")).toBeNull();
+  });
+
+  it("never routes a master that is pending owner approval, and keeps Ford Transit exact-only", () => {
+    expect(MASTER_APPROVAL[MAKE_WIDE_MASTERS.MITSUBISHI.variantKey]).toBe("pending_owner_approval");
+    expect(MASTER_APPROVAL[MAKE_WIDE_MASTERS.CHRYSLER.variantKey]).toBe("pending_owner_approval");
+    expect(routes("Mitsubishi", "Regular")).toBeNull();
+    expect(routes("Chrysler", "Plug-in Hybrid")).toBeNull();
+    expect(routes("Ford", "Regular")).toBeNull();
+  });
+});
+
+describe("coverage across the inventory", () => {
+  type Row = { v: FixtureVehicle; o: Outcome; route: Route };
+  const rows = (): Row[] => fx.vehicles.map((v) => {
+    const o = auto.get(v.v)!;
+    return { v, o, route: routeOf(o) };
+  });
+  const resultOf = (o: Outcome): string => {
+    if (o.kind === "pending_data") return "refused_no_build_sheet";
+    if (o.kind === "ineligible" || o.kind === "selection_blocked") return "held_unsupported_record";
+    if (o.kind === "one_page_review_required") return "held_one_page_review_required";
+    return o.autoPublish ? "published_eligible_one_page" : "held_other";
+  };
+
+  it("every vehicle lands in exactly one route and none is silently dropped", () => {
+    const counts: Record<Route, number> = { master_make_wide: 0, generic_fallback: 0, no_data: 0, unsupported: 0 };
+    for (const r of rows()) counts[r.route]++;
     expect(Object.values(counts).reduce((a, b) => a + b, 0)).toBe(44);
     expect(counts.no_data).toBe(5);
-    expect(counts.dedicated).toBe(0);
-    expect(counts.review_required).toBe(1);
-    expect(counts.unsupported).toBe(1);
-    expect(counts.approved_generic).toBe(37);
+    expect(counts.unsupported).toBe(0);
+    expect(counts.master_make_wide).toBe(38);
+    expect(counts.generic_fallback).toBe(1);
+  });
+
+  it("primary result: make-wide INFINITI master routing; comparison: exact-variant only", () => {
+    const rs = rows();
+    const makeWide = rs.filter((r) => r.route === "master_make_wide").length;
+    const exact = rs.filter((r) => exactVariantRoute(r.o)).length;
+    expect(makeWide).toBeGreaterThan(exact);
+    expect(exact).toBe(0);
+  });
+
+  it("no vehicle is an auto-published or complete one-page document unless its PDF has exactly one page", async () => {
+    for (const r of rows()) {
+      if (r.o.kind === "filed") {
+        const pdf = await PDFDocument.load(r.o.rendered.pdfBytes);
+        expect(pdf.getPageCount()).toBe(1);
+      } else {
+        expect(r.o.autoPublish).toBe(false);
+      }
+    }
   });
 
   it("writes evidence files when STICKER_EVIDENCE_DIR is set", async () => {
     const dir = process.env.STICKER_EVIDENCE_DIR;
     if (!dir) return;
     mkdirSync(dir, { recursive: true });
-    const coverage = [];
+    const coverage: Array<Record<string, string | number | boolean | null>> = [];
     for (const r of rows()) {
+      const id = [r.v.y, r.v.t].filter(Boolean).join(" ") || "(identity missing on saved record)";
+      const o = r.o;
       const base = {
-        vin: r.v.v, year_make_model_trim: [r.v.y, r.v.t].filter(Boolean).join(" ") || "(identity missing on saved record)",
-        layout_class: r.cls,
+        vin: r.v.v, year_make_model_trim: id, layout_route: r.route,
+        exact_variant_route: exactVariantRoute(o), result: resultOf(o),
       };
-      if (r.o.kind !== "filed") {
+      if (o.kind === "pending_data" || o.kind === "ineligible" || o.kind === "selection_blocked") {
         coverage.push({
-          ...base, reconciliation_status: "n/a", auto_publish_decision: r.o.kind === "pending_data" ? "refused_no_build_sheet" : "held_manual_review",
-          auto_version: null, manual_versions: null, disclosure_all_pages: null, qr_ok: null,
-          equipment_items: 0, equipment_items_not_in_source: 0, pages: 0, blockers: r.o.kind === "pending_data" ? "no saved VIN-specific build sheet" : "",
+          ...base, reconciliation_status: "n/a", auto_publish_decision: o.kind === "pending_data" ? "refused_no_build_sheet" : "held_manual_review",
+          standard_equipment_items: 0, options: 0, pages: 0, fit_overflow_pt: null, equipment_font_pt: null,
+          blockers: o.kind === "pending_data" ? "no saved VIN-specific build sheet" : o.plan.kind === "ineligible" ? o.plan.eligibility.status : (o.plan as { reason?: string }).reason ?? "selection_blocked",
+          hold_reason: o.kind === "pending_data" ? "No saved VIN-specific build sheet; nothing rendered." : "Record unsupported for an OEM reproduction layout.",
         });
         continue;
       }
-      const o = r.o;
-      const qr = o.model.pages.flatMap((p) => p.primitives.filter((x) => x.kind === "qr")).some((q) => q.kind === "qr" && q.payload === o.passportUrl);
-      const disc = o.model.pages.every((_, i) => pageText(o, i).includes(norm(REPRODUCTION_DISCLOSURE)) && pageText(o, i).includes(norm(REPRODUCTION_BANNER)));
-      const store = newStore();
-      await runOrchestrate(buildListing(fx, r.v), store);
-      if (!o.autoPublish) approvePublish(store);
-      const manual = await runOrchestrate(
-        { ...buildListing(fx, r.v), mc_attributes: { ...buildListing(fx, r.v).mc_attributes, exterior_color: "Corrected" } },
-        store, { regeneration: { reasonCode: "vehicle_information_corrected" } },
-      );
+      const fit = o.rendered.layout.fit;
       coverage.push({
         ...base, reconciliation_status: o.plan.reconciliation.status,
         auto_publish_decision: o.autoPublish ? "auto_published" : "held_manual_review",
-        auto_version: o.version, manual_versions: store.docs.map((d) => `v${d.version}:${d.document_status}`).join(" "),
-        disclosure_all_pages: disc, qr_ok: qr, equipment_items: printedEquipment(o).length,
-        equipment_items_not_in_source: untraceable(o).length, pages: o.rendered.layout.pages,
+        standard_equipment_items: adaptRenderData(o.normalized.data).data.equipment.standard.flatMap((g) => g.items).length,
+        options: o.normalized.data.options.length,
+        pages: o.kind === "filed" ? o.rendered.layout.pages : 0,
+        fit_overflow_pt: fit.ok ? 0 : fit.overflowPt,
+        equipment_font_pt: fit.ok ? fit.equipmentFontPt : fit.equipmentFontPt,
         blockers: o.assessment.decision.blockers.map((b) => b.code).join("|"),
+        hold_reason: fit.ok ? "" : fit.detail,
       });
-      void manual;
     }
+    const count = (pred: (c: Record<string, string | number | boolean | null>) => boolean) => coverage.filter(pred).length;
+    const summary = {
+      vehicles: coverage.length,
+      primary_make_wide_routing: {
+        routed_to_infiniti_master: count((c) => c.layout_route === "master_make_wide"),
+        published_eligible_one_page: count((c) => c.result === "published_eligible_one_page"),
+        held_one_page_review_required: count((c) => c.result === "held_one_page_review_required"),
+        held_other: count((c) => c.result === "held_other" || c.result === "held_unsupported_record"),
+        refused_no_build_sheet: count((c) => c.result === "refused_no_build_sheet"),
+      },
+      comparison_exact_variant_only: {
+        routed_to_dedicated_variant: count((c) => c.exact_variant_route === true),
+      },
+    };
     writeFileSync(join(dir, "coverage.json"), JSON.stringify({
       generated_for: "Harte INFINITI new inventory (read-only production extract)",
-      extracted_at: fx.extractedAt, vehicles: coverage.length,
-      summary: coverage.reduce<Record<string, number>>((m, c) => { m[c.layout_class] = (m[c.layout_class] ?? 0) + 1; return m; }, {}),
-      rows: coverage,
+      extracted_at: fx.extractedAt, rule: "exactly one physical PDF page; unfittable content is REVIEW_REQUIRED, never compressed",
+      summary, rows: coverage,
     }, null, 2));
     const cols = Object.keys(coverage[0]);
     const esc = (x: unknown) => `"${String(x ?? "").replace(/"/g, '""')}"`;
     writeFileSync(join(dir, "coverage.csv"), [cols.join(","), ...coverage.map((c) => cols.map((k) => esc((c as Record<string, unknown>)[k])).join(","))].join("\n"));
 
+    const FUELS: Array<[FuelClass, string]> = [
+      ["gasoline", "Premium"], ["hybrid", "Hybrid"], ["phev", "Plug-in Hybrid"], ["ev", "Electricity"], ["diesel", "Diesel"],
+    ];
+    const makeRows: Array<Record<string, string>> = Object.entries(MAKE_WIDE_MASTERS).flatMap(([make, m]) => FUELS.map(([cls, label]) => {
+      const routed = masterFor({ identity: { make }, epa: { fuelType: label } });
+      const approval = MASTER_APPROVAL[m.variantKey];
+      return {
+        make, fuel_class: cls, master: m.variantKey, owner_approval: approval,
+        scope: m.makeWide ? "make-wide" : "exact reference only",
+        result: routed ? "routes to master" : m.fuel.includes(cls) ? (approval === "approved" ? "exact reference only; other models generic" : "generic one-page fallback (master pending owner approval)") : "generic one-page fallback (fuel class not on master EPA panel)",
+      };
+    }));
+    makeRows.push(...FUELS.map(([cls]) => ({
+      make: "(every other make)", fuel_class: cls, master: "none", owner_approval: "n/a", scope: "generic",
+      result: "generic one-page layout",
+    })));
+    writeFileSync(join(dir, "make-fuel-coverage.json"), JSON.stringify(makeRows, null, 2));
+    const mcols = Object.keys(makeRows[0]);
+    writeFileSync(join(dir, "make-fuel-coverage.csv"), [mcols.join(","), ...makeRows.map((c) => mcols.map((k) => esc((c as Record<string, unknown>)[k])).join(","))].join("\n"));
+
+    const sampleDir = join(dir, "one-page-capability-samples");
+    mkdirSync(sampleDir, { recursive: true });
     const seen = new Set<string>();
-    for (const r of rows()) {
-      if (r.o.kind !== "filed") continue;
-      const cohort = `${r.v.y}-${r.v.t}`.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const written: string[] = [];
+    for (const v of renderable) {
+      const t = trimmed.get(v.v);
+      if (!t || t.kind !== "filed") continue;
+      const cohort = `${v.y}-${v.t}`.toLowerCase().replace(/[^a-z0-9]+/g, "-");
       if (seen.has(cohort)) continue;
       seen.add(cohort);
-      writeFileSync(join(dir, `${cohort}-${r.v.v}.pdf`), r.o.rendered.pdfBytes);
+      const file = join(sampleDir, `SUBSET-NOT-FULL-BUILD-${cohort}-${v.v}.pdf`);
+      writeFileSync(file, t.rendered.pdfBytes);
+      written.push(file);
+    }
+    for (const file of written) {
+      const pdf = await PDFDocument.load(new Uint8Array(readFileSync(file)));
+      expect(pdf.getPageCount(), file).toBe(1);
     }
     const refused = withoutSheet[0];
     writeFileSync(join(dir, `pending-data-${refused.v}-REFUSED.json`), JSON.stringify({

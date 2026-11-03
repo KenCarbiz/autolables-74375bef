@@ -189,7 +189,6 @@ export default function ThemeLab() {
   const [fixtureKey, setFixtureKey] = useState<keyof typeof LAB_FIXTURES>("used");
   const [grayscale, setGrayscale] = useState(false);
   const [actualSize, setActualSize] = useState(false);
-  const [pageIdx, setPageIdx] = useState(0);
 
   const profile = profiles.find((p) => p.oemId === oemId) ?? null;
 
@@ -205,9 +204,9 @@ export default function ThemeLab() {
 
   const pageSvg = useMemo(() => {
     if (!result.model) return null;
-    const page = result.model.pages[Math.min(pageIdx, result.model.pages.length - 1)];
-    return layoutToSvg({ ...result.model, pages: [page] });
-  }, [result, pageIdx]);
+    if (!result.model.fit.ok) return null;
+    return layoutToSvg(result.model);
+  }, [result]);
 
   return (
     <div className="min-h-screen bg-muted p-4 md:p-6">
@@ -225,14 +224,14 @@ export default function ThemeLab() {
             <div className="flex items-center gap-2 flex-wrap">
               <select
                 value={oemId}
-                onChange={(e) => { setOemId(e.target.value as OemId); setPageIdx(0); }}
+                onChange={(e) => { setOemId(e.target.value as OemId);  }}
                 className="h-8 rounded-md border border-border bg-white px-2 text-xs font-semibold"
               >
                 {oemIds.map((id) => <option key={id} value={id}>{id.replace(/_/g, " ")}</option>)}
               </select>
               <select
                 value={fixtureKey}
-                onChange={(e) => { setFixtureKey(e.target.value as keyof typeof LAB_FIXTURES); setPageIdx(0); }}
+                onChange={(e) => { setFixtureKey(e.target.value as keyof typeof LAB_FIXTURES);  }}
                 className="h-8 rounded-md border border-border bg-white px-2 text-xs font-semibold"
               >
                 {Object.entries(LAB_FIXTURES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
@@ -251,15 +250,6 @@ export default function ThemeLab() {
               >
                 Actual print size
               </button>
-              {result.model && result.model.pages.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => setPageIdx((i) => (i + 1) % result.model!.pages.length)}
-                  className="h-8 px-2.5 rounded-md border border-border text-[11px] font-bold hover:bg-muted"
-                >
-                  Page {pageIdx + 1}/{result.model.pages.length}
-                </button>
-              )}
             </div>
           </div>
           {profile && (

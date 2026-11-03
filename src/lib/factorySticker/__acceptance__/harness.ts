@@ -106,6 +106,17 @@ export type Outcome =
   | { kind: "ineligible"; status: "REVIEW_REQUIRED"; autoPublish: false; plan: GenerationPlan }
   | { kind: "selection_blocked"; status: "REVIEW_REQUIRED"; autoPublish: false; plan: GenerationPlan }
   | {
+    kind: "one_page_review_required";
+    status: "REVIEW_REQUIRED";
+    autoPublish: false;
+    normalized: NormalizeResult;
+    plan: Extract<GenerationPlan, { kind: "ready" }>;
+    assessment: RenderAssessment;
+    rendered: FactoryStickerRenderResult;
+    model: LayoutModel;
+    listing: Listing;
+  }
+  | {
     kind: "filed";
     status: "PUBLISHED" | "REVIEW_REQUIRED";
     autoPublish: boolean;
@@ -177,8 +188,18 @@ export async function runOrchestrate(listing: Listing, store: Store, opts: RunOp
     layout: {
       pages: rendered.layout.pages, widthPt: rendered.layout.widthPt,
       heightPt: rendered.layout.heightPt, drawnStrings: rendered.layout.drawnStrings,
+      printedEquipment: rendered.layout.printedEquipment, fit: rendered.layout.fit,
     },
   });
+  if (!rendered.layout.fit.ok) {
+    // Mirrors the orchestrator: no document is filed, so a published
+    // document for this VIN is left exactly as it was.
+    store.record = {
+      ...store.record, generation_status: "REVIEW_REQUIRED", review_required: true,
+      review_reason: assessment.decision.reviewReason,
+    };
+    return { kind: "one_page_review_required", status: "REVIEW_REQUIRED", autoPublish: false, listing, normalized, plan, assessment, rendered, model };
+  }
   const autoPublish = assessment.decision.autoPublish;
   const hash = sha256(rendered.pdfBytes);
   const ordered = [...store.docs].sort((a, b) => b.version - a.version);

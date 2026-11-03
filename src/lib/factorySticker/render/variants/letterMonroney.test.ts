@@ -2,7 +2,7 @@ import { writeFileSync } from "node:fs";
 import * as pdfLibModule from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import { buildRenderLayout, runRenderPipeline, type FactoryStickerRenderData } from "../contract";
-import { infinitiBenchmark, nissanBenchmark, themeFor } from "../__fixtures__/renderData";
+import { infinitiBenchmark, nissanBenchmark, qx55ClassFixture, themeFor } from "../__fixtures__/renderData";
 import { expectNoTextOverlap, pageStrings } from "../__fixtures__/layoutAsserts";
 import { PASSPORT_QR_CAPTION, REPRODUCTION_DISCLOSURE } from "../../reproduction";
 import { resolveReferenceVariant } from "../../oem/referenceVariants";
@@ -103,19 +103,15 @@ describe("Letter reference variant layouts", () => {
         expectNoTextOverlap(model, 0);
       });
 
-      it("continues long equipment onto further pages without dropping items", () => {
+      it("never adds a second page for long equipment", () => {
         const extra = Array.from({ length: 260 }, (_, i) => `Variant Extended Line ${String(i).padStart(3, "0")}`);
         const long = buildRenderLayout(
           { ...data, standardEquipment: { ...data.standardEquipment, technology: extra } },
           themeFor(theme),
         );
-        expect(isVariant(long.drawnStrings)).toBe(true);
-        expect(long.pages.length).toBeGreaterThan(1);
-        const printed = long.drawnStrings.join("\n");
-        for (const line of extra) expect(printed).toContain(line);
-        const last = long.pages.length;
-        expect(pageStrings(long, last - 1)).toContain(`PAGE ${last} OF ${last}`);
-        for (let i = 0; i < last; i++) expect(pageStrings(long, i)).toContain(PRINTED_BANNER);
+        expect(long.pages.length).toBe(1);
+        expect(long.fit.ok).toBe(false);
+        expect(long.mode).toBe("REVIEW_REQUIRED");
       });
 
       it("draws the owner-authorized logo artwork in the master logo slot", () => {
@@ -131,16 +127,43 @@ describe("Letter reference variant layouts", () => {
     });
   }
 
-  it("keeps near-miss vehicles on the generic reproduction layout", () => {
+  it("routes INFINITI make-wide but keeps other near-miss makes and fuel classes on the generic layout", () => {
     const qx60 = qx60SportFixture();
     for (const changed of [
       { ...qx60, identity: { ...qx60.identity, trim: "AUTOGRAPH" } },
       { ...qx60, identity: { ...qx60.identity, year: "2025" } },
       { ...qx60, mechanical: { ...qx60.mechanical!, drivetrain: "FWD" } },
     ]) {
-      expect(isVariant(buildRenderLayout(changed, themeFor("infiniti")).drawnStrings)).toBe(false);
+      expect(isVariant(buildRenderLayout(changed, themeFor("infiniti")).drawnStrings)).toBe(true);
     }
-    expect(isVariant(buildRenderLayout(nissanBenchmark(), themeFor("nissan")).drawnStrings)).toBe(false);
+    const ev = { ...qx60, epa: { ...qx60.epa!, fuelType: "Electricity" } };
+    expect(isVariant(buildRenderLayout(ev, themeFor("infiniti")).drawnStrings)).toBe(false);
+  });
+
+  it("a QX55-class build (about 60 items, 3 options) fits the routed INFINITI master on one page at the floor or above", () => {
+    const data = qx55ClassFixture();
+    const m = buildRenderLayout(data, themeFor("infiniti"));
+    expect(isVariant(m.drawnStrings)).toBe(true);
+    expect(m.pages).toHaveLength(1);
+    expect(m.fit.ok).toBe(true);
+    expect(m.fit.ok && m.fit.equipmentFontPt).toBeGreaterThanOrEqual(5.5);
+    expect(m.width).toBe(792);
+    expect(m.height).toBe(612);
+    expect([...m.printedEquipment].sort()).toEqual(Object.values(data.standardEquipment).flat().sort());
+  });
+
+  it("routes a non-reference Nissan model make-wide and a second Pathfinder trim on the Nissan master", () => {
+    for (const trim of ["SV", "SL"]) {
+      const data = { ...pathfinderPlatinumFixture(), identity: { year: "2026", make: "Nissan", model: "Pathfinder", trim } };
+      const m = buildRenderLayout(data, themeFor("nissan"));
+      expect(isVariant(m.drawnStrings)).toBe(true);
+      expect(m.pages).toHaveLength(1);
+      expect(m.fit.ok).toBe(true);
+    }
+    const rogue = { ...pathfinderPlatinumFixture(), identity: { year: "2026", make: "Nissan", model: "Rogue", trim: "SV" } };
+    const m = buildRenderLayout(rogue, themeFor("nissan"));
+    expect(isVariant(m.drawnStrings)).toBe(true);
+    expect(m.pages).toHaveLength(1);
   });
 
   it("shows unrated and unavailable safety states distinctly, never as stars", () => {

@@ -12,13 +12,14 @@
 // non-empty result as a blocker: the document does not publish.
 
 import type { FactoryStickerRenderData } from "./contract.ts";
-import type { LayoutModel } from "./layout.ts";
+import { sanitize, type LayoutModel } from "./layout.ts";
 
 export type ManifestCategory =
   | "identity"
   | "pricing"
   | "option"
   | "package_member"
+  | "standard_equipment"
   | "regulatory"
   | "disclosure";
 
@@ -43,6 +44,23 @@ const money = (n: number): string =>
   n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const clean = (s: string): string => s.replace(/\s+/g, " ").trim();
+
+/** Verified standard equipment, deduplicated the way the layout prints it. */
+export function expectedStandardEquipment(data: FactoryStickerRenderData): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const source of [data.standardEquipment, data.keyFeatures]) {
+    for (const items of Object.values(source ?? {})) {
+      for (const raw of items) {
+        const item = sanitize(raw);
+        if (!item || seen.has(item.toUpperCase())) continue;
+        seen.add(item.toUpperCase());
+        out.push(item);
+      }
+    }
+  }
+  return out;
+}
 
 /**
  * Everything this document must print. Derived from the same immutable
@@ -84,6 +102,10 @@ export function buildContentManifest(data: FactoryStickerRenderData): ManifestIt
     }
   }
 
+  for (const item of expectedStandardEquipment(data)) {
+    push("standard_equipment", `Standard equipment — ${item}`, item);
+  }
+
   for (const row of data.partsContent ?? []) {
     push("regulatory", `Parts content — ${row.label}`, row.value.toUpperCase());
   }
@@ -116,8 +138,8 @@ export function buildSingletonExpectations(
 
 /**
  * Compare the manifest against what the renderer drew, across every page
- * including a continuation page — content moved to page 2 is present, not
- * missing.
+ * on the single page. Every verified standard-equipment item must be drawn
+ * and recorded as printed exactly once.
  */
 export function checkRenderedCompleteness(
   data: FactoryStickerRenderData,
@@ -127,7 +149,12 @@ export function checkRenderedCompleteness(
   const haystack = drawn.join(" ");
   const manifest = buildContentManifest(data);
 
+  const printedCounts = new Map<string, number>();
+  for (const item of model.printedEquipment ?? []) {
+    printedCounts.set(item.toUpperCase(), (printedCounts.get(item.toUpperCase()) ?? 0) + 1);
+  }
   const missing = manifest.filter((item) => {
+    if (item.category === "standard_equipment" && !printedCounts.has(item.expected.toUpperCase())) return true;
     if (drawn.includes(item.expected)) return false;
     // Some values are drawn as part of a composed line (a leader row, a
     // spec cell), so a substring hit is a legitimate presence.
@@ -139,6 +166,13 @@ export function checkRenderedCompleteness(
     const actualCount = drawn.filter((s) => s === expectation.expected).length;
     if (actualCount !== expectation.expectedCount) {
       miscounted.push({ ...expectation, actualCount });
+    }
+  }
+
+  for (const item of expectedStandardEquipment(data)) {
+    const actualCount = printedCounts.get(item.toUpperCase()) ?? 0;
+    if (actualCount > 1) {
+      miscounted.push({ label: `Standard equipment ${item} listed once`, expected: item, expectedCount: 1, actualCount });
     }
   }
 

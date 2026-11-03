@@ -37,7 +37,9 @@ import {
   wrapD,
   yearModelTrim,
   type FirstPageContext,
-  type FlowEntry,
+  type FirstPageResult,
+  placedResult,
+  withColumns,
   type FlowStyle,
   type TabloidSpec,
 } from "./tabloidCommon.ts";
@@ -215,9 +217,8 @@ function paintPricing(p: Painter, d: FactoryStickerData): boolean {
 }
 
 const spec: TabloidSpec = {
-  contStyle: { size: 10.4, lh: 13, hang: 0, inset: 9 },
-  contTitle: (d, make) => yearModelTrim(d, ["year", "make", "model", "trim", "drivetrain"], make),
-  paintFirst(p: Painter, ctx: FirstPageContext): FlowEntry[] | null {
+  eqStyle: EQ_STYLE,
+  paintFirst(p: Painter, ctx: FirstPageContext): FirstPageResult | null {
     const { d, input } = ctx;
     paintFrame(p);
     if (!paintPricing(p, d)) return null;
@@ -238,20 +239,20 @@ const spec: TabloidSpec = {
     const warranty = warrantySection(d, "Warranty");
     const sections = [...buildSections(input), ...(warranty ? [warranty] : [])];
     const entries = toEntries(sections, (s) => s.toUpperCase(), 14, (h) => h !== "Warranty");
-    const style: FlowStyle = { ...EQ_STYLE, size: 8.6 };
+    const style = ctx.style;
     const upper = entries.map((e) => (e.heading ? e : { ...e, text: e.text.toUpperCase() }));
     const { placed, rest } = flow(
       upper,
-      [
+      withColumns([
         { x: 183, w: 232, top: 279, bottom: 490 },
         { x: 420, w: 230, top: 279, bottom: 490 },
         { x: 656, w: 217, top: 279, bottom: 490 },
         { x: 879, w: 206, top: 279, bottom: 490 },
-      ],
+      ], ctx.extraColumns),
       style,
     );
     paintPlaced(p, placed, style, { bullet: "dot" });
-    return rest;
+    return placedResult(upper, rest);
   },
 };
 

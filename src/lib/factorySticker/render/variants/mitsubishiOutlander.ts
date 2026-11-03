@@ -29,7 +29,9 @@ import {
   wrapD,
   yearModelTrim,
   type FirstPageContext,
-  type FlowEntry,
+  type FirstPageResult,
+  placedResult,
+  withColumns,
   type FlowStyle,
   type TabloidSpec,
 } from "./tabloidCommon.ts";
@@ -346,9 +348,8 @@ function paintAdditional(p: Painter, d: FactoryStickerData, rows: ReturnType<typ
 }
 
 const spec: TabloidSpec = {
-  contStyle: EQ_STYLE,
-  contTitle: (d, make) => yearModelTrim(d, ["year", "make", "model", "trim", "drivetrain"], make),
-  paintFirst(p: Painter, ctx: FirstPageContext): FlowEntry[] | null {
+  eqStyle: EQ_STYLE,
+  paintFirst(p: Painter, ctx: FirstPageContext): FirstPageResult | null {
     const { d, input } = ctx;
     const rows = priceRows(d);
     if (!paintAdditional(p, d, rows)) return null;
@@ -366,16 +367,17 @@ const spec: TabloidSpec = {
     });
     paintBottomBox(p, d);
 
+    const entries = toEntries(buildSections(input), (s) => s, 9, (h) => /safety/i.test(h));
     const { placed, rest } = flow(
-      toEntries(buildSections(input), (s) => s, 9, (h) => /safety/i.test(h)),
-      [
+      entries,
+      withColumns([
         { x: 198, w: 272, top: 291, bottom: 1040 },
         { x: 482, w: 270, top: 291, bottom: 1040 },
-      ],
-      EQ_STYLE,
+      ], ctx.extraColumns),
+      ctx.style,
     );
-    paintPlaced(p, placed, EQ_STYLE, { bullet: "square", headingFont: "bold" });
-    return rest;
+    paintPlaced(p, placed, ctx.style, { bullet: "square", headingFont: "bold" });
+    return placedResult(entries, rest);
   },
 };
 

@@ -150,15 +150,14 @@ describe("Stellantis tabloid PHEV layouts", () => {
         expect(s.filter((x) => /^\$0(\.00)?$/.test(x))).toEqual([]);
       });
 
-      it("continues long equipment onto further pages without dropping items", () => {
+      it("never adds a second page: long equipment either fits one page or returns null", () => {
         const extra = Array.from({ length: 300 }, (_, i) => `Variant Extended Line ${String(i).padStart(3, "0")}`);
-        const long = run(c, { ...f, standardEquipment: { ...f.standardEquipment, technology: extra } });
-        expect(long.pages.length).toBeGreaterThan(1);
-        const printed = long.drawnStrings.join("\n");
-        for (const line of extra) expect(printed).toContain(line);
-        const last = long.pages.length;
-        expect(pageStrings(long, last - 1)).toContain(`PAGE ${last} OF ${last}`);
-        for (let i = 0; i < last; i++) expect(pageStrings(long, i)).toContain(REPRODUCTION_BANNER.replace("—", "-"));
+        const long = c.build({
+          layout: adaptRenderData({ ...f, standardEquipment: { ...f.standardEquipment, technology: extra } }),
+          equipmentGroups: Object.entries({ ...f.standardEquipment, technology: extra }).map(([hint, items]) => ({ hint, items })),
+          displayMake: c.make,
+        });
+        expect(long).toBeNull();
       });
 
       it("returns null when the pricing stack cannot fit", () => {

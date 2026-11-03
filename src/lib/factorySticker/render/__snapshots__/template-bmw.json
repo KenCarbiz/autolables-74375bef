@@ -1,15 +1,15 @@
 {
-  "pages": 2,
+  "pages": 1,
   "geometry": "792x612",
-  "mode": "CONTINUATION_REQUIRED",
+  "mode": "DENSE",
   "fonts": "\"Helvetica Neue\", Helvetica, Arial, sans-serif | \"Helvetica Neue\", Helvetica, Arial, sans-serif | \"Roboto Condensed\", \"Arial Narrow\", Arial, sans-serif",
   "primitivesByKind": {
     "barcode": 1,
-    "path": 75,
+    "path": 78,
     "qr": 2,
     "rect": 30,
-    "rule": 10,
-    "text": 248
+    "rule": 11,
+    "text": 265
   },
   "fills": [
     "#0d0d0d",
@@ -72,8 +72,10 @@
     "STANDARD EQUIPMENT",
     "EXTERIOR",
     "INTERIOR & COMFORT",
-    "PERFORMANCE & MECHANICAL",
-    "SAFETY & DRIVER ASSISTANCE",
+    "PERFORMANCE &",
+    "MECHANICAL",
+    "SAFETY & DRIVER",
+    "ASSISTANCE",
     "INCLUDED FACTORY PACKAGES",
     "EQUIPMENT GROUP SENSORY",
     "3,400.00",
@@ -87,13 +89,10 @@
     "Fuel Economy",
     "17",
     "MPG",
-    "15",
-    "20",
-    "5.9"
+    "15"
   ],
   "totalBand": "$95,695.00",
   "svgDigest": [
-    "ca1fece2",
-    "8c01471e"
+    "2dd5a494"
   ]
 }

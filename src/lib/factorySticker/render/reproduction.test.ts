@@ -4,6 +4,7 @@ import {
   hondaCrvHybridFixture,
   infinitiBenchmark,
   longEquipmentFixture,
+  qx55ClassFixture,
   newConditionBenchmark,
   noEpaFixture,
   themeFor,
@@ -24,7 +25,8 @@ const fixtures: Array<[string, () => FactoryStickerRenderData, string | null]> =
   ["used INFINITI benchmark", infinitiBenchmark, "infiniti"],
   ["new-condition benchmark", newConditionBenchmark, "infiniti"],
   ["no-EPA vehicle on the fallback theme", noEpaFixture, null],
-  ["long equipment (continuation pages)", longEquipmentFixture, "infiniti"],
+  ["QX55-class equipment", qx55ClassFixture, "infiniti"],
+  ["long equipment (review-required one page)", longEquipmentFixture, "infiniti"],
 ];
 
 describe("reproduction identification", () => {
@@ -85,24 +87,18 @@ describe("Vehicle Passport QR", () => {
   });
 });
 
-describe("continuation pages", () => {
-  it("prints every standard-equipment item somewhere; nothing is silently dropped", () => {
-    const data = longEquipmentFixture();
+describe("one-page rule", () => {
+  it("prints every QX55-class standard-equipment word on the single page", () => {
+    const data = qx55ClassFixture();
     const model = buildRenderLayout(data, themeFor("infiniti"));
+    expect(model.pages.length).toBe(1);
     const printed = norm(model.drawnStrings.join(" ")).toUpperCase();
-    const items = Object.values(data.standardEquipment).flat();
-    expect(items.length).toBeGreaterThan(0);
-    for (const item of items) {
-      const words = norm(item).toUpperCase().split(" ");
-      // Wrapped items break between words, so check each word survives.
-      for (const w of words) expect(printed, item).toContain(w);
+    for (const item of Object.values(data.standardEquipment).flat()) {
+      for (const w of norm(item).toUpperCase().split(" ")) expect(printed, item).toContain(w);
     }
-    expect(model.pages.length).toBeGreaterThan(2);
-    const last = model.pages.length;
-    expect(pageStrings(model, last - 1)).toContain(`PAGE ${last} OF ${last}`);
   });
 
-  it("paginates an extreme equipment list without truncation", () => {
+  it("holds an extreme equipment list for review on one page and never paginates", () => {
     const data = longEquipmentFixture();
     const extra: string[] = [];
     for (let i = 0; i < 400; i++) extra.push(`Extended Equipment Line ${String(i).padStart(3, "0")}`);
@@ -110,11 +106,9 @@ describe("continuation pages", () => {
       { ...data, standardEquipment: { ...data.standardEquipment, Technology: extra } },
       themeFor("infiniti"),
     );
-    const printed = model.drawnStrings.join("\n");
-    for (const line of extra) expect(printed).toContain(line);
-    for (let i = 0; i < model.pages.length; i++) {
-      expect(pageStrings(model, i)).toContain(PRINTED_BANNER);
-    }
+    expect(model.pages.length).toBe(1);
+    expect(model.fit.ok).toBe(false);
+    expect(pageStrings(model, 0)).toContain(PRINTED_BANNER);
   });
 });
 

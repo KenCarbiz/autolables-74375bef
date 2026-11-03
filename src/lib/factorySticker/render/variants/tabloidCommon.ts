@@ -13,9 +13,10 @@ import {
   measureText,
   starPath,
   validateModel,
+  EQUIPMENT_MIN_FONT_PT,
+  fitOk,
   type LayoutFont,
   type LayoutModel,
-  type LayoutPage,
 } from "../layout.ts";
 import {
   INK,
@@ -308,33 +309,6 @@ export function paintPlaced(
   }
 }
 
-export interface ContinuationContext {
-  title: string;
-  vin: string;
-  style: FlowStyle;
-  bottom: number;
-}
-
-const CONT_TOP = 120;
-
-export function continuationColumns(bottom: number): ColumnSpec[] {
-  const gap = 28;
-  const w = (1940 - 3 * gap) / 4;
-  return [0, 1, 2, 3].map((i) => ({ x: 30 + i * (w + gap), w, top: CONT_TOP, bottom }));
-}
-
-export function paintContinuation(p: Painter, ctx: ContinuationContext, entries: FlowEntry[]): FlowEntry[] {
-  tx(p, ctx.title, 30, 66, 24, "bold");
-  tx(p, `VIN: ${ctx.vin}`, 1970, 70, 17, "bold", { align: "right" });
-  bx(p, 30, 100, 1940, 3, INK);
-  tx(p, "STANDARD EQUIPMENT CONTINUED", 30, 112, 15, "bold");
-  const cols = continuationColumns(ctx.bottom).map((c) => ({ ...c, top: CONT_TOP + 44 }));
-  const { placed, rest } = flow(entries, cols, ctx.style);
-  tx(p, `Continuation of the reproduction window sticker for VIN ${ctx.vin}. This page belongs to the sticker on page 1 and is not valid on its own.`, 30, CONT_TOP + 20, 11, "body");
-  paintPlaced(p, placed, ctx.style, { bullet: "dot" });
-  return rest;
-}
-
 // ── Pricing ───────────────────────────────────────────────────────────
 
 export interface PriceRow {
@@ -485,64 +459,104 @@ export interface FirstPageContext {
   input: VariantRenderInput;
   d: FactoryStickerData;
   footerTop: number;
+  /** Equipment type for this attempt, from the spec's compaction ladder. */
+  style: FlowStyle;
+  /** Columns added to the master's equipment region for this attempt. */
+  extraColumns: number;
+}
+
+/**
+ * Re-splits the master's equipment region into more, narrower columns. The
+ * region (outer edges, top, bottom) never changes; only the split does.
+ */
+export function withColumns(base: ColumnSpec[], extra: number): ColumnSpec[] {
+  if (extra <= 0 || !base.length) return base;
+  const n = base.length + extra;
+  const gap = 12;
+  const x0 = base[0].x;
+  const x1 = base[base.length - 1].x + base[base.length - 1].w;
+  const w = (x1 - x0 - gap * (n - 1)) / n;
+  return Array.from({ length: n }, (_, i) => ({ x: x0 + i * (w + gap), w, top: base[0].top, bottom: base[0].bottom }));
+}
+
+export const MAX_EXTRA_COLUMNS = 2;
+
+/** Equipment left unplaced, and the items that were placed whole. */
+export interface FirstPageResult {
+  rest: FlowEntry[];
+  printed: string[];
+}
+
+export function placedResult(entries: FlowEntry[], rest: FlowEntry[]): FirstPageResult {
+  return {
+    rest,
+    printed: entries.slice(0, entries.length - rest.length).filter((e) => !e.heading).map((e) => e.text),
+  };
 }
 
 export interface TabloidSpec {
-  /** Paints page 1 (below the banner); returns unplaced equipment, or null when pricing cannot fit. */
-  paintFirst: (p: Painter, ctx: FirstPageContext) => FlowEntry[] | null;
-  contStyle: FlowStyle;
-  contTitle: (d: FactoryStickerData, displayMake: string) => string;
+  /** Paints page 1 (below the banner); returns null when pricing cannot fit. */
+  paintFirst: (p: Painter, ctx: FirstPageContext) => FirstPageResult | null;
+  /** The approved master equipment type; the ladder never grows past it. */
+  eqStyle: FlowStyle;
+}
+
+/** Tightest leading ratio found across the approved tabloid masters. */
+export const VARIANT_MIN_LINE_HEIGHT_RATIO = 1.06;
+
+const DISPLAY_PT = (K * 1) / 2;
+
+/**
+ * Compaction ladder for a reference layout: leading tightens first, then
+ * type size steps down to the equipment floor. The floor is the readable
+ * minimum, or the master's own size when the approved master is already
+ * smaller. Sizes are display units.
+ */
+export function styleLadder(master: FlowStyle): FlowStyle[] {
+  const floorSize = Math.min(master.size, EQUIPMENT_MIN_FONT_PT / DISPLAY_PT);
+  const out: FlowStyle[] = [master];
+  const minLh = (size: number): number => size * VARIANT_MIN_LINE_HEIGHT_RATIO;
+  for (let i = 1; i <= 3; i++) {
+    const lh = master.lh - ((master.lh - Math.min(master.lh, minLh(master.size))) * i) / 3;
+    if (lh < out[out.length - 1].lh - 0.01) out.push({ ...master, lh });
+  }
+  for (let size = master.size - 0.25; size > floorSize + 0.01; size -= 0.25) {
+    out.push({ ...master, size, lh: Math.min(master.lh, minLh(size)) });
+  }
+  if (floorSize < master.size - 0.01) out.push({ ...master, size: floorSize, lh: Math.min(master.lh, minLh(floorSize)) });
+  return out;
 }
 
 export function assembleTabloid(input: VariantRenderInput, spec: TabloidSpec): LayoutModel | null {
   const d = input.layout.data;
   const disclosure = disclosureLines(input);
   const footerTop = footerTopFor(disclosure);
-  const ctx: FirstPageContext = { input, d, footerTop };
 
-  const probe = spec.paintFirst(new Painter(null), ctx);
-  if (probe === null) return null;
+  for (const style of styleLadder(spec.eqStyle)) {
+   for (let extraColumns = 0; extraColumns <= MAX_EXTRA_COLUMNS; extraColumns++) {
+    const ctx: FirstPageContext = { input, d, footerTop, style, extraColumns };
+    const probe = spec.paintFirst(new Painter(null), ctx);
+    if (probe === null) return null;
+    if (probe.rest.length) continue;
 
-  const contBottom = footerTop - 14;
-  const cont: ContinuationContext = {
-    title: spec.contTitle(d, input.displayMake),
-    vin: d.vehicle.vin,
-    style: spec.contStyle,
-    bottom: contBottom,
-  };
-  const plan: FlowEntry[][] = [];
-  let remaining = probe;
-  while (remaining.length) {
-    const next = paintContinuation(new Painter(null), cont, remaining);
-    if (next.length === remaining.length) throw new Error("layout_failed: continuation entry cannot fit an empty page");
-    plan.push(remaining.slice(0, remaining.length - next.length));
-    remaining = next;
+    const drawn: string[] = [];
+    const p = new Painter(drawn);
+    paintBanner(p, "PAGE 1 OF 1");
+    spec.paintFirst(p, ctx);
+    paintDisclosure(p, disclosure, footerTop);
+    const model: LayoutModel = {
+      width: TABLOID_WIDTH,
+      height: TABLOID_HEIGHT,
+      mode: style === spec.eqStyle ? "STANDARD" : "DENSE",
+      pages: [{ primitives: p.primitives }],
+      drawnStrings: drawn,
+      printedEquipment: probe.printed,
+      fontFamilies: { heading: "Helvetica-Bold", body: "Helvetica", numeric: "Courier" },
+      fit: fitOk(0, style.size * DISPLAY_PT),
+    };
+    validateModel(model);
+    return model;
+   }
   }
-  const pageCount = plan.length + 1;
-
-  const drawn: string[] = [];
-  const p = new Painter(drawn);
-  paintBanner(p, pageCount > 1 ? `PAGE 1 OF ${pageCount} - EQUIPMENT CONTINUED ON PAGE 2` : "PAGE 1 OF 1");
-  spec.paintFirst(p, ctx);
-  paintDisclosure(p, disclosure, footerTop);
-  const pages: LayoutPage[] = [{ primitives: p.primitives }];
-
-  plan.forEach((entries, i) => {
-    const cp = new Painter(drawn);
-    paintBanner(cp, `PAGE ${i + 2} OF ${pageCount}`);
-    paintContinuation(cp, cont, entries);
-    paintDisclosure(cp, disclosure, footerTop);
-    pages.push({ primitives: cp.primitives });
-  });
-
-  const model: LayoutModel = {
-    width: TABLOID_WIDTH,
-    height: TABLOID_HEIGHT,
-    mode: pages.length > 1 ? "CONTINUATION_REQUIRED" : "STANDARD",
-    pages,
-    drawnStrings: drawn,
-    fontFamilies: { heading: "Helvetica-Bold", body: "Helvetica", numeric: "Courier" },
-  };
-  validateModel(model);
-  return model;
+  return null;
 }

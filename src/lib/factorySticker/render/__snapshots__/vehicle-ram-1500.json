@@ -1,15 +1,15 @@
 {
-  "pages": 2,
+  "pages": 1,
   "geometry": "792x612",
-  "mode": "CONTINUATION_REQUIRED",
+  "mode": "DENSE",
   "fonts": "\"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", Arial, sans-serif | \"Arial Narrow\", \"Roboto Condensed\", Arial, sans-serif | \"Arial Narrow\", \"Roboto Condensed\", Arial, sans-serif",
   "primitivesByKind": {
     "barcode": 1,
-    "path": 46,
+    "path": 60,
     "qr": 2,
     "rect": 30,
-    "rule": 11,
-    "text": 222
+    "rule": 12,
+    "text": 245
   },
   "fills": [
     "#0d0d0d",
@@ -39,14 +39,15 @@
     5.5,
     5.6,
     5.8,
+    5.9,
     6,
     6.2,
     6.4,
     6.5,
     6.6,
     6.8,
+    6.9,
     7.2,
-    7.5,
     7.6,
     8,
     8.5,
@@ -71,8 +72,6 @@
     "2026 RAM 1500",
     "LARAMIE CREW CAB 4X4",
     "STANDARD EQUIPMENT",
-    "EXTERIOR",
-    "INTERIOR & COMFORT",
     "FACTORY OPTIONS",
     "DESTINATION & HANDLING",
     "1,435.00",
@@ -95,7 +94,6 @@
   ],
   "totalBand": "$72,845.00",
   "svgDigest": [
-    "3a3987d3",
-    "18e6216c"
+    "dc0acf27"
   ]
 }

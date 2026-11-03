@@ -8,8 +8,8 @@
     "path": 65,
     "qr": 1,
     "rect": 17,
-    "rule": 9,
-    "text": 199
+    "rule": 10,
+    "text": 212
   },
   "fills": [
     "#0d0d0d",
@@ -61,8 +61,10 @@
     "STANDARD EQUIPMENT",
     "EXTERIOR",
     "INTERIOR & COMFORT",
-    "PERFORMANCE & MECHANICAL",
-    "SAFETY & DRIVER ASSISTANCE",
+    "PERFORMANCE &",
+    "MECHANICAL",
+    "SAFETY & DRIVER",
+    "ASSISTANCE",
     "INCLUDED FACTORY PACKAGES",
     "EQUIPMENT GROUP SENSORY",
     "3,400.00",
@@ -76,6 +78,6 @@
   ],
   "totalBand": "$95,695.00",
   "svgDigest": [
-    "6af53c74"
+    "76605398"
   ]
 }

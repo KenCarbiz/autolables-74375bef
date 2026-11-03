@@ -17,6 +17,7 @@ import {
 } from "./oem/selection.ts";
 import { resolveReferenceVariant, type ReferenceVariantResolution } from "./oem/referenceVariants.ts";
 import { resolveRenderProfile, type FactoryStickerRenderData, type FactoryStickerTheme } from "./render/contract.ts";
+import { fitOk } from "./render/layout.ts";
 import { checkRenderedCompleteness, type CompletenessReport } from "./render/completeness.ts";
 import type { ResolvedThemeProfile } from "./oem/profiles.ts";
 import { evaluateAutoPublish, reconcileMsrp, type AutoPublishDecision, type MsrpReconciliation } from "./autoPublish.ts";
@@ -177,6 +178,9 @@ export interface RenderedLayoutFacts {
   widthPt: number;
   heightPt: number;
   drawnStrings: string[];
+  printedEquipment: string[];
+  /** Absent on a legacy payload; treated as a pass so old callers still run. */
+  fit?: { ok: boolean; detail?: string };
 }
 
 export interface RenderAssessment {
@@ -218,7 +222,9 @@ export function assessRenderedSticker(input: {
     mode: "STANDARD",
     pages: [],
     drawnStrings: drawn,
+    printedEquipment: layout.printedEquipment || [],
     fontFamilies: { heading: "", body: "", numeric: "" },
+    fit: fitOk(0, 0),
   });
   const qaChecks = {
     vin_drawn: drawn.includes(vin),
@@ -226,6 +232,7 @@ export function assessRenderedSticker(input: {
     barcode_is_vin: normalized.data.barcodePayload === vin,
     qr_is_canonical_passport: !!canonicalPassportUrl && normalized.data.passportUrl === canonicalPassportUrl,
     page_count_ok: geometry.pass,
+    one_page_fit_ok: layout.fit ? layout.fit.ok : true,
   };
   const decision = evaluateAutoPublish({
     hasBuildSheet: input.hasBuildSheet,
@@ -247,6 +254,7 @@ export function assessRenderedSticker(input: {
     qaChecks,
     completeness,
     geometry,
+    onePageFit: layout.fit ? { ok: layout.fit.ok, detail: layout.fit.detail ?? "" } : { ok: true, detail: "" },
   });
   return {
     qaChecks,

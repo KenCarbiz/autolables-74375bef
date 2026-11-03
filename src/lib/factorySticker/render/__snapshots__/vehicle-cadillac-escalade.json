@@ -1,15 +1,15 @@
 {
-  "pages": 2,
+  "pages": 1,
   "geometry": "792x612",
-  "mode": "CONTINUATION_REQUIRED",
+  "mode": "DENSE",
   "fonts": "\"Roboto Condensed\", \"Arial Narrow\", \"Helvetica Neue\", Arial, sans-serif | \"Roboto Condensed\", \"Arial Narrow\", Arial, sans-serif | \"Roboto Condensed\", \"Arial Narrow\", Arial, sans-serif",
   "primitivesByKind": {
     "barcode": 1,
-    "path": 37,
+    "path": 42,
     "qr": 2,
     "rect": 28,
-    "rule": 15,
-    "text": 195
+    "rule": 16,
+    "text": 206
   },
   "fills": [
     "#0d0d0d",
@@ -52,7 +52,6 @@
     6.6,
     6.8,
     7.2,
-    7.5,
     7.6,
     8,
     8.5,
@@ -78,10 +77,6 @@
     "2026 CADILLAC ESCALADE",
     "PREMIUM LUXURY 4WD",
     "STANDARD EQUIPMENT",
-    "EXTERIOR",
-    "INTERIOR & COMFORT",
-    "PERFORMANCE & MECHANICAL",
-    "SAFETY & DRIVER ASSISTANCE",
     "MSRP INCLUDES",
     "FACTORY OPTIONS",
     "DESTINATION & HANDLING",
@@ -98,11 +93,13 @@
     "6.2",
     "spend",
     "$7,250",
-    "cost"
+    "cost",
+    "$3,650",
+    "fueleconomy.gov",
+    "VEHICLE PASSPORT"
   ],
   "totalBand": "$109,335.00",
   "svgDigest": [
-    "81678910",
-    "b8276e5c"
+    "f4d103d3"
   ]
 }

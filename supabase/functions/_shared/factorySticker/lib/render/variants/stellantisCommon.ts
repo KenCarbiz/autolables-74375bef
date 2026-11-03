@@ -30,10 +30,10 @@ import {
   formatPlain,
   measureText,
   starPath,
+  fitOk,
   validateModel,
   type LayoutFont,
   type LayoutModel,
-  type LayoutPage,
 } from "../layout.ts";
 import { INK, PAPER, pt, roundedRectPath, txt, u, wrapFigma, type VariantRenderInput } from "./shared.ts";
 import {
@@ -124,6 +124,8 @@ const money0 = (n: number): string => formatMoney(n).replace(/\.00$/, "");
 // ── Equipment sections ─────────────────────────────────────────────────
 
 interface FlowLine {
+  itemId?: number;
+  item?: string;
   text: string;
   font: LayoutFont;
   indent: number;
@@ -182,15 +184,28 @@ const COL2_X = 598.57;
 const COL2_W = 420;
 const COL2_TOP = 243.35;
 const COL_BOTTOM = 1160.5;
-const PITCHES = [20.99, 19.24, 17.49];
+const MASTER_PITCHES = [20.99, 19.24, 17.49];
+const MIN_STACK_PITCH = MASTER_PITCHES[MASTER_PITCHES.length - 1];
 
-function flowLines(sections: Array<{ id: SectionId; items: string[] }>, width: number): FlowLine[] {
+interface EquipmentStep { px: number; pitch: number; stackPitch: number }
+
+// Master type and leading first, then the standard-equipment column (not
+// the price stack) steps down to the 5.5pt floor (11px at 2x) at the
+// tightest master leading ratio.
+const EQUIPMENT_STEPS: EquipmentStep[] = [
+  ...MASTER_PITCHES.map((pitch) => ({ px: ITEM_PX, pitch, stackPitch: pitch })),
+  ...[14.4, 13.2, 12.1, 11].map((px) => ({ px, pitch: px * (MIN_STACK_PITCH / ITEM_PX), stackPitch: MIN_STACK_PITCH })),
+];
+
+function flowLines(sections: Array<{ id: SectionId; items: string[] }>, width: number, px: number): FlowLine[] {
   const lines: FlowLine[] = [];
+  let nextId = 0;
   for (const s of sections) {
     lines.push({ text: SECTION_HEADING[s.id], font: "body", indent: HEAD_INDENT, heading: true });
     for (const item of s.items) {
-      wrapFigma(item, "body", ITEM_PX, width).forEach((text, i) =>
-        lines.push({ text, font: "body", indent: i === 0 ? 0 : 10, heading: false }));
+      const itemId = nextId++;
+      wrapFigma(item, "body", px, width).forEach((text, i) =>
+        lines.push({ itemId, item, text, font: "body", indent: i === 0 ? 0 : 10, heading: false }));
     }
   }
   return lines;
@@ -203,7 +218,7 @@ interface PlacedLine extends FlowLine {
 
 /** Column 1 then column 2; a heading never ends a column. */
 function placeStd(
-  lines: FlowLine[], pitch: number, col1Top: number, col2Limit: number,
+  lines: FlowLine[], pitch: number, px: number, col1Top: number, col2Limit: number,
 ): { placed: PlacedLine[]; rest: FlowLine[]; col2End: number } {
   const placed: PlacedLine[] = [];
   const cols = [
@@ -216,7 +231,7 @@ function placeStd(
   let col2End = COL2_TOP;
   while (i < lines.length) {
     const line = lines[i];
-    const need = pitch * (line.heading ? 2 : 1) - (pitch - ITEM_PX * 1.3);
+    const need = pitch * (line.heading ? 2 : 1) - (pitch - px * 1.3);
     if (y + need > cols[col].bottom) {
       if (col === 0) { col = 1; y = cols[1].top; continue; }
       break;
@@ -793,33 +808,6 @@ function titleLine(d: FactoryStickerData, displayMake: string): string {
   return [v.year > 0 ? String(v.year) : "", displayMake, v.model, v.trim ?? ""].filter(Boolean).join(" ").toUpperCase();
 }
 
-const CONT_COL_W = 470;
-const CONT_COL_GAP = 20;
-const CONT_TOP = 175;
-
-function paintContinuation(
-  p: Painter, d: FactoryStickerData, config: StellantisVariantConfig, displayMake: string,
-  lines: FlowLine[], pitch: number,
-): FlowLine[] {
-  paintFrame(p, config.frameColor);
-  T(p, titleLine(d, displayMake), 106, 92, 34, "bold", { spacing: 0.5 });
-  T(p, `VIN: ${d.vehicle.vin}`, 2030, 100, 20, "bold", { align: "right" });
-  R(p, 106, 140, 1924, 3, INK);
-  T(p, "STANDARD EQUIPMENT CONTINUED", 106, 150, 17.348, "bold");
-  let col = 0;
-  let y = CONT_TOP;
-  let i = 0;
-  while (i < lines.length && col < 4) {
-    const line = lines[i];
-    const need = pitch * (line.heading ? 2 : 1) - (pitch - ITEM_PX * 1.3);
-    if (y + need > COL_BOTTOM) { col++; y = CONT_TOP; continue; }
-    T(p, line.text, 106 + col * (CONT_COL_W + CONT_COL_GAP) + line.indent, y, ITEM_PX, line.font);
-    y += pitch;
-    i++;
-  }
-  return lines.slice(i);
-}
-
 /**
  * Builds the dedicated layout, or returns null when the pricing stack cannot
  * fit the right-hand column so the caller falls back to the generic layout.
@@ -829,45 +817,36 @@ export function buildStellantisPhevLayout(
   input: VariantRenderInput,
 ): LayoutModel | null {
   const d = input.layout.data;
-  const minPitch = PITCHES[PITCHES.length - 1];
-  if (paintStack(null, d, minPitch, COL2_TOP) > COL_BOTTOM) return null;
+  if (paintStack(null, d, MIN_STACK_PITCH, COL2_TOP) > COL_BOTTOM) return null;
 
   const groups = input.equipmentGroups.length
     ? input.equipmentGroups
     : d.equipment.standard.map((g) => ({ hint: CATEGORY_HINT[g.category], items: g.items }));
-  const lines = flowLines(assignSections(groups), COL1_W);
+  const sections = assignSections(groups);
   const spec = specLines(d, config.specTitle(d, input.displayMake));
   const stdHeadTop = SPEC_TOP + spec.length * SPEC_PITCH + 3;
   const col1Top = stdHeadTop + 18.45;
 
-  let chosen = { pitch: minPitch, ...placeStd(lines, minPitch, col1Top, COL_BOTTOM - paintStack(null, d, minPitch, COL2_TOP) + COL2_TOP) };
-  for (const pitch of PITCHES) {
-    const stackH = paintStack(null, d, pitch, COL2_TOP) - COL2_TOP;
+  let chosen: (EquipmentStep & ReturnType<typeof placeStd> & { stackTop: number }) | null = null;
+  for (const step of EQUIPMENT_STEPS) {
+    const stackH = paintStack(null, d, step.stackPitch, COL2_TOP) - COL2_TOP;
     if (stackH > COL_BOTTOM - COL2_TOP) continue;
-    const trial = placeStd(lines, pitch, col1Top, COL_BOTTOM - stackH);
-    chosen = { pitch, ...trial };
-    if (!trial.rest.length) break;
+    const trial = placeStd(flowLines(sections, COL1_W, step.px), step.pitch, step.px, col1Top, COL_BOTTOM - stackH);
+    if (trial.rest.length) continue;
+    const stackTop = trial.placed.some((l) => l.x >= COL2_X) ? trial.col2End : COL2_TOP;
+    if (paintStack(null, d, step.stackPitch, stackTop) > COL_BOTTOM + 4) continue;
+    chosen = { ...step, ...trial, stackTop };
+    break;
   }
-  const { pitch, placed, rest, col2End } = chosen;
-  const stackTop = placed.some((l) => l.x >= COL2_X) ? col2End : COL2_TOP;
-  if (paintStack(null, d, pitch, stackTop) > COL_BOTTOM + 4) return null;
+  if (!chosen) return null;
+  const { px, stackPitch, placed, stackTop } = chosen;
 
   const disclosure = [...reproductionDisclosureLines(input.layout.factoryBuild), ...input.layout.disclaimers];
   const footerTop = Math.min(1446, CANVAS_H - 36 - disclosureHeight(disclosure));
 
-  const plan: FlowLine[][] = [];
-  let remaining = rest;
-  while (remaining.length) {
-    const next = paintContinuation(new Painter(null), d, config, input.displayMake, remaining, pitch);
-    if (next.length === remaining.length) throw new Error("layout_failed: continuation entry cannot fit an empty page");
-    plan.push(remaining.slice(0, remaining.length - next.length));
-    remaining = next;
-  }
-  const pageCount = plan.length + 1;
-
   const drawn: string[] = [];
   const p = new Painter(drawn);
-  paintBanner(p, pageCount > 1 ? `PAGE 1 OF ${pageCount} - EQUIPMENT CONTINUED ON PAGE 2` : "PAGE 1 OF 1");
+  paintBanner(p, "PAGE 1 OF 1");
   paintFrame(p, config.frameColor);
   config.paintHeader(p, d, input.displayMake);
   R(p, 570.4, 234, 2, 921, INK);
@@ -877,8 +856,8 @@ export function buildStellantisPhevLayout(
   T(p, "STANDARD EQUIPMENT", 106.07, stdHeadTop, 17.348, "bold");
   const seW = widthFig("STANDARD EQUIPMENT", "bold", 17.348) + 6;
   Tfit(p, "(UNLESS REPLACED BY OPTIONAL EQUIPMENT)", 106.07 + seW, stdHeadTop + 3.1, 13.879, "body", 555 - 106.07 - seW);
-  for (const l of placed) T(p, l.text, l.x, l.top, ITEM_PX, l.font);
-  paintStack(p, d, pitch, stackTop);
+  for (const l of placed) T(p, l.text, l.x, l.top, px, l.font);
+  paintStack(p, d, stackPitch, stackTop);
   T(p, "THIS VEHICLE IS MANUFACTURED TO MEET SPECIFIC UNITED STATES REQUIREMENTS. THIS", 99.93, 198.43, 13.879, "bold");
   T(p, "VEHICLE IS NOT MANUFACTURED FOR SALE OR REGISTRATION OUTSIDE OF THE UNITED STATES.", 99.93, 212.31, 13.879, "bold");
   paintEpa(p, d);
@@ -888,22 +867,18 @@ export function buildStellantisPhevLayout(
   paintFooterLeft(p, d);
   paintDisclosureAt(p, disclosure, footerTop);
 
-  const pages: LayoutPage[] = [{ primitives: p.primitives }];
-  plan.forEach((pageLines, i) => {
-    const cp = new Painter(drawn);
-    paintBanner(cp, `PAGE ${i + 2} OF ${pageCount}`);
-    paintContinuation(cp, d, config, input.displayMake, pageLines, pitch);
-    paintDisclosureAt(cp, disclosure, footerTop);
-    pages.push({ primitives: cp.primitives });
-  });
+  const items = new Map<number, string>();
+  for (const l of placed) if (l.itemId !== undefined && l.item) items.set(l.itemId, l.item);
 
   const model: LayoutModel = {
     width: CANVAS_W / 2,
     height: CANVAS_H / 2,
-    mode: pages.length > 1 ? "CONTINUATION_REQUIRED" : "STANDARD",
-    pages,
+    mode: px === ITEM_PX ? "STANDARD" : "DENSE",
+    pages: [{ primitives: p.primitives }],
     drawnStrings: drawn,
+    printedEquipment: [...items.values()],
     fontFamilies: { heading: "Helvetica-Bold", body: "Helvetica", numeric: "Courier" },
+    fit: fitOk(2, px / 2),
   };
   validateModel(model);
   return model;
