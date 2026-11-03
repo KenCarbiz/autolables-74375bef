@@ -58,6 +58,7 @@ fi
 rm -rf "$BASE"
 
 cd "$WS"
+export AL_REPO="$REPO"
 echo "== from-empty bootstrap: migrations 0000-0042, fixtures, rtgip2.sql, reconciliation-v3.sql"
 PATH="$SHIM:$PATH" python3 scripts/bootstrap-gateway-disposable.py >"$WS/bootstrap.log" 2>&1 || { tail -20 "$WS/bootstrap.log"; exit 1; }
 tail -1 "$WS/bootstrap.log"
