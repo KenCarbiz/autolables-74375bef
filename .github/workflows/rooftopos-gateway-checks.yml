@@ -79,7 +79,7 @@ jobs:
         run: bash supabase/tests/rtgip/pg_integration.sh
 
   rtgip_local_staging:
-    name: rtgip/2 local four-node staging (real app nodes and adapters; Gateway is a stand-in; needs peer repo token)
+    name: rtgip/2 four-node acceptance (real app nodes and adapters; actual Gateway candidate code; needs peer repo token)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
