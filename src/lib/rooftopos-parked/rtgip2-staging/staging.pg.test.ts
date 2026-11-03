@@ -37,7 +37,7 @@ const URLS = {
 const CAND = (process.env.RTGIP_STG_GATEWAY ?? "candidate") !== "standin";
 /** Refusal status per Gateway: the candidate (GW-F6) answers malformed 400 and not-granted 403 where the stand-in answers 401. */
 const S = (standin: number, candidate: number) => (CAND ? candidate : standin);
-const RESULT_LABEL = CAND ? "isolated four-node, actual Gateway code (da5118a + GW-F1..F3 fixes), disposable" : STANDIN_RESULT_LABEL;
+const RESULT_LABEL = CAND ? "isolated four-node, actual Gateway code (da5118a + amendments GW-F1, F2, F3, F6, F7), disposable" : STANDIN_RESULT_LABEL;
 const run = describe.runIf(!!URLS.autolabels && !!URLS.gateway && !!SEED_FILE);
 const seed: Record<string, string> = SEED_FILE ? (JSON.parse(readFileSync(SEED_FILE, "utf8")) as Record<string, string>) : {};
 
