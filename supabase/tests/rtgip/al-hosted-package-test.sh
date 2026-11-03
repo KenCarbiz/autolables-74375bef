@@ -49,10 +49,11 @@ declare -A FILE=(
   [R]="$SB/proposed/rtgip_source_readers.proposed.sql" [E]="$SB/proposed/rtgip_labels_effects.proposed.sql")
 approve() { for s in "${STEPS[@]}"; do export "AL_APPROVED_$s=$(sha256sum "${FILE[$s]}" | cut -d' ' -f1)"; done; }
 unapprove() { for s in "${STEPS[@]}"; do unset "AL_APPROVED_$s"; done; }
+# PostgreSQL 17 adds the MAINTAIN privilege (m) to table ACLs; it is dropped so 16, 17 and 18 compare equal.
 acl() { psqlq "$1" -c "SELECT md5(string_agg(k || ':' || a, ';' ORDER BY k)) FROM (
-    SELECT 'f ' || p.oid::regprocedure::text AS k, coalesce((SELECT string_agg(x::text, ',' ORDER BY x::text) FROM unnest(p.proacl) x), '-') AS a FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+    SELECT 'f ' || p.oid::regprocedure::text AS k, coalesce((SELECT string_agg(split_part(x::text, '=', 1) || '=' || replace(split_part(split_part(x::text, '=', 2), '/', 1), 'm', '') || '/' || split_part(x::text, '/', 2), ',' ORDER BY x::text) FROM unnest(p.proacl) x), '-') AS a FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
      WHERE n.nspname IN ('rtgip','rtgip_src','rtgip_fx') OR (n.nspname = 'public' AND (p.proname ~ '^(integration_|vehicle_history_)' OR p.proname IN ('tenant_store_registry','apply_payment_estimator_settings','repair_items_record_status','vehicle_instances_custody_guard')))
-    UNION ALL SELECT 't ' || n.nspname || '.' || c.relname, coalesce((SELECT string_agg(x::text, ',' ORDER BY x::text) FROM unnest(c.relacl) x), '-') FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+    UNION ALL SELECT 't ' || n.nspname || '.' || c.relname, coalesce((SELECT string_agg(split_part(x::text, '=', 1) || '=' || replace(split_part(split_part(x::text, '=', 2), '/', 1), 'm', '') || '/' || split_part(x::text, '/', 2), ',' ORDER BY x::text) FROM unnest(c.relacl) x), '-') FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
      WHERE c.relkind IN ('r','p') AND (n.nspname IN ('rtgip','rtgip_src','rtgip_fx') OR (n.nspname = 'public' AND c.relname ~ '^(vehicles|vehicle_instances|vehicle_external_refs|integration_.*|inspection_evidence|repair_items|acquisition_records|vehicle_identity_.*|vehicle_custody_milestones|service_visits|repair_item_status_history|vehicle_reappearance_reviews|vehicle_access_grants|vehicle_history_.*)$'))
     UNION ALL SELECT 'r ' || rolname, rolcanlogin::text || rolinherit::text FROM pg_roles WHERE rolname LIKE 'rtgip\_%') x"; }
 hosted_today() {
