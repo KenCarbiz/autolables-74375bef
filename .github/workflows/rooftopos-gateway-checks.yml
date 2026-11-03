@@ -79,7 +79,7 @@ jobs:
         run: bash supabase/tests/rtgip/pg_integration.sh
 
   rtgip_local_staging:
-    name: rtgip/2 local four-node staging (four throwaway clusters, HTTP, generated keys; Gateway is a stand-in)
+    name: rtgip/2 local four-node staging (real app nodes and adapters; Gateway is a stand-in; needs peer repo token)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -90,8 +90,39 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci --no-audit --no-fund
+      - name: Peer app checkouts (AutoCurb, AutoFrame) need a read-only token
+        id: peers
+        env:
+          PEER_TOKEN: ${{ secrets.ROOFTOPOS_PEER_REPO_TOKEN }}
+        run: |
+          if [ -z "$PEER_TOKEN" ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Four-node staging NOT RUN: secret ROOFTOPOS_PEER_REPO_TOKEN is absent, so the AutoCurb and AutoFrame nodes cannot be built. This is not a pass."
+            echo "### Four-node staging: NOT RUN (peer repositories unavailable). Not a pass." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.peers.outputs.available == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: KenCarbiz/hartecash-2edb8fec
+          ref: claude/project-thread-ixjske
+          token: ${{ secrets.ROOFTOPOS_PEER_REPO_TOKEN }}
+          path: peers/autocurb
+      - if: steps.peers.outputs.available == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: KenCarbiz/showroom-photo-polish
+          ref: claude/project-thread-ixjske
+          token: ${{ secrets.ROOFTOPOS_PEER_REPO_TOKEN }}
+          path: peers/autoframe
+      - if: steps.peers.outputs.available == 'true'
+        uses: oven-sh/setup-bun@v2
+      - if: steps.peers.outputs.available == 'true'
+        run: (cd peers/autocurb && npm ci --no-audit --no-fund) && (cd peers/autoframe && bun install --frozen-lockfile)
       - name: Six directions over HTTP with committed transactions, failure, replay and attack cases
-        run: RTGIP_STG_REPORT=staging-report.json bash supabase/tests/rtgip/pg_staging.sh
+        if: steps.peers.outputs.available == 'true'
+        run: AC_REPO="$PWD/peers/autocurb" AF_REPO="$PWD/peers/autoframe" RTGIP_STG_REPORT=staging-report.json bash supabase/tests/rtgip/pg_staging.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
