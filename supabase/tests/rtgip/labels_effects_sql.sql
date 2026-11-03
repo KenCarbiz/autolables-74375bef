@@ -25,7 +25,7 @@ SELECT set_config('vehicle_history.custody_writer', '', true);
 -- Envelope with only the fields the consumer reads; admission has already verified the rest.
 CREATE FUNCTION pg_temp.env(p_type text, p_src text, p_evt text, p_tenant uuid, p_rooftop text, p_inst text, p_ep text, p_vin text,
   p_agg text, p_arev int, p_payload jsonb) RETURNS jsonb LANGUAGE sql AS $$
-  SELECT jsonb_build_object('event_type', p_type, 'source_app', p_src, 'target_app', 'autolabels', 'tenant_id', p_tenant, 'rooftop_id', p_rooftop,
+  SELECT jsonb_build_object('event_id', md5('evt:' || p_evt)::uuid, 'event_type', p_type, 'source_app', p_src, 'target_app', 'autolabels', 'tenant_id', p_tenant, 'rooftop_id', p_rooftop,
     'vehicle', jsonb_build_object('vin', p_vin, 'instance_id', p_inst, 'episode_id', p_ep),
     'aggregate', jsonb_build_object('id', p_agg, 'revision', p_arev),
     'origin', jsonb_build_object('app', p_src, 'event_id', p_evt, 'revision', p_arev), 'payload', p_payload);
@@ -79,7 +79,7 @@ BEGIN
   PERFORM pg_temp.check(pg_temp.ap(pg_temp.purchase('ac-1', x.ta, 'rf-fx-01', o, 'not-a-uuid', '1FX0000000000A001', 'acq-1', 1)), false, 'bad_reference', 'episode ref');
   IF EXISTS (SELECT 1 FROM rtgip_fx.acquisition_evidence) OR EXISTS (SELECT 1 FROM rtgip_fx.applied) THEN RAISE EXCEPTION 'FAIL X1: refused evidence was stored'; END IF;
   -- The correct binding is accepted; the same acquisition cannot then move to another episode.
-  PERFORM pg_temp.check(pg_temp.ap(pg_temp.purchase('ac-1', x.ta, 'rf-fx-01', o, o, '1FX0000000000A001', 'acq-1', 1)), true, NULL, 'accepted');
+  PERFORM pg_temp.check(pg_temp.ap(pg_temp.purchase('ac-1', x.ta, 'rf-fx-01', o, o, '1FX0000000000A001', 'acq-1', 1)), true, 'applied', 'accepted');
   PERFORM pg_temp.check(pg_temp.ap(pg_temp.purchase('ac-2', x.ta, 'rf-fx-01', x.e_open2::text, x.e_open2::text, '1FX0000000000A003', 'acq-1', 2)),
     false, 'acquisition_episode_reassignment', 'reassignment');
   RAISE NOTICE 'PASS X1 acquisition evidence on the wrong tenant, rooftop, VIN, instance or episode is refused';
@@ -95,6 +95,10 @@ BEGIN
   PERFORM pg_temp.check(pg_temp.ap(pg_temp.purchase('ac-1', x.ta, 'rf-fx-01', o, o, '1FX0000000000A001', 'acq-1', 1, 'audit-changed')),
     false, 'conflicting_duplicate', 'changed body');
   PERFORM pg_temp.check(pg_temp.ap(pg_temp.purchase('ac-3', x.ta, 'rf-fx-01', o, o, '1FX0000000000A001', 'acq-1', 1)), false, 'stale_revision', 'stale');
+  PERFORM pg_temp.check(pg_temp.ap(pg_temp.purchase('ac-1', x.ta, 'rf-fx-01', o, o, '1FX0000000000A001', 'acq-1', 1)
+    || jsonb_build_object('event_id', gen_random_uuid())), false, 'origin_event_reused', 'same origin, new event id');
+  PERFORM pg_temp.check(pg_temp.ap(pg_temp.purchase('ac-1', x.ta, 'rf-fx-01', o, o, '1FX0000000000A001', 'acq-1', 1)
+    || jsonb_build_object('event_id', 'not-a-uuid')), false, 'bad_reference', 'bad event id');
   IF (SELECT count(*) FROM rtgip_fx.acquisition_evidence) <> 1 THEN RAISE EXCEPTION 'FAIL X2: evidence rows'; END IF;
   RAISE NOTICE 'PASS X2 duplicate replays return the first answer; changed or stale events are refused';
 END $$;
@@ -120,7 +124,7 @@ DECLARE x _x%ROWTYPE; c text; r jsonb;
 BEGIN
   SELECT * INTO x FROM _x; c := x.e_closed::text;
   r := pg_temp.ap(pg_temp.purchase('ac-6', x.ta, 'rf-fx-01', c, c, '1FX0000000000A002', 'acq-6', 1));
-  IF NOT (r->>'review')::boolean OR r->>'reason' <> 'episode_closed' THEN RAISE EXCEPTION 'FAIL X4: %', r; END IF;
+  IF NOT (r->>'review')::boolean OR r->>'reason' <> 'custody_review_opened' THEN RAISE EXCEPTION 'FAIL X4: %', r; END IF;
   IF EXISTS (SELECT 1 FROM rtgip_fx.acquisition_evidence WHERE episode_id = x.e_closed)
      OR NOT EXISTS (SELECT 1 FROM rtgip_fx.reconciliation_reviews WHERE source_event_id = 'ac-6' AND kind = 'custody_review')
      OR (SELECT status || '/' || custody_state FROM public.vehicle_instances WHERE id = x.e_closed) <> 'disposed/delivered' THEN

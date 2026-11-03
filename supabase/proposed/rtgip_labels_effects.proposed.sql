@@ -106,8 +106,11 @@ CREATE TABLE IF NOT EXISTS rtgip_fx.media_reinstatements (
   UNIQUE (media_id, audit_ref)
 );
 
--- One row per accepted origin event: replays return the first answer, a changed body is refused.
+-- One row per accepted event id (rtgip/2-event/v2, bound to one full envelope): a replay returns
+-- the first answer, a different envelope under a known id is refused. The origin event is kept
+-- as provenance and is unique too, so one source fact lands once whatever id it travels under.
 CREATE TABLE IF NOT EXISTS rtgip_fx.applied (
+  event_id        uuid PRIMARY KEY,
   source_app      text NOT NULL,
   source_event_id text NOT NULL,
   envelope_sha256 text NOT NULL,
@@ -115,7 +118,7 @@ CREATE TABLE IF NOT EXISTS rtgip_fx.applied (
   tenant_id       uuid NOT NULL,
   outcome         jsonb NOT NULL,
   applied_at      timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (source_app, source_event_id)
+  UNIQUE (source_app, source_event_id)
 );
 
 CREATE OR REPLACE FUNCTION rtgip_fx.append_only() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -193,7 +196,7 @@ BEGIN
       INSERT INTO rtgip_fx.reconciliation_reviews (kind, tenant_id, rooftop_id, vin, source_app, source_instance_ref, source_episode_ref,
           prior_episode_id, source_event_id, envelope_sha256)
       VALUES ('custody_review', v_tenant, v_rooftop, v_vin, v_src, v_inst, v_episode::text, v_episode, v_evt, v_sha);
-      RETURN jsonb_build_object('ok', true, 'review', true, 'reason', 'episode_closed');
+      RETURN jsonb_build_object('ok', true, 'review', true, 'reason', 'custody_review_opened');
     END IF;
     IF v_type = 'appraisal.completed' THEN
       v_kind := 'appraisal_finalized'; v_refs := ARRAY[pl->>'appraisal_ref', pl->>'audit_ref']; v_at := (pl->>'finalized_at')::timestamptz;
@@ -262,21 +265,32 @@ END $$;
 CREATE OR REPLACE FUNCTION rtgip_fx.labels_apply(e jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = '' AS $$
 DECLARE
-  v_src text := e#>>'{origin,app}'; v_evt text := e#>>'{origin,event_id}'; v_sha text := rtgip_fx.envelope_sha(e);
+  v_id uuid; v_src text := e#>>'{origin,app}'; v_evt text := e#>>'{origin,event_id}'; v_sha text := rtgip_fx.envelope_sha(e);
   prev rtgip_fx.applied%ROWTYPE; r jsonb;
 BEGIN
-  IF v_src IS NULL OR v_evt IS NULL THEN RETURN jsonb_build_object('ok', false, 'reason', 'provenance_missing'); END IF;
+  BEGIN
+    v_id := (e->>'event_id')::uuid;
+  EXCEPTION WHEN others THEN RETURN jsonb_build_object('ok', false, 'reason', 'bad_reference');
+  END;
+  IF v_id IS NULL OR v_src IS NULL OR v_evt IS NULL OR e->>'source_app' IS DISTINCT FROM v_src THEN
+    RETURN jsonb_build_object('ok', false, 'reason', 'provenance_missing');
+  END IF;
+  PERFORM pg_advisory_xact_lock(hashtextextended('rtgip_fx.event:' || v_id::text, 0));
   PERFORM pg_advisory_xact_lock(hashtextextended('rtgip_fx.origin:' || v_src || ':' || v_evt, 0));
-  SELECT * INTO prev FROM rtgip_fx.applied a WHERE a.source_app = v_src AND a.source_event_id = v_evt;
+  SELECT * INTO prev FROM rtgip_fx.applied a WHERE a.event_id = v_id;
   IF FOUND THEN
     RETURN CASE WHEN prev.envelope_sha256 = v_sha THEN prev.outcome || jsonb_build_object('duplicate', true)
       ELSE jsonb_build_object('ok', false, 'reason', 'conflicting_duplicate') END;
   END IF;
+  IF EXISTS (SELECT 1 FROM rtgip_fx.applied a WHERE a.source_app = v_src AND a.source_event_id = v_evt) THEN
+    RETURN jsonb_build_object('ok', false, 'reason', 'origin_event_reused');
+  END IF;
   r := rtgip_fx.labels_effect(e, v_sha);
-  -- Only accepted effects are remembered, so a refusal (unmapped rooftop, unknown episode) can succeed once fixed.
   IF (r->>'ok')::boolean THEN
-    INSERT INTO rtgip_fx.applied (source_app, source_event_id, envelope_sha256, event_type, tenant_id, outcome)
-    VALUES (v_src, v_evt, v_sha, e->>'event_type', (e->>'tenant_id')::uuid, r);
+    r := jsonb_build_object('reason', CASE WHEN (r->>'review')::boolean THEN 'review_opened' ELSE 'applied' END) || r;
+    -- Only accepted effects are remembered, so a refusal (unmapped rooftop, unknown episode) can succeed once fixed.
+    INSERT INTO rtgip_fx.applied (event_id, source_app, source_event_id, envelope_sha256, event_type, tenant_id, outcome)
+    VALUES (v_id, v_src, v_evt, v_sha, e->>'event_type', (e->>'tenant_id')::uuid, r);
   END IF;
   RETURN r;
 END $$;
@@ -294,3 +308,11 @@ BEGIN
   END LOOP;
 END $$;
 GRANT EXECUTE ON FUNCTION rtgip_fx.labels_apply(jsonb) TO rtgip_labels_consumer;
+-- The inbox receiver runs the effect inside its own admission transaction: it may assume the
+-- consumer role for that call, and nothing else.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'rtgip_inbox_receiver') THEN
+    GRANT rtgip_labels_consumer TO rtgip_inbox_receiver;
+  END IF;
+END $$;
