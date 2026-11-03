@@ -1,7 +1,8 @@
 -- Gateway STAND-IN for the local four-node staging harness only. It is not the hosted Gateway
 -- and is never applied anywhere but a throwaway cluster. It gives the stand-in what the real
 -- Gateway must provide durably: a source-nonce claim bound to the body hash, one admission per
--- (event, target) with the forwarding nonce fixed at admission, and an append-only audit.
+-- (event, target) holding the exact signed admission text and the forwarding nonce fixed at
+-- admission, the target's receipt texts once verified, and an append-only audit.
 CREATE SCHEMA IF NOT EXISTS gw_standin;
 CREATE TABLE IF NOT EXISTS gw_standin.source_nonces (
   key_id text NOT NULL,
@@ -17,6 +18,13 @@ CREATE TABLE IF NOT EXISTS gw_standin.admissions (
   connection_id text NOT NULL,
   body_sha256 text NOT NULL CHECK (body_sha256 ~ '^[0-9a-f]{64}$'),
   gateway_nonce text NOT NULL,
+  delivery_id text NOT NULL UNIQUE CHECK (delivery_id ~ '^[0-9a-f]{64}$'),
+  tenant_id text NOT NULL,
+  body text NOT NULL,
+  envelope jsonb NOT NULL,
+  admission_text text NOT NULL,
+  target_receipts text[],
+  forward_attempts integer NOT NULL DEFAULT 0,
   admitted_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (event_id, target_app)
 );

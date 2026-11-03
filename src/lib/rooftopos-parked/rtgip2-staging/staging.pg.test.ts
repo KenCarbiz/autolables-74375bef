@@ -6,7 +6,9 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
 import { writeFileSync } from "node:fs";
-import { receiptSigningJson, type Receipt } from "../rtgip2/delivery.ts";
+import { RECEIPT_PROTOCOL, type ReceiptV2 } from "../rtgip2/receipt-v2.ts";
+import { ADMISSION_HEADER, encodeAdmissionHeader } from "../rtgip2/admission.ts";
+import { signAdmission, STANDIN_LABEL } from "../rtgip2/harness.ts";
 import {
   canonicalize, deriveEventId, eventIdScopeOf, hmacHex, payloadHash, preimage, scopeOf, sha256Hex, signEnvelope, SIGNATURE_PREFIX,
   type EnvelopeV2, type Registry, type ServiceKey,
@@ -22,7 +24,7 @@ import { TENANT, INSTANCE, EPISODE, VIN, ROOFTOP as FIX_ROOFTOP } from "../rtgip
 import { AT, MEDIA, SUB, approval, cmeta, curbRecords, curbScope, frameRecords, frameScope, revocation, revocationRecords } from "../rtgip2-matrix/scenario.ts";
 import {
   APPS, OTHER_ROOFTOP, ROOFTOP, connect, connIdOf, dispatch, enqueue, keyFor, makeDue, noFaults, nowSec, projectionEffect,
-  seedNode, stagingRegistry, startGatewayStandin, startTarget, type App, type Faults, type Server, type Sql,
+  seedNode, stagingRegistry, startGatewayStandin, startTarget, type App, type Faults, type GatewayStandin, type Server, type Sql,
 } from "./nodes.ts";
 
 const URLS = {
@@ -39,7 +41,7 @@ const ids = { ep: randomUUID(), listing: randomUUID(), file: randomUUID(), store
 let reg: Registry;
 const db = {} as Record<App | "gateway", Sql>;
 const faults: Record<App, Faults> = { autolabels: noFaults(), autocurb: noFaults(), autoframe: noFaults() };
-const servers = {} as Record<App | "gateway", Server>;
+const servers = {} as Record<App, Server> & { gateway: GatewayStandin };
 const evidence: Record<string, Record<string, unknown>> = {};
 const note = (route: string, k: string, v: unknown) => void ((evidence[route] ??= {})[k] = v);
 const scope = () => ({ tenant_id: tenant, rooftop_id: ROOFTOP, scope_verified_server_side: true as const });
@@ -63,20 +65,19 @@ const labelsReader: SourceDb = {
 };
 const effects = async (app: App, id: string) => Number((await db[app]`SELECT count(*)::int AS c FROM rtgip_stage.effects WHERE event_id = ${id}`)[0]!.c);
 const projection = async <P>(app: App) => (await db[app]`SELECT doc FROM rtgip_stage.projection WHERE app = ${app}`)[0]?.doc as P;
-const outboxState = async (app: App, id: string) => (await db[app]`SELECT state, last_inbox_outcome FROM rtgip.outbox WHERE event_id = ${id}`)[0];
+const outboxState = async (app: App, id: string) => (await db[app]`SELECT state, receipts->1->>'outcome' AS inbox_outcome FROM rtgip.outbox WHERE event_id = ${id}`)[0];
 const receiptKinds = async (app: App, id: string) =>
   (await db[app]`SELECT kind, outcome FROM rtgip.receipts WHERE event_id = ${id} ORDER BY attempt, kind`).map((r) => `${r.kind}:${r.outcome}`);
 
-async function pumpUntilSettled(app: App, max = 6) {
+async function pumpUntilSettled(app: App, max = 8) {
   const all = [];
   for (let i = 0; i < max; i++) {
     const r = await dispatch(db[app], app, reg, servers.gateway.url, `w-${app}`);
     all.push(...r);
-    if (r.length === 0) {
-      const open = await db[app]`SELECT count(*)::int AS c FROM rtgip.outbox WHERE state NOT IN ('consumer_committed','target_quarantined','dead_letter')`;
-      if (open[0]!.c === 0) break;
-      await makeDue(db[app]);
-    }
+    const open = await db[app]`SELECT count(*)::int AS c FROM rtgip.outbox WHERE state NOT IN ('consumer_committed','target_quarantined','dead_letter')`;
+    if (open[0]!.c === 0) break;
+    await servers.gateway.forwardPending();
+    await makeDue(db[app]);
   }
   return all;
 }
@@ -98,7 +99,7 @@ async function proveCommitted(src: App, tgt: App, envelope: EnvelopeV2, sourceFa
   note(route, "gateway_admission_committed", "gw_standin.admissions row");
   note(route, "target_inbox_committed", `rtgip.inbox outcome=${inbox[0]?.outcome}, committed`);
   note(route, "consumer_effect_committed", "rtgip_stage.effects = 1, projection updated by the real consumer");
-  note(route, "signed_ack_verified", `rtgip.outbox_advance verified: ${kinds.join(", ")}`);
+  note(route, "signed_ack_verified", `rtgip.outbox_advance verified the three-receipt chain (${kinds.join(", ")}); ${STANDIN_LABEL}`);
 }
 
 run("local four-node staging over HTTP and committed transactions", () => {
@@ -177,7 +178,7 @@ run("local four-node staging over HTTP and committed transactions", () => {
     await pumpUntilSettled("autoframe");
     await enqueue(db.autoframe, stale);
     await pumpUntilSettled("autoframe");
-    for (const p of stale) expect(await outboxState("autoframe", p.envelope.event_id)).toEqual({ state: "consumer_committed", last_inbox_outcome: "stale_ignored" });
+    for (const p of stale) expect(await outboxState("autoframe", p.envelope.event_id)).toEqual({ state: "consumer_committed", inbox_outcome: "stale_ignored" });
     expect((await projection<LabelsProjection>("autolabels")).media[MEDIA]).toMatchObject({ state: "revoked", active_in_gallery: false });
     expect((await projection<CurbProjection>("autocurb")).vehicles[ids.ep]!.media[MEDIA]!.state).toBe("revoked");
     for (const t of ["autolabels->autocurb", "autoframe->autolabels", "autoframe->autocurb"]) note(t, "stale_revision", "stale_ignored, no effect");
@@ -205,44 +206,54 @@ run("local four-node staging over HTTP and committed transactions", () => {
 
   it.each(DIRS)("%s -> %s: lost acknowledgement, crash in the consumer transaction, exact replay and altered replay", async (src, tgt) => {
     const route = `${src}->${tgt}`;
-    // Lost ACK: the target commits but the receipts never arrive; the retry gets the committed duplicate.
+    // Lost ACK: the target commits and stores its receipts but the answer never reaches the Gateway.
     const [a] = await freshEvent(src, tgt);
     await enqueue(db[src], [a!]);
     faults[tgt].dropReceipts = 1;
     const first = await dispatch(db[src], src, reg, servers.gateway.url, `w-${src}`);
-    expect(first[0]!.state).toBe("retry_wait");
+    expect(first[0]).toMatchObject({ action: "deliver", advanced: ["gateway_admitted"], state: "gateway_admitted" });
     expect(await effects(tgt, a!.envelope.event_id)).toBe(1);
+    // The source confirms before the Gateway has the chain: pending, the row stays admitted.
+    await makeDue(db[src]);
+    const early = await dispatch(db[src], src, reg, servers.gateway.url, `w-${src}`);
+    expect(early[0]).toMatchObject({ action: "confirm", advanced: ["pending:target_inbox_pending"], state: "gateway_admitted" });
+    // The Gateway's retry reaches the target, which returns the stored receipts byte for byte.
+    await servers.gateway.forwardPending();
     await makeDue(db[src]);
     await pumpUntilSettled(src);
     expect(await outboxState(src, a!.envelope.event_id)).toMatchObject({ state: "consumer_committed" });
     expect(await effects(tgt, a!.envelope.event_id)).toBe(1);
-    // Crash inside the target's business transaction: nothing commits, no receipt, retry applies once.
+    // Crash inside the target's business transaction: nothing commits, no receipt, the retry applies once.
     const [b] = await freshEvent(src, tgt);
     await enqueue(db[src], [b!]);
     faults[tgt].crashInEffect = 1;
     const crashed = await dispatch(db[src], src, reg, servers.gateway.url, `w-${src}`);
-    expect(crashed[0]).toMatchObject({ http_status: 502, state: "retry_wait" });
+    expect(crashed[0]).toMatchObject({ action: "deliver", http_status: 200, state: "gateway_admitted" });
     expect(await db[tgt]`SELECT 1 FROM rtgip.inbox WHERE event_id = ${b!.envelope.event_id}`).toHaveLength(0);
     expect(await db[tgt]`SELECT 1 FROM rtgip.admissions WHERE event_id = ${b!.envelope.event_id}`).toHaveLength(0);
+    await servers.gateway.forwardPending();
     await makeDue(db[src]);
     await pumpUntilSettled(src);
     expect(await effects(tgt, b!.envelope.event_id)).toBe(1);
-    // Replay of the exact Gateway-forwarded delivery straight at the target: a committed duplicate, no second effect.
+    // Replay of the exact Gateway-forwarded delivery straight at the target: the stored receipts, no second effect.
     const gwKey = keyFor(reg, "gateway");
-    const nonce = (await db.gateway`SELECT gateway_nonce FROM gw_standin.admissions WHERE event_id = ${b!.envelope.event_id}`)[0]!.gateway_nonce as string;
-    const hdr = (await signEnvelope(b!.body, b!.envelope, gwKey, nowSec(), nonce)) as unknown as Record<string, string>;
+    const stored = (await db.gateway`SELECT gateway_nonce, admission_text, target_receipts FROM gw_standin.admissions WHERE event_id = ${b!.envelope.event_id}`)[0]!;
+    const nonce = stored.gateway_nonce as string;
+    const hdr = { ...((await signEnvelope(b!.body, b!.envelope, gwKey, nowSec(), nonce)) as unknown as Record<string, string>), [ADMISSION_HEADER]: encodeAdmissionHeader(JSON.parse(stored.admission_text as string) as ReceiptV2) };
     const replay = await fetch(`${servers[tgt].url}/rtgip/v2/inbound`, { method: "POST", headers: hdr, body: b!.body });
-    const rj = (await replay.json()) as { receipts: { kind: string; outcome: string }[] };
+    const rj = (await replay.json()) as { receipts: ReceiptV2[] };
     expect(replay.status).toBe(200);
-    expect(rj.receipts.map((r) => `${r.kind}:${r.outcome}`)).toEqual(["target_inbox:duplicate", `consumer_commit:${rj.receipts[1]?.outcome}`]);
+    expect(rj.receipts.map((r) => canonicalize(r))).toEqual(stored.target_receipts);
+    expect(rj.receipts.map((r) => r.kind)).toEqual(["target_inbox", "consumer_commit"]);
     expect(await effects(tgt, b!.envelope.event_id)).toBe(1);
     // The same nonce over other bytes is refused by the target database.
     const [c] = await freshEvent(src, tgt);
-    const hdr2 = (await signEnvelope(c!.body, c!.envelope, gwKey, nowSec(), nonce)) as unknown as Record<string, string>;
+    const admC = await signAdmission(c!.envelope, connIdOf(src, tgt, tenant), gwKey, nowSec());
+    const hdr2 = { ...((await signEnvelope(c!.body, c!.envelope, gwKey, nowSec(), nonce)) as unknown as Record<string, string>), [ADMISSION_HEADER]: encodeAdmissionHeader(admC) };
     const altered = await fetch(`${servers[tgt].url}/rtgip/v2/inbound`, { method: "POST", headers: hdr2, body: c!.body });
     expect(altered.status).toBe(403);
     expect(await effects(tgt, c!.envelope.event_id)).toBe(0);
-    note(route, "failure_retry_replay", "lost ack -> committed duplicate (1 effect); crash -> 503/no receipt -> retry (1 effect); exact replay -> duplicate; nonce reuse over other bytes -> 403");
+    note(route, "failure_retry_replay", "lost ack -> stored receipts returned on the Gateway's retry (1 effect); crash -> no receipt -> Gateway retry (1 effect); exact replay -> stored receipts; nonce reuse over other bytes -> 403");
   });
 
   it("concurrent dispatchers: every event is leased once and applied once", async () => {
@@ -251,6 +262,7 @@ run("local four-node staging over HTTP and committed transactions", () => {
     await enqueue(db.autolabels, evs);
     const [x, y, z] = await Promise.all([1, 2, 3].map((w) => dispatch(db.autolabels, "autolabels", reg, servers.gateway.url, `cw-${w}`)));
     const leased = [...x!, ...y!, ...z!].map((r) => r.event_id);
+    expect([...x!, ...y!, ...z!].every((r) => r.action === "deliver")).toBe(true);
     expect(new Set(leased).size).toBe(leased.length);
     await pumpUntilSettled("autolabels");
     for (const e of evs) expect(await effects("autocurb", e.envelope.event_id)).toBe(1);
@@ -324,13 +336,16 @@ run("local four-node staging over HTTP and committed transactions", () => {
     await db.autolabels`UPDATE rtgip.signing_keys SET status = 'revoked' WHERE owner = 'gateway'`;
     await makeDue(db.autocurb);
     const r2 = await dispatch(db.autocurb, "autocurb", reg, servers.gateway.url, "w-rev");
-    expect(r2[0]!.reason).toMatch(/^db:key_revoked|^db:/);
+    expect(r2[0]).toMatchObject({ action: "deliver", state: "gateway_admitted" });
+    const refused = (await db.gateway`SELECT decision, reason FROM gw_standin.audit WHERE event_id = ${a!.envelope.event_id} AND decision = 'target_error' ORDER BY seq DESC LIMIT 1`)[0];
+    expect(refused?.reason).toMatch(/^db:key_revoked/);
     expect(await effects("autolabels", a!.envelope.event_id)).toBe(0);
     await db.autolabels`UPDATE rtgip.signing_keys SET status = 'current' WHERE owner = 'gateway'`;
+    await servers.gateway.forwardPending();
     await makeDue(db.autocurb);
     await pumpUntilSettled("autocurb");
     expect(await effects("autolabels", a!.envelope.event_id)).toBe(1);
-    note("autocurb->autolabels", "revoked_credentials", `source key: 401 key_revoked; gateway key revoked in target DB: ${r2[0]!.reason}; restored -> applied once`);
+    note("autocurb->autolabels", "revoked_credentials", `source key: 401 key_revoked; gateway key revoked in target DB: ${refused?.reason}; restored -> applied once`);
   });
 
   it("a consumer rejection is quarantined: no consumer_commit receipt exists for it anywhere", async () => {
@@ -340,7 +355,7 @@ run("local four-node staging over HTTP and committed transactions", () => {
     const q = await F.mediaApproved(rebind(approval(1, "af-q-1"), { [MEDIA]: m }), fs, rebind(frameRecords(1, "af-q-1"), { [MEDIA]: m }), ["autolabels"]);
     await enqueue(db.autoframe, q);
     await pumpUntilSettled("autoframe");
-    expect(await outboxState("autoframe", q[0]!.envelope.event_id)).toEqual({ state: "target_quarantined", last_inbox_outcome: "quarantined" });
+    expect(await outboxState("autoframe", q[0]!.envelope.event_id)).toEqual({ state: "target_quarantined", inbox_outcome: "quarantined" });
     expect(await receiptKinds("autoframe", q[0]!.envelope.event_id)).not.toContain("consumer_commit:applied");
     expect((await receiptKinds("autoframe", q[0]!.envelope.event_id)).some((k) => k.startsWith("consumer_commit"))).toBe(false);
     expect(await effects("autolabels", q[0]!.envelope.event_id)).toBe(0);
@@ -466,9 +481,10 @@ run("local four-node staging over HTTP and committed transactions", () => {
     await expect(enqueue(db.autolabels, [{ envelope: changed, body }])).rejects.toThrow(/event_id_conflict/);
     const g = await postRaw(await sigFor({ body, scope: scopeOf(changed), key: keyFor(reg, "autolabels") }), body);
     expect([401, 409]).toContain(g.status);
-    const t = await fetch(`${servers.autocurb.url}/rtgip/v2/inbound`, { method: "POST", headers: await sigFor({ body, scope: scopeOf(changed), key: keyFor(reg, "gateway") }), body });
+    const admChanged = await signAdmission(changed, connIdOf("autolabels", "autocurb", tenant), keyFor(reg, "gateway"), nowSec());
+    const t = await fetch(`${servers.autocurb.url}/rtgip/v2/inbound`, { method: "POST", headers: { ...(await sigFor({ body, scope: scopeOf(changed), key: keyFor(reg, "gateway") })), [ADMISSION_HEADER]: encodeAdmissionHeader(admChanged) }, body });
     const tj = (await t.json()) as { reason: string | null; receipts: { kind: string; outcome: string }[] };
-    expect(tj.receipts.some((r) => r.kind === "consumer_commit")).toBe(false);
+    expect([t.status, tj.reason, tj.receipts.map((r) => `${r.kind}:${r.outcome}`)]).toEqual([200, null, ["target_inbox:quarantined"]]);
     expect(await effects("autocurb", a!.envelope.event_id)).toBe(1);
     note("autolabels->autocurb", "full_envelope_collision", `source: event_id_conflict; gateway: ${g.status} ${g.reason}; target: ${t.status} ${tj.reason ?? tj.receipts.map((r) => r.kind + ":" + r.outcome).join(",")}`);
   });
@@ -477,29 +493,34 @@ run("local four-node staging over HTTP and committed transactions", () => {
     const [a] = await freshEvent("autolabels", "autoframe");
     await enqueue(db.autolabels, [a!]);
     const asD = <T>(fn: (tx: Sql) => Promise<T>) => db.autolabels.begin(async (tx) => { await tx.unsafe("SET LOCAL ROLE rtgip_dispatcher"); return fn(tx as unknown as Sql); }) as Promise<T>;
-    const leased = await asD((tx) => tx`SELECT event_id FROM rtgip.outbox_claim('w-forge', 100, 60) WHERE event_id = ${a!.envelope.event_id}`);
+    const leased = await asD((tx) => tx`SELECT event_id, lease_generation, lease_action FROM rtgip.outbox_claim('w-forge', 100, 60) WHERE event_id = ${a!.envelope.event_id}`);
     expect(leased).toHaveLength(1);
+    expect(leased[0]!.lease_action).toBe("deliver");
+    const gen = Number(leased[0]!.lease_generation);
     const h = await signAs(a!, "autolabels");
     const res = await fetch(gwUrl(), { method: "POST", headers: h, body: a!.body });
-    const { receipts } = (await res.json()) as { receipts: (Receipt & { signature: string })[] };
-    const adv = async (worker: string, unsigned: Omit<Receipt, "signature">, sig: string) =>
-      (await asD((tx) => tx`SELECT rtgip.outbox_advance(${a!.envelope.event_id}, ${worker}, ${receiptSigningJson(unsigned)}, ${sig}) AS r`))[0]!.r as string;
-    const [adm, inbox, commit] = receipts;
-    const { signature: s0, ...u0 } = adm!;
-    expect(await adv("w-forge", { ...u0, outcome: "duplicate" as never }, s0)).toMatch(/^rejected:ack_/);
+    const { receipts } = (await res.json()) as { receipts: ReceiptV2[] };
+    const adv = async (worker: string, generation: number, texts: string[]) =>
+      (await asD((tx) => tx.unsafe("SELECT rtgip.outbox_advance($1, $2, $3, $4::text[]) AS r", [a!.envelope.event_id, worker, generation, tx.array(texts) as never])))[0]!.r as string;
+    const adm = receipts[0]!;
+    expect(adm.kind).toBe("gateway_admission");
+    const altered = { ...adm, issued_at: adm.issued_at + 1 };
+    expect(await adv("w-forge", gen, [canonicalize(altered)])).toBe("rejected:ack_bad_signature");
     // An app key signing a receipt that claims to be the Gateway's admission.
     const appKey = keyFor(reg, "autolabels");
-    const u1 = { ...u0, key_id: appKey.key_id };
-    const s1 = await hmacHex(appKey.secret, "rtgip/2-receipt\n" + receiptSigningJson(u1));
-    expect(await adv("w-forge", u1, s1)).toBe("rejected:ack_bad_key");
-    expect(await adv("w-other", u0, s0)).toBe("rejected:not_lease_holder");
-    expect(await adv("w-forge", u0, s0)).toBe("gateway_admitted");
-    expect(await adv("w-forge", u0, s0)).toMatch(/^rejected:illegal_transition/);
-    for (const r of [inbox!, commit!]) { const { signature, ...u } = r; await adv("w-forge", u, signature); }
+    const { signature: _s, key_id: _k, ...bare } = adm;
+    const unsigned = { ...bare, key_id: appKey.key_id };
+    const forged = { ...unsigned, signature: await hmacHex(appKey.secret, RECEIPT_PROTOCOL + "\n" + canonicalize(unsigned)) };
+    expect(await adv("w-forge", gen, [canonicalize(forged)])).toBe("rejected:ack_key_not_authorized");
+    await expect(adv("w-other", gen, [canonicalize(adm)])).rejects.toThrow(/lost_lease/);
+    await expect(adv("w-forge", gen + 1, [canonicalize(adm)])).rejects.toThrow(/lost_lease/);
+    expect(await adv("w-forge", gen, [canonicalize(adm)])).toBe("gateway_admitted");
+    await expect(adv("w-forge", gen, [canonicalize(adm)])).rejects.toThrow(/lost_lease/);
+    await pumpUntilSettled("autolabels");
     expect(await outboxState("autolabels", a!.envelope.event_id)).toMatchObject({ state: "consumer_committed" });
     const rejected = await db.autolabels`SELECT count(*)::int AS c FROM rtgip.audit_log WHERE event_id = ${a!.envelope.event_id} AND action = 'receipt_rejected'`;
-    expect(rejected[0]!.c).toBe(4);
-    note("autolabels->autoframe", "receipt_forgery", "tampered outcome, app key posing as Gateway, non-lease-holder and replayed receipt all rejected and audited");
+    expect(rejected[0]!.c).toBe(2);
+    note("autolabels->autoframe", "receipt_forgery", "altered receipt, app key posing as Gateway: rejected and audited; non-lease-holder, stale generation and replay after release: lost_lease");
   });
 
   it("a suspended connection pauses without spending attempts; a dead letter is terminal until an operator redrives it with a reason", async () => {
@@ -532,7 +553,7 @@ run("local four-node staging over HTTP and committed transactions", () => {
     for (const a of APPS) {
       const acts = (await db[a]`SELECT DISTINCT action FROM rtgip.audit_log`).map((r) => r.action as string);
       if (a !== "autolabels") continue;
-      expect(acts).toEqual(expect.arrayContaining(["enqueued", "fail:retry_wait"]));
+      expect(acts).toEqual(expect.arrayContaining(["enqueued", "fail:gateway_admitted"]));
     }
     const kept = await db.autolabels`SELECT count(*)::int AS c FROM rtgip.receipts`;
     expect(kept[0]!.c).toBeGreaterThan(0);

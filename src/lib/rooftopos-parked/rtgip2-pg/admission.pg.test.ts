@@ -16,8 +16,9 @@ import {
   type EnvelopeV2,
   type Registry,
 } from "../rtgip2/protocol.ts";
-import { expectReceipt, receiptContext, verifyReceipt } from "../rtgip2/delivery.ts";
-import { admitDelivery, type AdmissionEffect } from "../rtgip2/admission.ts";
+import { deliveryIdentity, verifyReceiptV2, type ReceiptV2 } from "../rtgip2/receipt-v2.ts";
+import { ADMISSION_HEADER, admitDelivery, encodeAdmissionHeader, type AdmissionEffect } from "../rtgip2/admission.ts";
+import { signAdmission } from "../rtgip2/harness.ts";
 import { connId, draftEnvelope, keyOf, EPISODE, EPISODE_2 } from "../rtgip2/fixtures.ts";
 import { admissionDb, connect, nowSec, PG_URL, seedRegistry, type Sql } from "./pg.ts";
 import contract from "../rtgip2/rtgip2-gateway-contract.v1.json";
@@ -28,11 +29,42 @@ let reg: Registry;
 let n = 0;
 const CONN = connId("autolabels", "autocurb");
 
-const effect: AdmissionEffect = async (tx, e) => {
-  const t = (tx as unknown as { sql: Sql }).sql;
-  if (e.vehicle.episode_id === "ep-unknown") return { ok: false, reason: "unknown_episode" };
-  await t`INSERT INTO rtgip_test.effects (event_id, agg, revision) VALUES (${e.event_id}, ${e.aggregate.id}, ${e.aggregate.revision})`;
-  return { ok: true };
+const SQL_EFFECT = `CREATE OR REPLACE FUNCTION rtgip.consumer_effect(e jsonb) RETURNS jsonb LANGUAGE plpgsql SET search_path = '' AS $f$
+BEGIN
+  IF e#>>'{vehicle,episode_id}' = 'ep-unknown' THEN RETURN '{"ok":false,"reason":"unknown_episode"}'::jsonb; END IF;
+  INSERT INTO rtgip_test.effects (event_id, agg, revision) VALUES ((e->>'event_id')::uuid, e#>>'{aggregate,id}', (e#>>'{aggregate,revision}')::bigint);
+  RETURN '{"ok":true}'::jsonb;
+END $f$`;
+
+const tsRefuse: AdmissionEffect = async (_tx, e) =>
+  e.vehicle.episode_id === "ep-ts-refuse" ? { ok: false, reason: "ts_refused" } : { ok: true };
+const crashEffect: AdmissionEffect = async () => {
+  throw new Error("worker crashed after writing");
+};
+
+const admissions = new Map<string, ReceiptV2>();
+async function admissionFor(e: EnvelopeV2): Promise<ReceiptV2> {
+  let a = admissions.get(e.event_id);
+  if (!a) {
+    a = await signAdmission(e, CONN, keyOf(reg, "gw-dev-1"), nowSec());
+    admissions.set(e.event_id, a);
+  }
+  return a;
+}
+const admText = async (body: string): Promise<string> => {
+  try {
+    return canonicalize(await admissionFor(JSON.parse(body) as EnvelopeV2));
+  } catch {
+    return "{}";
+  }
+};
+const chain = async (e: EnvelopeV2, receipts: ReceiptV2[]) => {
+  const adm = await admissionFor(e);
+  const did = await deliveryIdentity(e, CONN);
+  const all = [adm, ...receipts];
+  for (let i = 1; i < all.length; i++)
+    await verifyReceiptV2(all[i], { envelope: e, connection_id: CONN, delivery_id: did, kind: all[i]!.kind }, reg, nowSec(), all.slice(0, i));
+  return all.length;
 };
 
 async function envelope(over: Partial<Omit<EnvelopeV2, "payload_sha256">> = {}, label = `e${n++}`) {
@@ -45,12 +77,16 @@ async function envelope(over: Partial<Omit<EnvelopeV2, "payload_sha256">> = {}, 
   );
 }
 const hdr = async (p: ReturnType<typeof signEnvelope>) => (await p) as unknown as Record<string, string>;
-const gw = (body: string, e: EnvelopeV2, nonce = `gw_nonce_${n++}_0123456789`) =>
-  hdr(signEnvelope(body, e, keyOf(reg, "gw-dev-1"), nowSec(), nonce));
-const deps = () => ({ app: "autocurb" as const, registry: reg, nowSec: nowSec(), db: admissionDb(sql), effect, receiptKey: keyOf(reg, "ac-dev-1") });
+const gw = async (body: string, e: EnvelopeV2, nonce = `gw_nonce_${n++}_0123456789`): Promise<Record<string, string>> => ({
+  ...(await hdr(signEnvelope(body, e, keyOf(reg, "gw-dev-1"), nowSec(), nonce))),
+  [ADMISSION_HEADER]: encodeAdmissionHeader(await admissionFor(e)),
+});
+const deps = () => ({ app: "autocurb" as const, registry: reg, nowSec: nowSec(), db: admissionDb(sql), receiptKey: keyOf(reg, "ac-dev-1") });
 const effects = async (id: string) => Number((await sql`SELECT count(*)::int AS c FROM rtgip_test.effects WHERE event_id = ${id}`)[0]!.c);
-const direct = async (h: Record<string, string>, body: string) =>
-  (await admissionDb(sql).transaction((tx) => tx.admit(h, body, null)))[0]!;
+const direct = async (h: Record<string, string>, body: string) => {
+  const adm = await admText(body);
+  return (await admissionDb(sql).transaction((tx) => tx.admit(h, body, adm, null)))[0]!;
+};
 
 /** Gateway-signed with the real key over arbitrary bytes: only the database checks can refuse it. */
 async function signedRaw(body: string, scope: string, ts = nowSec(), nonce = `raw_nonce_${n++}_0123456789`): Promise<Record<string, string>> {
@@ -68,9 +104,11 @@ run("verified inbound admission (TypeScript boundary + Postgres inbox_admit)", (
       CREATE TABLE IF NOT EXISTS rtgip_test.effects (seq bigserial PRIMARY KEY, event_id uuid NOT NULL, agg text NOT NULL, revision bigint NOT NULL);
       GRANT USAGE ON SCHEMA rtgip_test TO rtgip_inbox_receiver; GRANT SELECT, INSERT ON rtgip_test.effects TO rtgip_inbox_receiver;
       GRANT USAGE ON SEQUENCE rtgip_test.effects_seq_seq TO rtgip_inbox_receiver;`);
+    await sql.unsafe(SQL_EFFECT);
   });
   beforeEach(async () => {
     reg = await seedRegistry(sql, "autocurb");
+    admissions.clear();
     await sql`TRUNCATE rtgip_test.effects`;
   });
   afterAll(async () => {
@@ -82,18 +120,20 @@ run("verified inbound admission (TypeScript boundary + Postgres inbox_admit)", (
     const res = await admitDelivery(await gw(a.body, a.envelope), a.body, deps());
     expect(res.http_status).toBe(200);
     expect(res.receipts!.map((r) => `${r.kind}:${r.outcome}`)).toEqual(["target_inbox:applied", "consumer_commit:applied"]);
-    for (const r of res.receipts!)
-      expect(await verifyReceipt(r, expectReceipt(a.envelope, CONN, r.kind), reg, nowSec(), receiptContext(a.envelope, nowSec() - 5))).toEqual({ ok: true });
+    expect(await chain(a.envelope, res.receipts!)).toBe(3);
+    const stored = await sql`SELECT receipts FROM rtgip.inbox_deliveries WHERE event_id = ${a.envelope.event_id}`;
+    expect(stored[0]!.receipts).toEqual(res.receipts!.map((r) => canonicalize(r)));
     expect(await effects(a.envelope.event_id)).toBe(1);
     const adm = await sql`SELECT connection_id, signer, outcome FROM rtgip.admissions WHERE event_id = ${a.envelope.event_id}`;
     expect(adm).toEqual([{ connection_id: CONN, signer: "gateway", outcome: "applied" }]);
   });
 
-  it("a redelivery with a new Gateway nonce is a committed duplicate: no second effect", async () => {
+  it("a redelivery with a new Gateway nonce returns the stored receipts byte for byte: no second effect", async () => {
     const a = await envelope();
-    await admitDelivery(await gw(a.body, a.envelope), a.body, deps());
+    const first = await admitDelivery(await gw(a.body, a.envelope), a.body, deps());
     const res = await admitDelivery(await gw(a.body, a.envelope), a.body, deps());
-    expect(res.receipts!.map((r) => `${r.kind}:${r.outcome}`)).toEqual(["target_inbox:duplicate", "consumer_commit:applied"]);
+    expect(res.receipts!.map((r) => `${r.kind}:${r.outcome}`)).toEqual(["target_inbox:applied", "consumer_commit:applied"]);
+    expect(res.receipts!.map((r) => canonicalize(r))).toEqual(first.receipts!.map((r) => canonicalize(r)));
     expect(await effects(a.envelope.event_id)).toBe(1);
   });
 
@@ -102,7 +142,8 @@ run("verified inbound admission (TypeScript boundary + Postgres inbox_admit)", (
     const h = await gw(a.body, a.envelope);
     const res = await Promise.all(Array.from({ length: 20 }, () => admitDelivery(h, a.body, deps())));
     expect(res.every((r) => r.http_status === 200)).toBe(true);
-    expect(res.filter((r) => r.receipts![0]!.outcome === "applied")).toHaveLength(1);
+    expect(new Set(res.map((r) => res[0]!.receipts!.map((x) => canonicalize(x)).join("|") === r.receipts!.map((x) => canonicalize(x)).join("|"))).size).toBe(1);
+    expect(res.every((r) => r.receipts![0]!.outcome === "applied")).toBe(true);
     expect(await effects(a.envelope.event_id)).toBe(1);
   });
 
@@ -122,7 +163,7 @@ run("verified inbound admission (TypeScript boundary + Postgres inbox_admit)", (
     const res = await admitDelivery(await gw(a.body, a.envelope), a.body, deps());
     expect(res.receipts!.map((r) => `${r.kind}:${r.outcome}`)).toEqual(["target_inbox:quarantined"]);
     const row = await sql`SELECT outcome, reason FROM rtgip.inbox WHERE event_id = ${a.envelope.event_id}`;
-    expect(row).toEqual([{ outcome: "quarantined", reason: "consumer_reject:unknown_episode" }]);
+    expect(row).toEqual([{ outcome: "quarantined", reason: "unknown_episode" }]);
     expect(await effects(a.envelope.event_id)).toBe(0);
     const again = await admitDelivery(await gw(a.body, a.envelope), a.body, deps());
     expect(again.receipts!.map((r) => `${r.kind}:${r.outcome}`)).toEqual(["target_inbox:quarantined"]);
@@ -131,11 +172,7 @@ run("verified inbound admission (TypeScript boundary + Postgres inbox_admit)", (
   it("crash inside the business transaction: everything rolls back, 503 without receipts, and the same delivery is admitted on retry", async () => {
     const a = await envelope();
     const h = await gw(a.body, a.envelope);
-    const crashing: AdmissionEffect = async (tx, e) => {
-      await effect(tx, e);
-      throw new Error("worker crashed after writing");
-    };
-    const res = await admitDelivery(h, a.body, { ...deps(), effect: crashing });
+    const res = await admitDelivery(h, a.body, { ...deps(), effect: crashEffect });
     expect(res).toEqual({ http_status: 503, reason: "admission_aborted" });
     expect(await effects(a.envelope.event_id)).toBe(0);
     expect(await sql`SELECT 1 FROM rtgip.inbox WHERE event_id = ${a.envelope.event_id}`).toHaveLength(0);
@@ -144,11 +181,32 @@ run("verified inbound admission (TypeScript boundary + Postgres inbox_admit)", (
     const retry = await admitDelivery(h, a.body, deps());
     expect(retry.receipts!.map((r) => `${r.kind}:${r.outcome}`)).toEqual(["target_inbox:applied", "consumer_commit:applied"]);
     expect(await effects(a.envelope.event_id)).toBe(1);
-    // After the commit an identical re-presentation is a committed duplicate (the database nonce
-    // claim binds the nonce to these exact bytes), so a lost acknowledgement still recovers.
+    // After the commit an identical re-presentation returns the stored receipts, so a lost
+    // acknowledgement still recovers.
     const again = await admitDelivery(h, a.body, deps());
-    expect(again.receipts!.map((r) => `${r.kind}:${r.outcome}`)).toEqual(["target_inbox:duplicate", "consumer_commit:applied"]);
+    expect(again.receipts!.map((r) => canonicalize(r))).toEqual(retry.receipts!.map((r) => canonicalize(r)));
     expect(await effects(a.envelope.event_id)).toBe(1);
+  });
+
+  it("an app-side TypeScript effect refusal quarantines through the second pass", async () => {
+    const a = await envelope({ vehicle: { vin: "1HGCM82633A004352", instance_id: "inst-syn-0001", episode_id: "ep-ts-refuse" } });
+    const res = await admitDelivery(await gw(a.body, a.envelope), a.body, { ...deps(), effect: tsRefuse });
+    expect(res.receipts!.map((r) => `${r.kind}:${r.outcome}`)).toEqual(["target_inbox:quarantined"]);
+    expect(await sql`SELECT reason FROM rtgip.inbox WHERE event_id = ${a.envelope.event_id}`).toEqual([{ reason: "consumer_reject:ts_refused" }]);
+  });
+
+  it("an admission receipt for another envelope, a missing one and a changed one are refused in SQL", async () => {
+    const a = await envelope();
+    const b = await envelope();
+    const h = await gw(a.body, a.envelope);
+    const wrong = canonicalize(await admissionFor(b.envelope));
+    const run1 = async (adm: string | null) => (await admissionDb(sql).transaction((tx) => tx.admit(h, a.body, adm as string, null)))[0]!;
+    expect((await run1(wrong)).reason).toMatch(/^ack_wrong_/);
+    expect((await run1(null)).reason).toBe("ack_missing");
+    const ok = await admitDelivery(h, a.body, deps());
+    expect(ok.http_status).toBe(200);
+    const other = await signAdmission(a.envelope, CONN, keyOf(reg, "gw-dev-1"), nowSec() - 5);
+    expect((await run1(canonicalize(other))).reason).toBe("admission_digest_mismatch");
   });
 
   it("a lost database connection is a retryable 503 with no receipts", async () => {
@@ -271,7 +329,8 @@ run("verified inbound admission (TypeScript boundary + Postgres inbox_admit)", (
     ])
       await expect(admissionDb(sql).transaction((tx) => (tx as unknown as { sql: Sql }).sql.unsafe(stmt))).rejects.toThrow(/permission denied/);
     const h = await gw(a.body, a.envelope);
+    const adm = canonicalize(await admissionFor(a.envelope));
     for (const role of ["authenticated", "anon", "service_role", "rtgip_dispatcher", "rtgip_outbox_writer"])
-      await expect(admissionDb(sql, role).transaction((tx) => tx.admit(h, a.body, null))).rejects.toThrow(/permission denied/);
+      await expect(admissionDb(sql, role).transaction((tx) => tx.admit(h, a.body, adm, null))).rejects.toThrow(/permission denied/);
   });
 });

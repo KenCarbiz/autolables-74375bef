@@ -27,3 +27,9 @@ GRANT SELECT, INSERT ON rtgip_stage.effects TO rtgip_inbox_receiver;
 GRANT USAGE ON SEQUENCE rtgip_stage.effects_seq_seq TO rtgip_inbox_receiver;
 GRANT SELECT, INSERT ON rtgip_stage.source_writes TO rtgip_outbox_writer;
 GRANT USAGE ON SEQUENCE rtgip_stage.source_writes_id_seq TO rtgip_outbox_writer;
+
+-- The staging targets run each app's real consumer in TypeScript inside the admission
+-- transaction (admitDelivery's effect), so the SQL hook only lets the event through. An app
+-- node that carries its effects in SQL (AutoLabels: rtgip_fx.labels_apply) replaces this.
+CREATE OR REPLACE FUNCTION rtgip.consumer_effect(e jsonb) RETURNS jsonb
+LANGUAGE sql SET search_path = '' AS 'SELECT ''{"ok":true}''::jsonb';

@@ -18,7 +18,7 @@ export async function seedRegistry(sql: Sql, localApp: string): Promise<Registry
   const n = nowSec();
   const reg: Registry = { ...base, keys: base.keys.map((k) => ({ ...k, not_before: n - 86_400, not_after: n + 31_536_000 })) };
   await sql.begin(async (tx) => {
-    await tx.unsafe("TRUNCATE rtgip.receipts, rtgip.admissions, rtgip.inbox, rtgip.inbox_conflicts, rtgip.watermarks, rtgip.nonce_claims CASCADE");
+    await tx.unsafe("TRUNCATE rtgip.receipts, rtgip.admissions, rtgip.inbox, rtgip.inbox_deliveries, rtgip.inbox_conflicts, rtgip.watermarks, rtgip.nonce_claims CASCADE");
     await tx.unsafe("DELETE FROM rtgip.signing_keys");
     await tx.unsafe("DELETE FROM rtgip.connections WHERE connection_id NOT IN (SELECT connection_id FROM rtgip.outbox)");
     await tx.unsafe("DELETE FROM vault.decrypted_secrets WHERE name LIKE 'rtgip:%'");
@@ -46,12 +46,15 @@ export function admissionDb(sql: Sql, role = "rtgip_inbox_receiver"): AdmissionD
         await tx.unsafe(`SET LOCAL ROLE ${role}`);
         const wrapped: AdmissionTx & { sql: typeof tx } = {
           sql: tx,
-          admit: async (headers, body, rej) =>
-            (await tx.unsafe("SELECT * FROM rtgip.inbox_admit($1::text::jsonb, $2::text, $3::text::jsonb)", [
+          admit: async (headers, body, admission, rej) =>
+            (await tx.unsafe("SELECT * FROM rtgip.inbox_admit($1::text::jsonb, $2::text, $3::text, $4::text::jsonb)", [
               JSON.stringify(headers),
               body,
+              admission,
               rej ? JSON.stringify(rej) : null,
             ])) as unknown as AdmitRow[],
+          recordReceipts: async (deliveryId, receipts) =>
+            void (await tx.unsafe("SELECT rtgip.inbox_record_receipts($1, $2::text[])", [deliveryId, tx.array(receipts) as never])),
           savepoint: async (n) => void (await tx.unsafe(`SAVEPOINT ${n}`)),
           rollbackTo: async (n) => void (await tx.unsafe(`ROLLBACK TO SAVEPOINT ${n}`)),
         };

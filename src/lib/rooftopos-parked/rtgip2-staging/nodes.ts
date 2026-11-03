@@ -12,6 +12,7 @@ import type { AddressInfo } from "node:net";
 import postgres from "postgres";
 import {
   ROUTES,
+  canonicalize,
   sha256Hex,
   signEnvelope,
   verifyDelivery,
@@ -25,8 +26,10 @@ import {
   type ServiceConnection,
   type ServiceKey,
 } from "../rtgip2/protocol.ts";
-import { receiptSigningJson, signReceipt, type ConsumerEffect, type Receipt } from "../rtgip2/delivery.ts";
-import { admitDelivery, type AdmissionEffect } from "../rtgip2/admission.ts";
+import type { ConsumerEffect } from "../rtgip2/delivery.ts";
+import { deliveryIdentity, receiptDraft, signReceiptV2, verifyReceiptV2, type ReceiptV2 } from "../rtgip2/receipt-v2.ts";
+import { signReceiptQuery, verifyReceiptQuery } from "../rtgip2/receipt-query.ts";
+import { ADMISSION_HEADER, admitDelivery, encodeAdmissionHeader, type AdmissionEffect } from "../rtgip2/admission.ts";
 import { admissionDb } from "../rtgip2-pg/pg.ts";
 
 export type Sql = ReturnType<typeof postgres>;
@@ -36,7 +39,7 @@ export const ROOFTOP = "rf-stg-01";
 export const OTHER_ROOFTOP = "rf-stg-02";
 export const nowSec = () => Math.floor(Date.now() / 1000);
 export const connect = (url: string): Sql => postgres(url, { max: 20, onnotice: () => {}, idle_timeout: 5 });
-export const connIdOf = (s: AppId, t: AppId, tenant: string) => `conn:${s}>${t}:${tenant}`;
+export const connIdOf = (s: AppId, t: AppId, tenant: string, rooftop = ROOFTOP) => `conn:${s}>${t}:${tenant}:${rooftop}`;
 
 const PAIRS: readonly [App, App][] = [
   ["autolabels", "autocurb"],
@@ -50,7 +53,7 @@ const PAIRS: readonly [App, App][] = [
 function grant(s: App, t: App, tenant: string, rooftops: string[]): ServiceConnection {
   const route = ROUTES.find((r) => r.source === s && r.target === t)!;
   return {
-    connection_id: connIdOf(s, t, tenant),
+    connection_id: connIdOf(s, t, tenant, rooftops[0]),
     source_app: s,
     target_app: t,
     tenant_id: tenant,
@@ -207,12 +210,113 @@ function pgNonces(sql: Sql): NonceStore {
   };
 }
 
-/** Gateway stand-in ingress: POST /rtgip/v2/deliver. */
-export function startGatewayStandin(sql: Sql, reg: () => Registry, targets: () => Record<App, string>): Promise<Server> {
+export interface GatewayStandin extends Server {
+  /** Test control: one forwarding pass over every admission whose chain is not terminal. */
+  forwardPending(): Promise<number>;
+}
+
+interface AdmissionRow {
+  delivery_id: string;
+  body: string;
+  envelope: EnvelopeV2;
+  connection_id: string;
+  admission_text: string;
+  gateway_nonce: string;
+  forward_attempts: number;
+}
+
+/**
+ * Gateway STAND-IN (rtgip/2-forward/1 and rtgip/2-receipt-query/1) over a throwaway cluster:
+ * POST /rtgip/v2/deliver admits synchronously and forwards once; POST /rtgip/v2/receipts is the
+ * read-only chain query. Not the hosted Gateway; its results are not acceptance evidence.
+ */
+export async function startGatewayStandin(sql: Sql, reg: () => Registry, targets: () => Record<App, string>): Promise<GatewayStandin> {
   const audit = (decision: string, reason: string | null, status: number, e?: Partial<EnvelopeV2>, keyId?: string) =>
     sql`INSERT INTO gw_standin.audit (decision, reason, event_id, route, key_id, http_status)
       VALUES (${decision}, ${reason}, ${e?.event_id ?? null}, ${e?.route ?? null}, ${keyId ?? null}, ${status})`;
-  return listen(async (req, res) => {
+  const forward = async (row: AdmissionRow): Promise<void> => {
+    const gwKey = keyFor(reg(), "gateway");
+    const now = nowSec();
+    const envelope = row.envelope;
+    const admission = JSON.parse(row.admission_text) as ReceiptV2;
+    const fwd = await signEnvelope(row.body, envelope, gwKey, now, row.gateway_nonce);
+    let status = 502;
+    let doc: { reason?: string | null; receipts?: ReceiptV2[] } = {};
+    try {
+      const r = await fetch(`${targets()[envelope.target_app as App]}/rtgip/v2/inbound`, {
+        method: "POST",
+        headers: { "content-type": "application/json", ...(fwd as unknown as Record<string, string>), [ADMISSION_HEADER]: encodeAdmissionHeader(admission) },
+        body: row.body,
+      });
+      status = r.status;
+      doc = (await r.json()) as typeof doc;
+    } catch {
+      doc = { reason: "target_unreachable" };
+    }
+    await sql`UPDATE gw_standin.admissions SET forward_attempts = forward_attempts + 1 WHERE delivery_id = ${row.delivery_id}`;
+    let reason = doc.reason ?? null;
+    if (status === 200 && doc.receipts?.length) {
+      // Only a fully verified chain is stored; the query never serves an unverified receipt.
+      const chain: ReceiptV2[] = [admission];
+      try {
+        const kinds = ["target_inbox", "consumer_commit"] as const;
+        for (let i = 0; i < doc.receipts.length; i++) {
+          await verifyReceiptV2(
+            doc.receipts[i],
+            { envelope, connection_id: row.connection_id, delivery_id: row.delivery_id, kind: kinds[i]! },
+            reg(),
+            now,
+            chain.slice(),
+          );
+          chain.push(doc.receipts[i]!);
+        }
+        const texts = chain.slice(1).map((r) => canonicalize(r));
+        await sql`UPDATE gw_standin.admissions SET target_receipts = ${sql.array(texts, 25)} WHERE delivery_id = ${row.delivery_id}`;
+      } catch (err) {
+        status = 502;
+        reason = (err as Error).message;
+      }
+    }
+    await audit(status === 200 && doc.receipts?.length ? "forwarded" : "target_error", reason, status, envelope, gwKey.key_id);
+  };
+  const pendingRows = () =>
+    sql`SELECT delivery_id, body, envelope, connection_id, admission_text, gateway_nonce, forward_attempts FROM gw_standin.admissions
+      WHERE target_receipts IS NULL OR (cardinality(target_receipts) = 1 AND target_receipts[1] NOT LIKE '%"outcome":"quarantined"%')
+      ORDER BY admitted_at` as unknown as Promise<AdmissionRow[]>;
+  const queryNonces = pgNonces(sql);
+
+  const server = await listen(async (req, res) => {
+    if (req.method === "POST" && req.url === "/rtgip/v2/receipts") {
+      const read = await readBody(req);
+      if (!read.ok) return reply(res, read.status, { reason: read.reason });
+      let peek = "";
+      try {
+        peek = String((JSON.parse(read.body) as { delivery_id?: unknown }).delivery_id ?? "");
+      } catch {
+        peek = "";
+      }
+      const found = peek ? (await sql`SELECT envelope, connection_id, admission_text, target_receipts FROM gw_standin.admissions WHERE delivery_id = ${peek}`)[0] : undefined;
+      const v = await verifyReceiptQuery(headersOf(req) as Record<string, string>, read.body, {
+        registry: reg(),
+        nonces: queryNonces,
+        nowSec: nowSec(),
+        lookup: (id) =>
+          found && id === peek
+            ? {
+                connection_id: found.connection_id as string,
+                source_app: (found.envelope as EnvelopeV2).source_app,
+                tenant_id: (found.envelope as EnvelopeV2).tenant_id,
+                event_id: (found.envelope as EnvelopeV2).event_id,
+              }
+            : null,
+      });
+      if (!v.ok) {
+        await audit("rejected", `query:${v.reason}`, 403);
+        return reply(res, 403, { reason: v.reason });
+      }
+      const chain = [JSON.parse(found!.admission_text as string), ...((found!.target_receipts as string[] | null) ?? []).map((t) => JSON.parse(t) as unknown)];
+      return reply(res, 200, { reason: null, receipts: chain });
+    }
     if (req.method !== "POST" || req.url !== "/rtgip/v2/deliver") return reply(res, 404, { reason: "not_found" });
     const read = await readBody(req);
     const h = headersOf(req) as Record<string, string>;
@@ -233,42 +337,40 @@ export function startGatewayStandin(sql: Sql, reg: () => Registry, targets: () =
       return reply(res, 401, { reason: v.reason });
     }
     const e = v.delivery.envelope;
+    const connection_id = v.delivery.connection_id;
+    const delivery_id = await deliveryIdentity(e, connection_id);
+    const gwKey = keyFor(reg(), "gateway");
     const gwNonce = `gw_${(await sha256Hex(`${e.event_id}|${e.target_app}`)).slice(0, 32)}`;
-    await sql`INSERT INTO gw_standin.admissions (event_id, target_app, source_app, connection_id, body_sha256, gateway_nonce)
-      VALUES (${e.event_id}, ${e.target_app}, ${e.source_app}, ${v.delivery.connection_id}, ${v.delivery.body_sha256}, ${gwNonce})
-      ON CONFLICT DO NOTHING`;
-    const adm = (await sql`SELECT body_sha256, gateway_nonce FROM gw_standin.admissions WHERE event_id = ${e.event_id} AND target_app = ${e.target_app}`)[0]!;
+    const prior = await sql`SELECT body_sha256 FROM gw_standin.admissions WHERE event_id = ${e.event_id} AND target_app = ${e.target_app}`;
+    if (!prior.length) {
+      const admission = await signReceiptV2(
+        await receiptDraft({ envelope: e, connection_id, delivery_id, kind: "gateway_admission" }, "admitted", now, null),
+        gwKey,
+      );
+      await sql`INSERT INTO gw_standin.admissions (event_id, target_app, source_app, connection_id, body_sha256, gateway_nonce, delivery_id, tenant_id, body, envelope, admission_text)
+        VALUES (${e.event_id}, ${e.target_app}, ${e.source_app}, ${connection_id}, ${v.delivery.body_sha256}, ${gwNonce}, ${delivery_id}, ${e.tenant_id}, ${body}, ${sql.json(e as never)}, ${canonicalize(admission)})
+        ON CONFLICT DO NOTHING`;
+    }
+    const adm = (await sql`SELECT body_sha256, admission_text, forward_attempts FROM gw_standin.admissions WHERE event_id = ${e.event_id} AND target_app = ${e.target_app}`)[0]!;
     if (adm.body_sha256 !== v.delivery.body_sha256) {
       await audit("rejected", "admission_conflict", 409, e, h["rtgip-key-id"]);
       return reply(res, 409, { reason: "admission_conflict" });
     }
     await audit("admitted", null, 200, e, h["rtgip-key-id"]);
-    const gwKey = keyFor(reg(), "gateway");
-    const admission = await signReceipt(
-      {
-        protocol: "rtgip/2", kind: "gateway_admission", event_id: e.event_id, route: e.route, source_app: e.source_app,
-        target_app: e.target_app, tenant_id: e.tenant_id, rooftop_id: e.rooftop_id, connection_id: v.delivery.connection_id,
-        payload_sha256: e.payload_sha256, issuer: "gateway", outcome: "admitted", issued_at: now,
-      },
-      gwKey,
-    );
-    const fwd = await signEnvelope(body, e, gwKey, now, adm.gateway_nonce as string);
-    let status = 502;
-    let doc: { reason?: string | null; receipts?: Receipt[] } = {};
-    try {
-      const r = await fetch(`${targets()[e.target_app as App]}/rtgip/v2/inbound`, {
-        method: "POST",
-        headers: { "content-type": "application/json", ...(fwd as unknown as Record<string, string>) },
-        body,
-      });
-      status = r.status;
-      doc = (await r.json()) as typeof doc;
-    } catch {
-      doc = { reason: "target_unreachable" };
+    if (Number(adm.forward_attempts) === 0) {
+      const row = (await sql`SELECT delivery_id, body, envelope, connection_id, admission_text, gateway_nonce, forward_attempts FROM gw_standin.admissions WHERE delivery_id = ${delivery_id}`)[0] as unknown as AdmissionRow;
+      await forward(row);
     }
-    await audit(status === 200 ? "forwarded" : "target_error", doc.reason ?? null, status, e, gwKey.key_id);
-    reply(res, status >= 500 ? 502 : status, { reason: doc.reason ?? null, receipts: [admission, ...(doc.receipts ?? [])] });
+    reply(res, 200, { reason: null, receipts: [JSON.parse(adm.admission_text as string)] });
   });
+  return {
+    ...server,
+    async forwardPending() {
+      const rows = await pendingRows();
+      for (const row of rows) await forward(row);
+      return rows.length;
+    },
+  };
 }
 
 /** Source-side transactional capture: the business write and the outbox row commit together. */
@@ -291,50 +393,63 @@ export async function enqueue(
 
 export interface DispatchResult {
   event_id: string;
+  action: "deliver" | "confirm";
   http_status: number;
   reason: string | null;
   advanced: string[];
   state: string;
 }
 
-/** One dispatcher pass as rtgip_dispatcher: lease, sign as the source, POST, verify receipts in SQL. */
+/**
+ * One dispatcher pass as rtgip_dispatcher. A deliver lease POSTs to the Gateway and advances on
+ * the admission receipt; a confirm lease queries the Gateway for the chain and advances on it.
+ * Every receipt is verified in SQL by outbox_advance under the lease generation claim returned.
+ */
 export async function dispatch(sql: Sql, app: App, reg: Registry, gatewayUrl: string, worker = "w1", sign?: (r: { body: string; envelope: EnvelopeV2 }) => Promise<Record<string, string>>): Promise<DispatchResult[]> {
   const asDispatcher = <T>(fn: (tx: Sql) => Promise<T>) =>
     sql.begin(async (tx) => {
       await tx.unsafe("SET LOCAL ROLE rtgip_dispatcher");
       return fn(tx as unknown as Sql);
     }) as Promise<T>;
-  const rows = await asDispatcher((tx) => tx`SELECT event_id, body, envelope FROM rtgip.outbox_claim(${worker}, 100, 60)`);
+  const advance = async (id: string, gen: number, texts: string[]) =>
+    (await asDispatcher((tx) => tx.unsafe("SELECT rtgip.outbox_advance($1, $2, $3, $4::text[]) AS r", [id, worker, gen, tx.array(texts) as never])))[0]!.r as string;
+  const rows = await asDispatcher((tx) => tx`SELECT event_id, body, envelope, delivery_id, lease_generation, lease_action FROM rtgip.outbox_claim(${worker}, 100, 60)`);
   const out: DispatchResult[] = [];
   for (const row of rows) {
     const envelope = row.envelope as EnvelopeV2;
     const body = row.body as string;
-    const headers = sign
-      ? await sign({ body, envelope })
-      : ((await signEnvelope(body, envelope, keyFor(reg, app), nowSec(), `src_${randomBytes(12).toString("hex")}`)) as unknown as Record<string, string>);
+    const gen = Number(row.lease_generation);
+    const action = row.lease_action as "deliver" | "confirm";
     let status = 0;
-    let doc: { reason?: string | null; receipts?: Receipt[] } = {};
+    let doc: { reason?: string | null; receipts?: ReceiptV2[] } = {};
     try {
-      const r = await fetch(`${gatewayUrl}/rtgip/v2/deliver`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body });
+      let r: Response;
+      if (action === "deliver") {
+        const headers = sign
+          ? await sign({ body, envelope })
+          : ((await signEnvelope(body, envelope, keyFor(reg, app), nowSec(), `src_${randomBytes(12).toString("hex")}`)) as unknown as Record<string, string>);
+        r = await fetch(`${gatewayUrl}/rtgip/v2/deliver`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body });
+      } else {
+        const q = await signReceiptQuery({ delivery_id: row.delivery_id as string, event_id: row.event_id as string }, keyFor(reg, app), nowSec(), `qry_${randomBytes(12).toString("hex")}`);
+        r = await fetch(`${gatewayUrl}/rtgip/v2/receipts`, { method: "POST", headers: { "content-type": "application/json", ...q.headers }, body: q.body });
+      }
       status = r.status;
       doc = (await r.json()) as typeof doc;
     } catch {
       doc = { reason: "gateway_unreachable" };
     }
     const advanced: string[] = [];
-    for (const rc of doc.receipts ?? []) {
-      const { signature, ...unsigned } = rc;
-      const res = await asDispatcher((tx) => tx`SELECT rtgip.outbox_advance(${row.event_id}, ${worker}, ${receiptSigningJson(unsigned)}, ${signature}) AS r`);
-      advanced.push(res[0]!.r as string);
+    if (status === 200 && doc.receipts?.length) advanced.push(await advance(row.event_id as string, gen, doc.receipts.map((x) => canonicalize(x))));
+    const last = advanced.at(-1);
+    if (last !== "gateway_admitted" && last !== "consumer_committed" && last !== "target_quarantined") {
+      const why = last ? last.replace(/^(rejected|pending):/, "") : (doc.reason ?? `http_${status}`);
+      await asDispatcher((tx) => tx`SELECT rtgip.outbox_fail(${row.event_id}, ${worker}, ${gen}, ${why}, 1, 10)`);
     }
-    const terminal = advanced.at(-1);
-    if (terminal !== "consumer_committed" && terminal !== "target_quarantined")
-      await asDispatcher((tx) => tx`SELECT rtgip.outbox_fail(${row.event_id}, ${worker}, ${doc.reason ?? `http_${status}`}, 1, 10)`);
     const state = (await sql`SELECT state FROM rtgip.outbox WHERE event_id = ${row.event_id}`)[0]!.state as string;
-    out.push({ event_id: row.event_id as string, http_status: status, reason: doc.reason ?? null, advanced, state });
+    out.push({ event_id: row.event_id as string, action, http_status: status, reason: doc.reason ?? null, advanced, state });
   }
   return out;
 }
 
-/** Test control only: make retry_wait rows due now (stands in for waiting out the backoff). */
-export const makeDue = (sql: Sql) => sql`UPDATE rtgip.outbox SET next_attempt_at = now() WHERE state = 'retry_wait'`;
+/** Test control only: make waiting rows due now (stands in for waiting out the backoff). */
+export const makeDue = (sql: Sql) => sql`UPDATE rtgip.outbox SET next_attempt_at = now() WHERE state IN ('retry_wait', 'gateway_admitted')`;

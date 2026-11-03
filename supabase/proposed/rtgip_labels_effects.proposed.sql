@@ -316,3 +316,13 @@ BEGIN
     GRANT rtgip_labels_consumer TO rtgip_inbox_receiver;
   END IF;
 END $$;
+
+-- The shared delivery ledger calls rtgip.consumer_effect(envelope) inside the inbox
+-- transaction; this app's replacement runs the AutoLabels effect. ok:false quarantines.
+DO $$
+BEGIN
+  IF to_regprocedure('rtgip.consumer_effect(jsonb)') IS NOT NULL THEN
+    EXECUTE $f$CREATE OR REPLACE FUNCTION rtgip.consumer_effect(e jsonb) RETURNS jsonb
+      LANGUAGE sql SET search_path = '' AS 'SELECT rtgip_fx.labels_apply(e)'$f$;
+  END IF;
+END $$;
