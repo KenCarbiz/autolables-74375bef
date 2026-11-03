@@ -130,10 +130,10 @@ const INTERMEDIATE = new Set(["offer_accepted", "deal_finalized", "title_ownersh
 export const APPROVER_ROLES = ["admin", "gsm_gm", "gm"] as const;
 export const APPRAISAL_ROLES = ["admin", "used_car_manager", "new_car_manager", "gsm_gm", "gm", "appraiser"] as const;
 export const CHECK_PROCESSING_ROLES = ["accounting", ...APPROVER_ROLES] as const;
-/** AutoCurb has no role rule for title verification today; this is the proposed rule (owner decision). */
-export const TITLE_VERIFY_ROLES = ["accounting", ...APPROVER_ROLES] as const;
-/** Who may attest that the dealership received the vehicle (owner decision; no process exists yet). */
-export const CUSTODY_ROLES = APPROVER_ROLES;
+/** Managers and higher (Ken, 2026-11-03, D1/D2): title verification, custody approval and vehicle receipt. */
+export const MANAGER_ROLES = ["admin", "gsm_gm", "gm", "used_car_manager", "new_car_manager"] as const;
+export const TITLE_VERIFY_ROLES = MANAGER_ROLES;
+export const CUSTODY_ROLES = MANAGER_ROLES;
 /** The only statuses accept_offer moves from (supabase/migrations/20260510143530_*.sql). */
 const CUSTOMER_ACCEPT_FROM = new Set(["new", "offer_made", "contacted"]);
 const MILESTONE_ROLES: Record<string, readonly string[] | "any_staff_or_customer"> = {

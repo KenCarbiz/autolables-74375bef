@@ -15,18 +15,30 @@ import {
   type Registry,
 } from "./protocol.ts";
 import {
-  expectReceipt,
-  receiptContext,
   MemoryInbox,
   MemoryOutbox,
-  receiptSigningJson,
-  signReceipt,
-  verifyReceipt,
   type OutboxRow,
-  type Receipt,
-  type TransportResult,
+  type ReceiptQueryPort,
+  type Transport,
 } from "./delivery.ts";
-import { makeTarget, ReferenceGateway, type TargetEndpoint } from "./harness.ts";
+import {
+  makeTarget,
+  queryPort,
+  ReferenceGatewayStandIn,
+  signAdmission,
+  sourceTransport,
+  type TargetEndpoint,
+} from "./harness.ts";
+import { encodeAdmissionHeader, ADMISSION_HEADER } from "./admission.ts";
+import {
+  deliveryIdentity,
+  receiptDigest,
+  receiptDraft,
+  RECEIPT_PROTOCOL,
+  signReceiptV2,
+  verifyReceiptV2,
+  type ReceiptV2,
+} from "./receipt-v2.ts";
 import {
   connId,
   draftEnvelope,
@@ -48,42 +60,38 @@ const effect = (p: Proj, e: EnvelopeV2) => {
   p.applied.push(e.event_id);
   return { ok: true as const };
 };
+const CONN = connId("autolabels", "autocurb");
 
 function world(reg: Registry = syntheticRegistry()) {
-  const inbox = new MemoryInbox<Proj>("autocurb", { applied: [] }, effect);
-  let drop = false;
-  const target = makeTarget("autocurb", inbox, reg, keyOf(reg, "ac-dev-1"), undefined, {
-    dropAck: () => drop,
+  const inbox = new MemoryInbox<Proj>("autocurb", { applied: [] }, effect, {
+    registry: reg,
+    key: keyOf(reg, "ac-dev-1"),
   });
-  const gw = new ReferenceGateway(
+  let drop = false;
+  const target = makeTarget("autocurb", inbox, reg, undefined, { dropAck: () => drop });
+  const gw = new ReferenceGatewayStandIn(
     reg,
     keyOf(reg, "gw-dev-1"),
     new Map<AppId, TargetEndpoint>([["autocurb", target]]),
   );
-  const outbox = new MemoryOutbox<{ n: number }>({ n: 0 });
+  const outbox = new MemoryOutbox<{ n: number }>({ n: 0 }, reg);
   const clock = { now: T0 };
-  let i = 0;
-  const transport = async (r: OutboxRow): Promise<TransportResult> => {
-    const h = await signEnvelope(
-      r.body,
-      r.envelope,
-      keyOf(reg, "al-dev-1"),
-      clock.now,
-      `src_nonce_${r.event_id.slice(0, 8)}_${i++}`,
-    );
-    return gw.admit(h, r.body, clock.now);
-  };
+  const transport = sourceTransport(gw, keyOf(reg, "al-dev-1"), clock);
+  const query = queryPort(gw, keyOf(reg, "al-dev-1"), clock);
   return {
     reg,
     inbox,
+    gw,
     outbox,
     clock,
     transport,
+    query,
     setDrop: (d: boolean) => {
       drop = d;
     },
   };
 }
+type World = ReturnType<typeof world>;
 
 const unknownEpisode = () =>
   sealEnvelope({
@@ -91,9 +99,52 @@ const unknownEpisode = () =>
     vehicle: { vin: "1HGCM82633A004352", instance_id: INSTANCE, episode_id: "ep-unknown" },
   });
 
-async function pump(w: ReturnType<typeof world>, transport = w.transport) {
-  for (const r of w.outbox.claim("w1", w.clock.now, 50))
-    await w.outbox.deliver(r, "w1", transport, w.reg, w.clock.now, () => 0);
+async function pump(
+  w: World,
+  transport: Transport = w.transport,
+  query: ReceiptQueryPort = w.query,
+) {
+  for (const r of w.outbox.claim("w1", w.clock.now, 50)) {
+    if (r.lease_action === "confirm")
+      await w.outbox.confirm(r, "w1", r.lease_generation, query, w.reg, w.clock.now, () => 0);
+    else
+      await w.outbox.deliver(r, "w1", r.lease_generation, transport, w.reg, w.clock.now, () => 0);
+  }
+}
+
+const delivery = (envelope: EnvelopeV2, connection_id = CONN) => ({
+  envelope,
+  body_sha256: "x",
+  key_id: "gw-dev-1",
+  signer: "gateway" as const,
+  connection_id,
+  duplicate_delivery: false,
+});
+
+/** A second delivery of the same event: the same target database reached over another connection id. */
+function viaOtherConnection(w: World) {
+  const other = `${CONN}-renamed`;
+  const renamed: Registry = {
+    connections: w.reg.connections.map((c) =>
+      c.connection_id === CONN ? { ...c, connection_id: other } : c,
+    ),
+    keys: w.reg.keys.map((k) => ({
+      ...k,
+      connection_ids: k.connection_ids.map((c) => (c === CONN ? other : c)),
+    })),
+  };
+  const inbox = new MemoryInbox<Proj>("autocurb", w.inbox.projection, effect, {
+    registry: renamed,
+    key: keyOf(renamed, "ac-dev-1"),
+  });
+  inbox.rows = w.inbox.rows;
+  inbox.watermarks = w.inbox.watermarks;
+  return async (e: EnvelopeV2, at: number) =>
+    inbox.receive(
+      delivery(e, other),
+      await signAdmission(e, other, keyOf(renamed, "gw-dev-1"), T0),
+      at,
+    );
 }
 
 describe("C1: a quarantined or held event never receives a successful commit acknowledgment", () => {
@@ -105,19 +156,22 @@ describe("C1: a quarantined or held event never receives a successful commit ack
     });
     w.setDrop(true);
     await pump(w);
+    w.clock.now += 10;
+    await pump(w);
     const row = w.outbox.rows.get(bad.envelope.event_id)!;
-    expect(row.state).toBe("retry_wait");
-    expect(row.last_error).toBe("ack_missing");
+    expect(row.state).toBe("gateway_admitted");
+    expect(row.last_error).toBe("target_inbox_pending");
     w.setDrop(false);
-    const seen: Receipt[] = [];
-    const spy = async (r: OutboxRow) => {
-      const res = await w.transport(r);
-      seen.push(...(res.receipts ?? []));
-      return res;
+    const seen: ReceiptV2[] = [];
+    const spy: ReceiptQueryPort = async (d, e) => {
+      const chain = await w.query(d, e);
+      seen.push(...chain);
+      return chain;
     };
+    await w.gw.forwardPending(w.clock.now);
     for (let k = 0; k < 3; k++) {
       w.clock.now = Math.max(w.clock.now, row.next_attempt_at);
-      await pump(w, spy);
+      await pump(w, w.transport, spy);
     }
     expect(row.state).toBe("target_quarantined");
     expect(seen.filter((r) => r.kind === "consumer_commit")).toEqual([]);
@@ -126,20 +180,19 @@ describe("C1: a quarantined or held event never receives a successful commit ack
     expect(w.inbox.projection.applied).toEqual([]);
   });
 
-  it("a direct duplicate of a quarantined event reports quarantined and uncommitted", async () => {
+  it("a redelivery of a quarantined event, by the same or another delivery, reports quarantined and uncommitted", async () => {
     const w = world();
     const bad = await unknownEpisode();
-    const d = {
-      envelope: bad.envelope,
-      body_sha256: "x",
-      key_id: "gw-dev-1",
-      signer: "gateway" as const,
-      connection_id: connId("autolabels", "autocurb"),
-      duplicate_delivery: false,
-    };
-    expect(w.inbox.receive(d, T0)).toMatchObject({ outcome: "quarantined", committed: false });
+    const adm = await signAdmission(bad.envelope, CONN, keyOf(w.reg, "gw-dev-1"), T0);
+    const first = await w.inbox.receive(delivery(bad.envelope), adm, T0);
+    expect(first).toMatchObject({ outcome: "quarantined", committed: false });
+    for (let k = 1; k < 4; k++) {
+      const again = await w.inbox.receive(delivery(bad.envelope), adm, T0 + k);
+      expect(again.receipts).toEqual(first.receipts);
+    }
+    const viaOther = viaOtherConnection(w);
     for (let k = 0; k < 3; k++)
-      expect(w.inbox.receive(d, T0 + k)).toEqual({
+      expect(await viaOther(bad.envelope, T0 + k)).toMatchObject({
         outcome: "quarantined",
         reason: "duplicate_of:quarantined",
         committed: false,
@@ -160,50 +213,55 @@ describe("C1: a quarantined or held event never receives a successful commit ack
         },
       }),
     );
-    const d = {
-      envelope: r2.envelope,
-      body_sha256: "x",
-      key_id: "gw-dev-1",
-      signer: "gateway" as const,
-      connection_id: connId("autolabels", "autocurb"),
-      duplicate_delivery: false,
-    };
-    expect(w.inbox.receive(d, T0).outcome).toBe("held");
-    expect(w.inbox.receive(d, T0 + 1)).toMatchObject({
+    const adm = await signAdmission(r2.envelope, CONN, keyOf(w.reg, "gw-dev-1"), T0);
+    expect((await w.inbox.receive(delivery(r2.envelope), adm, T0)).outcome).toBe("held");
+    expect(await w.inbox.receive(delivery(r2.envelope), adm, T0 + 1)).toMatchObject({
       outcome: "held",
       committed: false,
       committed_outcome: null,
+    });
+    expect(
+      (await w.inbox.receive(delivery(r2.envelope), adm, T0 + 1)).receipts.map((x) => x.kind),
+    ).toEqual(["target_inbox"]);
+    expect(await viaOtherConnection(w)(r2.envelope, T0 + 2)).toMatchObject({
+      outcome: "held",
+      committed: false,
     });
   });
 
   it("crash during a quarantining delivery then retry: still no commit acknowledgment", async () => {
     const reg = syntheticRegistry();
-    const inbox = new MemoryInbox<Proj>("autocurb", { applied: [] }, effect);
-    let crash = true;
-    const target = makeTarget("autocurb", inbox, reg, keyOf(reg, "ac-dev-1"), undefined, {
-      crashAfterEffect: () => crash,
+    const inbox = new MemoryInbox<Proj>("autocurb", { applied: [] }, effect, {
+      registry: reg,
+      key: keyOf(reg, "ac-dev-1"),
     });
-    const res = await (async () => {
-      const bad = await unknownEpisode();
-      const fwd = await signEnvelope(
-        bad.body,
-        bad.envelope,
-        keyOf(reg, "gw-dev-1"),
-        T0,
-        "gw_nonce_crash_000001",
-      );
-      const first = await target.handle(fwd, bad.body, T0);
-      crash = false;
-      const second = await target.handle(fwd, bad.body, T0);
-      const third = await target.handle(fwd, bad.body, T0);
-      return [first, second, third];
-    })();
-    expect(res[0]!.http_status).toBe(503);
-    for (const r of res.slice(1)) {
+    let crash = true;
+    const target = makeTarget("autocurb", inbox, reg, undefined, { crashAfterEffect: () => crash });
+    const bad = await unknownEpisode();
+    const sig = await signEnvelope(
+      bad.body,
+      bad.envelope,
+      keyOf(reg, "gw-dev-1"),
+      T0,
+      "gw_nonce_crash_000001",
+    );
+    const fwd = {
+      ...sig,
+      [ADMISSION_HEADER]: encodeAdmissionHeader(
+        await signAdmission(bad.envelope, CONN, keyOf(reg, "gw-dev-1"), T0),
+      ),
+    };
+    const first = await target.handle(fwd, bad.body, T0);
+    crash = false;
+    const second = await target.handle(fwd, bad.body, T0);
+    const third = await target.handle(fwd, bad.body, T0);
+    expect(first.http_status).toBe(503);
+    expect(inbox.deliveries.size).toBe(1);
+    for (const r of [second, third])
       expect(r.receipts?.map((x) => `${x.kind}:${x.outcome}`)).toEqual([
         "target_inbox:quarantined",
       ]);
-    }
+    expect(second.receipts).toEqual(third.receipts);
   });
 
   it("refuses to sign, and refuses to accept, a consumer_commit stating an uncommitted outcome", async () => {
@@ -211,36 +269,31 @@ describe("C1: a quarantined or held event never receives a successful commit ack
     const a = await sealEnvelope(
       draftEnvelope("autolabels", "autocurb", "inventory.status_changed"),
     );
-    const conn = connId("autolabels", "autocurb");
-    const ex = expectReceipt(a.envelope, conn, "consumer_commit");
-    const { kind: _k, ...rest } = ex;
+    const delivery_id = await deliveryIdentity(a.envelope, CONN);
+    const exp = {
+      envelope: a.envelope,
+      connection_id: CONN,
+      delivery_id,
+      kind: "consumer_commit" as const,
+    };
+    const admission = await signAdmission(a.envelope, CONN, keyOf(reg, "gw-dev-1"), T0);
     for (const outcome of ["quarantined", "held", "duplicate"] as const) {
-      await expect(
-        signReceipt(
-          { protocol: "rtgip/2", kind: "consumer_commit", ...rest, outcome, issued_at: T0 },
-          keyOf(reg, "ac-dev-1"),
-        ),
-      ).rejects.toThrow("receipt_outcome_not_allowed");
+      const draft = await receiptDraft(exp, outcome, T0, admission);
+      await expect(signReceiptV2(draft, keyOf(reg, "ac-dev-1"))).rejects.toThrow(
+        "receipt_invalid_shape",
+      );
       // A target that bypasses the signer guard still cannot get the receipt accepted.
-      const unsigned = {
-        protocol: "rtgip/2" as const,
-        kind: "consumer_commit" as const,
-        ...rest,
-        outcome,
-        issued_at: T0,
-        key_id: "ac-dev-1",
-      };
-      const forged: Receipt = {
+      const unsigned = { ...draft, key_id: "ac-dev-1" };
+      const forged = {
         ...unsigned,
         signature: await hmacHex(
           keyOf(reg, "ac-dev-1").secret,
-          `rtgip/2-receipt\n${receiptSigningJson(unsigned)}`,
+          `${RECEIPT_PROTOCOL}\n${canonicalize(unsigned)}`,
         ),
       };
-      expect(await verifyReceipt(forged, ex, reg, T0, receiptContext(a.envelope, 0))).toEqual({
-        ok: false,
-        reason: "ack_outcome_not_allowed",
-      });
+      await expect(verifyReceiptV2(forged, exp, reg, T0, [admission])).rejects.toThrow(
+        "ack_unsupported_version_or_shape",
+      );
     }
   });
 
@@ -252,28 +305,31 @@ describe("C1: a quarantined or held event never receives a successful commit ack
     await w.outbox.transaction(async (_s, enqueue) => {
       await enqueue(a.envelope, a.body);
     });
-    const conn = connId("autolabels", "autocurb");
-    const lying = async (r: OutboxRow): Promise<TransportResult> => {
-      const res = await w.transport(r);
-      const base = {
-        protocol: "rtgip/2" as const,
-        ...(({ kind: _k, ...x }) => x)(expectReceipt(r.envelope, conn, "target_inbox")),
-        issued_at: w.clock.now,
-      };
-      const held = await signReceipt(
-        { ...base, kind: "target_inbox", outcome: "held" },
-        keyOf(w.reg, "ac-dev-1"),
-      );
-      const commit = await signReceipt(
-        { ...base, kind: "consumer_commit", outcome: "applied" },
-        keyOf(w.reg, "ac-dev-1"),
-      );
-      return { http_status: 200, receipts: [res.receipts![0]!, held, commit] };
-    };
-    await pump(w, lying);
+    await pump(w);
     const row = w.outbox.rows.get(a.envelope.event_id)!;
-    expect(row.state).toBe("retry_wait");
-    expect(row.last_error).toBe("ack_commit_contradicts_inbox");
+    const [adm] = await w.query(row.delivery_id, row.event_id);
+    const exp = (kind: "target_inbox" | "consumer_commit") => ({
+      envelope: a.envelope,
+      connection_id: CONN,
+      delivery_id: row.delivery_id,
+      kind,
+    });
+    const ac = keyOf(w.reg, "ac-dev-1");
+    const lying: ReceiptQueryPort = async () => {
+      const held = await signReceiptV2(
+        await receiptDraft(exp("target_inbox"), "held", T0, adm!),
+        ac,
+      );
+      const commit = await signReceiptV2(
+        await receiptDraft(exp("consumer_commit"), "applied", T0, held),
+        ac,
+      );
+      return [adm!, held, commit];
+    };
+    w.clock.now += 10;
+    await pump(w, w.transport, lying);
+    expect(row.state).toBe("gateway_admitted");
+    expect(row.last_error).toBe("ack_commit_without_effect");
   });
 });
 
@@ -336,37 +392,41 @@ describe("H1: event ids are scoped to source, tenant, rooftop, instance and epis
 
 describe("H2: receipts are bound to the exact delivery, connection and a valid key", () => {
   async function signed(
-    over: Partial<Receipt> = {},
+    over: Partial<ReceiptV2> = {},
     keyId = "ac-dev-1",
     reg = syntheticRegistry(),
   ) {
     const a = await sealEnvelope(
       draftEnvelope("autolabels", "autocurb", "inventory.status_changed"),
     );
-    const conn = connId("autolabels", "autocurb");
-    const ex = expectReceipt(a.envelope, conn, "target_inbox");
-    const { kind: _k, ...rest } = ex;
-    const unsigned = {
-      protocol: "rtgip/2" as const,
+    const delivery_id = await deliveryIdentity(a.envelope, CONN);
+    const ex = {
+      envelope: a.envelope,
+      connection_id: CONN,
+      delivery_id,
       kind: "target_inbox" as const,
-      ...rest,
-      outcome: "applied" as const,
-      issued_at: T0,
-      ...over,
-      key_id: keyId,
     };
+    const admission = await signAdmission(
+      a.envelope,
+      CONN,
+      keyOf(syntheticRegistry(), "gw-dev-1"),
+      T0,
+    );
+    const draft = await receiptDraft(ex, "applied", T0, admission);
+    const unsigned = { ...draft, ...over, key_id: keyId };
     const key = reg.keys.find((k) => k.key_id === keyId)!;
-    const { signature: _s, ...toSign } = unsigned as Receipt;
-    const r: Receipt = {
-      ...(unsigned as Omit<Receipt, "signature">),
-      signature: await hmacHex(key.secret, `rtgip/2-receipt\n${receiptSigningJson(toSign)}`),
-    };
-    return { r, ex, reg, ctx: receiptContext(a.envelope, 0) };
+    const r = {
+      ...unsigned,
+      signature: await hmacHex(key.secret, `${RECEIPT_PROTOCOL}\n${canonicalize(unsigned)}`),
+    } as ReceiptV2;
+    return { r, ex, reg, admission };
   }
+  const check = (s: Awaited<ReturnType<typeof signed>>, reg = s.reg, now = T0) =>
+    verifyReceiptV2(s.r, s.ex, reg, now, [s.admission]);
 
   it("accepts a correctly bound receipt", async () => {
-    const { r, ex, reg, ctx } = await signed();
-    expect(await verifyReceipt(r, ex, reg, T0, ctx)).toEqual({ ok: true });
+    const s = await signed();
+    expect(await check(s)).toEqual(s.r);
   });
 
   it.each([
@@ -378,11 +438,13 @@ describe("H2: receipts are bound to the exact delivery, connection and a valid k
     ["connection_id", connId("autolabels", "autoframe"), "ack_wrong_connection_id"],
     ["event_id", "00000000-0000-4000-8000-000000000000", "ack_wrong_event_id"],
     ["payload_sha256", "0".repeat(64), "ack_wrong_payload_sha256"],
+    ["envelope_sha256", "0".repeat(64), "ack_wrong_envelope_sha256"],
+    ["delivery_id", "0".repeat(64), "ack_wrong_delivery_id"],
   ] as const)(
     "refuses a validly signed receipt with a different %s",
     async (field, value, reason) => {
-      const { r, ex, reg, ctx } = await signed({ [field]: value } as Partial<Receipt>);
-      expect(await verifyReceipt(r, ex, reg, T0, ctx)).toEqual({ ok: false, reason });
+      const s = await signed({ [field]: value } as Partial<ReceiptV2>);
+      await expect(check(s)).rejects.toThrow(reason);
     },
   );
 
@@ -394,20 +456,11 @@ describe("H2: receipts are bound to the exact delivery, connection and a valid k
       keys: reg.keys.map((k) => (k.key_id === "ac-dev-1" ? { ...k, status: "revoked" } : k)),
     };
     let s = await signed({}, "ac-dev-1", revoked);
-    expect(await verifyReceipt(s.r, s.ex, revoked, T0, s.ctx)).toEqual({
-      ok: false,
-      reason: "ack_key_revoked",
-    });
+    await expect(check(s)).rejects.toThrow("ack_key_not_authorized");
     s = await signed({ issued_at: ac.not_after + 1 }, "ac-dev-1", reg);
-    expect(await verifyReceipt(s.r, s.ex, reg, ac.not_after + 1, s.ctx)).toEqual({
-      ok: false,
-      reason: "ack_key_outside_validity",
-    });
+    await expect(check(s, reg, ac.not_after + 1)).rejects.toThrow("ack_key_not_authorized");
     s = await signed({}, "ac-legacy-1", reg);
-    expect(await verifyReceipt(s.r, s.ex, reg, T0, s.ctx)).toEqual({
-      ok: false,
-      reason: "ack_key_dialect_mismatch",
-    });
+    await expect(check(s)).rejects.toThrow("ack_key_not_authorized");
   });
 
   it("refuses a key not bound to the connection, a suspended connection and a future-dated receipt", async () => {
@@ -416,36 +469,30 @@ describe("H2: receipts are bound to the exact delivery, connection and a valid k
       ...reg,
       keys: reg.keys.map((k) =>
         k.key_id === "ac-dev-1"
-          ? {
-              ...k,
-              connection_ids: k.connection_ids.filter(
-                (c) => c !== connId("autolabels", "autocurb"),
-              ),
-            }
+          ? { ...k, connection_ids: k.connection_ids.filter((c) => c !== CONN) }
           : k,
       ),
     };
     let s = await signed({}, "ac-dev-1", unbound);
-    expect(await verifyReceipt(s.r, s.ex, unbound, T0, s.ctx)).toEqual({
-      ok: false,
-      reason: "ack_key_not_bound_to_connection",
-    });
+    await expect(check(s)).rejects.toThrow("ack_key_not_authorized");
     const suspended: Registry = {
       ...reg,
       connections: reg.connections.map((c) =>
-        c.connection_id === connId("autolabels", "autocurb") ? { ...c, status: "suspended" } : c,
+        c.connection_id === CONN ? { ...c, status: "suspended" } : c,
       ),
     };
     s = await signed({}, "ac-dev-1", suspended);
-    expect(await verifyReceipt(s.r, s.ex, suspended, T0, s.ctx)).toEqual({
-      ok: false,
-      reason: "ack_connection_inactive",
-    });
+    await expect(check(s)).rejects.toThrow("ack_connection_not_authorized");
     s = await signed({ issued_at: T0 + 3600 }, "ac-dev-1", reg);
-    expect(await verifyReceipt(s.r, s.ex, reg, T0, s.ctx)).toEqual({
-      ok: false,
-      reason: "ack_issued_in_future",
-    });
+    await expect(check(s)).rejects.toThrow("ack_future_receipt");
+  });
+
+  it("chains the inbox receipt to the exact admission it follows", async () => {
+    const s = await signed();
+    expect(s.r.prev_receipt_sha256).toBe(await receiptDigest(s.admission));
+    await expect(verifyReceiptV2(s.r, s.ex, s.reg, T0, [])).rejects.toThrow(
+      "ack_missing_previous_stage",
+    );
   });
 
   it("an outbox fails closed when its connection is revoked after enqueue", async () => {
@@ -459,11 +506,19 @@ describe("H2: receipts are bound to the exact delivery, connection and a valid k
     const revokedReg: Registry = {
       ...w.reg,
       connections: w.reg.connections.map((c) =>
-        c.connection_id === connId("autolabels", "autocurb") ? { ...c, status: "revoked" } : c,
+        c.connection_id === CONN ? { ...c, status: "revoked" } : c,
       ),
     };
     for (const r of w.outbox.claim("w1", w.clock.now, 1))
-      await w.outbox.deliver(r, "w1", w.transport, revokedReg, w.clock.now, () => 0);
+      await w.outbox.deliver(
+        r,
+        "w1",
+        r.lease_generation,
+        w.transport,
+        revokedReg,
+        w.clock.now,
+        () => 0,
+      );
     const row = w.outbox.rows.get(a.envelope.event_id)!;
     expect(row.state).toBe("retry_wait");
     expect(row.last_error).toBe("authorization:connection_revoked");

@@ -102,11 +102,17 @@ export interface FrameApprovalRecords {
   reinstatements?: readonly ReinstatementRow[];
 }
 
-/** Server scope. The episode map comes from the AutoLabels identity AutoFrame received. */
+/**
+ * Server scope, in AutoFrame's own ids. The episode map comes from the AutoLabels identity
+ * AutoFrame received; rooftop_scope is the RooftopOS tenant_id and rooftop_id the owner-reviewed
+ * registry binds this AutoFrame rooftop to (rtgip_src.frame_rooftop_scope). Envelopes carry only
+ * the RooftopOS pair.
+ */
 export interface FrameServerScope {
   tenant_id: string;
   rooftop_id: string;
   scope_verified_server_side: true;
+  rooftop_scope: { tenant_id: string; rooftop_id: string };
   /** AutoLabels' shared episode id for AutoFrame's local integer episode. */
   episode_map: Record<number, string>;
   /** Previous emitted revision for this media aggregate, or null for the first. */
@@ -120,6 +126,25 @@ export class FrameProducerError extends Error {
 }
 
 const iso = (t: string) => new Date(t).toISOString().replace(/\.\d{3}Z$/, "Z");
+const CANON_TENANT = /^[A-Za-z0-9._:-]{1,128}$/;
+const CANON_ROOFTOP = /^[A-Za-z0-9._-]{1,64}$/;
+function canonical(scope: FrameServerScope) {
+  const c = scope.rooftop_scope;
+  if (!c || !CANON_TENANT.test(c.tenant_id) || !CANON_ROOFTOP.test(c.rooftop_id))
+    throw new FrameProducerError("rooftop_unmapped");
+  return c;
+}
+/** The private object key, re-rooted from AutoFrame's ids onto the RooftopOS pair. */
+function objectKey(
+  path: string,
+  afPrefix: string,
+  c: { tenant_id: string; rooftop_id: string },
+  instance: string,
+) {
+  if (!path.startsWith(afPrefix) || path.includes(".."))
+    throw new FrameProducerError("storage_path_out_of_scope");
+  return `${c.tenant_id}/${c.rooftop_id}/${instance}/${path.slice(afPrefix.length)}`;
+}
 const staffRef = (uid: string) => `af-staff:${uid}`;
 
 export function mediaApproved(
@@ -197,14 +222,19 @@ export function mediaApproved(
   }
   const episode = scope.episode_map[v.episode_id];
   if (!episode) throw new FrameProducerError("episode_not_mapped");
-  if (!p.storage_ref.path.startsWith(`${m.tenant_id}/${m.rooftop_id}/${v.instance_id}/`))
-    throw new FrameProducerError("storage_path_out_of_scope");
+  const canon = canonical(scope);
+  const key = objectKey(
+    r.path,
+    `${m.tenant_id}/${m.rooftop_id}/${v.instance_id}/`,
+    canon,
+    v.instance_id,
+  );
   return produceFor(
     {
       source: "autoframe",
       event_type: "media.approved",
-      tenant_id: scope.tenant_id,
-      rooftop_id: scope.rooftop_id,
+      tenant_id: canon.tenant_id,
+      rooftop_id: canon.rooftop_id,
       vehicle: { vin: v.vin, instance_id: v.instance_id, episode_id: episode },
       aggregate_id: m.id,
       revision: m.revision,
@@ -220,7 +250,7 @@ export function mediaApproved(
         width: r.width,
         height: r.height,
         orientation: p.orientation,
-        storage_ref: { bucket: p.storage_ref.bucket, object_key: r.path },
+        storage_ref: { bucket: p.storage_ref.bucket, object_key: key },
         content_sha256: r.sha256,
         approval_audit_ref: p.approval_audit_ref,
         approved_by_ref: staffRef(latest.actor),
@@ -273,12 +303,13 @@ export function mediaRevoked(
   if (rv.revision <= rv.prev_revision) throw new FrameProducerError("revocation_not_newer");
   const episode = scope.episode_map[rv.episode_id];
   if (!episode) throw new FrameProducerError("episode_not_mapped");
+  const canon = canonical(scope);
   return produceFor(
     {
       source: "autoframe",
       event_type: "media.revoked",
-      tenant_id: scope.tenant_id,
-      rooftop_id: scope.rooftop_id,
+      tenant_id: canon.tenant_id,
+      rooftop_id: canon.rooftop_id,
       vehicle: { vin: rv.vin, instance_id: rv.instance_id, episode_id: episode },
       aggregate_id: rv.media_id,
       revision: rv.revision,

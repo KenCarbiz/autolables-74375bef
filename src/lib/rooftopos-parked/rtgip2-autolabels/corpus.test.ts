@@ -5,7 +5,8 @@ import { describe, expect, it } from "vitest";
 import corpus from "../rtgip2/rtgip2-corpus.v2.json";
 import { MemoryNonceStore, verifyDelivery, type EnvelopeV2 } from "../rtgip2/protocol.ts";
 import { MemoryInbox } from "../rtgip2/delivery.ts";
-import { syntheticRegistry, T0, TENANT, ROOFTOP, VIN, INSTANCE, EPISODE } from "../rtgip2/fixtures.ts";
+import { signAdmission } from "../rtgip2/harness.ts";
+import { keyOf, syntheticRegistry, T0, TENANT, ROOFTOP, VIN, INSTANCE, EPISODE } from "../rtgip2/fixtures.ts";
 import * as L from "./producer.ts";
 import { emptyLabelsProjection, labelsConsumer, type LabelsProjection } from "./consumer.ts";
 
@@ -31,11 +32,11 @@ describe("AutoLabels against the shared rtgip/2 corpus", () => {
     const nonces = new MemoryNonceStore();
     const p = emptyLabelsProjection();
     p.instances[INSTANCE] = { tenant_id: TENANT, rooftop_id: ROOFTOP, vin: VIN, episodes: { [EPISODE]: { state: "open", opened_reason: "acquisition" } }, service_visits: {} };
-    const inbox = new MemoryInbox<LabelsProjection>("autolabels", p, labelsConsumer);
+    const inbox = new MemoryInbox<LabelsProjection>("autolabels", p, labelsConsumer, { registry: reg, key: keyOf(reg, "al-dev-1") });
     for (const e of inbound) {
       const v = await verifyDelivery(e.gateway_headers as Record<string, string>, e.body, { registry: reg, nonces, nowSec: corpus.t0, expectedSigner: "gateway", receiver: "autolabels" });
       expect(v.ok, `seq ${e.seq}`).toBe(true);
-      if (v.ok) expect(inbox.receive(v.delivery, T0).outcome, `seq ${e.seq}`).toBe("applied");
+      if (v.ok) expect((await inbox.receive(v.delivery, await signAdmission(v.delivery.envelope, v.delivery.connection_id, keyOf(reg, "gw-dev-1"), T0), T0)).outcome, `seq ${e.seq}`).toBe("applied");
     }
     expect(inbox.projection.evidence.map((x) => x.kind)).toEqual(["appraisal_finalized", "acquisition_milestone:deal_finalized", "purchase_completed_custody_received"]);
     expect(inbox.projection.media["med-syn-1"]).toMatchObject({ state: "revoked", active_in_gallery: false });

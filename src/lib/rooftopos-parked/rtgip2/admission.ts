@@ -13,6 +13,7 @@
 // without passing the database verification, whatever it claims to have checked itself.
 
 import {
+  canonicalize,
   MemoryNonceStore,
   verifyDelivery,
   type AppId,
@@ -21,7 +22,42 @@ import {
   type ServiceKey,
   type SignedHeaders,
 } from "./protocol.ts";
-import { signReceipt, type InboxOutcome, type Receipt } from "./delivery.ts";
+import type { InboxOutcome } from "./delivery.ts";
+import {
+  deliveryIdentity,
+  isReceipt,
+  receiptDraft,
+  signReceiptV2,
+  verifyReceiptV2,
+  type ReceiptV2,
+} from "./receipt-v2.ts";
+
+export const ADMISSION_HEADER = "rtgip-admission-receipt";
+
+export const encodeAdmissionHeader = (r: ReceiptV2): string => {
+  const bytes = new TextEncoder().encode(canonicalize(r));
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+};
+
+/** The admission receipt's canonical JSON text, or null when the header is not exactly that. */
+export function decodeAdmissionHeader(
+  value: string | undefined,
+): { text: string; receipt: ReceiptV2 } | null {
+  if (!value || !/^[A-Za-z0-9_-]+$/.test(value)) return null;
+  try {
+    const bin = atob(value.replace(/-/g, "+").replace(/_/g, "/"));
+    const text = new TextDecoder("utf-8", { fatal: true }).decode(
+      Uint8Array.from(bin, (c) => c.charCodeAt(0)),
+    );
+    const parsed: unknown = JSON.parse(text);
+    if (!isReceipt(parsed) || canonicalize(parsed) !== text) return null;
+    return { text, receipt: parsed };
+  } catch {
+    return null;
+  }
+}
 
 /** One row returned by rtgip.inbox_admit. */
 export interface AdmitRow {
@@ -33,16 +69,25 @@ export interface AdmitRow {
   committed_outcome: "applied" | "stale_ignored" | null;
   connection_id: string | null;
   envelope: EnvelopeV2 | null;
+  /** First row only: the delivery this call answers, its stored issue time and stored receipts. */
+  delivery_id: string | null;
+  issued_at: number | string | null;
+  stored_receipts: string[] | null;
+  /** True when the decision was already final: answered from the stored record, engine not run. */
+  replayed: boolean | null;
 }
 
 /** The target's database transaction, as the server's SQL client exposes it. */
 export interface AdmissionTx {
-  /** SELECT * FROM rtgip.inbox_admit($1::text::jsonb, $2::text, $3::text::jsonb) */
+  /** SELECT * FROM rtgip.inbox_admit($1::text::jsonb, $2::text, $3::text, $4::text::jsonb) */
   admit(
     headers: Record<string, string>,
     body: string,
+    admission: string,
     consumerReject: { event_id: string; reason: string } | null,
   ): Promise<AdmitRow[]>;
+  /** SELECT rtgip.inbox_record_receipts($1, $2::text[]) */
+  recordReceipts(deliveryId: string, receipts: string[]): Promise<void>;
   savepoint(name: string): Promise<void>;
   rollbackTo(name: string): Promise<void>;
 }
@@ -63,14 +108,15 @@ export interface AdmissionDeps {
   registry: Registry;
   nowSec: number;
   db: AdmissionDb;
-  effect: AdmissionEffect;
+  /** Optional app-side effect run by the server in the same transaction, after the database's own hook. */
+  effect?: AdmissionEffect;
   receiptKey: ServiceKey;
 }
 
 export interface AdmissionResult {
   http_status: number;
   reason?: string;
-  receipts?: Receipt[];
+  receipts?: ReceiptV2[];
   admission_id?: number | string | null;
   outcomes?: { event_id: string; outcome: string; reason: string | null }[];
 }
@@ -108,6 +154,9 @@ export async function admitDelivery(
   deps: AdmissionDeps,
 ): Promise<AdmissionResult> {
   const headers = admissionHeaders(rawHeaders);
+  const lowered = new Map(Object.entries(rawHeaders).map(([k, v]) => [k.toLowerCase(), v]));
+  const adm = decodeAdmissionHeader(lowered.get(ADMISSION_HEADER));
+  if (!adm) return { http_status: 400, reason: "admission_receipt_malformed" };
   const v = await verifyDelivery(headers, body, {
     registry: deps.registry,
     nonces: new MemoryNonceStore(),
@@ -117,6 +166,26 @@ export async function admitDelivery(
   });
   if ("reason" in v) return { http_status: 401, reason: v.reason };
   const verified = v.delivery;
+  const delivery = {
+    envelope: verified.envelope,
+    connection_id: verified.connection_id,
+  };
+  try {
+    await verifyReceiptV2(
+      adm.receipt,
+      {
+        envelope: delivery.envelope,
+        connection_id: delivery.connection_id,
+        delivery_id: await deliveryIdentity(delivery.envelope, delivery.connection_id),
+        kind: "gateway_admission",
+      },
+      deps.registry,
+      deps.nowSec,
+      [],
+    );
+  } catch (err) {
+    return { http_status: 403, reason: (err as Error).message };
+  }
 
   // Anything that aborts the transaction (a crash in the effect, a lost connection, a
   // serialization failure) rolls back the inbox rows, the watermark and the database nonce
@@ -126,7 +195,7 @@ export async function admitDelivery(
   try {
     decided = await deps.db.transaction(async (tx) => {
       await tx.savepoint("rtgip_admit");
-      let rows = await tx.admit(headers, body, null);
+      let rows = await tx.admit(headers, body, adm.text, null);
       const first = rows[0];
       if (!first) throw new AdmissionDisagreement("admit_returned_nothing");
       if (first.outcome === "rejected")
@@ -137,15 +206,19 @@ export async function admitDelivery(
       )
         throw new AdmissionDisagreement("verifier_disagreement");
       for (const row of rows) {
-        if (row.outcome !== "applied") continue;
+        if (row.outcome !== "applied" || first.replayed) continue;
         if (!row.envelope || !row.event_id)
           throw new AdmissionDisagreement("applied_without_envelope");
+        if (!deps.effect) continue;
         const res = await deps.effect(tx, row.envelope);
         if (!("reason" in res)) continue;
         // Undo the first pass (inbox rows, watermark, admission, effects) and verify the same
         // delivery again with this event marked quarantined.
         await tx.rollbackTo("rtgip_admit");
-        rows = await tx.admit(headers, body, { event_id: row.event_id, reason: res.reason });
+        rows = await tx.admit(headers, body, adm.text, {
+          event_id: row.event_id,
+          reason: res.reason,
+        });
         const again = rows[0];
         if (!again || again.outcome === "rejected")
           throw new AdmissionDisagreement("reject_pass_refused");
@@ -165,43 +238,62 @@ export async function admitDelivery(
 
   if (decided.rejected) return { http_status: 403, reason: `db:${decided.rejected}` };
   const received = decided.rows[0]!;
-  const e = verified.envelope;
-  const base = {
-    protocol: "rtgip/2" as const,
-    event_id: e.event_id,
-    route: e.route,
-    source_app: e.source_app,
-    target_app: e.target_app,
-    tenant_id: e.tenant_id,
-    rooftop_id: e.rooftop_id,
-    connection_id: verified.connection_id,
-    payload_sha256: e.payload_sha256,
-    issuer: deps.app,
-    issued_at: deps.nowSec,
-  };
-  // Signed only after the transaction committed: a receipt never describes rolled-back work,
-  // and a consumer_commit is issued only for a committed effect (never held or quarantined).
-  const receipts: Receipt[] = [
-    await signReceipt(
-      { ...base, kind: "target_inbox", outcome: received.outcome as InboxOutcome },
-      deps.receiptKey,
-    ),
-  ];
-  if (received.committed && received.committed_outcome)
-    receipts.push(
-      await signReceipt(
-        { ...base, kind: "consumer_commit", outcome: received.committed_outcome },
-        deps.receiptKey,
-      ),
-    );
-  return {
+  const outcomes = decided.rows.map((r) => ({
+    event_id: r.event_id ?? "",
+    outcome: r.outcome,
+    reason: r.reason,
+  }));
+  if (!received.delivery_id || received.issued_at === null)
+    return { http_status: 500, reason: "delivery_record_missing" };
+  const respond = (receipts: ReceiptV2[]): AdmissionResult => ({
     http_status: 200,
     receipts,
     admission_id: received.admission_id,
-    outcomes: decided.rows.map((r) => ({
-      event_id: r.event_id ?? "",
-      outcome: r.outcome,
-      reason: r.reason,
-    })),
-  };
+    outcomes,
+  });
+  // A decision already signed and stored for this delivery is returned byte for byte.
+  if (received.stored_receipts) {
+    const stored = received.stored_receipts.map((t) => JSON.parse(t) as ReceiptV2);
+    return respond(stored);
+  }
+  // Signed only after the transaction committed: a receipt never describes rolled-back work,
+  // and a consumer_commit is issued only for a committed effect (never held or quarantined).
+  // The issue time is the stored one, so a retry after a crash re-signs identical bytes.
+  const issuedAt = Number(received.issued_at);
+  const exp = (kind: "target_inbox" | "consumer_commit") => ({
+    envelope: delivery.envelope,
+    connection_id: delivery.connection_id,
+    delivery_id: received.delivery_id!,
+    kind,
+  });
+  const inbox = await signReceiptV2(
+    await receiptDraft(
+      exp("target_inbox"),
+      received.outcome as InboxOutcome,
+      issuedAt,
+      adm.receipt,
+    ),
+    deps.receiptKey,
+  );
+  const receipts = [inbox];
+  if (received.committed && received.committed_outcome)
+    receipts.push(
+      await signReceiptV2(
+        await receiptDraft(exp("consumer_commit"), received.committed_outcome, issuedAt, inbox),
+        deps.receiptKey,
+      ),
+    );
+  if (received.outcome !== "held") {
+    try {
+      await deps.db.transaction((tx) =>
+        tx.recordReceipts(
+          received.delivery_id!,
+          receipts.map((r) => canonicalize(r)),
+        ),
+      );
+    } catch {
+      return { http_status: 503, reason: "receipts_not_stored" };
+    }
+  }
+  return respond(receipts);
 }

@@ -3,15 +3,23 @@
   "files": {
     "rtgip2/protocol.ts": {
       "origin": "shared core (byte-identical in all three repos)",
-      "sha256": "154debfb4960c7ee2fb058c2194d182c83c47d667f4446986c7e8e650d4b5e84"
+      "sha256": "dfa5ba596d752c264230e192639fb7068ac50bcb3c6ff9be839b83c3e1eaa7c9"
+    },
+    "rtgip2/receipt-v2.ts": {
+      "origin": "shared core (byte-identical in all three repos)",
+      "sha256": "835407a7708ea822c728eb92f50398278040cf7725164da94105ba81564bb5ec"
+    },
+    "rtgip2/receipt-query.ts": {
+      "origin": "shared core (byte-identical in all three repos)",
+      "sha256": "bd5955f58444722540240cc5117b288138aa916bcd95988dde24252ee8936018"
     },
     "rtgip2/delivery.ts": {
       "origin": "shared core (byte-identical in all three repos)",
-      "sha256": "c61646fab77058cfe4f0cfefdb6ea38dae6a5eebf4b1f8a8bbebb22692f8b927"
+      "sha256": "834e14b2bd2ec49449c2d774dc63b245afb158f9f7b994dc3f635d2dd84b190b"
     },
     "rtgip2/harness.ts": {
       "origin": "shared core (byte-identical in all three repos)",
-      "sha256": "df5d414cb841c405899bbcadcc6d490b11c1cdd0a73b769c52073d25965d6bfd"
+      "sha256": "d219c3ee9ddc5a1c11eb245038c0869e9c74c1c8f30b0b1e67b7a56158e4de94"
     },
     "rtgip2/produce.ts": {
       "origin": "shared core (byte-identical in all three repos)",
@@ -23,7 +31,7 @@
     },
     "rtgip2/admission.ts": {
       "origin": "shared core (byte-identical in all three repos)",
-      "sha256": "91a5b0d59145f4d948e08a56d0e8d26295067718c98ef1b21bbfd65087307bf2"
+      "sha256": "993cd8852fe90586a8c68b828ab9fd5debede3a651de9dbe920ed92ef3fcc870"
     },
     "rtgip2/rtgip2-corpus.v2.json": {
       "origin": "shared core (byte-identical in all three repos)",
@@ -39,7 +47,7 @@
     },
     "rtgip2-autocurb/producer.ts": {
       "origin": "KenCarbiz/hartecash-2edb8fec:src/lib/rooftopos/rtgip2-autocurb/producer.ts",
-      "sha256": "a5dcdbaf2422373452500f0e57a9c71ca627db46682325aafcb81c4f67593a77"
+      "sha256": "d73629e52fa70781a71325cac51d972da7fad64dd8fd5e3433389e240d82e8b9"
     },
     "rtgip2-autocurb/consumer.ts": {
       "origin": "KenCarbiz/hartecash-2edb8fec:src/lib/rooftopos/rtgip2-autocurb/consumer.ts",
@@ -47,7 +55,7 @@
     },
     "rtgip2-autoframe/producer.ts": {
       "origin": "KenCarbiz/showroom-photo-polish:src/lib/af/rtgip2-autoframe/producer.ts",
-      "sha256": "1f69565a2bb12630be41006b83ec6c05d2ccd1fa77ee59a1340761a02c3206a1"
+      "sha256": "ff98bc9be8182492f3f0552c7e01bda2f5a59daa6ce2c2ee2b2b41fc6418da40"
     },
     "rtgip2-autoframe/consumer.ts": {
       "origin": "KenCarbiz/showroom-photo-polish:src/lib/af/rtgip2-autoframe/consumer.ts",

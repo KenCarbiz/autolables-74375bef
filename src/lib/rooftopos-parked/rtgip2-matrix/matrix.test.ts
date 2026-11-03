@@ -9,8 +9,8 @@ import {
   authorize, canonicalize, hmacHex, sealEnvelope, sha256Hex, signEnvelope, verifyDelivery, MemoryNonceStore,
   type AppId, type EnvelopeV2, type Registry, type SignedHeaders,
 } from "../rtgip2/protocol.ts";
-import { MemoryInbox, MemoryOutbox, reconcile, type OutboxRow, type Receipt } from "../rtgip2/delivery.ts";
-import { makeTarget, ReferenceGateway, type TargetEndpoint } from "../rtgip2/harness.ts";
+import { MemoryInbox, MemoryOutbox, reconcile, RETRY, type OutboxRow } from "../rtgip2/delivery.ts";
+import { makeTarget, queryPort, ReferenceGatewayStandIn, sourceTransport, type TargetEndpoint } from "../rtgip2/harness.ts";
 import { draftEnvelope, keyOf, signingKeyFor, syntheticRegistry, T0, TENANT, ROOFTOP, OTHER_TENANT, OTHER_ROOFTOP, VIN, INSTANCE, EPISODE } from "../rtgip2/fixtures.ts";
 import * as L from "../rtgip2-autolabels/producer.ts";
 import { emptyLabelsProjection, labelsConsumer, type LabelsProjection } from "../rtgip2-autolabels/consumer.ts";
@@ -27,36 +27,41 @@ type App = (typeof APPS)[number];
 
 function world(opts: { dropAckFor?: (app: App) => boolean } = {}) {
   const reg = syntheticRegistry();
-  const labels = new MemoryInbox<LabelsProjection>("autolabels", emptyLabelsProjection(), labelsConsumer);
+  const labels = new MemoryInbox<LabelsProjection>("autolabels", emptyLabelsProjection(), labelsConsumer, { registry: reg, key: keyOf(reg, signingKeyFor("autolabels")) });
   labels.projection.instances[INSTANCE] = { tenant_id: TENANT, rooftop_id: ROOFTOP, vin: VIN, episodes: { [EPISODE]: { state: "open", opened_reason: "acquisition" } }, service_visits: { "sv-syn-1": { ro_ref: "ro-syn-1" } } };
-  const curb = new MemoryInbox<CurbProjection>("autocurb", emptyCurbProjection(), curbConsumer);
-  const frame = new MemoryInbox<FrameProjection>("autoframe", emptyFrameProjection(), frameConsumer);
+  const curb = new MemoryInbox<CurbProjection>("autocurb", emptyCurbProjection(), curbConsumer, { registry: reg, key: keyOf(reg, signingKeyFor("autocurb")) });
+  const frame = new MemoryInbox<FrameProjection>("autoframe", emptyFrameProjection(), frameConsumer, { registry: reg, key: keyOf(reg, signingKeyFor("autoframe")) });
   const inboxes = { autolabels: labels, autocurb: curb, autoframe: frame } as const;
-  const targets = new Map<AppId, TargetEndpoint>(APPS.map((a) => [a, makeTarget(a, inboxes[a] as MemoryInbox<unknown>, reg, keyOf(reg, signingKeyFor(a)), undefined, { dropAck: () => opts.dropAckFor?.(a) ?? false })]));
-  const gw = new ReferenceGateway(reg, keyOf(reg, "gw-dev-1"), targets);
+  const targets = new Map<AppId, TargetEndpoint>(APPS.map((a) => [a, makeTarget(a, inboxes[a] as MemoryInbox<unknown>, reg, undefined, { dropAck: () => opts.dropAckFor?.(a) ?? false })]));
+  const gw = new ReferenceGatewayStandIn(reg, keyOf(reg, "gw-dev-1"), targets);
   const clock = { now: T0 };
-  let n = 0;
-  const outboxes = { autolabels: new MemoryOutbox({}), autocurb: new MemoryOutbox({}), autoframe: new MemoryOutbox({}) } as const;
-  const seen: Receipt[] = [];
-  const transport = (src: AppId) => async (r: OutboxRow) => {
-    const res = await gw.admit(await signEnvelope(r.body, r.envelope, keyOf(reg, signingKeyFor(src)), clock.now, `src_${src}_${String(n++).padStart(12, "0")}`), r.body, clock.now);
-    seen.push(...(res.receipts ?? []));
-    return res;
-  };
+  const outboxes = { autolabels: new MemoryOutbox({}, reg), autocurb: new MemoryOutbox({}, reg), autoframe: new MemoryOutbox({}, reg) } as const;
+  const transport = (src: AppId) => sourceTransport(gw, keyOf(reg, signingKeyFor(src)), clock);
+  const query = (src: AppId) => queryPort(gw, keyOf(reg, signingKeyFor(src)), clock);
   async function pump(src: App) {
-    for (const r of outboxes[src].claim("worker-1", clock.now, 100)) await outboxes[src].deliver(r, "worker-1", transport(src), reg, clock.now, () => 0);
+    for (const r of outboxes[src].claim("worker-1", clock.now, 100)) {
+      if (r.lease_action === "confirm") await outboxes[src].confirm(r, "worker-1", r.lease_generation, query(src), reg, clock.now, () => 0);
+      else await outboxes[src].deliver(r, "worker-1", r.lease_generation, transport(src), reg, clock.now, () => 0);
+    }
   }
   async function send(src: App, produced: Promise<{ envelope: EnvelopeV2; body: string }[]> | { envelope: EnvelopeV2; body: string }[]) {
     const evs = await produced;
     await outboxes[src].transaction(async (_s, enqueue) => { for (const e of evs) await enqueue(e.envelope, e.body); }, clock.now);
     await pump(src);
+    clock.now += RETRY.baseSec;
+    await pump(src);
     return evs.map((e) => outboxes[src].rows.get(e.envelope.event_id)!);
   }
-  return { reg, gw, inboxes, outboxes, send, pump, clock, seen };
+  return {
+    reg, gw, inboxes, outboxes, send, pump, clock,
+    /** Every receipt the stand-in Gateway holds, for all deliveries. */
+    get seen() { return [...gw.admissions.values()].flatMap((a) => a.chain); },
+    chain: (event_id: string) => [...gw.admissions.values()].find((a) => a.envelope.event_id === event_id)?.chain ?? [],
+  };
 }
 
 const committed = (rows: OutboxRow[]) => rows.every((r) => r.state === "consumer_committed");
-const inboxOutcome = (r: OutboxRow) => r.receipts.filter((x) => x.kind === "target_inbox").at(-1)?.outcome;
+const inboxOutcome = (w: { chain: (id: string) => { kind: string; outcome: string }[] }, r: OutboxRow) => w.chain(r.event_id).filter((x) => x.kind === "target_inbox").at(-1)?.outcome;
 
 describe("six-direction end-to-end exchange (positive path)", () => {
   const w = world();
@@ -97,7 +102,7 @@ describe("six-direction end-to-end exchange (positive path)", () => {
     expect(committed(r)).toBe(true);
     expect(w.inboxes.autolabels.projection.media[MEDIA]).toMatchObject({ state: "revoked", active_in_gallery: false });
     const late = await w.send("autoframe", stale);
-    expect(late.map(inboxOutcome)).toEqual(["stale_ignored", "stale_ignored"]);
+    expect(late.map((r) => inboxOutcome(w, r))).toEqual(["stale_ignored", "stale_ignored"]);
     // Source side: once the row is revoked, a queued approval can never be re-emitted.
     expect(() => F.mediaApproved(approval(1), frameScope(2), frameRecords(1, "af-evt-1", [], { status: "revoked" }), ["autolabels"])).toThrow("media_not_currently_approved");
     // Consumer side: a higher-revision approval without an audited reinstatement is quarantined.
@@ -142,7 +147,7 @@ describe("six-direction end-to-end exchange (positive path)", () => {
     const res = await w.send("autolabels", [replay]);
     expect(res[0]!.state).not.toBe("consumer_committed");
     expect(w.inboxes.autoframe.projection.vehicles[INSTANCE]!.approvals_allowed).toBe(false);
-    record("autolabels->autoframe", "reordered_reactivation", `rejected:${inboxOutcome(res[0]!)}`);
+    record("autolabels->autoframe", "reordered_reactivation", `rejected:${inboxOutcome(w, res[0]!)}`);
   });
 
   it("future service evidence attaches to a service visit without reopening the sold episode (synthetic; route reserved)", async () => {
@@ -285,14 +290,15 @@ describe.each(ROUTE_IDS)("negative matrix %s", (route) => {
     const gw = async (e: EnvelopeV2, body: string, nonce: string) => w.gw.admit(await signEnvelope(body, e, keyOf(w.reg, signingKeyFor(src)), T0, nonce), body, T0);
     const otherEpisode = await reseal(s.envelope, { vehicle: { ...s.envelope.vehicle, episode_id: "ep-syn-0001-9" } });
     const res = await gw(otherEpisode.envelope, otherEpisode.body, "nonce_matrix_ep_000001");
-    const outcome = res.receipts?.find((r) => r.kind === "target_inbox")?.outcome;
+    const outcome = w.chain(otherEpisode.envelope.event_id).find((r) => r.kind === "target_inbox")?.outcome;
     const sameVinOther = src === "autocurb" && tgt === "autoframe" ? "intake_only_no_identity" : String(outcome);
     record(route, "same_vin_other_episode", ["quarantined", "intake_only_no_identity"].includes(sameVinOther) ? `rejected:${sameVinOther}` : `UNEXPECTED:${sameVinOther}`);
     expect(["quarantined", "intake_only_no_identity"]).toContain(sameVinOther);
     const r3 = await reseal(s.envelope, { aggregate: { ...s.envelope.aggregate, revision: 3, prev_revision: 2 }, origin: { ...s.envelope.origin, revision: 3, event_id: "late-3" } });
     const held = await gw(r3.envelope, r3.body, "nonce_matrix_ooo_00001");
-    const heldOutcome = held.receipts?.find((r) => r.kind === "target_inbox")?.outcome;
-    record(route, "out_of_order_revision", heldOutcome === "held" && !held.receipts?.some((r) => r.kind === "consumer_commit") ? "held_not_applied_no_commit" : `UNEXPECTED:${heldOutcome}`);
+    const heldChain = w.chain(r3.envelope.event_id);
+    const heldOutcome = heldChain.find((r) => r.kind === "target_inbox")?.outcome;
+    record(route, "out_of_order_revision", heldOutcome === "held" && !heldChain.some((r) => r.kind === "consumer_commit") ? "held_not_applied_no_commit" : `UNEXPECTED:${heldOutcome}`);
     expect(heldOutcome).toBe("held");
     await gw(s.envelope, s.body, "nonce_matrix_dup_00001");
     const conflict = await reseal(s.envelope, { correlation_id: "corr-conflict" });
@@ -304,8 +310,9 @@ describe.each(ROUTE_IDS)("negative matrix %s", (route) => {
       drop = true;
       const bad = await reseal(s.envelope, { vehicle: { ...s.envelope.vehicle, episode_id: "ep-syn-0001-8" }, origin: { ...s.envelope.origin, event_id: "lost-ack-q" } });
       const rows = await w.send(src, [bad]);
-      expect(rows[0]!.state).toBe("retry_wait");
+      expect(rows[0]!.state).toBe("gateway_admitted");
       drop = false;
+      await w.gw.forwardPending(w.clock.now);
       for (let k = 0; k < 3 && rows[0]!.state !== "target_quarantined"; k++) {
         w.clock.now = Math.max(w.clock.now, rows[0]!.next_attempt_at);
         await w.pump(src);

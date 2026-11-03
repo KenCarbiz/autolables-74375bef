@@ -72,7 +72,7 @@ export const approval = (rev = 1, eventId = `af-evt-${rev}`): F.AutoFrameInterna
   payload: { media_id: MEDIA, rendition_id: `rend-syn-${rev}`, width: 1500, height: 1000, orientation: "landscape", storage_ref: { bucket: "autoframe-media", path: mediaPath(rev) }, content_sha256: "b".repeat(64), approval_audit_ref: "audit-af-1", preset: { key: "studio", version: 1 }, media_order: 1, shot_type: "front_34" },
 });
 
-export const frameScope = (prev: number | null = null): F.FrameServerScope => ({ ...scope, episode_map: { 1: EPISODE }, prev_revision: prev });
+export const frameScope = (prev: number | null = null): F.FrameServerScope => ({ ...scope, rooftop_scope: { tenant_id: scope.tenant_id, rooftop_id: scope.rooftop_id }, episode_map: { 1: EPISODE }, prev_revision: prev });
 
 /** Rows as they stand right after the approval at revision `rev` (optionally after a revocation). */
 export const frameRecords = (rev = 1, eventId = `af-evt-${rev}`, history: F.ApprovalRow[] = [], over: { lifecycle?: F.VehicleRow["lifecycle"]; status?: F.MediaAssetRow["status"]; reinstatements?: F.ReinstatementRow[] } = {}): F.FrameApprovalRecords => ({
