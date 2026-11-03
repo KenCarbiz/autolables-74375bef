@@ -81,6 +81,8 @@ export interface LedgerRow {
   actor_kind: ActorKind;
   /** The server action name for service_attested rows, otherwise null. */
   attested_service: string | null;
+  /** ovr:<id> when an admin override (reason and evidence on file) made this change. */
+  override_ref?: string | null;
   written_by: "db_trigger";
   at: string;
 }
@@ -134,6 +136,8 @@ export const CHECK_PROCESSING_ROLES = ["accounting", ...APPROVER_ROLES] as const
 export const MANAGER_ROLES = ["admin", "gsm_gm", "gm", "used_car_manager", "new_car_manager"] as const;
 export const TITLE_VERIFY_ROLES = MANAGER_ROLES;
 export const CUSTODY_ROLES = MANAGER_ROLES;
+/** Final purchase approval (Ken, 2026-11-03, D3): UCM, GSM, GM or admin, each within an assigned limit enforced in SQL. */
+export const PURCHASE_APPROVAL_ROLES = ["admin", "gsm_gm", "gm", "used_car_manager"] as const;
 /** The only statuses accept_offer moves from (supabase/migrations/20260510143530_*.sql). */
 const CUSTOMER_ACCEPT_FROM = new Set(["new", "offer_made", "contacted"]);
 const MILESTONE_ROLES: Record<string, readonly string[] | "any_staff_or_customer"> = {
@@ -265,7 +269,7 @@ export function purchaseCompleted(scope: CurbServerScope, r: CurbSourceRecords, 
   if (s.progress_status !== "purchase_complete") throw new CurbProducerError("status_not_purchase_complete");
   identityConsistent(r);
   const rows = trusted(scope, r, "progress_status");
-  const done = permitted(current(rows, "purchase_complete"), APPROVER_ROLES);
+  const done = permitted(current(rows, "purchase_complete"), PURCHASE_APPROVAL_ROLES);
   if (rows.filter((x) => x.to_value === "purchase_complete").length !== 1) throw new CurbProducerError("duplicate_purchase");
   if (done.from_value !== "check_request_submitted") throw new CurbProducerError("purchase_skipped_check_request");
   const requested = permitted(lastTo(rows, "check_request_submitted", done, "purchase_skipped_check_request"), APPROVER_ROLES);
@@ -282,7 +286,7 @@ export function purchaseCompleted(scope: CurbServerScope, r: CurbSourceRecords, 
   if (!own.length) throw new CurbProducerError("ownership_evidence_missing");
   if (!cond.length) throw new CurbProducerError("condition_evidence_missing");
   if (!r.custody_evidence) throw new CurbProducerError("custody_authority_missing");
-  const custody = permitted(r.custody_evidence, CUSTODY_ROLES);
+  const custody = permitted(r.custody_evidence, PURCHASE_APPROVAL_ROLES);
   if (!before(requested, custody)) throw new CurbProducerError("custody_before_check_request");
   return produceFor(fact(scope, r, "acquisition.purchase_completed", `acq:${s.id}`, done.at, meta, {
     purchase_ref: `pur:${s.id}`, custody_transferred: true, custody_at: custody.at, verified_by_ref: staffRef(done.actor_user_id!),
