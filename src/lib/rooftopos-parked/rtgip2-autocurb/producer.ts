@@ -132,9 +132,15 @@ const INTERMEDIATE = new Set(["offer_accepted", "deal_finalized", "title_ownersh
 export const APPROVER_ROLES = ["admin", "gsm_gm", "gm"] as const;
 export const APPRAISAL_ROLES = ["admin", "used_car_manager", "new_car_manager", "gsm_gm", "gm", "appraiser"] as const;
 export const CHECK_PROCESSING_ROLES = ["accounting", ...APPROVER_ROLES] as const;
-/** Managers and higher (Ken, 2026-11-03, D1/D2): title verification, custody approval and vehicle receipt. */
+/** Managers and higher (Ken, 2026-11-03, D2): vehicle receipt. */
 export const MANAGER_ROLES = ["admin", "gsm_gm", "gm", "used_car_manager", "new_car_manager"] as const;
-export const TITLE_VERIFY_ROLES = MANAGER_ROLES;
+/**
+ * Title verification (Ken, final owner policy 2026-11-03, D1): UCM, GSM, GM, or a title clerk or
+ * accounting employee individually granted for this dealership (ledger pseudo-role title_verifier).
+ * Sales and BDC never qualify, even alongside another role.
+ */
+export const TITLE_VERIFY_ROLES = ["used_car_manager", "gsm_gm", "gm", "title_verifier"] as const;
+export const TITLE_NEVER_ROLES = ["sales", "sales_bdc"] as const;
 export const CUSTODY_ROLES = MANAGER_ROLES;
 /** Final purchase approval (Ken, 2026-11-03, D3): UCM, GSM, GM or admin, each within an assigned limit enforced in SQL. */
 export const PURCHASE_APPROVAL_ROLES = ["admin", "gsm_gm", "gm", "used_car_manager"] as const;
@@ -166,6 +172,11 @@ function permitted<T extends LedgerRow | CustodyEvidence>(row: T, roles: readonl
   return row;
 }
 const staffRef = (uid: string) => `staff:${uid}`;
+function titleVerifier(row: LedgerRow): LedgerRow {
+  permitted(row, TITLE_VERIFY_ROLES);
+  if (row.actor_roles.some((r) => (TITLE_NEVER_ROLES as readonly string[]).includes(r))) throw new CurbProducerError("actor_lacks_permission");
+  return row;
+}
 
 /** The scope, rooftop and ledger rows must all belong to what the server publishes for. */
 function bound(scope: CurbServerScope, r: CurbSourceRecords) {
@@ -247,7 +258,8 @@ export function acquisitionMilestone(scope: CurbServerScope, r: CurbSourceRecord
     if (row.actor_kind === "customer_token") {
       if (!CUSTOMER_ACCEPT_FROM.has(row.from_value ?? "")) throw new CurbProducerError("customer_accept_from_invalid_status");
     } else if (!staffRow(row).actor_roles.length) throw new CurbProducerError("actor_lacks_permission");
-  } else permitted(row, rule);
+  } else if (rule === TITLE_VERIFY_ROLES) titleVerifier(row);
+  else permitted(row, rule);
   return produceFor(fact(scope, r, "acquisition.milestone_recorded", `acq:${s.id}`, row.at, meta, {
     milestone: s.progress_status, custody_transferred: false, recorded_at: row.at, audit_ref: row.id,
   }), targets);
@@ -273,7 +285,7 @@ export function purchaseCompleted(scope: CurbServerScope, r: CurbSourceRecords, 
   if (rows.filter((x) => x.to_value === "purchase_complete").length !== 1) throw new CurbProducerError("duplicate_purchase");
   if (done.from_value !== "check_request_submitted") throw new CurbProducerError("purchase_skipped_check_request");
   const requested = permitted(lastTo(rows, "check_request_submitted", done, "purchase_skipped_check_request"), APPROVER_ROLES);
-  const title = permitted(lastTo(rows, "title_ownership_verified", requested, "title_unverified"), TITLE_VERIFY_ROLES);
+  const title = titleVerifier(lastTo(rows, "title_ownership_verified", requested, "title_unverified"));
   permitted(lastTo(rows, "deal_finalized", title, "deal_not_finalized"), APPROVER_ROLES);
   if (s.appraisal_finalized !== true || s.acv_confirmed !== true) throw new CurbProducerError("appraisal_not_final");
   const fin = permitted(current(trusted(scope, r, "appraisal_finalized"), "true"), APPRAISAL_ROLES);
