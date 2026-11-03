@@ -5,13 +5,13 @@ import { useViewFixture } from "@/lib/admin/dataSource";
 import { Al97Dialog, Al97Frame, Banner, KeyVals, useFixtureCopy } from "@/components/admin/al97/al97ui";
 
 // Worker setup / change review. Proposes a schedule for the Files.com import
-// worker and nothing more: the real schedule is
-// supabase/manual/files_inventory_worker_schedule.sql, applied by hand after
-// Ken approves it, so every enable, apply or schedule control stays disabled.
+// worker and nothing more: the real schedule is set by
+// schedule_files_inventory_worker() (migration 0019) only after Ken approves
+// it, so every enable, apply or schedule control stays disabled.
 
 export interface WorkerSetupFixture { account: string; store: string | null; workerSchedule: "found" | "not_found" | null }
 
-export const WORKER_APPROVAL_REASON = "The worker schedule is applied by hand from supabase/manual/files_inventory_worker_schedule.sql after Ken approves it. Nothing on this page can enable it.";
+export const WORKER_APPROVAL_REASON = "The worker schedule is turned on with schedule_files_inventory_worker() only after Ken approves it. Nothing on this page can enable it.";
 
 export default function WorkerSetupPage() {
   const fx = useViewFixture<WorkerSetupFixture>("al97-worker");

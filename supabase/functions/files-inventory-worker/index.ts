@@ -1,9 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { matchesLegacyServiceRole, readCredentials } from "../_shared/functionAuth.ts";
+import { schedulerSecretValid } from "../_shared/schedulerAuth.ts";
 import { PipelineError, processImportJob, reconcile, type Db } from "../_shared/filescom/pipeline.ts";
 
 // Files.com inventory worker. Invoked by pg_cron (schedule_files_inventory_worker)
-// with the service-role credential, never by a browser. Each run optionally
+// with the database-held scheduler secret (or the service-role credential),
+// never by a browser. Each run optionally
 // reconciles the folder against processed versions, then drains a few due
 // jobs from the durable queue. Pause and emergency stop are enforced by the
 // claim functions and again by the per-store apply.
@@ -15,13 +17,15 @@ const MAX_JOBS = 3;
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json(405, { error: "method_not_allowed" });
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  if (!(await matchesLegacyServiceRole(readCredentials(req), serviceKey))) return json(401, { error: "unauthorized" });
+  const client = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey, { auth: { persistSession: false } });
+  const trusted = (await matchesLegacyServiceRole(readCredentials(req), serviceKey)) || (await schedulerSecretValid(req, client));
+  if (!trusted) return json(401, { error: "unauthorized" });
   const key = Deno.env.get("FILESCOM_API_KEY");
   if (!key) return json(409, { error: "FILESCOM_API_KEY_missing" });
   let body: Record<string, unknown> = {};
   try { body = await req.json(); } catch { /* empty body is a plain drain */ }
 
-  const db = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey, { auth: { persistSession: false } }) as unknown as Db;
+  const db = client as unknown as Db;
   const deps = { db, key, fetchFn: fetch };
   const started = Date.now();
 

@@ -612,10 +612,9 @@ BEGIN
   RETURN v_n;
 END $$;
 
--- Transport for the dispatcher. These defaults refuse: the deployment
--- package (supabase/manual/marketcheck_launch_transport.sql) replaces them
--- with pg_net calls that read the project URL and service key from Vault at
--- run time, so no key is ever written into a cron command or this file.
+-- Transport for the dispatcher. These defaults refuse; migration 0019
+-- replaces them with pg_net calls authenticated by the database-held
+-- scheduler secret, so no key is ever written into a cron command.
 CREATE OR REPLACE FUNCTION public.marketcheck_launch_transport_ready() RETURNS jsonb
 LANGUAGE sql STABLE AS $$ SELECT jsonb_build_object('ready', false, 'reason', 'transport_not_installed') $$;
 CREATE OR REPLACE FUNCTION public.marketcheck_launch_transport(p_function text, p_body jsonb) RETURNS bigint
@@ -911,7 +910,7 @@ BEGIN
     'status', CASE WHEN p.version IS NULL THEN 'unverified' WHEN v_ok THEN 'passed' ELSE 'failed' END,
     'summary', CASE WHEN p.version IS NULL THEN 'No plan.'
       WHEN p.workload IS NULL THEN 'The plan defines no workload, so START would only open the gate.'
-      WHEN NOT COALESCE((v_detail->>'ready')::boolean, false) THEN 'The dispatcher transport is not installed or its Vault secrets are missing: ' || COALESCE(v_detail->>'reason', 'unknown')
+      WHEN NOT COALESCE((v_detail->>'ready')::boolean, false) THEN 'The dispatcher transport is not installed or the scheduler is not configured: ' || COALESCE(v_detail->>'reason', 'unknown')
       WHEN v_n = 0 THEN 'No canary vehicle is waiting for a first NeoVIN decode.'
       ELSE format('START queues %s canary vehicle(s) for NeoVIN, at most %s call(s) each, %s at a time, inside the %s-call canary ceiling.',
         v_n, p.workload->>'calls_per_vehicle', p.workload->>'batch_size', p.canary_max_calls) END,

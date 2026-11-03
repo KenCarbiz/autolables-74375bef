@@ -134,6 +134,13 @@
       "when": 1793592000000,
       "tag": "0018_marketcheck_launch_control",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793592000001,
+      "tag": "0019_scheduler_invocation_secret",
+      "breakpoints": true
     }
   ]
 }
