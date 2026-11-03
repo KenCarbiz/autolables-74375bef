@@ -29,18 +29,18 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { normalizeForSticker } from "./normalize.ts";
 import {
   renderFactorySticker, FACTORY_STICKER_RENDERER_VERSION,
-  type FactoryStickerRenderResult, type FactoryStickerTheme,
-  resolveRenderProfile,
-  selectOemTemplate, validatePageGeometry, evaluateStickerEligibility,
-  listCompatibleTemplates, validateTemplateOverride, checkRenderedCompleteness,
-  resolveReferenceVariant, REFERENCE_VARIANT_REGISTRY_VERSION, DISCLOSURE_VERSION,
+  type FactoryStickerRenderResult,
+  selectOemTemplate, validateTemplateOverride,
+  listCompatibleTemplates,
+  REFERENCE_VARIANT_REGISTRY_VERSION, DISCLOSURE_VERSION,
 } from "../_shared/factorySticker/render.ts";
 import { parseYmm } from "../_shared/factorySticker/lib/ymm.ts";
 import { structuredSheet } from "../_shared/neovinSheet.ts";
 import { shouldDecodeVin, MAX_SPEC_ATTEMPTS } from "../_shared/factorySticker/lib/sourceData.ts";
-import {
-  AUTO_PUBLISH_POLICY_VERSION, evaluateAutoPublish, reconcileMsrp,
-} from "../_shared/factorySticker/lib/autoPublish.ts";
+import { AUTO_PUBLISH_POLICY_VERSION } from "../_shared/factorySticker/lib/autoPublish.ts";
+import { planGeneration, assessRenderedSticker } from "../_shared/factorySticker/lib/generationPlan.ts";
+import { REGENERATION_REASONS as REGENERATION_REASON_CODES } from "../_shared/factorySticker/lib/regenerationReason.ts";
+import { planDocumentFiling, recordStatusFor } from "../_shared/factorySticker/lib/documentFiling.ts";
 import { recordSourcePayload, refreshVehicleTruth } from "./truth.ts";
 import {
   countByStickerStatus, parseTruthRefreshMode, selectTruthRefreshWorklist,
@@ -100,16 +100,7 @@ const VIN_RE = /^[A-HJ-NPR-Z0-9]{17}$/;
 
 // Regeneration is always a recorded decision. "other" additionally demands a
 // written explanation so the version history never says only "regenerated".
-const REGENERATION_REASONS = new Set([
-  "vehicle_information_corrected",
-  "additional_source_data_available",
-  "options_or_packages_corrected",
-  "msrp_corrected",
-  "wrong_template_selected",
-  "pdf_or_layout_problem",
-  "qr_or_passport_link_changed",
-  "other",
-]);
+const REGENERATION_REASONS: ReadonlySet<string> = new Set<string>(REGENERATION_REASON_CODES);
 
 // Decision authority mirrors generate-vehicle-forms MANAGER_ROLES.
 const MANAGER_ROLES = new Set([
@@ -225,21 +216,13 @@ async function fileStickerDocument(
     .select("id, version, document_status, data_snapshot")
     .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId).eq("document_type", "factory_sticker")
     .order("version", { ascending: false });
-  const rows = (all || []) as { id: string; version: number; document_status: string; data_snapshot: Record<string, unknown> | null }[];
-  const RETIRED = new Set(["superseded", "archived", "rejected"]);
-  const MUTABLE = new Set(["draft", "pending_approval"]);
-  const liveRows = rows.filter((r) => !RETIRED.has(r.document_status));
-  // A published version stays public until an authorized user approves its
-  // replacement: an unreviewed draft never supersedes what customers can
-  // already see on the passport.
-  const holdPublished = preservePublished && !publish;
-  const publishedRows = liveRows.filter((r) => r.document_status === "published");
-  const supersedable = holdPublished
-    ? liveRows.filter((r) => r.document_status !== "published")
-    : liveRows;
-  const current = supersedable[0];
-  const nextVersion = rows.reduce((m, r) => Math.max(m, r.version || 0), 0) + 1;
-  const version = current && MUTABLE.has(current.document_status) ? current.version : nextVersion;
+  const rows = ((all || []) as { id: string; version: number; document_status: string; data_snapshot: Record<string, unknown> | null }[])
+    .map((r) => ({
+      id: r.id, version: r.version, document_status: r.document_status,
+      content_hash: (r.data_snapshot as { content_hash?: string } | null)?.content_hash ?? null,
+    }));
+  const plan = planDocumentFiling(rows, hash, publish, preservePublished);
+  const version = plan.version;
 
   const dir = `${tenantId}/vehicles/${vehicleId}/factory-stickers/v${version}`;
   const pdfPath = `${dir}/sticker.pdf`;
@@ -266,54 +249,50 @@ async function fileStickerDocument(
     }, { onConflict: "tenant_id,doc_type,entity_id,content_hash", ignoreDuplicates: true });
   } catch { /* archive best-effort */ }
 
-  const targetStatus = publish ? "published" : "pending_approval";
+  const targetStatus = plan.targetStatus;
   const snap = {
     source: "factory-sticker-orchestrate", storage_path: pdfPath, storage_bucket: BUCKET,
     preview_path: svgPath, content_hash: hash, ...snapExtra,
   };
 
-  if (current && MUTABLE.has(current.document_status)) {
+  if (plan.action === "update_in_place") {
     await admin.from("generated_documents").update({
       online_url: url, pdf_url: url, png_url: previewUrl, data_snapshot: snap,
       document_status: targetStatus, updated_at: new Date().toISOString(),
       ...(publish ? { published_at: new Date().toISOString() } : {}),
-    }).eq("id", current.id);
-    const extras = supersedable.slice(1).map((r) => r.id);
-    if (extras.length) {
+    }).eq("id", plan.documentId);
+    if (plan.supersedeIds.length) {
       await admin.from("generated_documents")
-        .update({ document_status: "superseded", superseded_by: current.id, updated_at: new Date().toISOString() })
-        .in("id", extras);
+        .update({ document_status: "superseded", superseded_by: plan.documentId, updated_at: new Date().toISOString() })
+        .in("id", plan.supersedeIds);
     }
-    await recordAssets(admin, tenantId, vehicleId, current.id, version, pdfPath, svgPath, BUCKET, hash, pdfBytes.length);
-    return { documentId: current.id, version, pdfUrl: url, previewUrl, supersededPublished: false };
+    await recordAssets(admin, tenantId, vehicleId, plan.documentId, version, pdfPath, svgPath, BUCKET, hash, pdfBytes.length);
+    return { documentId: plan.documentId, version, pdfUrl: url, previewUrl, supersededPublished: false };
   }
 
-  const identical = [current, ...publishedRows].find(
-    (r) => r && (r.data_snapshot as { content_hash?: string } | null)?.content_hash === hash,
-  );
-  if (identical) {
-    await admin.from("generated_documents").update({ online_url: url, pdf_url: url, png_url: previewUrl, updated_at: new Date().toISOString() }).eq("id", identical.id);
-    await recordAssets(admin, tenantId, vehicleId, identical.id, identical.version, pdfPath, svgPath, BUCKET, hash, pdfBytes.length);
-    return { documentId: identical.id, version: identical.version, pdfUrl: url, previewUrl, supersededPublished: false };
+  if (plan.action === "reuse_identical") {
+    await admin.from("generated_documents").update({ online_url: url, pdf_url: url, png_url: previewUrl, updated_at: new Date().toISOString() }).eq("id", plan.documentId);
+    await recordAssets(admin, tenantId, vehicleId, plan.documentId, version, pdfPath, svgPath, BUCKET, hash, pdfBytes.length);
+    return { documentId: plan.documentId, version, pdfUrl: url, previewUrl, supersededPublished: false };
   }
 
   const { data: inserted, error: insErr } = await admin.from("generated_documents").insert({
     tenant_id: tenantId, vehicle_id: vehicleId, template_id: profileFamily,
-    document_type: "factory_sticker", document_status: targetStatus, version: nextVersion,
+    document_type: "factory_sticker", document_status: targetStatus, version,
     template_version: 1, online_url: url, pdf_url: url, png_url: previewUrl, data_snapshot: snap,
     ...(publish ? { published_at: new Date().toISOString() } : {}),
   }).select("id").maybeSingle();
   if (insErr) throw new Error(`generated_documents insert failed: ${insErr.message}`);
   const newId = (inserted as { id?: string } | null)?.id ?? null;
-  if (newId && supersedable.length) {
+  if (newId && plan.supersedeIds.length) {
     await admin.from("generated_documents")
       .update({ document_status: "superseded", superseded_by: newId, updated_at: new Date().toISOString() })
-      .in("id", supersedable.map((r) => r.id));
+      .in("id", plan.supersedeIds);
   }
-  await recordAssets(admin, tenantId, vehicleId, newId, nextVersion, pdfPath, svgPath, BUCKET, hash, pdfBytes.length);
+  await recordAssets(admin, tenantId, vehicleId, newId, version, pdfPath, svgPath, BUCKET, hash, pdfBytes.length);
   return {
-    documentId: newId, version: nextVersion, pdfUrl: url, previewUrl,
-    supersededPublished: !holdPublished && publishedRows.length > 0,
+    documentId: newId, version, pdfUrl: url, previewUrl,
+    supersededPublished: plan.supersededPublished,
   };
 }
 
@@ -620,33 +599,29 @@ async function orchestrateVehicle(
     await audit(admin, tenantId, "factory_sticker.normalized", record.id,
       { vin, confidence: normalized.confidence, missing: normalized.missing });
 
-    // ── Eligibility: should a manufacturer-style document exist at all?
-    // Used and CPO inventory stays in the Used Car Sticker workflow unless
-    // the dealership explicitly enabled reproductions. An ineligible
-    // vehicle is parked, never rendered — a document that should not exist
-    // is not a failure to retry.
+    // ── Eligibility, template selection, override gate and MSRP
+    // reconciliation: one pure plan (_shared/factorySticker/lib/
+    // generationPlan.ts) so the same code is run by the acceptance harness.
+    // Used and CPO inventory stays in the Used Car Sticker workflow unless the
+    // dealership explicitly enabled reproductions. An ineligible vehicle is
+    // parked, never rendered — a document that should not exist is not a
+    // failure to retry.
     const stickerSettings = (dealerSettings.factory_sticker || {}) as Record<string, unknown>;
-    const eligibility = evaluateStickerEligibility({
+    const storedOverride = (record.qa_metadata?.template_override || null) as
+      { template_key?: string; layout_family?: string; theme_version?: string; reason?: string } | null;
+    const genPlan = planGeneration({
+      vin,
       condition: condRaw,
-      corroboratingConditions: [
-        typeof (mc as Record<string, unknown>).condition === "string"
-          ? String((mc as Record<string, unknown>).condition) : null,
-      ],
-      settings: {
-        enabled: stickerSettings.enabled !== false,
-        // `=== true` made this opt-IN, so every tenant that had never opened
-        // the Factory Sticker panel had no `factory_sticker` key at all and
-        // every used and CPO vehicle returned ineligible_used before anything
-        // rendered. The documented default is on (DEFAULT_FACTORY_STICKER_
-        // SETTINGS.used_reproduction === true) and the library already treats
-        // a used reproduction as permitted unless explicitly disabled — this
-        // line was the only thing overriding both.
-        used_reproduction: stickerSettings.used_reproduction !== false,
-      },
-      hasVinSpecificBuildData: !normalized.data.generic,
-      hasManufacturerPricing: !!normalized.baseMsrp && !!normalized.statedTotalMsrp,
+      corroboratingCondition: typeof (mc as Record<string, unknown>).condition === "string"
+        ? String((mc as Record<string, unknown>).condition) : null,
+      corroboratingMake: typeof (mc as Record<string, unknown>).make === "string"
+        ? String((mc as Record<string, unknown>).make) : null,
+      manufacturer: typeof sheet.manufacturer === "string" ? sheet.manufacturer : null,
+      stickerSettings, dealerSettings, normalized,
+      templateVersion: TEMPLATE_VERSION, storedOverride,
     });
-    if (!eligibility.eligible) {
+    if (genPlan.kind === "ineligible") {
+      const eligibility = genPlan.eligibility;
       await setRecord(admin, record.id, {
         generation_status: "REVIEW_REQUIRED",
         review_required: true,
@@ -671,37 +646,14 @@ async function orchestrateVehicle(
       };
     }
 
-    // ── OEM resolution: model-year-aware versioned theme profile. The
-    // profile pins the visual identity for this brand + model year so
-    // regenerating older documents never adopts a future brand identity.
-    const make = normalized.data.identity.make;
-    const modelYearNum = Number(normalized.data.identity.year);
     // The selection engine is the only thing allowed to name a template.
     // A corporate parent, a dealer name or a description never selects;
     // disagreement between trusted sources blocks outright.
-    const selection = selectOemTemplate({
-      vin,
-      modelYear: Number.isFinite(modelYearNum) ? modelYearNum : null,
-      canonicalMake: make,
-      canonicalManufacturer: typeof sheet.manufacturer === "string" ? sheet.manufacturer : null,
-      canonicalModel: normalized.data.identity.model,
-      market: "US",
-      condition: condRaw,
-      corroboratingMakes: [
-        typeof (mc as Record<string, unknown>).make === "string"
-          ? String((mc as Record<string, unknown>).make) : null,
-      ],
-    });
+    const selection = genPlan.selection;
+    const referenceVariant = genPlan.referenceVariant;
+    const make = normalized.data.identity.make;
     // Exact reference-variant match is recorded for review and for the
     // dedicated layouts to come; it does not change which template renders.
-    const referenceVariant = resolveReferenceVariant({
-      make,
-      modelYear: Number.isFinite(modelYearNum) ? modelYearNum : null,
-      model: normalized.data.identity.model,
-      trim: normalized.data.identity.trim,
-      drivetrain: normalized.data.mechanical?.drivetrain ?? null,
-      fuelType: normalized.data.epa?.fuelType ?? null,
-    });
     await audit(admin, tenantId, "factory_sticker.template_selected", record.id, {
       vin, template_key: selection.templateKey, status: selection.selectionStatus,
       confidence: selection.confidence, reasons: selection.reasons,
@@ -716,10 +668,8 @@ async function orchestrateVehicle(
       },
       disclosure_version: DISCLOSURE_VERSION,
     });
-    if (selection.selectionStatus === "unsupported" || selection.selectionStatus === "conflict") {
-      const code = selection.selectionStatus === "conflict"
-        ? "OEM_TEMPLATE_CONFLICT" : "OEM_TEMPLATE_UNSUPPORTED";
-      const reason = `${code}: ${selection.reasons.join("; ") || "no registered template for this vehicle"}`;
+    if (genPlan.kind === "selection_blocked") {
+      const reason = genPlan.reason;
       await setRecord(admin, record.id, {
         generation_status: "REVIEW_REQUIRED",
         review_required: true, review_reason: reason, last_error: null,
@@ -739,58 +689,20 @@ async function orchestrateVehicle(
         selection: selection.selectionStatus, reasons: selection.reasons,
       };
     }
-    // An authorized manual override replaces the automatic choice, but only
-    // one the compatibility gate still accepts: a stale override naming a
-    // template that is no longer valid for this make is discarded, never
-    // applied.
-    const storedOverride = (record.qa_metadata?.template_override || null) as
-      { template_key?: string; layout_family?: string; theme_version?: string; reason?: string } | null;
-    const overrideVerdict = storedOverride?.template_key
-      ? validateTemplateOverride(
-        selection.canonicalMake,
-        storedOverride.template_key,
-        Number.isFinite(modelYearNum) ? modelYearNum : null,
-      )
-      : null;
-    const appliedOverride = overrideVerdict?.allowed ? overrideVerdict.option : null;
-    if (storedOverride?.template_key && !overrideVerdict?.allowed) {
+    const { appliedOverride, canonicalOemId, profileFamily, theme, reconciliation } = genPlan;
+    if (genPlan.overrideDiscarded) {
       await audit(admin, tenantId, "factory_sticker.template_override_discarded", record.id, {
-        vin, requested: storedOverride.template_key, reason: overrideVerdict?.reason ?? null,
+        vin, requested: genPlan.overrideDiscarded.requested, reason: genPlan.overrideDiscarded.reason,
       });
     }
 
-    const canonicalOemId = make ? make.toLowerCase().replace(/[^a-z0-9]+/g, "-") : null;
-    const profile = resolveRenderProfile(normalized.data);
-    const profileFamily = appliedOverride && !appliedOverride.isAutomatic
-      ? appliedOverride.layoutFamily
-      : profile.profile.layoutFamily;
-    const theme: FactoryStickerTheme = {
-      oemThemeId: canonicalOemId ? `oem-${canonicalOemId}` : "oem-neutral",
-      oemThemeVersion: appliedOverride && !appliedOverride.isAutomatic
-        ? appliedOverride.themeVersion : profile.profile.themeVersion,
-      canonicalOemId,
-      templateFamilyId: profileFamily,
-      templateVersion: TEMPLATE_VERSION,
-      logoAssetId: String(dealerSettings.dealer_logo_url ?? dealerSettings.logo_url ?? "").trim() || null,
-      logoAssetVersion: null,
-      templateOverrideKey: appliedOverride && !appliedOverride.isAutomatic
-        ? appliedOverride.templateKey : null,
-    };
-
-    // ── Reconcile MSRP: computed (base + options + destination) vs the
-    // stated total (NeoVIN combined_msrp, else the feed MSRP). Integer cents
-    // throughout — see reconcileMsrp.
+    // Reconciliation is integer cents throughout — see reconcileMsrp.
     await setRecord(admin, record.id, { generation_status: "VALIDATING" });
-    const reconciliation = reconcileMsrp({
-      baseMsrp: normalized.baseMsrp,
-      optionsTotal: normalized.optionsTotal,
-      destinationCharge: normalized.destinationCharge,
-      statedTotalMsrp: normalized.statedTotalMsrp,
-    });
     const reconciliationStatus = reconciliation.status;
     const reconciliationDifference = reconciliation.difference;
     // Provisional, for the row written before the render. The authoritative
-    // decision is evaluateAutoPublish below, once QA has actually run.
+    // decision is evaluateAutoPublish (via assessRenderedSticker) below, once
+    // QA has actually run.
     const preRenderBlocking = reconciliationStatus === "REVIEW_REQUIRED" || !canonicalPassportUrl;
     if (preRenderBlocking) {
       await audit(admin, tenantId, "factory_sticker.review_required", record.id,
@@ -893,37 +805,16 @@ async function orchestrateVehicle(
 
     // ── QA: identity invariants the sticker must never violate.
     await setRecord(admin, record.id, { generation_status: "RUNNING_QA" });
-    const drawn = rendered.layout?.drawnStrings || [];
-    // Page geometry is checked against the template's own declared format,
-    // not a shared assumption: a portrait template must never pass because
-    // the landscape one would have.
-    const geometry = selection.definition
-      ? validatePageGeometry(selection.definition.pageFormat, {
+    const assessment = assessRenderedSticker({
+      vin, hasBuildSheet: !!sheet, normalized, plan: genPlan, canonicalPassportUrl,
+      layout: {
+        pages: Number(rendered.layout?.pages ?? 0),
         widthPt: Number(rendered.layout?.widthPt ?? 0),
         heightPt: Number(rendered.layout?.heightPt ?? 0),
-        pageCount: Number(rendered.layout?.pages ?? 0),
-      })
-      : { pass: true, code: "OK" as const, reasons: [] };
-    // Fit is never trusted. The manifest states everything the document is
-    // required to print — every option, every package member the buyer is
-    // charged for, both MSRP anchors, the parts content and the
-    // disclosure — and the render is checked against it.
-    const completeness = checkRenderedCompleteness(normalized.data, {
-      width: Number(rendered.layout?.widthPt ?? 0),
-      height: Number(rendered.layout?.heightPt ?? 0),
-      mode: "STANDARD",
-      pages: [],
-      drawnStrings: drawn,
-      fontFamilies: { heading: "", body: "", numeric: "" },
+        drawnStrings: rendered.layout?.drawnStrings || [],
+      },
     });
-    const qaChecks = {
-      vin_drawn: drawn.includes(vin),
-      content_complete: completeness.pass,
-      barcode_is_vin: normalized.data.barcodePayload === vin,
-      qr_is_canonical_passport: !!canonicalPassportUrl && normalized.data.passportUrl === canonicalPassportUrl,
-      page_count_ok: geometry.pass,
-    };
-    const qaPass = Object.values(qaChecks).every(Boolean);
+    const { qaChecks, qaPass, geometry, completeness, decision } = assessment;
     const qaPatch = {
       qr_identity_qa_status: qaChecks.qr_is_canonical_passport ? "PASS" : "FAIL",
       barcode_identity_qa_status: qaChecks.barcode_is_vin ? "PASS" : "FAIL",
@@ -954,31 +845,10 @@ async function orchestrateVehicle(
       record.id, { vin, checks: qaChecks });
 
     // ── File + publish decision. One pure, unit-tested policy (see
-    // _shared/factorySticker/lib/autoPublish.ts) rather than a boolean
-    // assembled here: the same evaluation produces both the verdict and the
-    // reason a dealer reads, so a record can never sit in review under a
-    // reason that does not correspond to what actually blocked it.
-    const decision = evaluateAutoPublish({
-      hasBuildSheet: !!sheet,
-      eligibility: {
-        eligible: eligibility.eligible,
-        status: eligibility.status,
-        reasons: eligibility.reasons,
-      },
-      selection: {
-        selectionStatus: selection.selectionStatus,
-        downgrades: selection.downgrades,
-        conflictingFields: selection.conflictingFields,
-        hasTemplateDefinition: !!selection.definition,
-      },
-      templateOverrideActive: !!appliedOverride && !appliedOverride.isAutomatic,
-      reconciliation,
-      confidence: normalized.confidence,
-      canonicalPassportUrl,
-      qaChecks,
-      completeness,
-      geometry,
-    });
+    // _shared/factorySticker/lib/autoPublish.ts), evaluated above with the QA
+    // result: the same evaluation produces both the verdict and the reason a
+    // dealer reads, so a record can never sit in review under a reason that
+    // does not correspond to what actually blocked it.
     const autoPublish = decision.autoPublish;
     const filed = await fileStickerDocument(admin, tenantId, vehicleId, vin,
       rendered.pdfBytes, rendered.previewSvg, {
@@ -1008,7 +878,7 @@ async function orchestrateVehicle(
       ...(opts.regeneration ? { reason_code: opts.regeneration.reasonCode } : {}),
     });
 
-    const finalStatus = autoPublish ? "PUBLISHED" : "REVIEW_REQUIRED";
+    const finalStatus = recordStatusFor(autoPublish);
     await setRecord(admin, record.id, {
       ...qaPatch,
       qa_metadata: {

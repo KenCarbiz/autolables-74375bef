@@ -1444,11 +1444,15 @@ function paintEpaPanel(p: Painter, y: number, ctx: BuildContext): number {
   sy = paintRatingSlider(p, sliderX, sy, sliderW, "Fuel Economy & Greenhouse Gas Rating", reg.greenhouseGasRating, ctx.theme);
   paintRatingSlider(p, sliderX, sy - 3, sliderW, "Smog Rating (tailpipe only)", reg.smogRating, ctx.theme);
 
-  // Fine print with the computed CO2 line (8,887 g CO2 per gallon of
-  // gasoline at the verified combined MPG — derived, never asserted).
+  // Fine print CO2 line. The saved EPA tailpipe figure wins; only when the row
+  // carries none is it derived (8,887 g CO2 per gallon of gasoline at the
+  // verified combined MPG), because the derivation can be several grams off
+  // the figure EPA published for that exact vehicle.
   let fy = subTop + 62;
   const isGas = !isEv && !isPhev;
-  const co2 = combined !== undefined && combined > 0 && isGas ? Math.round(8887 / combined) : null;
+  const co2 = !isGas ? null
+    : reg.co2TailpipeGpm !== undefined && reg.co2TailpipeGpm > 0 ? Math.round(reg.co2TailpipeGpm)
+    : combined !== undefined && combined > 0 ? Math.round(8887 / combined) : null;
   const finePrint =
     (co2 !== null ? `This vehicle emits ${co2} grams CO2 per mile (tailpipe only). ` : "") +
     (reg.epaClassNote ? `${reg.epaClassNote} ` : "") +

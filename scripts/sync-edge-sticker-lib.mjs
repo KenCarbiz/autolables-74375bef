@@ -39,7 +39,7 @@ export const MARKET_SOURCE_DIR = join(root, "src/lib/market");
 export const MARKET_PREFIX = "market/";
 const rewriteEngineImports = (body) => body.replace(/from "\.\.\/factorySticker\//g, 'from "../');
 
-const SKIP_DIRS = new Set(["__fixtures__", "__snapshots__"]);
+const SKIP_DIRS = new Set(["__fixtures__", "__snapshots__", "__acceptance__"]);
 const isCopyable = (name) => name.endsWith(".ts") && !name.endsWith(".test.ts");
 
 const HEADER = `// GENERATED — do not edit.

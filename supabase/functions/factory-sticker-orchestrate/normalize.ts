@@ -7,7 +7,7 @@
 import { parseYmm } from "../_shared/factorySticker/lib/ymm.ts";
 import { decideDrivetrain, splitRatingMetadata, type DrivetrainEvidence } from "../_shared/factorySticker/lib/oem/sourceCorrections.ts";
 
-import type { FactoryStickerRenderData } from "../_shared/factorySticker/render.ts";
+import type { FactoryStickerRenderData } from "../_shared/factorySticker/lib/render/contract.ts";
 
 // deno-lint-ignore no-explicit-any
 type AnyRow = Record<string, any>;
@@ -137,6 +137,7 @@ export function normalizeForSticker(
     rangeMiles: num(epaRow.rangeMiles),
     fuelType: str(epaRow.fuelType),
     gallonsPer100Miles: epaCombined ? Math.round((100 / epaCombined) * 10) / 10 : null,
+    co2TailpipeGpm: num(epaRow.co2TailpipeGpm),
   } : null;
   if (!epa) missing.push("epa_economy");
 
