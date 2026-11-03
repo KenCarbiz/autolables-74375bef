@@ -234,7 +234,7 @@ try {
   );
   check(
     "conflicting envelope returns no receipt",
-    conflict.status === 503 && !(await conflict.json()).receipt,
+    conflict.status === 409 && !(await conflict.json()).receipt,
   );
   const claimed = await sql`SELECT * FROM gw_r2_claim('worker-1',4,5)`;
   const first = claimed[0];
@@ -485,7 +485,7 @@ try {
   );
   check(
     "transactional revocation beats stale verifier registry",
-    revoked.status === 503 && !(await revoked.json()).receipt,
+    revoked.status === 403 && !(await revoked.json()).receipt,
   );
   void verified;
 } finally {

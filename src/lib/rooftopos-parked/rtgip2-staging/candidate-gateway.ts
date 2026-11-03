@@ -9,8 +9,6 @@
 //   - rtgip/2-forward/1 (GW-F4): the forward carries the admission receipt header.
 //   - rtgip/2-receipt-query/1 (GW-F5): served from gw_r2_receipts and gw_r2_uncommitted_receipts
 //     with the shared verifyReceiptQuery; its nonces are held in memory (no candidate store yet).
-//   - Refusal statuses: the vendored handler answers every refusal 503; the port re-runs the
-//     vendored pure verifyAdmission first so a permanent refusal is a 4xx with its reason (GW-F6).
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
@@ -21,7 +19,7 @@ import type { Registry as CandidateRegistry } from "../rtgip2-gateway/rtgip2/cor
 import { createRtgip2Handler } from "../rtgip2-gateway/rtgip2/handler.server";
 import { dispatcherStep, type DeliveryLease } from "../rtgip2-gateway/rtgip2/dispatcher.server";
 import { candidateStore, type CandidateRpc } from "../rtgip2-gateway/rtgip2/store.server";
-import { verifyAdmission, type IdentityMapping } from "../rtgip2-gateway/rtgip2/verify";
+import type { IdentityMapping } from "../rtgip2-gateway/rtgip2/verify";
 import type { ReceiptV2 } from "../rtgip2-gateway/rtgip2/receipt";
 import { nowSec, type App, type GatewayPort, type GwReply, type GwRequest, type MappingExport, type Sql } from "./nodes.ts";
 
@@ -84,8 +82,6 @@ function memoryNonces(): NonceStore {
     },
   };
 }
-
-const FORBIDDEN = /unauthori[sz]ed|not_granted|route|revoked|mapping|scope|tenant|purpose|event|producer|reader|connection/;
 
 export interface CandidateContext {
   reg: () => Registry;
@@ -154,14 +150,6 @@ export class CandidateGateway implements GatewayPort {
     if (/(^|;)autofilm(;|$)/.test(headers["rtgip-scope"] ?? "")) return { status: 403, doc: { reason: "autofilm_route_denied" } };
     const reg = this.ctx.reg() as unknown as CandidateRegistry;
     const mappings = this.identityMappings();
-    const bytes = new TextEncoder().encode(body);
-    let verified: Awaited<ReturnType<typeof verifyAdmission>>;
-    try {
-      verified = await verifyAdmission(headers, bytes, reg, mappings, nowSec());
-    } catch (err) {
-      const reason = (err as Error).message;
-      return { status: FORBIDDEN.test(reason) ? 403 : 401, doc: { reason } };
-    }
     const handler = createRtgip2Handler(
       {
         registry: async () => ({ registry: reg, mappings }),
@@ -174,12 +162,7 @@ export class CandidateGateway implements GatewayPort {
     );
     const res = await handler(new Request("http://candidate.local/rtgip/v2/deliver", { method: "POST", headers: { ...headers, "content-type": "application/json" }, body }));
     const doc = (await res.json()) as { outcome?: string; receipt?: ReceiptV2; error?: string };
-    if (res.status !== 200 || !doc.receipt) {
-      const e = verified.envelope;
-      const prior = await asService(this.sql, (tx) => tx`SELECT envelope_sha256 FROM gw_r2_admissions WHERE event_id=${e.event_id}::uuid AND connection_id=${verified.connection_id}`);
-      if (prior.length && prior[0]!.envelope_sha256 !== verified.body_sha256) return { status: 409, doc: { reason: "admission_conflict" } };
-      return { status: res.status, doc: { reason: doc.error ?? "admission_not_confirmed" } };
-    }
+    if (res.status !== 200 || !doc.receipt) return { status: res.status, doc: { reason: doc.error ?? "admission_not_confirmed" } };
     if (doc.outcome === "admitted") await this.forward();
     return { status: 200, doc: { reason: null, receipts: [doc.receipt] } };
   }

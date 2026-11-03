@@ -100,3 +100,69 @@ describe("GW-F3: a receipt must name the connection authorize() selected", () =>
     await expect(verifyReceiptV2(good, { ...live, kind: "gateway_admission" }, reg, now)).resolves.toEqual(good);
   });
 });
+
+describe("GW-F6: the handler answers permanent refusals 4xx and keeps 503 for unknown durability", async () => {
+  const { createRtgip2Handler } = await import("./rtgip2/handler.server");
+  const { signEnvelope } = await import("./rtgip2/core");
+  const source = key("autolabels", ["conn-a"]);
+  const gateway = key("gateway", ["conn-a"]);
+  const reg: Registry = { keys: [source, gateway], connections: [connection("conn-a", ["roof-a"])] };
+  const mappingFor = (episode_id: string) => ({
+    tenant_id: "synthetic-tenant",
+    rooftop_id: "roof-a",
+    source_app: "autolabels",
+    source_store_id: "store",
+    instance_id: "synthetic-instance",
+    episode_id,
+    vin: "1HGCM82633A004352",
+    connection_id: "conn-a",
+    status: "active" as const,
+    reviewed_ref: "reviewed",
+  });
+  const sealed = async () => {
+    const { sealEnvelope: seal } = await import("./rtgip2/core");
+    return seal({ ...(await envelopeFor("roof-a")), event_id: "" });
+  };
+  const call = async (
+    opts: { mappings?: ReturnType<typeof mappingFor>[]; admit?: () => Promise<never>; registryFails?: boolean; tamper?: boolean; body?: string } = {},
+  ) => {
+    const { envelope, body } = await sealed();
+    const t = Math.floor(Date.now() / 1000);
+    const handler = createRtgip2Handler(
+      {
+        registry: async () => {
+          if (opts.registryFails) throw new Error("db_down");
+          return { registry: { ...reg, keys: reg.keys.map((k) => ({ ...k, not_before: t - 100, not_after: t + 100 })) }, mappings: opts.mappings ?? [mappingFor("synthetic-episode")] };
+        },
+        now: () => t,
+        admit: opts.admit ?? (async () => { throw new Error("db_timeout"); }),
+        resolveSigningKey: async () => gateway,
+        persistSignedEvidence: async () => {},
+      },
+      true,
+    );
+    const headers = await signEnvelope(body, envelope, { ...source, not_before: t - 100, not_after: t + 100 }, t, "f6_nonce_000000001");
+    if (opts.tamper) headers["rtgip-signature"] = "rtgip2=" + "0".repeat(64);
+    const res = await handler(new Request("http://localhost/f6", { method: "POST", headers: { ...headers, "content-type": "application/json" }, body: opts.body ?? body }));
+    return { status: res.status, error: ((await res.json()) as { error?: string }).error };
+  };
+  it("bad signature is 401", async () => {
+    expect(await call({ tamper: true })).toEqual({ status: 401, error: "bad_signature" });
+  });
+  it("an unmapped episode is 403", async () => {
+    expect(await call({ mappings: [mappingFor("other-episode")] })).toEqual({ status: 403, error: "ambiguous_or_unauthorized_mapping" });
+  });
+  it("a malformed body is 400", async () => {
+    expect((await call({ body: '{"a":1,"a":2}' })).status).toBe(400);
+  });
+  it("a conflicting admission is 409", async () => {
+    expect(await call({ admit: async () => { throw new Error("admission_conflict"); } })).toEqual({ status: 409, error: "admission_conflict" });
+  });
+  it("a SQL authorization refusal under locks is 403", async () => {
+    expect(await call({ admit: async () => { throw new Error("admission_forbidden"); } })).toEqual({ status: 403, error: "admission_forbidden" });
+  });
+  it("registry and durability failures stay 503", async () => {
+    expect(await call({ registryFails: true })).toEqual({ status: 503, error: "admission_not_confirmed" });
+    expect(await call()).toEqual({ status: 503, error: "admission_not_confirmed" });
+  });
+});

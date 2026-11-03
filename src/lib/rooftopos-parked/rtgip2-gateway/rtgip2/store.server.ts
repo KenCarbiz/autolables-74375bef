@@ -21,9 +21,16 @@ export function candidateStore(
         _nonce: v.nonce,
         _timestamp: v.timestamp,
         _delivery_id: await deliveryIdentity(v.envelope, v.connection_id),
+      }).catch((err: unknown) => {
+        // GW-F6: the SQL re-check under locks refused authorization; that is permanent, not unknown.
+        const m = err instanceof Error ? err.message : "";
+        if (m === "key not authorized" || m === "mapping or connection not authorized")
+          throw new Error("admission_forbidden");
+        throw err;
       });
       if (!result || typeof result !== "object") throw new Error("invalid_admission_response");
       const r = result as Record<string, unknown>;
+      if (r["outcome"] === "conflict") throw new Error("admission_conflict");
       if (
         (r["outcome"] !== "admitted" && r["outcome"] !== "exact_retry") ||
         typeof r["connection_id"] !== "string" ||

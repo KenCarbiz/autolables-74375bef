@@ -679,6 +679,24 @@
           "sha256_after": "e8fc18e4646aeccd7e1cd017ef4eddc79c54f4f4bcf92392068abfd04d2d8bd9"
         }
       ]
+    },
+    {
+      "id": "GW-F6",
+      "summary": "Permanent refusals are 4xx: verification failures map to 400/401/403/413 by reason, an admission conflict is 409 and a SQL authorization refusal under locks is 403; registry and durability failures stay 503. The candidate's own disposable checks now expect 409 for the conflict and 403 for the transactional key revocation",
+      "files": [
+        {
+          "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/handler.server.ts",
+          "sha256_after": "0ec60dcdbb80ce51b5e6423200d6ab05b6431fa6371b78f1d4b47fa7eaead120"
+        },
+        {
+          "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/store.server.ts",
+          "sha256_after": "10e04487244c5fecf36d5ad9d4f53461d169aecda22136cb21bd796754b1e72e"
+        },
+        {
+          "vendored": "supabase/tests/rtgip/gateway/scripts/test-rtgip2-disposable.ts",
+          "sha256_after": "ea37972002e75716c1c230b98c4cab0d99cd1d0841d262f31a4b068466ddab61"
+        }
+      ]
     }
   ]
 }
