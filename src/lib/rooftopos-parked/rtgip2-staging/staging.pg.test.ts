@@ -979,7 +979,12 @@ run(`${RESULT_LABEL}: four real app nodes, registry-driven, over HTTP`, () => {
     };
     const keyBefore = keyFor(reg, "gateway");
     const rid = seed.REG_ROOFTOP_A!;
-    expect((await db.gateway`SELECT rooftop_registry.revoke_rooftop(${rid}::uuid, ${seed.REG_REVIEWER!}::uuid, 'staging: dealer agreement terminated') AS r`)[0]!.r).toBe("revoked");
+    const revoked = await db.gateway.begin(async (tx) => {
+      await tx`SELECT set_config('request.jwt.claims', ${JSON.stringify({ sub: seed.REG_REVIEWER!, aal: "aal2" })}, true)`;
+      await tx.unsafe("SET LOCAL ROLE authenticated");
+      return tx`SELECT rooftop_registry.revoke_rooftop(${rid}::uuid, 'staging: dealer agreement terminated') AS r`;
+    });
+    expect(revoked[0]!.r).toBe("revoked");
     await resync();
     expect(exp.rooftops.map((r) => r.rooftop_id)).toEqual([ROOFTOP_B]);
     expect(exp.connections.every((c) => c.tenant_id === tenantB())).toBe(true);

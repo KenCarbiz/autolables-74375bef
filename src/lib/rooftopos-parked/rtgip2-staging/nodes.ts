@@ -119,10 +119,16 @@ export async function grantSixRoutes(gw: Sql, tenant: string, operator: string, 
     const route = ROUTES.find((r) => r.source === s && r.target === t)!;
     const events = Object.keys(route.events);
     const purposes = [...new Set(Object.values(route.events).flat())];
-    const g = (await gw`SELECT rooftop_registry.propose_grant(${operator}::uuid, ${`synthetic staging grant ${s} to ${t}`}, ${tenant}, ${s}, ${t}, ${gw.array(events, 1009)}, ${gw.array(purposes, 1009)}) AS id`)[0]!.id as string;
-    const selfReview = (await gw`SELECT rooftop_registry.activate_grant(${g}::uuid, ${operator}::uuid, 'creator reviewing own grant', 'evidence:x') AS r`)[0]!.r;
+    const as = <T>(actor: string, fn: (tx: Sql) => Promise<T>) =>
+      gw.begin(async (tx) => {
+        await tx`SELECT set_config('request.jwt.claims', ${JSON.stringify({ sub: actor, aal: "aal2" })}, true)`;
+        await tx.unsafe("SET LOCAL ROLE authenticated");
+        return fn(tx as unknown as Sql);
+      }) as Promise<T>;
+    const g = (await as(operator, (tx) => tx`SELECT rooftop_registry.propose_grant(${`synthetic staging grant ${s} to ${t}`}, ${tenant}, ${s}, ${t}, ${tx.array(events, 1009)}, ${tx.array(purposes, 1009)}) AS id`))[0]!.id as string;
+    const selfReview = (await as(operator, (tx) => tx`SELECT rooftop_registry.activate_grant(${g}::uuid, 'creator reviewing own grant', 'evidence:x') AS r`))[0]!.r;
     if (selfReview !== "reviewer_is_creator") throw new Error(`registry accepted a self review: ${selfReview}`);
-    const ok = (await gw`SELECT rooftop_registry.activate_grant(${g}::uuid, ${reviewer}::uuid, 'synthetic staging reviewer sign-off', 'evidence:synthetic-route-approval') AS r`)[0]!.r;
+    const ok = (await as(reviewer, (tx) => tx`SELECT rooftop_registry.activate_grant(${g}::uuid, 'synthetic staging reviewer sign-off', 'evidence:synthetic-route-approval') AS r`))[0]!.r;
     if (ok !== "activated") throw new Error(`grant activation failed: ${ok}`);
     ids.push(g);
   }

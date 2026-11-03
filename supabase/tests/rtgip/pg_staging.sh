@@ -67,6 +67,7 @@ GW -c "CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE 
   ALTER DEFAULT PRIVILEGES GRANT EXECUTE ON FUNCTIONS TO anon, authenticated, service_role;
   ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO anon, authenticated, service_role;
   ALTER DEFAULT PRIVILEGES GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;" >/dev/null
+apply_twice "$PORT_gateway" stg_gateway "$WORK/sb/tests/rtgip/supabase_auth_stub.sql"
 apply_twice "$PORT_gateway" stg_gateway "$WORK/sb/proposed/rooftop_registry.proposed.sql"
 apply_twice "$PORT_gateway" stg_gateway "$WORK/sb/tests/rtgip/gateway_standin.sql"
 
@@ -74,18 +75,20 @@ apply_twice "$PORT_gateway" stg_gateway "$WORK/sb/tests/rtgip/gateway_standin.sq
 OP="$(uuid)"; RV="$(uuid)"
 T_A="$(uuid)"; T_B="$(uuid)"
 GW -c "INSERT INTO rooftop_registry.settings (environment) VALUES ('staging') ON CONFLICT DO NOTHING" >/dev/null
-GW -c "INSERT INTO rooftop_registry.principals (user_id, capacity, evidence_ref, enrolled_by) VALUES ('$OP', 'platform_admin', 'synthetic owner bootstrap', '$(uuid)')" >/dev/null
+GW -c "INSERT INTO auth.users (id, email, email_confirmed_at) VALUES ('$OP', 'op@synthetic.test', now()), ('$RV', 'rv@synthetic.test', now())" >/dev/null
+AS() { printf "SET request.jwt.claims = '{\"sub\":\"%s\",\"aal\":\"aal2\"}'; SET ROLE authenticated; " "$1"; }
+[ "$(GW -c "SELECT rooftop_registry.bootstrap_platform_admin('$OP', 'synthetic owner bootstrap')")" = "enrolled" ] || { echo "bootstrap failed"; exit 1; }
 for t in "$T_A" "$T_B"; do
-  [ "$(GW -c "SELECT rooftop_registry.enroll_principal('$OP', '$RV', 'dealership_gm', '$t', 'evidence:synthetic-gm-letter')")" = "enrolled" ] || { echo "GM enrollment failed"; exit 1; }
+  [ "$(GW -c "$(AS "$OP")SELECT rooftop_registry.enroll_principal('$RV', 'dealership_gm', '$t', 'evidence:synthetic-gm-letter')")" = "enrolled" ] || { echo "GM enrollment failed"; exit 1; }
 done
 propose() { # tenant rooftop dealership_ref ac_dealership
-  GW -c "SELECT rooftop_registry.propose_rooftop('$OP', 'synthetic staging proposal for $2', '$1', '$2', '$3', '$1', '$(uuid)', '$4', '$(uuid)', '$(uuid)', '$(uuid)')"
+  GW -c "$(AS "$OP")SELECT rooftop_registry.propose_rooftop('synthetic staging proposal for $2', '$1', '$2', '$3', '$1', '$(uuid)', '$4', '$(uuid)', '$(uuid)', '$(uuid)')"
 }
 RID_A="$(propose "$T_A" rf-stg-01 "synthetic:staging-primary" dlr-stg-01)"
 RID_B="$(propose "$T_B" rf-stg-02 "synthetic:staging-second" dlr-stg-02)"
 for r in "$RID_A" "$RID_B"; do
-  [ "$(GW -c "SELECT rooftop_registry.activate_rooftop('$r', '$OP', 'self review attempt must fail', 'evidence:x')")" = "reviewer_is_creator" ] || { echo "registry accepted a self review"; exit 1; }
-  [ "$(GW -c "SELECT rooftop_registry.activate_rooftop('$r', '$RV', 'synthetic staging reviewer sign-off', 'evidence:synthetic-dealer-letter')")" = "activated" ] || { echo "activation failed"; exit 1; }
+  [ "$(GW -c "$(AS "$OP")SELECT rooftop_registry.activate_rooftop('$r', 'self review attempt must fail', 'evidence:x')")" = "reviewer_is_creator" ] || { echo "registry accepted a self review"; exit 1; }
+  [ "$(GW -c "$(AS "$RV")SELECT rooftop_registry.activate_rooftop('$r', 'synthetic staging reviewer sign-off', 'evidence:synthetic-dealer-letter')")" = "activated" ] || { echo "activation failed"; exit 1; }
 done
 {
   echo "REG_OPERATOR=$OP"; echo "REG_REVIEWER=$RV"; echo "REG_ROOFTOP_A=$RID_A"; echo "REG_ROOFTOP_B=$RID_B"
@@ -114,7 +117,7 @@ EP_OPEN="$AL_SEED_OPEN_EPISODE"; EP_DELIVERED="$AL_SEED_DELIVERED_EPISODE"
 bind() { # episode vin
   local ev; ev="$(psql_on $PORT_autolabels stg_autolabels -c "SELECT id FROM public.vehicle_history_audit WHERE action = 'custody.episode_opened' AND entity_id = '$1'")"
   [ -n "$ev" ] || { echo "no custody event for $1"; exit 1; }
-  [ "$(GW -c "SELECT rooftop_registry.bind_episode('$OP', '$RID_A', '$1', '$1', '$2', '$ev')")" = "bound" ] || { echo "bind failed for $1"; exit 1; }
+  [ "$(GW -c "SET ROLE service_role; SELECT rooftop_registry.bind_episode('$RID_A', '$1', '$1', '$2', '$ev')")" = "bound" ] || { echo "bind failed for $1"; exit 1; }
   echo "REG_LABELS_EVENT_$3=$ev" | keep
 }
 bind "$EP_OPEN" 1M8GDM9AXKP042801 OPEN
