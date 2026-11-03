@@ -61,5 +61,6 @@ autolabels_node_seed() {
     vars+=(-v "$k=$v")
     echo "AL_SEED_${k^^}=$v"
   done
+  vars+=(-v "deliver=${AL_SEED_DELIVER:-1}")
   _al_psql $P $D -v ON_ERROR_STOP=1 "${vars[@]}" -f "$SB/tests/rtgip/autolabels_node_seed.sql" >/dev/null || return 1
 }
