@@ -33,6 +33,7 @@ import { signReceiptQuery, verifyReceiptQuery } from "../rtgip2/receipt-query.ts
 import { ADMISSION_HEADER, admitDelivery, encodeAdmissionHeader, type AdmissionEffect } from "../rtgip2/admission.ts";
 import { admissionDb } from "../rtgip2-pg/pg.ts";
 import type { StagingAdapter } from "../rtgip2-autolabels/staging-adapter.ts";
+import { refusalReason } from "../rtgip2/delivery.ts";
 
 export type Sql = ReturnType<typeof postgres>;
 export type App = "autolabels" | "autocurb" | "autoframe";
@@ -598,7 +599,11 @@ export async function dispatch(sql: Sql, app: App, reg: Registry, gatewayUrl: st
     if (status === 200 && doc.receipts?.length) advanced.push(await advance(row.event_id as string, gen, doc.receipts.map((x) => canonicalize(x))));
     const last = advanced.at(-1);
     if (last !== "gateway_admitted" && last !== "consumer_committed" && last !== "target_quarantined") {
-      const why = last ? last.replace(/^(rejected|pending):/, "") : (doc.reason ?? `http_${status}`);
+      const why = last
+        ? last.replace(/^(rejected|pending):/, "")
+        : status >= 400 && status < 500
+          ? refusalReason(status, doc.reason)
+          : (doc.reason ?? `http_${status}`);
       await asDispatcher((tx) => tx`SELECT rtgip.outbox_fail(${row.event_id}, ${worker}, ${gen}, ${why}, 1, 10)`);
     }
     const state = (await sql`SELECT state FROM rtgip.outbox WHERE event_id = ${row.event_id}`)[0]!.state as string;

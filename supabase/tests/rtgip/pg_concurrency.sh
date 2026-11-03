@@ -185,7 +185,7 @@ check "each duty role can execute exactly its own functions and nothing else" \
      WHERE n.nspname = 'rtgip' AND has_function_privilege(r, p.oid, 'EXECUTE'))
    SELECT NOT EXISTS (SELECT * FROM want EXCEPT SELECT * FROM got) AND NOT EXISTS (SELECT * FROM got EXCEPT SELECT * FROM want)"
 check "every rtgip function pins an empty search_path; every callable one is SECURITY DEFINER" \
-  "SELECT bool_and(p.proconfig @> ARRAY['search_path=\"\"']) AND bool_and(p.prosecdef OR p.prorettype = 'trigger'::regtype OR p.proname IN ('local_app','watermark_key','canonical_json','derive_event_id','ct_equal','deliverable_reason','receipt_canonical','envelope_sha','delivery_identity','clock','consumer_effect'))
+  "SELECT bool_and(p.proconfig @> ARRAY['search_path=\"\"']) AND bool_and(p.prosecdef OR p.prorettype = 'trigger'::regtype OR p.proname IN ('local_app','watermark_key','canonical_json','derive_event_id','ct_equal','deliverable_reason','receipt_canonical','envelope_sha','delivery_identity','clock','consumer_effect','refusal_class'))
    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'rtgip'"
 check "no duty role can write any rtgip table directly" \
   "SELECT bool_and(NOT has_table_privilege(r, c.oid, 'INSERT') AND NOT has_table_privilege(r, c.oid, 'UPDATE') AND NOT has_table_privilege(r, c.oid, 'DELETE'))
@@ -494,6 +494,26 @@ expect_error "a redrive needs a written reason" "$(as rtgip_operator "SELECT rtg
 expect_value "an operator redrive returns the dead letter to the queue" "$(as rtgip_operator "SELECT rtgip.outbox_redrive('$OB2', 'op-1', 'target recovered after the incident')")" "retry_wait"
 check "the redrive is audited with the operator and reason and the retry counters reset" \
   "SELECT o.attempts = 0 AND EXISTS (SELECT 1 FROM rtgip.audit_log a WHERE a.event_id = o.event_id AND a.action = 'redrive' AND a.actor = 'op-1' AND a.detail->>'reason' = 'target recovered after the incident') FROM rtgip.outbox o WHERE o.event_id = rtgip_test.uuid_for('ob2')"
+
+echo "== refusal policy: permanent refusals dead-letter at once, temporary ones retry"
+check "refusal_class matches rtgip2-refusal-policy.v1.json" "SELECT rtgip.refusal_class('refused:403:connection_revoked') = 'permanent'
+  AND rtgip.refusal_class('refused:401:nonce_reused') = 'permanent' AND rtgip.refusal_class('refused:400:body_not_canonical') = 'permanent'
+  AND rtgip.refusal_class('refused:409:admission_conflict') = 'permanent' AND rtgip.refusal_class('refused:413:body_too_large') = 'permanent'
+  AND rtgip.refusal_class('refused:403:ambiguous_or_unauthorized_mapping') = 'retryable' AND rtgip.refusal_class('refused:403:rooftop_not_granted') = 'retryable'
+  AND rtgip.refusal_class('refused:401:bad_signature') = 'retryable' AND rtgip.refusal_class('http_503') = 'retryable' AND rtgip.refusal_class(NULL) = 'retryable'"
+"${PSQL[@]}" -c "SET ROLE rtgip_dispatcher; SELECT count(*) FROM rtgip.outbox_claim('rp', 1000, 300)" >/dev/null
+RGEN=$("${PSQL[@]}" -c "SELECT lease_generation FROM rtgip.outbox WHERE event_id = rtgip_test.uuid_for('ob2')")
+RAT=$("${PSQL[@]}" -c "SELECT attempts FROM rtgip.outbox WHERE event_id = rtgip_test.uuid_for('ob2')")
+expect_value "a permanent refusal dead-letters on its first attempt (limit 10)" \
+  "$(as rtgip_dispatcher "SELECT rtgip.outbox_fail(rtgip_test.uuid_for('ob2'), 'rp', $RGEN, 'refused:403:connection_revoked', 5, 10)")" "dead_letter"
+check "the permanent dead letter keeps its evidence and class in the audit (attempts=$RAT)" \
+  "SELECT o.last_error = 'refused:403:connection_revoked' AND EXISTS (SELECT 1 FROM rtgip.audit_log a WHERE a.event_id = o.event_id AND a.action = 'fail:dead_letter' AND a.detail->>'refusal_class' = 'permanent') FROM rtgip.outbox o WHERE o.event_id = rtgip_test.uuid_for('ob2')"
+"${PSQL[@]}" -c "SET ROLE rtgip_test_app; SELECT rtgip.outbox_enqueue(rtgip_test.body('temp-refusal'))" >/dev/null
+"${PSQL[@]}" -c "SET ROLE rtgip_dispatcher; SELECT count(*) FROM rtgip.outbox_claim('rp', 1000, 300)" >/dev/null
+TID=$("${PSQL[@]}" -c "SELECT rtgip_test.uuid_for('temp-refusal')")
+TGEN=$("${PSQL[@]}" -c "SELECT lease_generation FROM rtgip.outbox WHERE event_id = '$TID'")
+expect_value "a temporary refusal (mapping pending) backs off instead" \
+  "$(as rtgip_dispatcher "SELECT rtgip.outbox_fail('$TID', 'rp', $TGEN, 'refused:403:ambiguous_or_unauthorized_mapping', 5, 10)")" "retry_wait"
 
 echo "== pause: a connection that is not deliverable is never leased and never dead-letters"
 "${PSQL[@]}" -c "SET ROLE rtgip_test_app; SELECT rtgip.outbox_enqueue(rtgip_test.body('pause-1'))" >/dev/null

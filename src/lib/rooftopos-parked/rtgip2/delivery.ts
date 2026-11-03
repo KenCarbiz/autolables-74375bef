@@ -75,6 +75,43 @@ export function deliverableReason(
 
 export const RETRY = { baseSec: 5, capSec: 900, maxAttempts: 10 } as const;
 
+/**
+ * rtgip/2-refusal-policy/1 (rtgip2-refusal-policy.v1.json; SQL rtgip.refusal_class). A Gateway
+ * refusal is reported as refused:STATUS:REASON. Permanent refusals dead-letter on the first
+ * attempt; temporary ones (a mapping or grant still pending) back off within the attempt limit.
+ */
+export const PERMANENT_REFUSAL_STATUSES: ReadonlySet<number> = new Set([400, 409, 413]);
+export const PERMANENT_REFUSAL_REASONS: ReadonlySet<string> = new Set([
+  "connection_revoked",
+  "event_not_granted",
+  "event_not_on_route",
+  "key_not_bound_to_connection",
+  "nonce_reused",
+  "not_source_authority",
+  "purpose_not_allowed",
+  "purpose_not_granted",
+  "route_reserved",
+  "source_impersonation",
+  "unknown_route",
+  "wrong_destination",
+]);
+
+export function refusalReason(status: number, reason?: string | null): string {
+  return status >= 400 && status < 500
+    ? `refused:${status}:${reason ?? "unspecified"}`
+    : `http_${status}`;
+}
+
+export function refusalClass(reason: string): "permanent" | "retryable" {
+  const m = /^refused:(\d{3}):(.*)$/.exec(reason);
+  if (!m) return "retryable";
+  const status = Number(m[1]);
+  if (PERMANENT_REFUSAL_STATUSES.has(status)) return "permanent";
+  if ((status === 401 || status === 403) && PERMANENT_REFUSAL_REASONS.has(m[2]!))
+    return "permanent";
+  return "retryable";
+}
+
 export function backoffSeconds(attempt: number, rand: () => number = Math.random): number {
   const ceiling = Math.min(RETRY.capSec, RETRY.baseSec * 2 ** Math.max(0, attempt - 1));
   return Math.max(1, Math.floor(ceiling / 2 + rand() * (ceiling / 2)));
@@ -305,7 +342,7 @@ export class MemoryOutbox<S> {
       return this.settle(r, reg, `transport:${(err as Error).message}`, now, rand);
     }
     if (res.http_status < 200 || res.http_status >= 300)
-      return this.settle(r, reg, `http_${res.http_status}`, now, rand);
+      return this.settle(r, reg, refusalReason(res.http_status, res.reason), now, rand);
     if (!res.admission) return this.settle(r, reg, "ack_missing", now, rand);
     try {
       await verifyReceiptV2(res.admission, this.expectation(r, "gateway_admission"), reg, now, []);
@@ -443,7 +480,7 @@ export class MemoryOutbox<S> {
     r.last_error = reason;
     const admitted = r.state === "gateway_admitted";
     this.release(r);
-    if (r.attempts >= RETRY.maxAttempts) {
+    if (r.attempts >= RETRY.maxAttempts || refusalClass(reason) === "permanent") {
       this.move(r, "dead_letter", now, reason);
       return r.state;
     }

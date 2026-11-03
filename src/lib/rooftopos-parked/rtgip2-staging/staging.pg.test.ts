@@ -753,7 +753,9 @@ run(`${RESULT_LABEL}: four real app nodes, registry-driven, over HTTP`, () => {
       // The candidate admits only registered (instance, episode) pairs, so an unregistered episode never reaches the app.
       const st = await outboxState("autoframe", q.envelope.event_id);
       expect(st).toEqual({ state: "dead_letter", inbox_outcome: null });
-      expect((await db.autoframe`SELECT detail->>'reason' AS r FROM rtgip.audit_log WHERE event_id = ${q.envelope.event_id} AND action LIKE 'fail:%' ORDER BY id DESC LIMIT 1`)[0]!.r).toBe("ambiguous_or_unauthorized_mapping");
+      expect((await db.autoframe`SELECT detail->>'reason' AS r FROM rtgip.audit_log WHERE event_id = ${q.envelope.event_id} AND action LIKE 'fail:%' ORDER BY id DESC LIMIT 1`)[0]!.r).toBe("refused:403:ambiguous_or_unauthorized_mapping");
+      // A pending mapping is a temporary refusal: it used the whole attempt budget, not one attempt.
+      expect(Number((await db.autoframe`SELECT attempts FROM rtgip.outbox WHERE event_id = ${q.envelope.event_id}`)[0]!.attempts)).toBe(10);
       expect(await db.autolabels`SELECT 1 FROM rtgip.inbox WHERE event_id = ${q.envelope.event_id}`).toHaveLength(0);
       expect(await admissionConns(q.envelope.event_id)).toHaveLength(0);
       expect(await appliedRows("autolabels", q.envelope)).toHaveLength(0);

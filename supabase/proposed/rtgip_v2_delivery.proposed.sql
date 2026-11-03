@@ -709,6 +709,22 @@ BEGIN
   END;
 END $$;
 
+-- rtgip/2-refusal-policy/1 (rtgip2/rtgip2-refusal-policy.v1.json, refusalClass() in delivery.ts).
+-- A Gateway refusal arrives as refused:STATUS:REASON. Permanent refusals dead-letter at once with
+-- their evidence kept; temporary ones (a mapping or grant still pending) retry within the limit.
+CREATE OR REPLACE FUNCTION rtgip.refusal_class(p_reason text)
+RETURNS text LANGUAGE sql IMMUTABLE SET search_path = '' AS $$
+  SELECT CASE
+    WHEN m IS NULL THEN 'retryable'
+    WHEN m[1]::integer IN (400, 409, 413) THEN 'permanent'
+    WHEN m[1]::integer IN (401, 403) AND m[2] = ANY (ARRAY['connection_revoked','event_not_granted',
+      'event_not_on_route','key_not_bound_to_connection','nonce_reused','not_source_authority',
+      'purpose_not_allowed','purpose_not_granted','route_reserved','source_impersonation',
+      'unknown_route','wrong_destination']) THEN 'permanent'
+    ELSE 'retryable' END
+  FROM (SELECT regexp_match(coalesce(p_reason, ''), '^refused:([0-9]{3}):(.*)$') AS m) x
+$$;
+
 -- A failure under the lease generation the caller holds. While the connection is not
 -- deliverable it is a pause: the attempt is given back and the row cannot dead-letter until the
 -- grant returns (same rule as MemoryOutbox). Otherwise the row backs off (jittered exponential,
@@ -732,7 +748,7 @@ BEGIN
   v_ceiling := least(900, 5 * power(2, greatest(0, o.attempts - 1)));
   v_backoff := coalesce(p_backoff_seconds, greatest(1, floor(v_ceiling / 2 + random() * v_ceiling / 2))::integer);
   UPDATE rtgip.outbox SET
-    state = CASE WHEN v_why IS NULL AND attempts >= p_max_attempts THEN 'dead_letter'
+    state = CASE WHEN v_why IS NULL AND (attempts >= p_max_attempts OR rtgip.refusal_class(p_reason) = 'permanent') THEN 'dead_letter'
                  WHEN o.state = 'gateway_admitted' THEN 'gateway_admitted' ELSE 'retry_wait' END,
     attempts = CASE WHEN v_why IS NULL THEN attempts ELSE greatest(0, attempts - 1) END,
     next_attempt_at = now() + make_interval(secs => greatest(1, CASE WHEN v_why IS NULL THEN v_backoff ELSE 5 END)),
@@ -741,7 +757,8 @@ BEGIN
   RETURNING state INTO v_state;
   INSERT INTO rtgip.audit_log (actor, action, event_id, detail)
   VALUES (p_worker, CASE WHEN v_why IS NULL THEN 'fail:' ELSE 'pause:' END || v_state, p_event_id,
-          jsonb_build_object('reason', left(p_reason, 200), 'paused_by', v_why, 'generation', p_generation));
+          jsonb_build_object('reason', left(p_reason, 200), 'paused_by', v_why, 'generation', p_generation,
+                             'refusal_class', rtgip.refusal_class(p_reason)));
   RETURN v_state;
 END $$;
 

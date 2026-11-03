@@ -15,7 +15,7 @@
     },
     "rtgip2/delivery.ts": {
       "origin": "shared core (byte-identical in all three repos)",
-      "sha256": "834e14b2bd2ec49449c2d774dc63b245afb158f9f7b994dc3f635d2dd84b190b"
+      "sha256": "bd5a8c3113f461d98aa6c62e6723066798d1749786425a83c8dc7109e08e2f93"
     },
     "rtgip2/harness.ts": {
       "origin": "shared core (byte-identical in all three repos)",
