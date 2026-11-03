@@ -120,9 +120,9 @@ export async function grantSixRoutes(gw: Sql, tenant: string, operator: string, 
     const events = Object.keys(route.events);
     const purposes = [...new Set(Object.values(route.events).flat())];
     const g = (await gw`SELECT rooftop_registry.propose_grant(${operator}::uuid, ${`synthetic staging grant ${s} to ${t}`}, ${tenant}, ${s}, ${t}, ${gw.array(events, 1009)}, ${gw.array(purposes, 1009)}) AS id`)[0]!.id as string;
-    const selfReview = (await gw`SELECT rooftop_registry.activate_grant(${g}::uuid, ${operator}::uuid, 'creator reviewing own grant') AS r`)[0]!.r;
+    const selfReview = (await gw`SELECT rooftop_registry.activate_grant(${g}::uuid, ${operator}::uuid, 'creator reviewing own grant', 'evidence:x') AS r`)[0]!.r;
     if (selfReview !== "reviewer_is_creator") throw new Error(`registry accepted a self review: ${selfReview}`);
-    const ok = (await gw`SELECT rooftop_registry.activate_grant(${g}::uuid, ${reviewer}::uuid, 'synthetic staging reviewer sign-off') AS r`)[0]!.r;
+    const ok = (await gw`SELECT rooftop_registry.activate_grant(${g}::uuid, ${reviewer}::uuid, 'synthetic staging reviewer sign-off', 'evidence:synthetic-route-approval') AS r`)[0]!.r;
     if (ok !== "activated") throw new Error(`grant activation failed: ${ok}`);
     ids.push(g);
   }

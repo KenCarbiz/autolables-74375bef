@@ -89,10 +89,58 @@ CREATE TABLE IF NOT EXISTS rooftop_registry.episodes (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS rr_one_active_episode ON rooftop_registry.episodes (instance_id, episode_id) WHERE status = 'active';
 
+-- Decision 6 governance. Principals: the registry operator is an enrolled RooftopOS platform
+-- admin; the independent reviewer is that dealership's enrolled GM or dealer owner. Actor ids are
+-- checked against this table in every state-changing function, so a role grant alone is not
+-- authority. Platform admins are enrolled only by the schema owner (a privileged, separately
+-- approved step); dealership principals are enrolled by a platform admin with written evidence.
+CREATE TABLE IF NOT EXISTS rooftop_registry.principals (
+  user_id      uuid NOT NULL,
+  capacity     text NOT NULL CHECK (capacity IN ('platform_admin','dealership_gm','dealer_owner')),
+  tenant_id    text NOT NULL DEFAULT '*',
+  status       text NOT NULL DEFAULT 'active' CHECK (status IN ('active','revoked')),
+  evidence_ref text NOT NULL CHECK (length(trim(evidence_ref)) >= 3),
+  enrolled_by  uuid NOT NULL,
+  enrolled_at  timestamptz NOT NULL DEFAULT clock_timestamp(),
+  revoked_by   uuid,
+  revoke_reason text,
+  revoked_at   timestamptz,
+  PRIMARY KEY (user_id, capacity, tenant_id),
+  CHECK ((capacity = 'platform_admin') = (tenant_id = '*')),
+  CHECK (status <> 'revoked' OR (revoked_by IS NOT NULL AND length(trim(revoke_reason)) >= 10))
+);
+-- One row. Hosted staging accepts only synthetic dealership refs and production refuses them;
+-- with no row every proposal fails closed.
+CREATE TABLE IF NOT EXISTS rooftop_registry.settings (
+  singleton   boolean PRIMARY KEY DEFAULT true CHECK (singleton),
+  environment text NOT NULL CHECK (environment IN ('staging','production'))
+);
+ALTER TABLE rooftop_registry.rooftops ADD COLUMN IF NOT EXISTS evidence_ref text;
+ALTER TABLE rooftop_registry.rooftops ADD COLUMN IF NOT EXISTS version integer NOT NULL DEFAULT 1;
+ALTER TABLE rooftop_registry.grants ADD COLUMN IF NOT EXISTS evidence_ref text;
+ALTER TABLE rooftop_registry.grants ADD COLUMN IF NOT EXISTS version integer NOT NULL DEFAULT 1;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'rooftops_active_has_evidence') THEN
+    ALTER TABLE rooftop_registry.rooftops ADD CONSTRAINT rooftops_active_has_evidence
+      CHECK (status = 'pending' OR reviewed_by IS NULL OR length(trim(coalesce(evidence_ref, ''))) >= 3);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'grants_active_has_evidence') THEN
+    ALTER TABLE rooftop_registry.grants ADD CONSTRAINT grants_active_has_evidence
+      CHECK (status = 'pending' OR reviewed_by IS NULL OR length(trim(coalesce(evidence_ref, ''))) >= 3);
+  END IF;
+END $$;
+
+CREATE OR REPLACE FUNCTION rooftop_registry.is_principal(p_user uuid, p_capacities text[], p_tenant text)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
+  SELECT EXISTS (SELECT 1 FROM rooftop_registry.principals
+                  WHERE user_id = p_user AND status = 'active' AND capacity = ANY (p_capacities)
+                    AND (tenant_id = '*' OR tenant_id = p_tenant))
+$$;
+
 CREATE TABLE IF NOT EXISTS rooftop_registry.audit (
   seq      bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   at       timestamptz NOT NULL DEFAULT clock_timestamp(),
-  subject  text NOT NULL CHECK (subject IN ('rooftop','grant','episode')),
+  subject  text NOT NULL CHECK (subject IN ('rooftop','grant','episode','principal')),
   ref      text NOT NULL,
   action   text NOT NULL CHECK (action IN ('proposed','activated','revoked','refused')),
   actor    uuid NOT NULL,
@@ -111,10 +159,11 @@ BEGIN
   IF TG_OP = 'DELETE' THEN RAISE EXCEPTION 'rooftop_registry_rows_are_never_deleted'; END IF;
   IF OLD.status = 'revoked' THEN RAISE EXCEPTION 'rooftop_registry_revoked_is_terminal'; END IF;
   IF OLD.status = 'active' AND NEW.status = 'pending' THEN RAISE EXCEPTION 'rooftop_registry_no_reactivation_path'; END IF;
+  IF TG_TABLE_NAME IN ('rooftops','grants') THEN NEW.version := OLD.version + 1; END IF;
   RETURN NEW;
 END $$;
 DO $$ DECLARE t text; BEGIN
-  FOREACH t IN ARRAY ARRAY['rooftops','grants','episodes'] LOOP
+  FOREACH t IN ARRAY ARRAY['rooftops','grants','episodes','principals'] LOOP
     EXECUTE format('DROP TRIGGER IF EXISTS guard ON rooftop_registry.%I', t);
     EXECUTE format('CREATE TRIGGER guard BEFORE UPDATE OR DELETE ON rooftop_registry.%I FOR EACH ROW EXECUTE FUNCTION rooftop_registry.guard()', t);
   END LOOP;
@@ -141,8 +190,16 @@ CREATE OR REPLACE FUNCTION rooftop_registry.propose_rooftop(
   p_al_tenant_id uuid, p_al_store_id uuid, p_ac_dealership_id text, p_ac_store_location_id uuid,
   p_af_tenant_id uuid, p_af_rooftop_id uuid
 ) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
-DECLARE v_id uuid;
+DECLARE v_id uuid; v_env text;
 BEGIN
+  IF NOT rooftop_registry.is_principal(p_actor, ARRAY['platform_admin'], p_tenant_id) THEN
+    RAISE EXCEPTION 'actor_not_platform_admin';
+  END IF;
+  SELECT environment INTO v_env FROM rooftop_registry.settings;
+  IF v_env IS NULL THEN RAISE EXCEPTION 'registry_environment_unset'; END IF;
+  IF (v_env = 'staging') <> (p_dealership_ref LIKE 'synthetic:%') THEN
+    RAISE EXCEPTION 'dealership_ref_wrong_for_environment:%', v_env;
+  END IF;
   INSERT INTO rooftop_registry.rooftops (tenant_id, rooftop_id, dealership_ref, al_tenant_id, al_store_id,
     ac_dealership_id, ac_store_location_id, af_tenant_id, af_rooftop_id, created_by, created_reason)
   VALUES (p_tenant_id, p_rooftop_id, p_dealership_ref, p_al_tenant_id, p_al_store_id,
@@ -153,7 +210,8 @@ BEGIN
   RETURN v_id;
 END $$;
 
-CREATE OR REPLACE FUNCTION rooftop_registry.activate_rooftop(p_id uuid, p_reviewer uuid, p_reason text)
+DROP FUNCTION IF EXISTS rooftop_registry.activate_rooftop(uuid, uuid, text);
+CREATE OR REPLACE FUNCTION rooftop_registry.activate_rooftop(p_id uuid, p_reviewer uuid, p_reason text, p_evidence_ref text)
 RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE r rooftop_registry.rooftops;
 BEGIN
@@ -165,10 +223,18 @@ BEGIN
     VALUES ('rooftop', p_id::text, 'refused', p_reviewer, coalesce(p_reason, ''), '{"why":"reviewer_is_creator"}');
     RETURN 'reviewer_is_creator';
   END IF;
+  IF NOT rooftop_registry.is_principal(p_reviewer, ARRAY['dealership_gm','dealer_owner'], r.tenant_id) THEN
+    INSERT INTO rooftop_registry.audit (subject, ref, action, actor, reason, detail)
+    VALUES ('rooftop', p_id::text, 'refused', p_reviewer, coalesce(p_reason, ''), '{"why":"reviewer_not_dealership_authority"}');
+    RETURN 'reviewer_not_dealership_authority';
+  END IF;
   IF length(trim(coalesce(p_reason, ''))) < 10 THEN RETURN 'reason_required'; END IF;
-  UPDATE rooftop_registry.rooftops SET status = 'active', reviewed_by = p_reviewer, review_reason = p_reason, reviewed_at = clock_timestamp()
+  IF length(trim(coalesce(p_evidence_ref, ''))) < 3 THEN RETURN 'evidence_required'; END IF;
+  UPDATE rooftop_registry.rooftops SET status = 'active', reviewed_by = p_reviewer, review_reason = p_reason, reviewed_at = clock_timestamp(),
+         evidence_ref = p_evidence_ref
    WHERE id = p_id;
-  INSERT INTO rooftop_registry.audit (subject, ref, action, actor, reason) VALUES ('rooftop', p_id::text, 'activated', p_reviewer, p_reason);
+  INSERT INTO rooftop_registry.audit (subject, ref, action, actor, reason, detail)
+  VALUES ('rooftop', p_id::text, 'activated', p_reviewer, p_reason, jsonb_build_object('evidence_ref', p_evidence_ref, 'version', r.version + 1));
   RETURN 'activated';
 END $$;
 
@@ -179,6 +245,9 @@ BEGIN
   IF length(trim(coalesce(p_reason, ''))) < 10 THEN RETURN 'reason_required'; END IF;
   SELECT * INTO r FROM rooftop_registry.rooftops WHERE id = p_id FOR UPDATE;
   IF r.id IS NULL THEN RETURN 'not_found'; END IF;
+  IF NOT rooftop_registry.is_principal(p_actor, ARRAY['platform_admin','dealership_gm','dealer_owner'], r.tenant_id) THEN
+    RETURN 'actor_not_authorized';
+  END IF;
   IF r.status = 'revoked' THEN RETURN 'already_revoked'; END IF;
   UPDATE rooftop_registry.rooftops SET status = 'revoked', revoked_by = p_actor, revoke_reason = p_reason, revoked_at = clock_timestamp()
    WHERE id = p_id;
@@ -195,13 +264,17 @@ CREATE OR REPLACE FUNCTION rooftop_registry.propose_grant(
 ) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE v_id uuid;
 BEGIN
+  IF NOT rooftop_registry.is_principal(p_actor, ARRAY['platform_admin'], p_tenant_id) THEN
+    RAISE EXCEPTION 'actor_not_platform_admin';
+  END IF;
   INSERT INTO rooftop_registry.grants (tenant_id, source_app, target_app, events, purposes, created_by, created_reason)
   VALUES (p_tenant_id, p_source, p_target, p_events, p_purposes, p_actor, p_reason) RETURNING id INTO v_id;
   INSERT INTO rooftop_registry.audit (subject, ref, action, actor, reason) VALUES ('grant', v_id::text, 'proposed', p_actor, p_reason);
   RETURN v_id;
 END $$;
 
-CREATE OR REPLACE FUNCTION rooftop_registry.activate_grant(p_id uuid, p_reviewer uuid, p_reason text)
+DROP FUNCTION IF EXISTS rooftop_registry.activate_grant(uuid, uuid, text);
+CREATE OR REPLACE FUNCTION rooftop_registry.activate_grant(p_id uuid, p_reviewer uuid, p_reason text, p_evidence_ref text)
 RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE g rooftop_registry.grants;
 BEGIN
@@ -213,9 +286,17 @@ BEGIN
     VALUES ('grant', p_id::text, 'refused', p_reviewer, coalesce(p_reason, ''), '{"why":"reviewer_is_creator"}');
     RETURN 'reviewer_is_creator';
   END IF;
+  IF NOT rooftop_registry.is_principal(p_reviewer, ARRAY['dealership_gm','dealer_owner'], g.tenant_id) THEN
+    INSERT INTO rooftop_registry.audit (subject, ref, action, actor, reason, detail)
+    VALUES ('grant', p_id::text, 'refused', p_reviewer, coalesce(p_reason, ''), '{"why":"reviewer_not_dealership_authority"}');
+    RETURN 'reviewer_not_dealership_authority';
+  END IF;
   IF length(trim(coalesce(p_reason, ''))) < 10 THEN RETURN 'reason_required'; END IF;
-  UPDATE rooftop_registry.grants SET status = 'active', reviewed_by = p_reviewer, review_reason = p_reason, reviewed_at = clock_timestamp() WHERE id = p_id;
-  INSERT INTO rooftop_registry.audit (subject, ref, action, actor, reason) VALUES ('grant', p_id::text, 'activated', p_reviewer, p_reason);
+  IF length(trim(coalesce(p_evidence_ref, ''))) < 3 THEN RETURN 'evidence_required'; END IF;
+  UPDATE rooftop_registry.grants SET status = 'active', reviewed_by = p_reviewer, review_reason = p_reason, reviewed_at = clock_timestamp(),
+         evidence_ref = p_evidence_ref WHERE id = p_id;
+  INSERT INTO rooftop_registry.audit (subject, ref, action, actor, reason, detail)
+  VALUES ('grant', p_id::text, 'activated', p_reviewer, p_reason, jsonb_build_object('evidence_ref', p_evidence_ref, 'version', g.version + 1));
   RETURN 'activated';
 END $$;
 
@@ -226,6 +307,9 @@ BEGIN
   IF length(trim(coalesce(p_reason, ''))) < 10 THEN RETURN 'reason_required'; END IF;
   SELECT * INTO g FROM rooftop_registry.grants WHERE id = p_id FOR UPDATE;
   IF g.id IS NULL THEN RETURN 'not_found'; END IF;
+  IF NOT rooftop_registry.is_principal(p_actor, ARRAY['platform_admin','dealership_gm','dealer_owner'], g.tenant_id) THEN
+    RETURN 'actor_not_authorized';
+  END IF;
   IF g.status = 'revoked' THEN RETURN 'already_revoked'; END IF;
   UPDATE rooftop_registry.grants SET status = 'revoked', revoked_by = p_actor, revoke_reason = p_reason, revoked_at = clock_timestamp() WHERE id = p_id;
   INSERT INTO rooftop_registry.audit (subject, ref, action, actor, reason) VALUES ('grant', p_id::text, 'revoked', p_actor, p_reason);
@@ -265,6 +349,36 @@ BEGIN
    WHERE instance_id = p_instance_id AND episode_id = p_episode_id AND status = 'active';
   IF NOT FOUND THEN RETURN 'not_active'; END IF;
   INSERT INTO rooftop_registry.audit (subject, ref, action, actor, reason) VALUES ('episode', p_instance_id || '/' || p_episode_id, 'revoked', p_actor, p_reason);
+  RETURN 'revoked';
+END $$;
+
+-- A platform admin enrolls a dealership GM or owner for one tenant, with the dealership's written
+-- authorization as evidence. Nobody enrolls themselves; platform admins are not enrolled here.
+CREATE OR REPLACE FUNCTION rooftop_registry.enroll_principal(p_enroller uuid, p_user uuid, p_capacity text, p_tenant text, p_evidence_ref text)
+RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+BEGIN
+  IF p_capacity NOT IN ('dealership_gm','dealer_owner') THEN RETURN 'capacity_not_enrollable'; END IF;
+  IF NOT rooftop_registry.is_principal(p_enroller, ARRAY['platform_admin'], p_tenant) THEN RETURN 'enroller_not_platform_admin'; END IF;
+  IF p_enroller = p_user THEN RETURN 'self_enrollment'; END IF;
+  IF length(trim(coalesce(p_evidence_ref, ''))) < 3 THEN RETURN 'evidence_required'; END IF;
+  INSERT INTO rooftop_registry.principals (user_id, capacity, tenant_id, evidence_ref, enrolled_by)
+  VALUES (p_user, p_capacity, p_tenant, p_evidence_ref, p_enroller) ON CONFLICT DO NOTHING;
+  IF NOT FOUND THEN RETURN 'already_enrolled'; END IF;
+  INSERT INTO rooftop_registry.audit (subject, ref, action, actor, reason, detail)
+  VALUES ('principal', p_user::text || '/' || p_capacity || '/' || p_tenant, 'activated', p_enroller, p_evidence_ref, '{}');
+  RETURN 'enrolled';
+END $$;
+
+CREATE OR REPLACE FUNCTION rooftop_registry.revoke_principal(p_actor uuid, p_user uuid, p_capacity text, p_tenant text, p_reason text)
+RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+BEGIN
+  IF length(trim(coalesce(p_reason, ''))) < 10 THEN RETURN 'reason_required'; END IF;
+  IF NOT rooftop_registry.is_principal(p_actor, ARRAY['platform_admin'], p_tenant) THEN RETURN 'actor_not_platform_admin'; END IF;
+  UPDATE rooftop_registry.principals SET status = 'revoked', revoked_by = p_actor, revoke_reason = p_reason, revoked_at = clock_timestamp()
+   WHERE user_id = p_user AND capacity = p_capacity AND tenant_id = p_tenant AND status = 'active';
+  IF NOT FOUND THEN RETURN 'not_active'; END IF;
+  INSERT INTO rooftop_registry.audit (subject, ref, action, actor, reason)
+  VALUES ('principal', p_user::text || '/' || p_capacity || '/' || p_tenant, 'revoked', p_actor, p_reason);
   RETURN 'revoked';
 END $$;
 
@@ -318,9 +432,10 @@ REVOKE ALL ON ALL FUNCTIONS IN SCHEMA rooftop_registry FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION rooftop_registry.propose_rooftop(uuid, text, text, text, text, uuid, uuid, text, uuid, uuid, uuid),
   rooftop_registry.revoke_rooftop(uuid, uuid, text), rooftop_registry.propose_grant(uuid, text, text, text, text, text[], text[]),
   rooftop_registry.revoke_grant(uuid, uuid, text), rooftop_registry.bind_episode(uuid, uuid, text, text, text, uuid),
-  rooftop_registry.revoke_episode(uuid, text, text, text)
+  rooftop_registry.revoke_episode(uuid, text, text, text),
+  rooftop_registry.enroll_principal(uuid, uuid, text, text, text), rooftop_registry.revoke_principal(uuid, uuid, text, text, text)
   TO rooftop_registry_operator;
-GRANT EXECUTE ON FUNCTION rooftop_registry.activate_rooftop(uuid, uuid, text), rooftop_registry.activate_grant(uuid, uuid, text),
+GRANT EXECUTE ON FUNCTION rooftop_registry.activate_rooftop(uuid, uuid, text, text), rooftop_registry.activate_grant(uuid, uuid, text, text),
   rooftop_registry.revoke_rooftop(uuid, uuid, text), rooftop_registry.revoke_grant(uuid, uuid, text)
   TO rooftop_registry_reviewer;
 GRANT EXECUTE ON FUNCTION rooftop_registry.connection_id(text, text, text, text) TO rooftop_registry_reader;

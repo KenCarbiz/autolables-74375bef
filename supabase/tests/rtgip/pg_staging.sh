@@ -73,14 +73,19 @@ apply_twice "$PORT_gateway" stg_gateway "$WORK/sb/tests/rtgip/gateway_standin.sq
 # Two synthetic actors: the operator proposes, a different reviewer activates.
 OP="$(uuid)"; RV="$(uuid)"
 T_A="$(uuid)"; T_B="$(uuid)"
+GW -c "INSERT INTO rooftop_registry.settings (environment) VALUES ('staging') ON CONFLICT DO NOTHING" >/dev/null
+GW -c "INSERT INTO rooftop_registry.principals (user_id, capacity, evidence_ref, enrolled_by) VALUES ('$OP', 'platform_admin', 'synthetic owner bootstrap', '$(uuid)')" >/dev/null
+for t in "$T_A" "$T_B"; do
+  [ "$(GW -c "SELECT rooftop_registry.enroll_principal('$OP', '$RV', 'dealership_gm', '$t', 'evidence:synthetic-gm-letter')")" = "enrolled" ] || { echo "GM enrollment failed"; exit 1; }
+done
 propose() { # tenant rooftop dealership_ref ac_dealership
   GW -c "SELECT rooftop_registry.propose_rooftop('$OP', 'synthetic staging proposal for $2', '$1', '$2', '$3', '$1', '$(uuid)', '$4', '$(uuid)', '$(uuid)', '$(uuid)')"
 }
-RID_A="$(propose "$T_A" rf-stg-01 "dealer:staging-primary" dlr-stg-01)"
-RID_B="$(propose "$T_B" rf-stg-02 "dealer:staging-second" dlr-stg-02)"
+RID_A="$(propose "$T_A" rf-stg-01 "synthetic:staging-primary" dlr-stg-01)"
+RID_B="$(propose "$T_B" rf-stg-02 "synthetic:staging-second" dlr-stg-02)"
 for r in "$RID_A" "$RID_B"; do
-  [ "$(GW -c "SELECT rooftop_registry.activate_rooftop('$r', '$OP', 'self review attempt must fail')")" = "reviewer_is_creator" ] || { echo "registry accepted a self review"; exit 1; }
-  [ "$(GW -c "SELECT rooftop_registry.activate_rooftop('$r', '$RV', 'synthetic staging reviewer sign-off')")" = "activated" ] || { echo "activation failed"; exit 1; }
+  [ "$(GW -c "SELECT rooftop_registry.activate_rooftop('$r', '$OP', 'self review attempt must fail', 'evidence:x')")" = "reviewer_is_creator" ] || { echo "registry accepted a self review"; exit 1; }
+  [ "$(GW -c "SELECT rooftop_registry.activate_rooftop('$r', '$RV', 'synthetic staging reviewer sign-off', 'evidence:synthetic-dealer-letter')")" = "activated" ] || { echo "activation failed"; exit 1; }
 done
 {
   echo "REG_OPERATOR=$OP"; echo "REG_REVIEWER=$RV"; echo "REG_ROOFTOP_A=$RID_A"; echo "REG_ROOFTOP_B=$RID_B"
