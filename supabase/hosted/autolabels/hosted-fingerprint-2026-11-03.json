@@ -1,0 +1,154 @@
+{
+  "fingerprint_sql_sha256": "c7e556ba959ce4a9b1712d964b22fac8be6074c4666aa3bd8d644f3a90c54810",
+  "note": "Per-component missing-object lists are omitted here for size; every object of every component was absent (present=0).",
+  "project": "Lovable 1a2a5abf-4218-480d-aac9-d7bd0d3cfb73 (AutoLabels)",
+  "result": {
+    "components": {
+      "D": {
+        "digest": "d41d8cd98f00b204e9800998ecf8427e",
+        "present": 0,
+        "state": "missing",
+        "total": 45
+      },
+      "E": {
+        "digest": "d41d8cd98f00b204e9800998ecf8427e",
+        "present": 0,
+        "state": "missing",
+        "total": 13
+      },
+      "R": {
+        "digest": "d41d8cd98f00b204e9800998ecf8427e",
+        "present": 0,
+        "state": "missing",
+        "total": 9
+      },
+      "S1": {
+        "digest": "d41d8cd98f00b204e9800998ecf8427e",
+        "present": 0,
+        "state": "missing",
+        "total": 19
+      },
+      "S2": {
+        "digest": "d41d8cd98f00b204e9800998ecf8427e",
+        "present": 0,
+        "state": "missing",
+        "total": 2
+      },
+      "S3": {
+        "digest": "d41d8cd98f00b204e9800998ecf8427e",
+        "present": 0,
+        "state": "missing",
+        "total": 49
+      }
+    },
+    "consumer_effect": null,
+    "database": "postgres",
+    "fingerprint_version": 1,
+    "ledger": {
+      "supabase": "241 rows, last 20261028000000"
+    },
+    "prerequisites": {
+      "column public.dealer_profiles.settings": {
+        "present": true
+      },
+      "column public.dealer_stores.status": {
+        "present": true
+      },
+      "column public.dealer_stores.tenant_id": {
+        "present": true
+      },
+      "column public.vehicle_listings.owning_store_id": {
+        "present": true
+      },
+      "extension pgcrypto in schema extensions": {
+        "detail": [
+          {
+            "ext": "pgcrypto",
+            "schema": "extensions"
+          }
+        ],
+        "present": true
+      },
+      "function auth.uid": {
+        "present": true
+      },
+      "function public.apply_payment_estimator_settings (pre-S2 or S2 body)": {
+        "detail": [
+          {
+            "body_md5": "cbdf88f87b7fb0041e84437d71e04ed0",
+            "mentions_dealer_stores": false,
+            "sig": "apply_payment_estimator_settings(uuid,text,integer,jsonb,uuid)"
+          }
+        ],
+        "present": true
+      },
+      "function public.has_role": {
+        "present": true
+      },
+      "function public.tenant_role_in": {
+        "present": true
+      },
+      "function public.update_updated_at_column": {
+        "present": true
+      },
+      "roles anon, authenticated, service_role": {
+        "present": true
+      },
+      "table public.audit_log": {
+        "present": true
+      },
+      "table public.dealer_profiles": {
+        "present": true
+      },
+      "table public.dealer_stores": {
+        "present": true
+      },
+      "table public.onboarding_profiles": {
+        "present": true
+      },
+      "table public.passport_payment_estimator_settings": {
+        "present": true
+      },
+      "table public.passport_payment_estimator_versions": {
+        "present": true
+      },
+      "table public.tenant_members": {
+        "present": true
+      },
+      "table public.tenants": {
+        "present": true
+      },
+      "table public.user_roles": {
+        "present": true
+      },
+      "table public.vehicle_files": {
+        "present": true
+      },
+      "table public.vehicle_listings": {
+        "present": true
+      },
+      "tenant_members.user_id, tenant_id, role, accepted_at": {
+        "present": true
+      },
+      "vehicle_listings price and identity columns": {
+        "detail": [],
+        "present": true
+      },
+      "view vault.decrypted_secrets": {
+        "present": true
+      }
+    },
+    "roles": {},
+    "security": {
+      "api_execute": [],
+      "definer_without_search_path": [],
+      "rtgip_tables_open_to_api": [],
+      "tables": []
+    },
+    "server_version": "17.6",
+    "transport": null
+  },
+  "run_on": "2026-11-03",
+  "statement": "al-hosted-fingerprint.sql with comment lines stripped (one WITH ... SELECT); run twice on 2026-11-03, the second run after fixing the xpath for transport and ledger; this file holds the second run",
+  "tool": "mcp__Lovable__query_database"
+}

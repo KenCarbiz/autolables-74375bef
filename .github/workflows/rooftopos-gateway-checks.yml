@@ -8,6 +8,10 @@ on:
       - 'supabase/proposed/rtgip_source_readers.proposed.sql'
       - 'supabase/proposed/20261109000000_vehicle_history_foundation.sql'
       - 'supabase/tests/rtgip/**'
+      - 'supabase/hosted/autolabels/**'
+      - 'supabase/proposed/20261030000000_rooftopos_spine.sql'
+      - 'supabase/proposed/20261108000000_canonical_store_registry.sql'
+      - 'supabase/proposed/rtgip_labels_effects.proposed.sql'
       - 'supabase/functions/_shared/integrations/envelope.ts'
       - '.github/workflows/rooftopos-gateway-checks.yml'
   workflow_dispatch:
@@ -62,6 +66,15 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run against a disposable local cluster (no Supabase connection)
         run: bash supabase/tests/rtgip/pg_concurrency.sh
+
+  al_hosted_package:
+    name: AutoLabels hosted package - apply plan, idempotence, post checks, forward recovery, checksums (throwaway cluster)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run against a disposable local cluster (no Supabase or Lovable connection)
+        run: bash supabase/tests/rtgip/al-hosted-package-test.sh
 
   rtgip_pg_integration:
     name: rtgip/2 admission and AutoLabels source readers on real Postgres (full history replay, throwaway cluster)
