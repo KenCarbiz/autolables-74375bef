@@ -75,6 +75,7 @@ try {
   await sql`INSERT INTO gw_tenant_members(user_id,tenant_id,role) VALUES(${actor},${TENANT},'admin')`;
   await sql.begin(async (tx) => {
     await tx`SELECT set_config('request.jwt.claims',${JSON.stringify({ sub: actor, role: "authenticated" })},true)`;
+    await tx.unsafe("SET LOCAL ROLE authenticated");
     await tx`SELECT gw_r2_redrive(${l2.delivery_id},'CASE-ACC-1')`;
   });
   const [row3] = await h.claim();
