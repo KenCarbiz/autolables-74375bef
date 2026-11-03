@@ -82,10 +82,10 @@ export async function setup(sql: Sql) {
       },
     ],
   };
-  const mapping: IdentityMapping = {
+  const mappingOf = (instance_id: string, episode_id: string): IdentityMapping => ({
     vin: "DEVSYN00000000401",
-    instance_id: "acc-instance",
-    episode_id: "acc-episode",
+    instance_id,
+    episode_id,
     tenant_id: TENANT,
     rooftop_id: ROOFTOP,
     source_app: "autolabels",
@@ -93,11 +93,17 @@ export async function setup(sql: Sql) {
     connection_id: connection,
     status: "active",
     reviewed_ref: "acc-reviewed",
-  };
+  });
+  const mapping = mappingOf("acc-instance", "acc-episode");
+  const mappings: IdentityMapping[] = [mapping];
+  async function addMapping(instance_id: string, episode_id: string) {
+    await sql`INSERT INTO gw_r2_mappings VALUES(${connection},${instance_id},${episode_id},'acc-store','DEVSYN00000000401','acc-reviewed','active')`;
+    mappings.push(mappingOf(instance_id, episode_id));
+  }
   const store = candidateStore(rpc(sql), async () => gateway.key_id);
   const handler = createRtgip2Handler(
     {
-      registry: async () => ({ registry, mappings: [mapping] }),
+      registry: async () => ({ registry, mappings }),
       now,
       ...store,
       resolveSigningKey: async (id) => keys.find((k) => k.key_id === id) ?? null,
@@ -105,7 +111,7 @@ export async function setup(sql: Sql) {
     true,
   );
   let nonce = 0;
-  async function admit(revision: number, origin = `acc-origin-${revision}`) {
+  async function admit(revision: number, origin = `acc-origin-${revision}`, instance_id = "acc-instance", episode_id = "acc-episode") {
     const { envelope, body } = await sealEnvelope({
       protocol: "rtgip/2",
       schema_version: 2,
@@ -117,8 +123,8 @@ export async function setup(sql: Sql) {
       purpose: "inventory_sync",
       tenant_id: TENANT,
       rooftop_id: ROOFTOP,
-      vehicle: { vin: "DEVSYN00000000401", instance_id: "acc-instance", episode_id: "acc-episode" },
-      aggregate: { domain: "inventory", type: "episode", id: "acc-episode", revision, prev_revision: revision > 1 ? revision - 1 : null },
+      vehicle: { vin: "DEVSYN00000000401", instance_id, episode_id },
+      aggregate: { domain: "inventory", type: "episode", id: episode_id, revision, prev_revision: revision > 1 ? revision - 1 : null },
       origin: { app: "autolabels", event_id: origin, revision },
       correlation_id: "acc-correlation",
       causation_id: null,
@@ -150,5 +156,5 @@ export async function setup(sql: Sql) {
   async function targetReceipt(l: DeliveryLease, kind: Stage, outcome: Outcome, prev: ReceiptV2) {
     return signReceiptV2(await receiptDraft({ ...l, kind }, outcome, now(), prev), target);
   }
-  return { keys, source, gateway, target, registry, mapping, store, handler, admit, claim, lease, targetReceipt };
+  return { keys, source, gateway, target, registry, mapping, mappings, addMapping, store, handler, admit, claim, lease, targetReceipt };
 }
