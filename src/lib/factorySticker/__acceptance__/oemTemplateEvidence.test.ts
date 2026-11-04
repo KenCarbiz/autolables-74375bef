@@ -15,6 +15,10 @@ import { textBBox, type LayoutModel, type TextPrimitive } from "../render/layout
 import { expectNoTextOverlap } from "../render/__fixtures__/layoutAsserts";
 import { referenceMatchData, tucsonListings, tucsonRenderData } from "../render/__fixtures__/tucson";
 import { wranglerReferenceMatchData, wranglerRenderData } from "../render/__fixtures__/wrangler";
+import { voyagerReferenceMatchData, voyagerRenderData } from "../render/__fixtures__/voyager";
+import { outlanderSportReferenceMatchData, outlanderSportRenderData } from "../render/__fixtures__/outlanderSport";
+import { CHRYSLER_VOYAGER_GAS_ID } from "../render/variants/chryslerVoyagerGas";
+import { MITSUBISHI_OUTLANDER_SPORT_ID } from "../render/variants/mitsubishiOutlanderSport";
 import { HYUNDAI_TUCSON_GAS_ID } from "../render/variants/hyundaiTucsonGas";
 import { JEEP_WRANGLER_GAS_ID } from "../render/variants/jeepWranglerGas";
 import { TEMPLATE_CATALOG, evaluateCatalogTemplate, type CatalogTemplate } from "../oem/templateCatalog";
@@ -128,6 +132,36 @@ Every printed value comes from the saved vehicle record the generator already re
 | Passport QR (0.90in including quiet zone) | canonicalPassportUrl(listing.slug) | Omitted with its caption when no Passport URL |
 `;
 
+const VOYAGER_MAPPING = `# Chrysler 2026 Voyager (gasoline) - data source mapping
+
+Every printed value comes from the saved vehicle record the generator already reads (vehicle_listings.mc_attributes from NeoVIN, vehicle_listings.epa_economy from the verified fueleconomy.gov match, dealer_profiles.settings). No provider call is made. No vehicle value is a literal in the layout: only fixed labels, OEM boilerplate headings (including the chrysler.com contact line) and the Chrysler logo artwork are. The reference sample's values (VIN 1C4RJXSJ5TW323044, Willys 392, Anvil paint, prices, EPA figures, parts content, QR, barcode) appear only in the reference-match fixture, and a test renders an empty record to prove none leaks.
+
+| Printed region | Source field | When missing |
+|---|---|---|
+| Reproduction banner and disclosure | reproduction.ts | Always printed |
+| Chrysler logo | packaged artwork (logoArtwork.ts, owner-authorized 2026-11-01) | Always printed |
+| Model year (stacked digits) and title (model trim) | identity from ymm + listing.trim | Missing parts omitted, never guessed |
+| Spec line, Exterior / Interior color | identity make, model, trim; build_sheet.colors | Row omitted |
+| Engine, Transmission | mc_attributes.engine / transmission (or build_sheet.mechanical) | Row omitted |
+| Base Price box, destination, total | build_sheet.pricing base_msrp, destination_charge, total_msrp (stated, else base + options + destination) | NOT AVAILABLE |
+| Optional equipment (packages, options with price) | build_sheet.packages / options; unpriced paint and trim entries that repeat the colour rows are not listed | Nothing listed; a missing price prints N/A, an included item INCLUDED |
+| Standard equipment | build_sheet.standard + key_features through equipmentSelection and catalog hygiene (full list when it fits, else selected lines plus the Passport pointer line) | Unavailable line |
+| Warranty coverage | warranty.* (verified OEM terms only) | "Not available for this vehicle." Not wired in the adapter today |
+| Fuel Economy MPG, city, highway, gallons per 100 miles | epa_economy combined / city / highway; gallons from the record or 100 / combined | Panel shows the unavailable message; nothing is zero |
+| Annual fuel cost | epa_economy.annualFuelCost | Not Available |
+| You save / You spend over 5 years | epa.fiveYearCostDifference | "5-year fuel cost comparison: Not Available" |
+| Greenhouse gas scale and pointer | epa_economy.ghgScore (integer 1-10) | Not Available; any value outside 1-10 is unavailable |
+| Smog scale and pointer | epa.smogScore (not on current records) | Not Available |
+| CO2 sentence | epa_economy.co2TailpipeGpm | Omitted |
+| Fuel type tag | epa_economy.fuelType | Omitted |
+| Government 5-star safety ratings | NHTSA ratings via NeoVIN decode (rating rows in the standard and key-feature lists, only when the Standard-NHTSA row is present; IIHS rows never feed stars). Combined Frontal Crash and Side Crash rows; never split into driver, passenger or seat rows. A saved NHTSA block takes precedence | Compact panel: "has not been rated by the government" when NHTSA states not rated, "not available from a verified NHTSA record" when there is no NHTSA row; otherwise Not Available per absent category |
+| Parts content box | factory.partsContent (AALA); country of final assembly from mc_attributes.made_in; assembly city/plant when present | "Not available for this vehicle." |
+| Original delivering dealer (SOLD TO) | dealer block, ONLY when dealerRole is original_delivery | Label printed blank. The current selling rooftop never prints. The orchestrator does not set dealerRole today |
+| Assembly Point / Port of Entry | factory.finalAssemblyPoint | Omitted |
+| VIN, VIN barcode | listing.vin; Code 128 regenerated per vehicle | Always present |
+| Passport QR (0.90in including quiet zone) | canonicalPassportUrl(listing.slug) | Omitted with its caption when no Passport URL |
+`;
+
 const WRANGLER_DIFFERENCES = (t: CatalogTemplate): string => `# Jeep 2026 Wrangler (gasoline) - differences from the OEM reference
 
 Status: layout ${t.layoutStatus}, approval ${t.approval}. Production routing cannot select this template until the owner approves it.
@@ -156,6 +190,89 @@ ${t.blockers.map((b) => `- ${b}`).join("\n")}
 - Matching: model names such as "Wrangler 4-Door" match; the 4xe is excluded by model, trim and plug-in fuel text. A record that states no drivetrain still matches; a stated non-4WD drivetrain does not. The 4xe plug-in is unsupported by this template and keeps its existing approved-master rendering.
 `;
 
+const VOYAGER_DIFFERENCES = (t: CatalogTemplate): string => `# Chrysler 2026 Voyager (gasoline) - differences from the OEM reference
+
+Status: layout ${t.layoutStatus}, approval ${t.approval}. Production routing cannot select this template until the owner approves it.
+
+## Sample data
+- reference-match: the reference sticker's own transcribed values, for side-by-side comparison only (reference VIN, prices, EPA figures, safety stars, parts content). It is never used for another vehicle.
+- sticker-2C4RC1CG6ER198366: off-year, other-model layout stress test (2014 Town & Country, used, 201 equipment items, three priced options). Production has no 2026 Voyager and no saved 2026 Chrysler record. The template does not match it (year and model), so it renders only through the explicit sample path.
+
+## Blockers (stable codes)
+${t.blockers.map((b) => `- ${b}`).join("\n")}
+
+## Unresolved differences
+- Fonts: Helvetica / Helvetica-Bold stand in for the reference's Arial Narrow and Arial (font_substitution); body text is wider than the original.
+- Layout compression: vertical positions are compressed by 7% to clear the mandatory banner and disclosure. The blue frame is drawn as four bands.
+- Artwork not reproduced: the FlexCare vehicle protection advertisement, the 5-year/60,000-mile powertrain warranty graphic, agency seals, the source Smartphone QR (replaced by the Vehicle Passport QR below the parts box), the source barcode (regenerated from the VIN) and the "FCA US LLC" legend.
+- Wording not reproduced: "THIS VEHICLE IS MANUFACTURED TO MEET SPECIFIC UNITED STATES REQUIREMENTS" and "THIS LABEL IS ADDED TO THIS VEHICLE TO COMPLY WITH FEDERAL LAW" (neither is certified here). The footnote reads "Original manufacturer's suggested retail prices shown. Excludes taxes, title, license, dealer-installed items and current selling price."
+- EPA panel: native rebuild with the same indicator semantics (1-10 scores, Not Available for anything else); gradient, bubble shape and spacing are approximated. The "These estimates reflect new EPA methods" sentence, the average-vehicle MPG and cost sentence and the pump icon are not printed.
+- Safety: the decode gives one frontal and one side value, so combined rows print where the reference shows driver/passenger and front/rear seat; the reference-match fixture carries per-row values to show the full panel. Not-rated and not-available states are shown honestly.
+- Fields in the reference with no render-data source: "Interior:" seat-material line, S.L., L4-VON, SHIP TO, the production strip. Not printed.
+- Optional equipment: the reference prints the unpriced package heading with a priced kit beneath it; this layout prints a priced package line with its contents. Unpriced paint and trim entries that the decoder lists as options are not listed (the colour rows already print them).
+- Title: the model-year digits are stacked as in the reference; the title prints model and trim from the record.
+- OCR: transcription was spot-checked against the PDF only (ocr_unverified). The reference-match fixture drops registered and trademark marks and normalizes en-dashes (WinAnsi sanitation).
+- Parts content, warranty: not wired by the orchestrator adapter today (blockers parts_content_not_wired, warranty_terms_not_wired); the reference-match render shows the populated state.
+- Equipment: the reference-match render prints all 44 items; the stress record prints all 201 at the ladder's compacted size. Decoder fragments (rating rows, speed thresholds, bare counts and letters, engine and drive labels) are dropped before selection, for this template and the Outlander Sport template only.
+- Matching: model Voyager, minivan body, gasoline only. The Pacifica and Pacifica Hybrid are not matched and flag template_configuration_unsupported; a stated drivetrain does not affect matching. The reference states no drivetrain.
+- Data caveat: a production 2026 Voyager has not been observed, so the MarketCheck body label ("Minivan" on the saved Chrysler minivan record) and the EPA fuel-type text are confirmed only from other Chrysler minivans.
+`;
+
+const OUTLANDER_MAPPING = `# Mitsubishi 2026 Outlander Sport (gasoline) - data source mapping
+
+Every printed value comes from the saved vehicle record the generator already reads (vehicle_listings.mc_attributes from NeoVIN, vehicle_listings.epa_economy from the verified fueleconomy.gov match, dealer_profiles.settings). No provider call is made. No vehicle value is a template default.
+
+| Printed region | Source field | When missing |
+|---|---|---|
+| Reproduction banner and disclosure | reproduction.ts | Always printed |
+| Mitsubishi logo | packaged artwork (logoArtwork.ts, owner-authorized 2026-11-01) | Always printed |
+| Title (year model trim) | identity from ymm + listing.trim | Missing parts omitted, never guessed |
+| Exterior / interior color, engine, transmission, drivetrain | build_sheet.colors; mc_attributes.engine / transmission; drivetrain from sourceCorrections.decideDrivetrain | Row omitted |
+| Emissions line | factoryCodes.emissions (not on current records) | Row omitted |
+| Fuel economy MPG, city, highway, gallons per 100 miles | epa_economy combined / city / highway; gallons from the record or 100 / combined | Panel shows the unavailable message; nothing is zero |
+| Annual fuel cost | epa_economy.annualFuelCost | Not Available |
+| You save / You spend over 5 years | epa.fiveYearCostDifference | "5-year fuel cost comparison: Not Available" |
+| Greenhouse gas scale and pointer | epa_economy.ghgScore (integer 1-10) | Not Available; any value outside 1-10 is unavailable |
+| Smog scale and pointer | epa.smogScore (not on current records) | Not Available |
+| CO2 sentence, fuel type tag, class range note | epa_economy.co2TailpipeGpm / fuelType; epa.classNote | Omitted |
+| Government 5-star safety ratings | NHTSA ratings via NeoVIN decode (rating rows, only when the Standard-NHTSA row is present; IIHS rows never feed stars). Combined Frontal Crash and Side Crash rows; never split into driver/passenger or front/rear seat. | "Not Rated", or the not-available message when no verified record |
+| Parts content box | factory.partsContent (AALA); country of final assembly from mc_attributes.made_in; assembly city/plant when present | "Not available for this vehicle." |
+| Standard equipment | build_sheet.standard + key_features through equipmentSelection and catalog hygiene (full list when it fits, else selected lines plus the Passport pointer line) | Unavailable line |
+| Additional equipment (packages, options with price) | build_sheet.packages / options | "None listed."; a missing price prints N/A, an included item INCLUDED |
+| MSRP, total additional equipment, subtotal, destination/handling, total MSRP | build_sheet.pricing base_msrp, factory-installed total, destination_charge; total_msrp (stated), else base + options + destination | NOT AVAILABLE |
+| Warranty coverage | warranty.* (verified OEM terms only) | "Not available for this vehicle." Not wired in the adapter today |
+| Ship to (original delivering dealer) | dealer block, ONLY when dealerRole is original_delivery | Label printed blank. The current selling rooftop never prints. The orchestrator does not set dealerRole today |
+| Plant / port of entry, method of transport | factory.finalAssemblyPoint, factory.transportMethod | Omitted |
+| VIN, VIN barcode | listing.vin; Code 128 regenerated per vehicle | Always present |
+| Passport QR (0.90in including quiet zone) | canonicalPassportUrl(listing.slug) | Omitted with its caption when no Passport URL |
+`;
+
+const OUTLANDER_DIFFERENCES = (t: CatalogTemplate): string => `# Mitsubishi 2026 Outlander Sport (gasoline) - differences from the OEM reference
+
+Status: layout ${t.layoutStatus}, approval ${t.approval}. Production routing cannot select this template until the owner approves it.
+
+## Sample data
+- reference-match: the reference sticker's own transcribed values, for side-by-side comparison only (reference VIN, prices, EPA figures, safety stars, parts content). It is never used for another vehicle.
+- sticker-JA4ATVAA3RZ023615: off-year, other-model layout stress test (2024 Eclipse Cross LE, used, 172 equipment items, two priced options). Production has no 2026 Outlander Sport. The template does not match it (year and model), so it renders only through the explicit sample path.
+
+## Blockers (stable codes)
+${t.blockers.map((b) => `- ${b}`).join("\n")}
+
+## Unresolved differences
+- Page: the reference is an 11x17 sheet (792x1224pt, rotation 0) carrying a landscape label printed rotated 90 degrees, so its text reads sideways. This layout is upright on the same 792x1224 page with the panels re-stacked (header, fuel economy, safety and parts content, equipment and pricing, footer). The order and content of the panels follow the reference; their positions do not. The owner should confirm that an upright portrait layout is acceptable (page_size_portrait).
+- Fonts: Helvetica / Helvetica-Bold stand in for the reference's Arial and DIN-style faces (font_substitution).
+- Artwork not reproduced: the 10-year powertrain warranty graphic and its coverage columns, the "Mitsubishi Motors Confidence" included-items list, "Full Tank of Gas INCLUDED", agency seals, the source Smartphone QR (replaced by the Vehicle Passport QR in the footer), the source barcode (regenerated from the VIN), the cumulative accessory weight line, route code, location and the build string.
+- Wording not reproduced: the federal-law label statement under the pricing ("This label has been applied to this vehicle pursuant to federal law ...") is not certified here. The footnote reads "Original manufacturer's suggested retail prices shown. Excludes taxes, title, license, dealer-installed items and current selling price."
+- EPA panel: native rebuild with the same indicator semantics (1-10 scores, Not Available for anything else); gradient, bubble shape and spacing are approximated, and the average-vehicle MPG and cost sentence is not printed.
+- Safety: the decode gives one frontal and one side value, so combined rows print where the reference shows driver/passenger and front/rear seat; the reference-match fixture carries per-row values to show the full panel. The footer wording uses www.nhtsa.gov/ratings where the reference prints safercar.gov.
+- Pricing block: prints MSRP, total additional equipment, subtotal, destination/handling and total MSRP from the record; any value the record lacks prints NOT AVAILABLE. The reference-match values reconcile ($24,995 + $455 + $1,795 = $27,245). The stress record reconciles ($27,995 + $410 + $1,445 = $29,850).
+- Fields in the reference with no render-data source: the dealer ship-to block (blank unless the original delivering dealer is proven), port of entry (Baltimore), route code, location, accessory weight, build string. Plant/port prints the final assembly point only when the record has one.
+- OCR: transcription was spot-checked against the PDF only (ocr_unverified). The reference-match fixture normalizes quotation marks and drops registered and trademark marks.
+- Parts content, warranty: not wired by the orchestrator adapter today (blockers parts_content_not_wired, warranty_terms_not_wired); the reference-match render shows the populated state. The stress record shows only the country of final assembly from mc_attributes.made_in.
+- Equipment: the reference prints its 26 items under five headings; the stress record prints all 172 at the ladder's compacted size with decoder fragments removed.
+- Matching: model Outlander Sport (or RVR), SUV body, gasoline. The full-size Outlander and the Outlander PHEV are not matched and flag template_configuration_unsupported. A record that states no drivetrain still matches.
+`;
+
 const packages: PackageSpec[] = [{
   templateId: HYUNDAI_TUCSON_GAS_ID,
   dirName: "hyundai-2026-tucson-gas",
@@ -172,6 +289,26 @@ const packages: PackageSpec[] = [{
   }),
   mappingMd: WRANGLER_MAPPING,
   differencesMd: WRANGLER_DIFFERENCES,
+}, {
+  templateId: CHRYSLER_VOYAGER_GAS_ID,
+  dirName: "chrysler-2026-voyager",
+  build: () => ({
+    real: [voyagerRenderData()],
+    realLabel: "off-year, other-model layout stress test (2014 Town & Country record), not a production candidate",
+    reference: voyagerReferenceMatchData,
+  }),
+  mappingMd: VOYAGER_MAPPING,
+  differencesMd: VOYAGER_DIFFERENCES,
+}, {
+  templateId: MITSUBISHI_OUTLANDER_SPORT_ID,
+  dirName: "mitsubishi-2026-outlander-sport",
+  build: () => ({
+    real: [outlanderSportRenderData()],
+    realLabel: "off-year, other-model layout stress test (2024 Eclipse Cross record), not a production candidate",
+    reference: outlanderSportReferenceMatchData,
+  }),
+  mappingMd: OUTLANDER_MAPPING,
+  differencesMd: OUTLANDER_DIFFERENCES,
 }];
 
 const smallestFont = (m: LayoutModel): number =>
