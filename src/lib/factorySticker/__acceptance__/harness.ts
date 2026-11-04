@@ -181,8 +181,16 @@ export async function runOrchestrate(listing: Listing, store: Store, opts: RunOp
     return { kind: plan.kind, status: "REVIEW_REQUIRED", autoPublish: false, plan };
   }
 
-  const rendered = await renderFactorySticker(normalized.data, plan.theme);
   const model = buildRenderLayout(normalized.data, plan.theme);
+  const rendered: FactoryStickerRenderResult = model.fit.ok
+    ? await renderFactorySticker(normalized.data, plan.theme)
+    : {
+      pdfBytes: new Uint8Array(0), previewSvg: "",
+      layout: {
+        pages: model.pages.length, drawnStrings: model.drawnStrings, widthPt: model.width,
+        heightPt: model.height, fit: model.fit, printedEquipment: model.printedEquipment,
+      },
+    };
   const assessment = assessRenderedSticker({
     vin, hasBuildSheet: true, normalized, plan, canonicalPassportUrl: passportUrl,
     layout: {

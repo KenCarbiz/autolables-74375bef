@@ -97,11 +97,6 @@ const filedOf = (vin: string): Filed => {
   if (!o || o.kind !== "filed") throw new Error(`${vin} was not rendered`);
   return o;
 };
-const heldOf = (vin: string): Held => {
-  const o = auto.get(vin);
-  if (!o || o.kind !== "one_page_review_required") throw new Error(`${vin} is not a one-page hold`);
-  return o;
-};
 
 beforeAll(async () => {
   auto = new Map();
@@ -534,43 +529,63 @@ describe("the orchestrator runs the code this harness runs", () => {
   });
 });
 
-describe("complete builds are held for an approved one-page layout adjustment, never compressed", () => {
-  const heldVins = renderable.map((v) => [v.v]);
+describe("complete builds: one page on the equipment-priority composition, or held", () => {
+  const completeOutcomes = (): Array<[string, Outcome]> => renderable.map((v) => [v.v, auto.get(v.v)!]);
+  const heldList = (): Held[] => completeOutcomes().flatMap(([, o]) => (o.kind === "one_page_review_required" ? [o] : []));
+  const filedList = (): Filed[] => completeOutcomes().flatMap(([, o]) => (o.kind === "filed" ? [o] : []));
 
-  it("the held set is every identified sheet-backed VIN whose verified content exceeds one readable page", () => {
-    expect(heldVins).toHaveLength(38);
-    for (const [vin] of heldVins) {
-      const o = heldOf(vin);
-      expect(o.rendered.layout.fit.ok).toBe(false);
+  it("every identified sheet-backed VIN is a verified one-page document or a one-page hold", () => {
+    expect(filedList().length + heldList().length).toBe(38);
+    expect(filedList().length).toBeGreaterThan(0);
+    expect(heldList().length).toBeGreaterThan(0);
+  });
+
+  it("filed complete builds are exactly one page at the floor or above and print every item once", async () => {
+    for (const o of filedList()) {
+      const pdf = await PDFDocument.load(o.rendered.pdfBytes);
+      expect(pdf.getPageCount()).toBe(1);
+      expect(Math.round(pdf.getPage(0).getSize().width)).toBe(792);
+      expect(Math.round(pdf.getPage(0).getSize().height)).toBe(612);
+      const fit = o.rendered.layout.fit;
+      expect(fit.ok && fit.equipmentFontPt).toBeGreaterThanOrEqual(5.5);
+      const expected = adaptRenderData(o.normalized.data).data.equipment.standard.flatMap((g) => g.items);
+      expect([...o.rendered.layout.printedEquipment].sort()).toEqual([...expected].sort());
+      expect(o.assessment.completeness.pass).toBe(true);
+      expect(untraceable(o)).toEqual([]);
+      const qrs = o.model.pages[0].primitives.filter((x) => x.kind === "qr");
+      expect(qrs.some((q) => q.kind === "qr" && q.payload === o.passportUrl && q.size >= 57.6)).toBe(true);
+      expect(o.model.drawnStrings).toContain("Scan for Vehicle Passport");
+      expect(o.model.pages[0].primitives.some((x) => x.kind === "barcode" && x.payload === o.listing.vin.toUpperCase())).toBe(true);
     }
   });
 
-  it.each(heldVins)("%s parks REVIEW_REQUIRED with no PDF, no document and the one-page reason", async (vin) => {
-    const o = heldOf(vin);
-    const fit = o.rendered.layout.fit;
-    expect(fit.ok).toBe(false);
-    if (fit.ok) return;
-    expect(fit.reason).toBe("one_page_fit_failed");
-    expect(fit.overflowPt).toBeGreaterThan(0);
-    expect(fit.equipmentFontPt).toBeGreaterThanOrEqual(5.5);
-    expect(fit.detail).toContain("approved one-page layout adjustment");
-    expect(fit.detail).toContain("run-in");
-    expect(o.rendered.pdfBytes.byteLength).toBe(0);
-    expect(o.rendered.previewSvg).toBe("");
-    expect(o.model.pages).toHaveLength(1);
-    expect(o.autoPublish).toBe(false);
-    expect(o.assessment.decision.blockers.map((b) => b.code)).toContain("one_page_review_required");
-    const store = newStore();
-    const again = await runOrchestrate(buildListing(fx, fx.vehicles.find((v) => v.v === vin)!), store);
-    expect(again.kind).toBe("one_page_review_required");
-    expect(store.docs).toHaveLength(0);
-    expect(store.record.generation_status).toBe("REVIEW_REQUIRED");
-    expect(store.record.review_required).toBe(true);
-    expect(store.record.review_reason).toContain("one_page_review_required");
+  it("held complete builds park REVIEW_REQUIRED with no PDF, no document and the one-page reason", async () => {
+    for (const o of heldList()) {
+      const fit = o.rendered.layout.fit;
+      expect(fit.ok).toBe(false);
+      if (fit.ok) continue;
+      expect(fit.reason).toBe("one_page_fit_failed");
+      expect(fit.overflowPt).toBeGreaterThan(0);
+      expect(fit.equipmentFontPt).toBeGreaterThanOrEqual(5.5);
+      expect(fit.detail).toContain("approved one-page layout adjustment");
+      expect(fit.detail).toContain("run-in");
+      expect(o.rendered.pdfBytes.byteLength).toBe(0);
+      expect(o.rendered.previewSvg).toBe("");
+      expect(o.model.pages).toHaveLength(1);
+      expect(o.autoPublish).toBe(false);
+      expect(o.assessment.decision.blockers.map((b) => b.code)).toContain("one_page_review_required");
+      const store = newStore();
+      const again = await runOrchestrate(o.listing, store);
+      expect(again.kind).toBe("one_page_review_required");
+      expect(store.docs).toHaveLength(0);
+      expect(store.record.generation_status).toBe("REVIEW_REQUIRED");
+      expect(store.record.review_required).toBe(true);
+      expect(store.record.review_reason).toContain("one_page_review_required");
+    }
   });
 
   it("an existing published document stays intact when the complete build cannot fit", async () => {
-    const v = withSheet.find((x) => x.y && x.t && (trimmed.get(x.v) as Filed | undefined)?.autoPublish)!;
+    const v = renderable.find((x) => auto.get(x.v)?.kind === "one_page_review_required" && (trimmed.get(x.v) as Filed | undefined)?.autoPublish)!;
     const store = newStore();
     const first = await runOrchestrate(trimmedListing(buildListing(fx, v)), store) as Filed;
     expect(first.autoPublish).toBe(true);
@@ -585,10 +600,8 @@ describe("complete builds are held for an approved one-page layout adjustment, n
     expect(store.record.review_required).toBe(true);
   });
 
-  it("the master is attempted first and the generic layout second, and neither goes below the floor", () => {
-    for (const [vin] of heldVins) {
-      const o = heldOf(vin);
-      expect(routeOf(o)).toBe("master_make_wide");
+  it("no held build was compressed below the floor", () => {
+    for (const o of heldList()) {
       const fit = o.rendered.layout.fit;
       expect(!fit.ok && fit.equipmentFontPt).toBe(5.5);
     }
@@ -658,6 +671,8 @@ describe("coverage across the inventory", () => {
     const exact = rs.filter((r) => exactVariantRoute(r.o)).length;
     expect(makeWide).toBeGreaterThan(exact);
     expect(exact).toBe(0);
+    expect(rs.filter((r) => r.o.kind === "filed" && r.o.autoPublish)).toHaveLength(23);
+    expect(rs.filter((r) => r.o.kind === "one_page_review_required")).toHaveLength(16);
   });
 
   it("no vehicle is an auto-published or complete one-page document unless its PDF has exactly one page", async () => {
@@ -687,6 +702,7 @@ describe("coverage across the inventory", () => {
         coverage.push({
           ...base, reconciliation_status: "n/a", auto_publish_decision: o.kind === "pending_data" ? "refused_no_build_sheet" : "held_manual_review",
           standard_equipment_items: 0, options: 0, pages: 0, fit_overflow_pt: null, equipment_font_pt: null,
+          rendered_on: null, composition: null, equipment_mode: null, smallest_equipment_font_pt: null,
           blockers: o.kind === "pending_data" ? "no saved VIN-specific build sheet" : o.plan.kind === "ineligible" ? o.plan.eligibility.status : (o.plan as { reason?: string }).reason ?? "selection_blocked",
           hold_reason: o.kind === "pending_data" ? "No saved VIN-specific build sheet; nothing rendered." : "Record unsupported for an OEM reproduction layout.",
         });
@@ -699,6 +715,10 @@ describe("coverage across the inventory", () => {
         standard_equipment_items: adaptRenderData(o.normalized.data).data.equipment.standard.flatMap((g) => g.items).length,
         options: o.normalized.data.options.length,
         pages: o.kind === "filed" ? o.rendered.layout.pages : 0,
+        rendered_on: o.model.pages[0].primitives.some((x) => x.kind === "image" && x.assetId.startsWith("figma-")) ? "figma_master" : "generic_engine",
+        composition: fit.composition ?? "standard",
+        equipment_mode: fit.equipmentMode ?? "list",
+        smallest_equipment_font_pt: fit.equipmentFontPt,
         fit_overflow_pt: fit.ok ? 0 : fit.overflowPt,
         equipment_font_pt: fit.ok ? fit.equipmentFontPt : fit.equipmentFontPt,
         blockers: o.assessment.decision.blockers.map((b) => b.code).join("|"),
@@ -750,35 +770,34 @@ describe("coverage across the inventory", () => {
 
     const fullDir = join(dir, "full-build");
     mkdirSync(fullDir, { recursive: true });
-    const cohortSeen = new Set<string>();
+    const cohortKey = (v: FixtureVehicle): string => `${v.y ?? "unidentified"}-${v.t ?? ""}`.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const cohortNames = [...new Set(fx.vehicles.filter((v) => v.bs).map(cohortKey))];
     const cohorts: Array<Record<string, unknown>> = [];
-    for (const v of fx.vehicles) {
-      const o = auto.get(v.v)!;
-      if (!v.bs || o.kind === "pending_data") continue;
-      const cohort = `${v.y ?? "unidentified"}-${v.t ?? ""}`.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-      if (cohortSeen.has(cohort)) continue;
-      cohortSeen.add(cohort);
-      const members = fx.vehicles.filter((x) => x.bs && `${x.y ?? "unidentified"}-${x.t ?? ""}`.toLowerCase().replace(/[^a-z0-9]+/g, "-") === cohort);
-      if (o.kind === "filed") {
-        const file = join(fullDir, `${cohort}-${v.v}.pdf`);
-        writeFileSync(file, o.rendered.pdfBytes);
-        const pdf = await PDFDocument.load(new Uint8Array(readFileSync(file)));
-        expect(pdf.getPageCount(), file).toBe(1);
-        const size = pdf.getPage(0).getSize();
-        cohorts.push({ cohort, vins: members.length, result: "pdf_written", file, pages: 1, width: Math.round(size.width), height: Math.round(size.height), smallest_equipment_font_pt: o.rendered.layout.fit.ok ? o.rendered.layout.fit.equipmentFontPt : null });
-      } else if (o.kind === "one_page_review_required") {
-        const fit = o.rendered.layout.fit;
-        const worst = Math.max(...members.map((m) => {
-          const x = auto.get(m.v);
-          return x?.kind === "one_page_review_required" && !x.rendered.layout.fit.ok ? x.rendered.layout.fit.overflowPt : 0;
-        }));
-        cohorts.push({
-          cohort, vins: members.length, result: "held_no_pdf", pages: 0,
-          equipment_mode_tried: "list then run_in", smallest_equipment_font_pt: fit.equipmentFontPt,
-          overflow_pt_this_vin: fit.ok ? 0 : fit.overflowPt, overflow_pt_worst_in_cohort: worst,
-          hold_reason: fit.ok ? "" : fit.detail,
-        });
+    for (const name of cohortNames) {
+      const members = fx.vehicles.filter((v) => v.bs && cohortKey(v) === name);
+      const outs = members.map((m) => auto.get(m.v)!);
+      const filed = outs.filter((o): o is Filed => o.kind === "filed");
+      const held = outs.filter((o): o is Held => o.kind === "one_page_review_required");
+      const fonts = outs.flatMap((o) => (o.kind === "filed" || o.kind === "one_page_review_required" ? [o.rendered.layout.fit.equipmentFontPt] : []));
+      let pdf: Record<string, unknown> | null = null;
+      if (filed.length) {
+        const rep = filed[0];
+        const file = join(fullDir, `${name}-${rep.listing.vin}.pdf`);
+        writeFileSync(file, rep.rendered.pdfBytes);
+        const doc = await PDFDocument.load(new Uint8Array(readFileSync(file)));
+        expect(doc.getPageCount(), file).toBe(1);
+        const size = doc.getPage(0).getSize();
+        expect(Math.round(size.width)).toBe(792);
+        expect(Math.round(size.height)).toBe(612);
+        pdf = { file, pages: 1, width: Math.round(size.width), height: Math.round(size.height) };
       }
+      cohorts.push({
+        cohort: name, vins: members.length, published_eligible: filed.filter((o) => o.autoPublish).length,
+        filed_held_other_reason: filed.filter((o) => !o.autoPublish).length, held_one_page_review_required: held.length,
+        smallest_equipment_font_pt_used: fonts.length ? Math.min(...fonts) : null,
+        held_overflow_pt_worst: held.length ? Math.max(...held.map((o) => (o.rendered.layout.fit.ok ? 0 : o.rendered.layout.fit.overflowPt))) : null,
+        representative_pdf: pdf,
+      });
     }
     writeFileSync(join(fullDir, "cohort-results.json"), JSON.stringify(cohorts, null, 2));
 

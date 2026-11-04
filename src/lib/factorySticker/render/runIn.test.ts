@@ -5,11 +5,13 @@ import { checkRenderedCompleteness, expectedStandardEquipment } from "./complete
 import { qx55ClassFixture, themeFor } from "./__fixtures__/renderData";
 import { expectMinFontRespected, expectNoTextOverlap, expectWithinBounds } from "./__fixtures__/layoutAsserts";
 
-const withExtra = (n: number): FactoryStickerRenderData => {
+const baseExtra = (n: number): FactoryStickerRenderData => {
   const base = qx55ClassFixture();
   const extra = Array.from({ length: n }, (_, i) => `Verified Test Equipment Line ${String(i).padStart(3, "0")}`);
   return { ...base, standardEquipment: { ...base.standardEquipment, technology: [...(base.standardEquipment.technology ?? []), ...extra] } };
 };
+
+const withExtra = baseExtra;
 
 const generic = (data: FactoryStickerRenderData): LayoutModel =>
   buildStickerLayout(adaptRenderData(data), resolveRenderTheme(data, themeFor("toyota")));
@@ -76,5 +78,54 @@ describe("run-in equipment mode", () => {
       for (const opt of data.options) expect(strings.some((s) => s.includes(opt.name)), opt.name).toBe(true);
       expect(strings.join(" ")).not.toMatch(new RegExp(`${data.options[0].name},`));
     });
+  });
+});
+
+describe("equipment-priority composition (generic layout only)", () => {
+  const withExtra = (n: number): FactoryStickerRenderData => ({ ...baseExtra(n), warranty: null, partsContent: null, safety: null });
+  const find = (): { n: number; model: LayoutModel } => {
+    for (let n = 0; n < 600; n += 4) {
+      const model = generic(withExtra(n));
+      if (model.fit.ok && model.fit.composition === "equipment_priority") return { n, model };
+      if (!model.fit.ok) break;
+    }
+    throw new Error("no equipment-priority transition found");
+  };
+  const { n, model } = find();
+  const data = withExtra(n);
+
+  it("is used only after the standard page cannot fit, and stays on one page at the floor or above", () => {
+    expect(model.pages).toHaveLength(1);
+    expect(model.fit.ok && model.fit.equipmentFontPt).toBeGreaterThanOrEqual(EQUIPMENT_MIN_FONT_PT);
+    expect(generic(qx55ClassFixture()).fit.ok && (generic(qx55ClassFixture()).fit as { composition?: string }).composition).toBe("standard");
+  });
+
+  it("prints every verified item once and keeps the banner and disclosure", () => {
+    expect([...model.printedEquipment].sort()).toEqual([...expectedStandardEquipment(data)].sort());
+    expect(checkRenderedCompleteness(data, model).pass).toBe(true);
+    expect(model.drawnStrings.some((s) => s.startsWith("REPRODUCTION WINDOW STICKER"))).toBe(true);
+  });
+
+  it("keeps a scannable Passport QR with its caption and the VIN barcode in the right rail", () => {
+    const prims = model.pages[0].primitives;
+    const qr = prims.find((p) => p.kind === "qr" && p.payload === data.passportUrl);
+    expect(qr && qr.kind === "qr" ? qr.size : 0).toBeGreaterThanOrEqual(57.6);
+    expect(model.drawnStrings).toContain("Scan for Vehicle Passport");
+    const barcode = prims.find((p) => p.kind === "barcode");
+    expect(barcode && barcode.kind === "barcode" && barcode.x).toBeGreaterThan(500);
+    expect(barcode && barcode.kind === "barcode" && barcode.payload).toBe(data.vin);
+  });
+
+  it("does not touch the Figma masters: a master that fits keeps its own composition", () => {
+    const m = routed(withExtra(0));
+    expect(m.drawnStrings.some((s) => s.includes("Fuel Economy and Environment") || s.includes("Fuel Economy & Environment"))).toBe(true);
+    expect(m.fit.ok && m.fit.composition).toBe("standard");
+    expect(m.fit.ok && m.fit.columns).toBe(2);
+  });
+
+  it("still holds content that cannot fit even on this composition", () => {
+    const m = generic(withExtra(900));
+    expect(m.fit.ok).toBe(false);
+    expect(m.mode).toBe("REVIEW_REQUIRED");
   });
 });

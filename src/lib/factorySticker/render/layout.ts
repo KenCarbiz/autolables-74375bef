@@ -42,10 +42,13 @@ export type LayoutMode = "STANDARD" | "DENSE" | "REVIEW_REQUIRED";
 /** "list" prints one item per line; "run_in" prints each category as a comma-joined paragraph. */
 export type EquipmentMode = "list" | "run_in";
 
+/** "equipment_priority" moves the VIN/barcode block and vehicle record into the right rail and compacts the Passport block. */
+export type PageComposition = "standard" | "equipment_priority";
+
 export type OnePageFitReason = "one_page_fit_failed";
 
 export type LayoutFit =
-  | { ok: true; columns: number; equipmentFontPt: number; equipmentMode?: EquipmentMode }
+  | { ok: true; columns: number; equipmentFontPt: number; equipmentMode?: EquipmentMode; composition?: PageComposition }
   | {
     ok: false;
     reason: OnePageFitReason;
@@ -55,11 +58,12 @@ export type LayoutFit =
     equipmentFontPt: number;
     columns: number;
     equipmentMode?: EquipmentMode;
+    composition?: PageComposition;
   };
 
-export const fitOk = (columns: number, equipmentFontPt: number, equipmentMode: EquipmentMode = "list"): LayoutFit => ({
-  ok: true, columns, equipmentFontPt, equipmentMode,
-});
+export const fitOk = (
+  columns: number, equipmentFontPt: number, equipmentMode: EquipmentMode = "list", composition: PageComposition = "standard",
+): LayoutFit => ({ ok: true, columns, equipmentFontPt, equipmentMode, composition });
 
 export interface TextPrimitive {
   kind: "text";
@@ -224,14 +228,22 @@ export function charWidthUnits(ch: string, font: LayoutFont): number {
   return table[ch] ?? DEFAULT_CHAR_WIDTH;
 }
 
+const WIDTH_CACHE = new Map<string, number>();
+
 export function measureText(
   str: string,
   font: LayoutFont,
   size: number,
   charSpacing = 0,
 ): number {
-  let units = 0;
-  for (const ch of str) units += charWidthUnits(ch, font);
+  const key = `${font}|${str}`;
+  let units = WIDTH_CACHE.get(key);
+  if (units === undefined) {
+    units = 0;
+    for (const ch of str) units += charWidthUnits(ch, font);
+    if (WIDTH_CACHE.size > 200_000) WIDTH_CACHE.clear();
+    WIDTH_CACHE.set(key, units);
+  }
   const spacing = str.length > 1 ? charSpacing * (str.length - 1) : 0;
   return (units / 1000) * size + spacing;
 }
@@ -665,6 +677,8 @@ interface BuildContext {
   columns: number;
   /** Equipment printed as run-in category paragraphs instead of one item per line. */
   runIn?: boolean;
+  /** Equipment-priority composition: see PageComposition. */
+  priority?: boolean;
 }
 
 // ── Reproduction banner: first thing on every page ───────────────────
@@ -943,8 +957,10 @@ function paintHeader(p: Painter, y: number, ctx: BuildContext): number {
     if (value) idRows[col].push([label, value.toUpperCase()]);
   };
   pushId(0, "VIN", v.vin);
-  pushId(0, "EXTERIOR", v.exteriorColor);
-  pushId(0, "INTERIOR", v.interiorColor);
+  const coded = (name: string | undefined, code: string | undefined): string | undefined =>
+    name && ctx.priority && code ? `${name} (${code})` : name;
+  pushId(0, "EXTERIOR", coded(v.exteriorColor, v.exteriorColorCode));
+  pushId(0, "INTERIOR", coded(v.interiorColor, v.interiorColorCode));
   pushId(1, "ENGINE", v.engine);
   pushId(1, "TRANSMISSION", v.transmission);
   pushId(1, "DRIVETRAIN", v.drivetrain);
@@ -1371,23 +1387,22 @@ function paintSpecGrid(p: Painter, y: number, ctx: BuildContext): number {
   return cursor;
 }
 
-function paintVinBarcode(p: Painter, y: number, ctx: BuildContext): number {
+function paintVinBarcode(p: Painter, y: number, ctx: BuildContext, bx: number = LX, boxW: number = LW * 0.72): number {
   const { theme, input } = ctx;
   const v = input.data.vehicle;
-  const boxW = LW * 0.72;
   const showBarcode = theme.layout.barcodeVariant !== "NONE";
   const boxH = showBarcode ? 48 : 22;
-  p.rect(LX, y, boxW, boxH, null, BLACK, 0.9);
-  p.text("VIN", LX + 6, y + 11, 6, "bold", "#4c5157");
-  p.text(v.vin, LX + 6 + measureText("VIN  ", "bold", 6), y + 11.5, 8.5, "bold", BLACK, { charSpacing: 0.5 });
+  p.rect(bx, y, boxW, boxH, null, BLACK, 0.9);
+  p.text("VIN", bx + 6, y + 11, 6, "bold", "#4c5157");
+  p.text(v.vin, bx + 6 + measureText("VIN  ", "bold", 6), y + 11.5, 8.5, "bold", BLACK, { charSpacing: 0.5 });
   if (showBarcode) {
-    p.barcode(LX + 6, y + 15, boxW * 0.66, 23, input.barcodePayload, BLACK);
+    p.barcode(bx + 6, y + 15, boxW * 0.66, 23, input.barcodePayload, BLACK);
   }
   // Factory allocation families show the ship-to dealer beside the barcode.
   if (familyStyle(theme).shipToBlock && input.data.dealer.name) {
     const d = input.data.dealer;
     const f = input.data.factory;
-    const sx = LX + boxW - 6;
+    const sx = bx + boxW - 6;
     const shipMax = boxW * 0.31;
     const cityLine = [d.city, [d.state, d.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", ");
     p.text(`SHIP TO: ${f.dealerCode ?? ""}`.trim(), sx, y + 12, 5.4, "bold", BLACK, { align: "right" });
@@ -1405,7 +1420,7 @@ function paintVinBarcode(p: Painter, y: number, ctx: BuildContext): number {
     v.stockNumber ? `STOCK ${v.stockNumber.toUpperCase()}` : null,
     `DOCUMENT v${input.data.document.templateVersion}`,
   ].filter(Boolean).join("   -   ");
-  p.text(meta, LX + 6, y + boxH - 5.5, 5.5, "body", "#4c5157");
+  p.text(meta, bx + 6, y + boxH - 5.5, 5.5, "body", "#4c5157");
   return y + boxH;
 }
 
@@ -1842,6 +1857,54 @@ function paintPassportPanel(p: Painter, y: number, ctx: BuildContext, targetH: n
   return y + boxH;
 }
 
+const PRIORITY_QR_SIZE = 60; // 0.83in, above the 0.8in scan minimum
+
+function paintPassportFixed(p: Painter, y: number, ctx: BuildContext): number {
+  const passportUrl = ctx.input.data.document.passportUrl.trim();
+  if (!passportUrl) return y;
+  const navy = "#0b1f3a";
+  let cy = y + 9;
+  p.text("VEHICLE PASSPORT", RX + RW / 2, cy, 7.5, "bold", BLACK, { align: "center", charSpacing: 0.4 });
+  cy += 8;
+  p.text(PASSPORT_QR_CAPTION, RX + RW / 2, cy, 6, "body", "#4c5157", { align: "center" });
+  cy += 5;
+  p.qr(RX + (RW - PRIORITY_QR_SIZE) / 2, cy, PRIORITY_QR_SIZE, passportUrl, BLACK);
+  cy += PRIORITY_QR_SIZE + 8;
+  p.text(passportUrl.replace(/^https?:\/\//i, ""), RX + RW / 2, cy, 6.2, "body", "#4c5157", { align: "center" });
+  cy += 8;
+  const t1 = "Powered by ", t2 = "auto", t3 = "(LABELS)";
+  const total = measureText(t1, "body", 6) + measureText(t2, "bold", 6.2) + measureText(t3, "bold", 6.2);
+  let bx = RX + (RW - total) / 2;
+  p.text(t1, bx, cy, 6, "body", "#55595e");
+  bx += measureText(t1, "body", 6);
+  p.text(t2, bx, cy, 6.2, "bold", "#2563eb");
+  bx += measureText(t2, "bold", 6.2);
+  p.text(t3, bx, cy, 6.2, "bold", navy);
+  return cy + 3;
+}
+
+/** Verified vehicle-record facts the equipment-priority page moves out of the left spec grid. */
+function priorityRecordRows(ctx: BuildContext): Array<[string, string]> {
+  const f = ctx.input.data.factory;
+  const rows: Array<[string, string]> = [];
+  const assembly = f.finalAssemblyPoint || [f.assemblyPlant, f.assemblyCountry].filter(Boolean).join(", ");
+  if (assembly) rows.push(["FINAL ASSEMBLY POINT:", assembly]);
+  if (f.transportMethod) rows.push(["METHOD OF TRANSPORT:", f.transportMethod]);
+  return rows;
+}
+
+function paintPriorityRecord(p: Painter, y: number, ctx: BuildContext): number {
+  const rows = priorityRecordRows(ctx);
+  let cy = y;
+  for (const [label, value] of rows) {
+    cy += 8.4;
+    p.text(label, RX, cy, 5.5, "bold", "#4c5157");
+    const lw = measureText(`${label} `, "bold", 5.5);
+    p.text(ellipsize(value.toUpperCase(), "body", 6.4, RW - lw - 2), RX + lw + 2, cy, 6.4, "body", BLACK);
+  }
+  return rows.length ? cy + 4 : y;
+}
+
 // ── Right column: verification block and reproduction disclosure ──────
 
 function paintVerificationBlock(p: Painter, y: number, ctx: BuildContext): number {
@@ -2135,8 +2198,9 @@ function buildAttempt(
   compactPackages: boolean,
   force = false,
   runIn = false,
+  priority = false,
 ): AttemptResult | null {
-  const ctx: BuildContext = { input, theme, density, compactPackages, columns, runIn };
+  const ctx: BuildContext = { input, theme, density, compactPackages, columns, runIn, priority };
   const drawn: string[] = [];
   const p = new Painter(drawn);
 
@@ -2152,11 +2216,13 @@ function buildAttempt(
   // The pricing split follows the equipment block directly; the spec grid,
   // barcode and navy band anchor together at the page bottom, so any slack
   // lands between the optional list and the spec grid as on the reference.
-  const bottomH = measureStack([
-    (sp, sy) => paintSpecGrid(sp, sy, ctx),
-    (sp, sy) => paintVinBarcode(sp, sy, ctx) + SECTION_GAP,
-    (sp, sy) => paintTotalBand(sp, sy, ctx),
-  ]);
+  const bottomH = measureStack(priority
+    ? [(sp, sy) => paintTotalBand(sp, sy, ctx)]
+    : [
+      (sp, sy) => paintSpecGrid(sp, sy, ctx),
+      (sp, sy) => paintVinBarcode(sp, sy, ctx) + SECTION_GAP,
+      (sp, sy) => paintTotalBand(sp, sy, ctx),
+    ]);
   const pricingH = measureStack([(sp, sy) => paintPricingSplit(sp, sy, ctx) + SECTION_GAP]);
   // The left parts panel reserves its height out of the equipment budget so
   // it always fits between the pricing split and the spec grid.
@@ -2193,9 +2259,13 @@ function buildAttempt(
   if (leftPartsH > 0 && y + 6 + leftPartsH <= bottomTop - 2) {
     paintPartsContentPanel(p, y + 6, ctx, LX, leftPartsW);
   }
-  y = paintSpecGrid(p, bottomTop, ctx);
-  y = paintVinBarcode(p, y, ctx) + SECTION_GAP;
-  paintTotalBand(p, y, ctx);
+  if (priority) {
+    paintTotalBand(p, bottomTop, ctx);
+  } else {
+    y = paintSpecGrid(p, bottomTop, ctx);
+    y = paintVinBarcode(p, y, ctx) + SECTION_GAP;
+    paintTotalBand(p, y, ctx);
+  }
 
   // Right column, top to bottom: regulatory panels (supporting), then the
   // Passport panel stretched over the middle, with the verification block,
@@ -2216,13 +2286,29 @@ function buildAttempt(
     ...(fsAll.leftPartsPanel ? [] : [paintPartsContentPanel]),
     ...(fsAll.msrpIncludes ? [] : [paintWarrantyPanel]),
   ];
-  for (const panel of railPanels) {
-    const panelH = measureStack([(sp, sy) => panel(sp, sy, ctx)]);
-    if (panelH > 0 && ry + panelH + 7 + 118 <= bottomBlockTop - 6) {
-      ry = panel(p, ry, ctx) + 7;
+  if (priority) {
+    for (const panel of railPanels) {
+      const panelH = measureStack([(sp, sy) => panel(sp, sy, ctx)]);
+      if (panelH > 0) ry = panel(p, ry, ctx) + 7;
     }
+    ry = paintPassportFixed(p, ry, ctx) + 7;
+    const recordEnd = paintPriorityRecord(p, ry, ctx);
+    ry = recordEnd > ry ? recordEnd + 4 : ry;
+    ry = paintVinBarcode(p, ry, ctx, RX, RW) + 4;
+    const railOverflow = ry - (bottomBlockTop - 2);
+    if (railOverflow > 0) {
+      if (!force) return null;
+      overflowPt = Math.max(overflowPt, railOverflow);
+    }
+  } else {
+    for (const panel of railPanels) {
+      const panelH = measureStack([(sp, sy) => panel(sp, sy, ctx)]);
+      if (panelH > 0 && ry + panelH + 7 + 118 <= bottomBlockTop - 6) {
+        ry = panel(p, ry, ctx) + 7;
+      }
+    }
+    paintPassportPanel(p, ry, ctx, bottomBlockTop - 6 - ry);
   }
-  paintPassportPanel(p, ry, ctx, bottomBlockTop - 6 - ry);
   const by = paintVerificationBlock(p, bottomBlockTop, ctx);
   paintRightFooter(p, by, ctx, pageLabel);
 
@@ -2238,7 +2324,7 @@ function buildAttempt(
       body: theme.typography.bodyFont,
       numeric: theme.typography.numericFont,
     },
-    fit: fitOk(columns, density.item, runIn ? "run_in" : "list"),
+    fit: fitOk(columns, density.item, runIn ? "run_in" : "list", priority ? "equipment_priority" : "standard"),
   };
   if (!force) validateModel(model);
   return { model, overflowPt };
@@ -2256,34 +2342,49 @@ export function buildStickerLayout(input: StickerLayoutInput, theme: OemStickerT
   // tried before a compact one, and more equipment columns only after the
   // family's own column count, so type never shrinks while a layout change
   // would do. Every step prints every member; only spacing and wrapping move.
-  for (const density of GENERIC_DENSITY_LADDER) {
-    for (const columns of candidateColumns(theme)) {
-      for (const compactPackages of [false, true]) {
-        const attempt = buildAttempt(input, theme, density, columns, compactPackages);
+  //
+  // Smaller type only ever frees space, so a (columns, packages) setting that
+  // cannot fit at the floor cannot fit at any larger size: each composition
+  // probes the floor once per setting and walks the ladder over the survivors.
+  const settings = candidateColumns(theme).flatMap((columns) =>
+    [false, true].map((compactPackages) => ({ columns, compactPackages })));
+  const compositions: Array<{ runIn: boolean; priority: boolean }> = [
+    { runIn: false, priority: false },
+    // One item per line cannot fit at the floor. Each category then prints as
+    // a run-in paragraph: same items, verbatim, once each, joined inline.
+    { runIn: true, priority: false },
+    // Equipment-priority composition: the VIN/barcode block and vehicle record
+    // move into the right rail beside a compact fixed Passport block, and the
+    // left region gives equipment the height they occupied.
+    { runIn: false, priority: true },
+    { runIn: true, priority: true },
+  ];
+  for (const { runIn, priority } of compositions) {
+    const feasible = settings.filter((st) =>
+      buildAttempt(input, theme, DENSITY_MINIMUM, st.columns, st.compactPackages, false, runIn, priority) !== null);
+    if (!feasible.length) continue;
+    for (const density of GENERIC_DENSITY_LADDER) {
+      for (const st of feasible) {
+        const attempt = buildAttempt(input, theme, density, st.columns, st.compactPackages, false, runIn, priority);
         if (attempt) return attempt.model;
       }
     }
   }
-  // One item per line cannot fit at the floor. Each category then prints as
-  // a run-in paragraph: same items, verbatim, once each, joined inline.
-  for (const density of GENERIC_DENSITY_LADDER) {
-    for (const columns of candidateColumns(theme)) {
-      for (const compactPackages of [false, true]) {
-        const attempt = buildAttempt(input, theme, density, columns, compactPackages, false, true);
-        if (attempt) return attempt.model;
-      }
-    }
-  }
-  // Nothing fits on one page at the validated minimum. Report the tighter of
-  // the two floor configurations as a review-required fit failure.
+  // Nothing fits on one page at the validated minimum. Report the tightest
+  // of the floor configurations as a review-required fit failure.
   const columns = Math.max(...candidateColumns(theme));
-  const floorList = buildAttempt(input, theme, DENSITY_MINIMUM, columns, true, true, false);
-  const floorRunIn = buildAttempt(input, theme, DENSITY_MINIMUM, columns, true, true, true);
-  const floor = floorRunIn && floorList && floorRunIn.overflowPt < floorList.overflowPt ? floorRunIn : floorList;
+  const floors = [
+    buildAttempt(input, theme, DENSITY_MINIMUM, columns, true, true, false, false),
+    buildAttempt(input, theme, DENSITY_MINIMUM, columns, true, true, true, false),
+    buildAttempt(input, theme, DENSITY_MINIMUM, columns, true, true, false, true),
+    buildAttempt(input, theme, DENSITY_MINIMUM, columns, true, true, true, true),
+  ].filter((f): f is AttemptResult => f !== null);
+  const floor = floors.reduce<AttemptResult | null>((best, f) => (!best || f.overflowPt < best.overflowPt ? f : best), null);
   const overflowPt = floor ? Math.round(floor.overflowPt * 10) / 10 : 0;
   const base = floor?.model;
   if (!base) throw new Error("layout_failed: floor attempt produced no model");
   const mode = base.fit.ok ? base.fit.equipmentMode ?? "list" : "list";
+  const composition = base.fit.ok ? base.fit.composition ?? "standard" : "standard";
   return {
     ...base,
     mode: "REVIEW_REQUIRED",
@@ -2294,7 +2395,8 @@ export function buildStickerLayout(input: StickerLayoutInput, theme: OemStickerT
       equipmentFontPt: DENSITY_MINIMUM.item,
       columns,
       equipmentMode: mode,
-      detail: `verified content does not fit one readable page at ${DENSITY_MINIMUM.item}pt equipment text, even as run-in category paragraphs, in ${columns} columns (about ${overflowPt}pt over); an approved one-page layout adjustment is required`,
+      composition,
+      detail: `verified content does not fit one readable page at ${DENSITY_MINIMUM.item}pt equipment text, even as run-in category paragraphs on the equipment-priority page, in ${columns} columns (about ${overflowPt}pt over); an approved one-page layout adjustment is required`,
     },
   };
 }
