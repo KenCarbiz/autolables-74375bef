@@ -21,7 +21,7 @@ const read = (rel: string) => readFileSync(root(rel), "utf8");
 const BUNDLE = "supabase/functions/_shared/rtgip2-runtime.bundle.js";
 const PRODUCTION_REFS = ["onnbmmdbrsgytfozfozn", "ptiwdwfdckfqivoocyvp", "eabnaohpjuewhwrfhkun"];
 const STAGING_REFS = ["uakiwvigsmrlyfpsalai", "zzwuxpbxkfxgtrnfxgia", "mubzldoczujeoatzdwko"];
-const COMPILED_LITERAL = false;
+const COMPILED_LITERAL = true;
 const ENV_NAMES = ["RTGIP2_GATEWAY_URL", "RTGIP2_RUNTIME_MODE", "SUPABASE_ANON_KEY", "SUPABASE_DB_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_URL"];
 
 describe("the generated bundle", () => {
@@ -56,7 +56,7 @@ describe("the generated bundle", () => {
     const text = read(BUNDLE);
     expect(text).toContain(`var RTGIP2_APP_RUNTIME_ENABLED = ${COMPILED_LITERAL};`);
     expect(text).toContain(`var STAGING_PROJECT_REF = "${STAGING_PROJECT_REF}";`);
-    expect(text).toMatch(/var STAGING_GATEWAY_ORIGINS = \[[^\]]*\];/);
+    expect(text).toMatch(/var PENDING_GATEWAY_STAGING_ORIGIN = \[[^\]]*\];/);
   });
 });
 
@@ -107,7 +107,7 @@ describe("the entry runtime with the real constants", () => {
 
   it("refuses every entry point when the compiled literal is off, whatever the environment says", async () => {
     platform(stagingEnv);
-    const rt = createEntryRuntime({ compiledEnabled: COMPILED_LITERAL });
+    const rt = createEntryRuntime({ compiledEnabled: false });
     for (const call of [rt.inbound, rt.dispatch, rt.publish]) {
       const r = await call(new Request("https://fn.test/", { method: "POST", headers: { authorization: `Bearer ${stagingEnv.SUPABASE_SERVICE_ROLE_KEY}` }, body: "{}" }));
       expect([r.status, ((await r.json()) as { reason: string }).reason]).toEqual([503, "RTGIP2_NOT_ACTIVATED"]);

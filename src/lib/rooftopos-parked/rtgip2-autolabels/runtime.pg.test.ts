@@ -85,6 +85,12 @@ async function deliver(p: { envelope: EnvelopeV2; body: string }, tenant = S.ten
 const publishAs = (user: string, body: unknown) =>
   postJson(`${rt.url}/publish`, JSON.stringify(body), { authorization: `Bearer user-${user}` });
 
+const REFUSED: Record<string, [number, string]> = {
+  inbound: [400, "admission_receipt_malformed"],
+  dispatch: [503, "gateway_origin_not_allowed"],
+  publish: [401, "unauthenticated"],
+};
+
 run("AutoLabels runtime bundle under Deno against a disposable node", () => {
   beforeAll(async () => {
     sql = postgres(PG_URL, { max: 5, onnotice: () => {}, idle_timeout: 5 });
@@ -258,7 +264,7 @@ run("AutoLabels runtime bundle under Deno against a disposable node", () => {
       });
       try {
         const r = await postJson(`${d.url}/`, "{}", { authorization: `Bearer ${SERVICE_KEY}` });
-        expect([fn, r.status, ((await r.json()) as { reason: string }).reason]).toEqual([fn, 503, "RTGIP2_NOT_ACTIVATED"]);
+        expect([fn, r.status, ((await r.json()) as { reason: string }).reason]).toEqual([fn, ...REFUSED[fn]!]);
       } finally {
         await d.stop();
       }

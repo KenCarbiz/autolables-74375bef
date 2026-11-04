@@ -2389,9 +2389,10 @@ var labelsPublishAuthorizer = async (db, userId, req) => {
 };
 
 // src/lib/rooftopos-parked/rtgip2-autolabels/runtime-config.ts
-var RTGIP2_APP_RUNTIME_ENABLED = false;
+var RTGIP2_APP_RUNTIME_ENABLED = true;
 var STAGING_PROJECT_REF = "uakiwvigsmrlyfpsalai";
-var STAGING_GATEWAY_ORIGINS = [];
+var PENDING_GATEWAY_STAGING_ORIGIN = [];
+var STAGING_GATEWAY_ORIGINS = PENDING_GATEWAY_STAGING_ORIGIN;
 
 // src/lib/rooftopos-parked/rtgip2-autolabels/runtime-entry.ts
 var APP_BINDINGS = {
