@@ -71,10 +71,10 @@
     "2025 BMW 530I XDRIVE",
     "SEDAN (G60)",
     "STANDARD EQUIPMENT",
-    "EXTERIOR",
-    "INTERIOR & COMFORT",
     "PERFORMANCE & MECHANICAL",
     "SAFETY & DRIVER ASSISTANCE",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
     "FACTORY OPTIONS",
     "DESTINATION & HANDLING",
     "1,175.00",
@@ -94,6 +94,6 @@
   ],
   "totalBand": "$67,725.00",
   "svgDigest": [
-    "746f7300"
+    "4a1bd13e"
   ]
 }

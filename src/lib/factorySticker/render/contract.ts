@@ -16,6 +16,7 @@ import type {
   VehicleCondition,
 } from "../types.ts";
 import { resolveOem } from "../oem/identity.ts";
+import { classifyStandardItem } from "../equipment.ts";
 import { resolveReferenceVariant } from "../oem/referenceVariants.ts";
 import { VARIANT_LAYOUTS } from "./variants/index.ts";
 import { getTheme, type OemStickerTheme } from "../oem/themes.ts";
@@ -244,14 +245,16 @@ const categoryForHint = (hint: string): EquipmentCategory => {
   return "OTHER";
 };
 
+// Order of the OEM reference sticker: mechanical, comfort, safety and driver
+// assistance, audio and infotainment, then exterior and interior.
 const CATEGORY_SEQUENCE: EquipmentCategory[] = [
-  "EXTERIOR",
-  "INTERIOR",
-  "COMFORT_CONVENIENCE",
-  "FUNCTIONAL",
   "POWERTRAIN",
+  "FUNCTIONAL",
+  "COMFORT_CONVENIENCE",
   "SAFETY_SECURITY",
   "TECHNOLOGY",
+  "EXTERIOR",
+  "INTERIOR",
   "OTHER",
 ];
 
@@ -262,13 +265,14 @@ function groupStandardEquipment(
   const seen = new Set<string>();
   for (const source of sources) {
     for (const [hint, items] of Object.entries(source)) {
-      const category = categoryForHint(hint);
+      const hinted = categoryForHint(hint);
       for (const raw of items) {
         const item = raw.trim();
         if (!item) continue;
         const key = item.toUpperCase();
         if (seen.has(key)) continue;
         seen.add(key);
+        const category = hinted === "OTHER" ? classifyStandardItem(item) : hinted;
         const bucket = byCategory.get(category);
         if (bucket) bucket.push(item);
         else byCategory.set(category, [item]);

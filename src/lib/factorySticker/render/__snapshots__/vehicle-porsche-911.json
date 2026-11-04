@@ -9,7 +9,7 @@
     "qr": 2,
     "rect": 31,
     "rule": 15,
-    "text": 223
+    "text": 222
   },
   "fills": [
     "#0a0a0a",
@@ -48,6 +48,7 @@
     6.6,
     6.8,
     7,
+    7.1,
     7.2,
     7.5,
     7.6,
@@ -74,10 +75,6 @@
     "2026 PORSCHE 911",
     "CARRERA 4 GTS COUPE",
     "STANDARD EQUIPMENT",
-    "EXTERIOR",
-    "INTERIOR & COMFORT",
-    "PERFORMANCE & MECHANICAL",
-    "SAFETY & DRIVER ASSISTANCE",
     "MSRP INCLUDES",
     "FACTORY OPTIONS",
     "DESTINATION & HANDLING",
@@ -94,10 +91,14 @@
     "5",
     "spend",
     "$14,250",
-    "cost"
+    "cost",
+    "$2,850",
+    "fueleconomy.gov",
+    "Not Rated",
+    "VEHICLE PASSPORT"
   ],
   "totalBand": "$182,785.00",
   "svgDigest": [
-    "7156c99d"
+    "6768ed7e"
   ]
 }

@@ -366,7 +366,7 @@ const CATEGORY_LABELS: Record<EquipmentCategory, string> = {
   EXTERIOR: "Exterior",
   INTERIOR: "Interior & Comfort",
   COMFORT_CONVENIENCE: "Convenience & Utility",
-  FUNCTIONAL: "Performance & Mechanical",
+  FUNCTIONAL: "Utility & Towing",
   POWERTRAIN: "Performance & Mechanical",
   SAFETY_SECURITY: "Safety & Driver Assistance",
   TECHNOLOGY: "Technology & Connectivity",
@@ -683,6 +683,10 @@ interface BuildContext {
   runIn?: boolean;
   /** Equipment-priority composition: see PageComposition. */
   priority?: boolean;
+  /** Pricing as a column at the bottom right of the left region, equipment flowing beside and above it. */
+  stackedPricing?: { x: number; w: number };
+  /** Height the pricing column takes out of the equipment columns that overlap it. */
+  shortBy?: number;
 }
 
 // ── Reproduction banner: first thing on every page ───────────────────
@@ -1043,6 +1047,14 @@ function paintEntryLines(
 }
 
 const EQUIPMENT_COLUMN_GAP = 13;
+
+/** Height of equipment column `col`: columns that overlap the stacked pricing column are shorter. */
+function columnHeight(
+  ctx: BuildContext, x0: number, colW: number, gap: number, col: number, height: number,
+): number {
+  const sp = ctx.stackedPricing;
+  return sp && x0 + col * (colW + gap) + colW > sp.x - 4 ? Math.max(0, height - (ctx.shortBy ?? 0)) : height;
+}
 /** Narrowest column that still wraps item names legibly at the floor size. */
 const MAX_EQUIPMENT_COLUMNS = 5;
 
@@ -1091,7 +1103,7 @@ function paintStandardEquipment(
 
   const colTop = cursor;
   // Reserve the footnote + closing rule (~14pt) that follow this section.
-  const colBudget = Math.max(0, budget - (cursor - y) - (familyStyle(ctx.theme).boxedZones ? 21 : 14));
+  const colBudget = Math.max(0, budget - (cursor - y) - (ctx.stackedPricing ? 0 : familyStyle(ctx.theme).boxedZones ? 21 : 14));
   const balanced = balancedColumnHeight(entries, LW, colBudget, columns, ctx);
   const flowHeight = balanced ?? colBudget;
   const { leftover, usedHeight, placedItems } = flowColumns(p, entries, LX, colTop, LW, flowHeight, columns, ctx);
@@ -1104,8 +1116,12 @@ function paintStandardEquipment(
 
   for (let col = 1; col < columns; col++) {
     const sx = LX + col * (colW + gap) - gap / 2;
-    p.rule(sx, colTop + 3, 0.5, Math.max(0, usedHeight - 2), "#b6b9bd");
+    const ruleH = ctx.stackedPricing
+      ? Math.min(usedHeight, columnHeight(ctx, LX, colW, gap, col, flowHeight))
+      : usedHeight;
+    p.rule(sx, colTop + 3, 0.5, Math.max(0, ruleH - 2), "#b6b9bd");
   }
+  if (ctx.stackedPricing) return { yEnd: colTop + usedHeight, leftover, overflowPt, printed: placedItems };
 
   const boxed = familyStyle(ctx.theme).boxedZones;
   if (boxed) {
@@ -1125,9 +1141,11 @@ function paintStandardEquipment(
 
 function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
   const { input } = ctx;
-  const leftW = LW * 0.415;
-  const rightX = LX + leftW + 10;
-  const rightW = LX + LW - rightX;
+  const stacked = ctx.stackedPricing;
+  const px = stacked ? stacked.x : LX;
+  const leftW = stacked ? stacked.w : LW * 0.415;
+  const rightX = stacked ? stacked.x : px + leftW + 10;
+  const rightW = stacked ? stacked.w : LX + LW - rightX;
   // The pricing pair reads larger than the equipment lists on the OEM
   // reference, so its sizes are fixed rather than density-driven.
   const size = 7.6;
@@ -1140,8 +1158,8 @@ function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
   // can never read as double-counted against the reconciliation.
   let ly = y + 10;
   if (input.data.equipment.packages.length) {
-    p.text("INCLUDED FACTORY PACKAGES", LX, ly, 8, "bold", BLACK, { charSpacing: 0.4 });
-    p.text("(MSRP)", LX + leftW - 2, ly, 6, "body", "#4c5157", { align: "right" });
+    p.text("INCLUDED FACTORY PACKAGES", px, ly, 8, "bold", BLACK, { charSpacing: 0.4 });
+    p.text("(MSRP)", px + leftW - 2, ly, 6, "body", "#4c5157", { align: "right" });
   }
   ly += 2;
   const pricing0 = input.data.pricing;
@@ -1154,24 +1172,24 @@ function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
     ly += optLh + 1;
     const label = [pkg.code, pkg.name].filter(Boolean).join(" ").toUpperCase();
     const labelLines = wrapText(label, "bold", size, leftW - 50);
-    p.text(labelLines[0] ?? label, LX, ly, size, "bold", BLACK);
-    p.text(priceLabel(pkg, true), LX + leftW - 2, ly, size, "bold", BLACK, { align: "right" });
+    p.text(labelLines[0] ?? label, px, ly, size, "bold", BLACK);
+    p.text(priceLabel(pkg, true), px + leftW - 2, ly, size, "bold", BLACK, { align: "right" });
     for (const extra of labelLines.slice(1)) {
       ly += size * EQUIPMENT_MIN_LINE_HEIGHT_RATIO;
-      p.text(extra, LX, ly, size, "bold", BLACK);
+      p.text(extra, px, ly, size, "bold", BLACK);
     }
     // If the priced packages are not part of the factory-options total, they
     // are already inside Base MSRP — say so explicitly.
     if (pkg.price !== undefined && optTotal !== undefined && Math.abs(optionsSum - optTotal) < 1) {
       ly += 7.5;
-      p.text("INCLUDED IN BASE MSRP", LX + leftW - 2, ly, 5.5, "body", "#4c5157", { align: "right" });
+      p.text("INCLUDED IN BASE MSRP", px + leftW - 2, ly, 5.5, "body", "#4c5157", { align: "right" });
     }
     for (const feature of pkg.features) {
       const lines = wrapText(sanitize(feature), "body", density.item, leftW - 14);
       for (const [li, line] of lines.entries()) {
         ly += density.itemLh;
-        if (li === 0) bulletDot(p, LX + 4, ly, density.item, BLACK);
-        p.text(line, LX + 9, ly, density.item, "body", BLACK);
+        if (li === 0) bulletDot(p, px + 4, ly, density.item, BLACK);
+        p.text(line, px + 9, ly, density.item, "body", BLACK);
       }
     }
   }
@@ -1185,13 +1203,13 @@ function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
       : [];
     if (includeLines.length) {
       ly += 2;
-      p.text("MSRP INCLUDES", LX, ly, 8, "bold", BLACK, { charSpacing: 0.4 });
+      p.text("MSRP INCLUDES", px, ly, 8, "bold", BLACK, { charSpacing: 0.4 });
       for (const line of includeLines) {
         const wrapped = wrapText(line.toUpperCase(), "body", 6.8, leftW - 12);
         wrapped.forEach((seg, si) => {
           ly += si === 0 ? 9 : 7.6;
-          if (si === 0) bulletDot(p, LX + 1.5, ly, 6.8, BLACK);
-          p.text(seg, LX + 6, ly, 6.8, "body", BLACK);
+          if (si === 0) bulletDot(p, px + 1.5, ly, 6.8, BLACK);
+          p.text(seg, px + 6, ly, 6.8, "body", BLACK);
         });
       }
     }
@@ -1202,7 +1220,7 @@ function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
   // FACTORY OPTIONS heading rather than printing a vacant section.
   const hasPortOnly = !input.data.equipment.options.length &&
     (input.data.equipment.portInstalled?.length ?? 0) > 0;
-  let ry = y + 10;
+  let ry = stacked && ly > y + 12 ? ly + 6 : y + 10;
   if (!hasPortOnly) {
     p.text("FACTORY OPTIONS", rightX, ry, 8, "bold", BLACK, { charSpacing: 0.4 });
   }
@@ -1324,7 +1342,7 @@ function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
   }
 
   const end = Math.max(ly, ry) + 5;
-  p.rule(rightX - 6, y + 4, 0.5, end - y - 8, "#b6b9bd");
+  if (!stacked) p.rule(rightX - 6, y + 4, 0.5, end - y - 8, "#b6b9bd");
   return end;
 }
 
@@ -1861,6 +1879,7 @@ function paintPassportPanel(p: Painter, y: number, ctx: BuildContext, targetH: n
   return y + boxH;
 }
 
+const STACKED_PRICING_W = 205;
 const PRIORITY_QR_SIZE = 60; // 0.83in, above the 0.8in scan minimum
 
 function paintPassportFixed(p: Painter, y: number, ctx: BuildContext): number {
@@ -2019,7 +2038,7 @@ function flowRunIn(
     const gapBefore = cy === y0 ? 0 : (lineIdx === 0 ? PARA_GAP : 0);
     const remaining = lines.length - lineIdx;
     const keep = lineIdx === 0 ? Math.min(2, remaining) : 1;
-    if (cy + gapBefore + keep * density.itemLh > y0 + height) {
+    if (cy + gapBefore + keep * density.itemLh > y0 + columnHeight(ctx, x0, colW, gap, col, height)) {
       col++;
       cy = y0;
       if (col >= columns) break;
@@ -2090,7 +2109,7 @@ function flowColumns(
     }
     const itemH = entry.lines.length * density.itemLh;
     const needed = (pendingHeading !== null ? headHFor(pendingHeading) : 0) + itemH;
-    if (cy + needed > y0 + height) {
+    if (cy + needed > y0 + columnHeight(ctx, x0, colW, gap, col, height)) {
       if (!advanceColumn()) break;
       continue;
     }
@@ -2227,22 +2246,27 @@ function buildAttempt(
       (sp, sy) => paintVinBarcode(sp, sy, ctx) + SECTION_GAP,
       (sp, sy) => paintTotalBand(sp, sy, ctx),
     ]);
-  const pricingH = measureStack([(sp, sy) => paintPricingSplit(sp, sy, ctx) + SECTION_GAP]);
-  // The left parts panel reserves its height out of the equipment budget so
-  // it always fits between the pricing split and the spec grid.
   const fsAll = familyStyle(theme);
   const leftPartsW = LW * 0.62;
   const leftPartsH = fsAll.leftPartsPanel
     ? measureStack([(sp, sy) => paintPartsContentPanel(sp, sy, ctx, LX, leftPartsW)])
     : 0;
+  if (priority && leftPartsH === 0) ctx.stackedPricing = { x: LX + LW - STACKED_PRICING_W, w: STACKED_PRICING_W };
+  const stackedH = ctx.stackedPricing ? measureStack([(sp, sy) => paintPricingSplit(sp, sy, ctx)]) : 0;
+  if (ctx.stackedPricing) ctx.shortBy = stackedH + 6;
+  const pricingH = ctx.stackedPricing ? 0 : measureStack([(sp, sy) => paintPricingSplit(sp, sy, ctx) + SECTION_GAP]);
+  // The left parts panel reserves its height out of the equipment budget so
+  // it always fits between the pricing split and the spec grid.
 
   const hasStandard = input.data.equipment.standard.some((g) => g.items.length > 0);
+  const footnoteH = ctx.stackedPricing ? 14 : 0;
   const stdBudget = hasStandard
-    ? Math.max(40, CONTENT_BOTTOM - y - bottomH - pricingH - (leftPartsH > 0 ? leftPartsH + 6 : 0) - SECTION_GAP)
+    ? Math.max(40, CONTENT_BOTTOM - y - bottomH - pricingH - footnoteH - (leftPartsH > 0 ? leftPartsH + 6 : 0) - (ctx.stackedPricing ? 0 : SECTION_GAP))
     : 0;
 
   let overflowPt = 0;
   let printedEquipment: string[] = [];
+  const regionTop = y;
   if (hasStandard) {
     const result = paintStandardEquipment(p, y, stdBudget, ctx);
     overflowPt = result.overflowPt;
@@ -2251,9 +2275,23 @@ function buildAttempt(
   }
   if (overflowPt > 0 && !force) return null;
 
-  y = paintPricingSplit(p, y + 3, ctx);
   const bottomTop = CONTENT_BOTTOM - bottomH;
-  const pricingOverflow = y + SECTION_GAP - (bottomTop + 0.5);
+  let pricingOverflow: number;
+  if (ctx.stackedPricing) {
+    const areaBottom = bottomTop - footnoteH;
+    const priceTop = areaBottom - stackedH;
+    paintPricingSplit(p, priceTop, ctx);
+    p.text(
+      "* See Owner's Manual for complete details, limitations and exclusions.",
+      LX + LW / 2, areaBottom + 8, 5.5, "body", "#4c5157", { align: "center" },
+    );
+    p.rule(LX, areaBottom + 11, LW, 1.4, BLACK);
+    pricingOverflow = hasStandard ? Math.max(0, regionTop + 40 - priceTop) : 0;
+    y = areaBottom;
+  } else {
+    y = paintPricingSplit(p, y + 3, ctx);
+    pricingOverflow = y + SECTION_GAP - (bottomTop + 0.5);
+  }
   if (pricingOverflow > 0) {
     if (!force) return null;
     overflowPt = Math.max(overflowPt, pricingOverflow);

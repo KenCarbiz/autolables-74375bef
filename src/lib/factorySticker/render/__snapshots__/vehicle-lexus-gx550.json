@@ -71,10 +71,10 @@
     "2025 LEXUS GX 550",
     "LUXURY+",
     "STANDARD EQUIPMENT",
-    "EXTERIOR",
-    "INTERIOR & COMFORT",
     "PERFORMANCE & MECHANICAL",
     "SAFETY & DRIVER ASSISTANCE",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
     "FACTORY OPTIONS",
     "DESTINATION & HANDLING",
     "1,350.00",
@@ -94,6 +94,6 @@
   ],
   "totalBand": "$85,790.00",
   "svgDigest": [
-    "07ceede2"
+    "3e2448b8"
   ]
 }

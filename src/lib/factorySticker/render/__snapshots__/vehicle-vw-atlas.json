@@ -71,10 +71,10 @@
     "2026 VOLKSWAGEN ATLAS",
     "SEL 4MOTION",
     "STANDARD EQUIPMENT",
-    "EXTERIOR",
-    "INTERIOR & COMFORT",
     "PERFORMANCE & MECHANICAL",
     "SAFETY & DRIVER ASSISTANCE",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
     "FACTORY OPTIONS",
     "DESTINATION & HANDLING",
     "1,425.00",
@@ -94,6 +94,6 @@
   ],
   "totalBand": "$52,095.00",
   "svgDigest": [
-    "ba60bce0"
+    "4faf0530"
   ]
 }

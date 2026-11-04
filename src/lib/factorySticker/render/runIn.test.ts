@@ -60,9 +60,10 @@ describe("run-in equipment mode", () => {
 
     it("keeps readable leading, bounds and no overlap", () => {
       const items = new Set(Object.values(data.standardEquipment).flat().map((s) => s.split(" ")[0]));
-      const tops = model.pages[0].primitives
-        .flatMap((p) => (p.kind === "text" && p.font === "body" && p.str.startsWith("Verified Test") ? [p] : []))
-        .map((p) => p.y);
+      const starts = model.pages[0].primitives
+        .flatMap((p) => (p.kind === "text" && p.font === "body" && p.str.startsWith("Verified Test") ? [p] : []));
+      const originX = Math.min(...starts.map((p) => p.x));
+      const tops = starts.filter((p) => Math.abs(p.x - originX) < 0.01).map((p) => p.y);
       const ys = [...new Set(tops)].sort((a, b) => a - b);
       const gaps = ys.slice(1).map((y, i) => y - ys[i]).filter((g) => g > 0.5);
       const size = model.fit.ok ? model.fit.equipmentFontPt : 0;

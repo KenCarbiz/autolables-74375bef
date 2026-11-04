@@ -74,10 +74,10 @@
     "2026 KIA TELLURIDE",
     "SX AWD",
     "STANDARD EQUIPMENT",
-    "EXTERIOR",
-    "INTERIOR & COMFORT",
     "PERFORMANCE & MECHANICAL",
     "SAFETY & DRIVER ASSISTANCE",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
     "FACTORY OPTIONS",
     "DESTINATION & HANDLING",
     "1,395.00",
@@ -97,6 +97,6 @@
   ],
   "totalBand": "$48,870.00",
   "svgDigest": [
-    "15fa3b4c"
+    "b75544aa"
   ]
 }

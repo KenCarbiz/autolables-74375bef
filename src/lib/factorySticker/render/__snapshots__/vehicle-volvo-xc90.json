@@ -74,10 +74,10 @@
     "2026 VOLVO XC90",
     "B5 AWD PLUS 7-SEAT",
     "STANDARD EQUIPMENT",
-    "EXTERIOR",
-    "INTERIOR & COMFORT",
     "PERFORMANCE & MECHANICAL",
     "SAFETY & DRIVER ASSISTANCE",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
     "FACTORY OPTIONS",
     "DESTINATION & HANDLING",
     "1,295.00",
@@ -98,6 +98,6 @@
   ],
   "totalBand": "$64,185.00",
   "svgDigest": [
-    "d183d687"
+    "1564df8a"
   ]
 }

@@ -72,6 +72,8 @@ const exactVariantRoute = (o: Outcome): boolean => {
 };
 
 const TRIM_TO_ITEMS = 56;
+const PUBLISHED_N = 31;
+const HELD_N = 5;
 
 /**
  * A one-page-capable subset of a VIN's own saved rows: the first rows of its
@@ -671,8 +673,8 @@ describe("coverage across the inventory", () => {
     const exact = rs.filter((r) => exactVariantRoute(r.o)).length;
     expect(makeWide).toBeGreaterThan(exact);
     expect(exact).toBe(0);
-    expect(rs.filter((r) => r.o.kind === "filed" && r.o.autoPublish)).toHaveLength(23);
-    expect(rs.filter((r) => r.o.kind === "one_page_review_required")).toHaveLength(16);
+    expect(rs.filter((r) => r.o.kind === "filed" && r.o.autoPublish)).toHaveLength(PUBLISHED_N);
+    expect(rs.filter((r) => r.o.kind === "one_page_review_required")).toHaveLength(HELD_N);
   });
 
   it("no vehicle is an auto-published or complete one-page document unless its PDF has exactly one page", async () => {

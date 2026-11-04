@@ -75,10 +75,10 @@
     "2025 BUICK ENVISION",
     "AVENIR AWD",
     "STANDARD EQUIPMENT",
-    "EXTERIOR",
-    "INTERIOR & COMFORT",
     "PERFORMANCE & MECHANICAL",
     "SAFETY & DRIVER ASSISTANCE",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
     "MSRP INCLUDES",
     "FACTORY OPTIONS",
     "DESTINATION & HANDLING",
@@ -99,6 +99,6 @@
   ],
   "totalBand": "$53,195.00",
   "svgDigest": [
-    "1e4aeccb"
+    "119a9c90"
   ]
 }

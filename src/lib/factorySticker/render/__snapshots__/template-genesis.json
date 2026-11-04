@@ -9,7 +9,7 @@
     "qr": 2,
     "rect": 31,
     "rule": 16,
-    "text": 265
+    "text": 264
   },
   "fills": [
     "#0d0d0d",
@@ -96,6 +96,6 @@
   ],
   "totalBand": "$95,695.00",
   "svgDigest": [
-    "e02e7745"
+    "cee27b17"
   ]
 }

@@ -76,10 +76,10 @@
     "2026 CHRYSLER PACIFICA",
     "LIMITED AWD",
     "STANDARD EQUIPMENT",
-    "EXTERIOR",
-    "INTERIOR & COMFORT",
     "PERFORMANCE & MECHANICAL",
     "SAFETY & DRIVER ASSISTANCE",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
     "MSRP INCLUDES",
     "FACTORY OPTIONS",
     "DESTINATION & HANDLING",
@@ -100,6 +100,6 @@
   ],
   "totalBand": "$60,220.00",
   "svgDigest": [
-    "04fd5ac3"
+    "3693b3a0"
   ]
 }

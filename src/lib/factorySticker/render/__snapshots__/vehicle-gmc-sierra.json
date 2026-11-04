@@ -74,10 +74,10 @@
     "2026 GMC SIERRA 1500",
     "DENALI 4WD CREW CAB",
     "STANDARD EQUIPMENT",
-    "EXTERIOR",
-    "INTERIOR & COMFORT",
     "PERFORMANCE & MECHANICAL",
     "SAFETY & DRIVER ASSISTANCE",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
     "FACTORY OPTIONS",
     "DESTINATION & HANDLING",
     "2,095.00",
@@ -97,6 +97,6 @@
   ],
   "totalBand": "$75,970.00",
   "svgDigest": [
-    "f482b5a4"
+    "f08f6f45"
   ]
 }

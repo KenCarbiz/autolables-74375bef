@@ -74,10 +74,10 @@
     "2025 DODGE DURANGO",
     "R/T PLUS AWD",
     "STANDARD EQUIPMENT",
-    "EXTERIOR",
-    "INTERIOR & COMFORT",
     "PERFORMANCE & MECHANICAL",
     "SAFETY & DRIVER ASSISTANCE",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
     "MSRP INCLUDES",
     "FACTORY OPTIONS",
     "DESTINATION & HANDLING",
@@ -98,6 +98,6 @@
   ],
   "totalBand": "$63,575.00",
   "svgDigest": [
-    "6b93387c"
+    "d8b97fc4"
   ]
 }

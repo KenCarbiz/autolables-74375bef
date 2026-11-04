@@ -9,7 +9,7 @@
     "qr": 1,
     "rect": 17,
     "rule": 10,
-    "text": 212
+    "text": 211
   },
   "fills": [
     "#0d0d0d",
@@ -59,12 +59,11 @@
     "2021 TOYOTA RAV4",
     "XLE",
     "STANDARD EQUIPMENT",
-    "EXTERIOR",
-    "INTERIOR & COMFORT",
-    "PERFORMANCE &",
-    "MECHANICAL",
+    "UTILITY & TOWING",
     "SAFETY & DRIVER",
     "ASSISTANCE",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
     "INCLUDED FACTORY PACKAGES",
     "EQUIPMENT GROUP SENSORY",
     "3,400.00",
@@ -78,6 +77,6 @@
   ],
   "totalBand": "$95,695.00",
   "svgDigest": [
-    "76605398"
+    "587ee7ca"
   ]
 }

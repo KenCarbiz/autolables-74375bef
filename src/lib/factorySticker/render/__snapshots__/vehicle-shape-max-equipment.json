@@ -69,11 +69,11 @@
     "2025 INFINITI QX80",
     "SENSORY AWD",
     "STANDARD EQUIPMENT",
-    "EXTERIOR",
-    "INTERIOR & COMFORT",
     "PERFORMANCE & MECHANICAL",
     "SAFETY & DRIVER ASSISTANCE",
     "TECHNOLOGY & CONNECTIVITY",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
     "INCLUDED FACTORY PACKAGES",
     "EQUIPMENT GROUP SENSORY",
     "3,400.00",
@@ -93,6 +93,6 @@
   ],
   "totalBand": "$95,695.00",
   "svgDigest": [
-    "9858b7eb"
+    "08bfc236"
   ]
 }
