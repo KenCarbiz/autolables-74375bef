@@ -95,8 +95,10 @@ function paintEpa(p: Painter, d: FactoryStickerData): void {
   Tx(p, "EPA", left + 4, EY(106), 9.5, "bold", { color: PAPER, lh: 10 });
   Tx(p, "DOT", left + 4, EY(106) + 10.2, 9.5, "bold", { color: PAPER, lh: 10 });
   Tx(p, "Fuel Economy and Environment", DX(684), EY(112), 16, "bold", { color: PAPER });
-  R(p, DX(1003), EY(106), 160, EY(134) - EY(106), EPA_BLUE);
-  if (d.vehicle.fuelType) Tx(p, fuelCategoryLabel(d.vehicle.fuelType), left + width - 11, EY(114), 10.5, "bold", { align: "right" });
+  if (d.vehicle.fuelType) {
+    R(p, DX(1003), EY(106), 160, EY(134) - EY(106), EPA_BLUE);
+    Tx(p, fuelCategoryLabel(d.vehicle.fuelType), left + width - 11, EY(114), 10.5, "bold", { align: "right" });
+  }
 
   const rule = EY(265);
   R(p, left + 3, rule, width - 6, 2.2, INK);

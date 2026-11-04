@@ -103,8 +103,10 @@ function paintEpa(p: Painter, d: FactoryStickerData): void {
   T(p, "EPA", EPA_X + 4, Y(106), 9.5, "bold", { color: PAPER, lh: 10 });
   T(p, "DOT", EPA_X + 4, Y(106) + 10.2, 9.5, "bold", { color: PAPER, lh: 10 });
   T(p, "Fuel Economy and Environment", 684.4, Y(112), 16, "bold", { color: PAPER });
-  R(p, 1003, Y(106), 166, Y(134) - Y(106), "#8cc4e3");
-  if (d.vehicle.fuelType) T(p, fuelCategoryLabel(d.vehicle.fuelType), 1163, Y(114), 10.5, "bold", { align: "right" });
+  if (d.vehicle.fuelType) {
+    R(p, 1003, Y(106), 166, Y(134) - Y(106), "#8cc4e3");
+    T(p, fuelCategoryLabel(d.vehicle.fuelType), 1163, Y(114), 10.5, "bold", { align: "right" });
+  }
 
   const footerTop = panelBottom;
   const note = "Actual results will vary for many reasons, including driving conditions and how you drive and maintain your vehicle. Cost estimates are current EPA estimates and may differ from those printed on the original label.";
