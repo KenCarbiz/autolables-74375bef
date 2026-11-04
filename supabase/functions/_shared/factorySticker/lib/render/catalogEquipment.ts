@@ -13,7 +13,7 @@ import type { FactoryStickerRenderData } from "./contract.ts";
 
 const EXTRA_NON_EQUIPMENT: RegExp[] = [
   /-\s*(good|acceptable|marginal|poor)\s*$/i,
-  /^(frontal crash rating|rollover rating|side impact|overall|headlights|latch|seat belt reminder)\s*-/i,
+  /^(frontal crash rating|rollover rating|side impact|overall|headlights|seat belt reminder)\s*-/i,
   /^(top safety pick status|standard|test revision)\s*-/i,
   /\b(kph|mph)\b/i,
   /^(includes|activates|operates)\b/i,
@@ -26,22 +26,33 @@ const EXTRA_NON_EQUIPMENT: RegExp[] = [
   /^(front|rear) seats head restraints\s*-\s*\d+$/i,
 ];
 
-export const isCatalogNonEquipment = (raw: string): boolean => {
+// Templates added later also drop bare counts and letters, engine and drive
+// labels that the Engine, Transmission and Drivetrain rows already carry.
+const POWERTRAIN_FRAGMENTS: RegExp[] = [
+  /^\d+$|^[a-z]$/i,
+  /^\d+-cyl$|^in-line$|^(short|long|extended) wheelbase$|^(full|mid|compact)[- ]size mpv$|^(unleaded|premium unleaded|diesel)$/i,
+  /^(fwd|rwd|awd|4wd|2wd)$|^(four|front|rear|all) wheel drive( type-.*)?$/i,
+];
+
+const FRAGMENT_TEMPLATES = new Set(["mitsubishi_2026_outlander_sport_s", "chrysler_2026_voyager_lx"]);
+
+export const isCatalogNonEquipment = (raw: string, templateId?: string): boolean => {
   const s = String(raw ?? "").replace(/\s+/g, " ").trim();
-  return !s || isRatingMetadata(s) || isDecoderNoise(s) || EXTRA_NON_EQUIPMENT.some((re) => re.test(s));
+  if (!s || isRatingMetadata(s) || isDecoderNoise(s) || EXTRA_NON_EQUIPMENT.some((re) => re.test(s))) return true;
+  return !!templateId && FRAGMENT_TEMPLATES.has(templateId) && POWERTRAIN_FRAGMENTS.some((re) => re.test(s));
 };
 
-const clean = (groups: Record<string, string[]> | undefined): Record<string, string[]> => {
+const clean = (groups: Record<string, string[]> | undefined, templateId?: string): Record<string, string[]> => {
   const out: Record<string, string[]> = {};
   for (const [hint, items] of Object.entries(groups ?? {})) {
-    const kept = items.filter((i) => !isCatalogNonEquipment(i));
+    const kept = items.filter((i) => !isCatalogNonEquipment(i, templateId));
     if (kept.length) out[hint] = kept;
   }
   return out;
 };
 
-export const withCatalogEquipment = (data: FactoryStickerRenderData): FactoryStickerRenderData => ({
+export const withCatalogEquipment = (data: FactoryStickerRenderData, templateId?: string): FactoryStickerRenderData => ({
   ...data,
-  standardEquipment: clean(data.standardEquipment),
-  keyFeatures: clean(data.keyFeatures),
+  standardEquipment: clean(data.standardEquipment, templateId),
+  keyFeatures: clean(data.keyFeatures, templateId),
 });

@@ -35,4 +35,19 @@ describe("catalog equipment filter", () => {
     expect(out.keyFeatures.Tech).toEqual(["Apple CarPlay"]);
     expect(JSON.stringify(out)).not.toMatch(/Poor|Kph|Mph/);
   });
+
+  describe("powertrain fragments for the Outlander Sport and Voyager templates only", () => {
+    const POWERTRAIN = ["2", "V", "6-Cyl", "Unleaded", "FWD", "AWD", "Short Wheelbase", "Full Size MPV", "Four Wheel Drive Type-Full-Time", "In-Line"];
+    const IDS = ["mitsubishi_2026_outlander_sport_s", "chrysler_2026_voyager_lx"];
+    it.each(POWERTRAIN)("drops %s for those templates and keeps it elsewhere", (s) => {
+      for (const id of IDS) expect(isCatalogNonEquipment(s, id)).toBe(true);
+      expect(isCatalogNonEquipment(s)).toBe(false);
+      expect(isCatalogNonEquipment(s, "jeep_2026_wrangler_willys_392")).toBe(false);
+    });
+    it("keeps LATCH-Ready child-seat anchors and drops the LATCH rating row", () => {
+      expect(isCatalogNonEquipment("LATCH-Ready Child-Seat Anchor System", IDS[1])).toBe(false);
+      expect(isCatalogNonEquipment("Latch-Good", IDS[1])).toBe(true);
+      expect(isCatalogNonEquipment("6 Person Seating Capacity", IDS[1])).toBe(false);
+    });
+  });
 });

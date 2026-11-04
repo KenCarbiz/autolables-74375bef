@@ -337,6 +337,12 @@ export function priceRows(d: FactoryStickerData, money: (n: number) => string = 
   ];
 }
 
+/** Price rows without the unpriced paint and trim entries the decoder lists as options; the colour rows already print them. */
+export function priceRowsWithoutColors(d: FactoryStickerData, money: (n: number) => string = formatMoney): PriceRow[] {
+  const colors = new Set([d.vehicle.exteriorColor, d.vehicle.interiorColor].filter((c): c is string => !!c).map((c) => c.trim().toUpperCase()));
+  return priceRows(d, money).filter((r) => !(r.amount === "N/A" && !r.features.length && colors.has(r.label.trim().toUpperCase())));
+}
+
 export function totalMsrp(d: FactoryStickerData): number | undefined {
   return d.pricing.sourceReportedTotalMsrp ?? d.pricing.calculatedTotalMsrp;
 }

@@ -625,7 +625,7 @@ export function buildRenderLayout(
   const baseInput = adaptRenderData(data);
   const route = resolveVariantRoute(data, theme, baseInput, options.sampleTemplateId ?? null);
   const isCatalog = !!route && !!CATALOG_LAYOUTS[route.variantKey];
-  if (isCatalog) data = withCatalogNeovin(withCatalogEquipment(data));
+  if (isCatalog) data = withCatalogNeovin(withCatalogEquipment(data, route!.variantKey));
   const input = isCatalog ? adaptRenderData(data) : baseInput;
   const genericTheme = resolveRenderTheme(data, theme);
   const base = equipmentBase(data);
