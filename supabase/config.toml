@@ -110,3 +110,16 @@ verify_jwt = false
 
 [functions.integration-health]
 verify_jwt = false
+
+# rtgip/2 app runtime (dark: the compiled literal in the bundle is false and nothing else can
+# enable it). rtgip-inbound is authenticated by the Gateway HMAC, which rtgip.inbox_admit
+# verifies in SQL; rtgip-dispatch accepts only the service role key as its bearer; rtgip-publish
+# needs a signed-in user and re-derives that user's permission from database rows.
+[functions.rtgip-inbound]
+verify_jwt = false
+
+[functions.rtgip-dispatch]
+verify_jwt = false
+
+[functions.rtgip-publish]
+verify_jwt = true
