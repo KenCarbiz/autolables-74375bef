@@ -2,16 +2,21 @@
 // Mirror of src/lib/factorySticker/render/variants/index.ts, copied so the edge runtime can
 // bundle the engine (Supabase ships only supabase/functions/). Edit the
 // source file and run `bun run sync:edge-sticker`.
+import { BUICK_ENVISTA_GAS_ID, buildBuickEnvistaGasLayout } from "./buickEnvistaGas.ts";
 import { buildChryslerPacificaPhevLayout } from "./chryslerPacificaPhev.ts";
 import { CHRYSLER_VOYAGER_GAS_ID, buildChryslerVoyagerGasLayout } from "./chryslerVoyagerGas.ts";
+import { DODGE_DURANGO_GAS_ID, buildDodgeDurangoGasLayout } from "./dodgeDurangoGas.ts";
 import { buildFordTransitCarbLayout } from "./fordTransitCarb.ts";
+import { GENESIS_GV80_GAS_ID, buildGenesisGv80GasLayout } from "./genesisGv80Gas.ts";
 import { buildHyundaiSantaFeHybridLayout } from "./hyundaiSantaFeHybrid.ts";
 import { HYUNDAI_TUCSON_GAS_ID, buildHyundaiTucsonGasLayout } from "./hyundaiTucsonGas.ts";
 import { buildJeepGrandCherokee4xeLayout } from "./jeepGrandCherokee4xe.ts";
 import { JEEP_WRANGLER_GAS_ID, buildJeepWranglerGasLayout } from "./jeepWranglerGas.ts";
 import { LETTER_VARIANT_CONFIGS, buildLetterVariantLayout } from "./letterMonroney.ts";
 import { buildMitsubishiOutlanderLayout } from "./mitsubishiOutlander.ts";
+import { KIA_SORENTO_GAS_ID, buildKiaSorentoGasLayout } from "./kiaSorentoGas.ts";
 import { MITSUBISHI_OUTLANDER_SPORT_ID, buildMitsubishiOutlanderSportLayout } from "./mitsubishiOutlanderSport.ts";
+import { SUBARU_FORESTER_GAS_ID, buildSubaruForesterGasLayout } from "./subaruForesterGas.ts";
 import type { VariantLayoutBuilder } from "./shared.ts";
 
 export type { VariantLayoutBuilder, VariantRenderInput } from "./shared.ts";
@@ -34,4 +39,9 @@ export const CATALOG_LAYOUTS: Partial<Record<string, VariantLayoutBuilder>> = {
   [JEEP_WRANGLER_GAS_ID]: buildJeepWranglerGasLayout,
   [CHRYSLER_VOYAGER_GAS_ID]: buildChryslerVoyagerGasLayout,
   [MITSUBISHI_OUTLANDER_SPORT_ID]: buildMitsubishiOutlanderSportLayout,
+  [KIA_SORENTO_GAS_ID]: buildKiaSorentoGasLayout,
+  [DODGE_DURANGO_GAS_ID]: buildDodgeDurangoGasLayout,
+  [BUICK_ENVISTA_GAS_ID]: buildBuickEnvistaGasLayout,
+  [GENESIS_GV80_GAS_ID]: buildGenesisGv80GasLayout,
+  [SUBARU_FORESTER_GAS_ID]: buildSubaruForesterGasLayout,
 };

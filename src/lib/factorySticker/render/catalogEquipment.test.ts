@@ -50,4 +50,16 @@ describe("catalog equipment filter", () => {
       expect(isCatalogNonEquipment("6 Person Seating Capacity", IDS[1])).toBe(false);
     });
   });
+
+  describe("fragments for the Sorento, Forester, GV80, Durango and Envista templates", () => {
+    const IDS = ["kia_2026_sorento_lx", "subaru_2026_forester_wilderness", "genesis_2026_gv80_3.5t_prestige", "dodge_2026_durango_gt_blacktop", "buick_2026_envista_avenir"];
+    it.each(["2", "6-Cyl", "Gasoline", "Regular Unleaded", "AWD", "Mid", "Upper Medium", "Turbo", "Horizontal"])("drops %s for those templates only", (s) => {
+      for (const id of IDS) expect(isCatalogNonEquipment(s, id)).toBe(true);
+      expect(isCatalogNonEquipment(s, "chrysler_2026_voyager_lx")).toBe(s !== "Mid" && s !== "Upper Medium" && s !== "Turbo" && s !== "Horizontal");
+      expect(isCatalogNonEquipment(s)).toBe(false);
+    });
+    it("keeps real equipment", () => {
+      for (const id of IDS) expect(isCatalogNonEquipment("Turbo Boost Gauge", id)).toBe(false);
+    });
+  });
 });

@@ -133,4 +133,34 @@ describe("template catalog", () => {
       expect(isRoutable({ ...t, approval: "approved", layoutStatus: "approved" })).toBe(true);
     });
   });
+
+  it("marks the Sorento, Forester, GV80, Durango and Envista templates sample ready, pending approval, with accurate blockers", () => {
+    for (const id of ["kia_2026_sorento_lx", "subaru_2026_forester_wilderness", "genesis_2026_gv80_3.5t_prestige", "dodge_2026_durango_gt_blacktop", "buick_2026_envista_avenir"]) {
+      const t = getCatalogTemplate(id)!;
+      expect(t.layoutStatus, id).toBe("sample_ready");
+      expect(t.approval, id).toBe("pending_owner_approval");
+      expect(t.page, id).toEqual({ widthPt: 1224, heightPt: 792, orientation: "landscape" });
+      expect(t.blockers, id).not.toContain("layout_not_built");
+      expect(t.blockers, id).toContain("owner_exact_match_not_approved");
+      expect(t.blockers, id).not.toContain("missing_source_artwork");
+    }
+  });
+
+  it("matches only the gasoline configuration of each new template", () => {
+    const veh = (make: string, model: string, over: Partial<CatalogVehicleInput> = {}): CatalogVehicleInput =>
+      ({ make, modelYear: 2026, model, trim: null, bodyClass: "SUV", fuelClass: "gasoline", drivetrain: null, ...over });
+    const status = (v: CatalogVehicleInput): string => resolveCatalogTemplate(v).status;
+    expect(status(veh("Kia", "Sorento"))).toBe("pending_match");
+    expect(status(veh("Kia", "Sorento Hybrid", { fuelClass: "hybrid" }))).toBe("configuration_unsupported");
+    expect(status(veh("Kia", "Sorento", { fuelClass: "phev" }))).toBe("configuration_unsupported");
+    expect(status(veh("Subaru", "Forester"))).toBe("pending_match");
+    expect(status(veh("Subaru", "Forester", { fuelClass: "hybrid" }))).toBe("configuration_unsupported");
+    expect(status(veh("Subaru", "Forester Hybrid"))).toBe("configuration_unsupported");
+    expect(status(veh("Genesis", "GV80", { trim: "3.5T Prestige" }))).toBe("pending_match");
+    expect(status(veh("Genesis", "GV80 Coupe"))).toBe("configuration_unsupported");
+    expect(status(veh("Dodge", "Durango", { trim: "SRT Hellcat" }))).toBe("pending_match");
+    expect(status(veh("Dodge", "Durango", { fuelClass: "phev" }))).toBe("configuration_unsupported");
+    expect(status(veh("Buick", "Envista"))).toBe("pending_match");
+    expect(status(veh("Buick", "Envista", { bodyClass: "Sedan" }))).toBe("configuration_unsupported");
+  });
 });

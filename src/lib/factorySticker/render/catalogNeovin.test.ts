@@ -65,6 +65,7 @@ describe("NeoVIN decode facts for catalog templates", () => {
     const production = buildRenderLayout(d, theme);
     expect(production.width).toBe(792);
     expect(hasBuiltCatalogTemplates("Hyundai")).toBe(true);
+    for (const make of ["Kia", "Subaru", "Genesis", "Dodge", "Buick"]) expect(hasBuiltCatalogTemplates(make), make).toBe(true);
     expect(hasBuiltCatalogTemplates("Infiniti")).toBe(false);
     const listing = { ...tucsonListings()[0], ymm: "2026 Infiniti QX60" };
     const n = normalizeForSticker(listing, {}, canonicalPassportUrl("x"), "t").data;
