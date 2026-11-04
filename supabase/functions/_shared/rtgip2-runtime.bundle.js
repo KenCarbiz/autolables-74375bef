@@ -1408,6 +1408,9 @@ function createAppRuntime(cfg) {
       } catch {
         doc = {};
       }
+      if (doc.reason == null && typeof doc.error === "string") doc = { ...doc, reason: doc.error };
+      if (!Array.isArray(doc.receipts) && doc.receipt && typeof doc.receipt === "object")
+        doc = { ...doc, receipts: [doc.receipt] };
       return { status: r.status, doc };
     } catch {
       return { status: 0, doc: { reason: "gateway_unreachable" } };

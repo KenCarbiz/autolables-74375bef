@@ -4,7 +4,7 @@
     "pg-harness.ts": "8e9010a7e26fcaba5cc97f5d7748f57818f9205cf516f3539c5736c51d3095c5",
     "provenance.test.ts": "69876cddb0b7e18701cdd972c2190f7a013f8ab8d64bcf99be21b1ebdd3509f5",
     "runtime.test.ts": "673aeba45bfd2f801ebc25c0a47da40564a8470c899482438ca3d5c35e1b264b",
-    "runtime.ts": "bf91fbfa7214a6fda717b0e77944490a7cf5a002f30bd4263cfe54529ab79ca2"
+    "runtime.ts": "e772e666687e96c620b31883520c9b6a5c9ff8d9347f45fb0d79bb1677790be1"
   },
   "core": {
     "admission.ts": "993cd8852fe90586a8c68b828ab9fd5debede3a651de9dbe920ed92ef3fcc870",

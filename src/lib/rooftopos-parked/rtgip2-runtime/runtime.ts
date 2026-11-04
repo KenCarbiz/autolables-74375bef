@@ -399,13 +399,24 @@ export function createAppRuntime(cfg: AppRuntimeConfig): AppRuntime {
         redirect: "error",
         signal: timeoutSignal(FETCH_TIMEOUT_MS),
       });
-      let doc: { reason?: string | null; receipts?: ReceiptV2[] } = {};
+      let doc: {
+        reason?: string | null;
+        error?: string;
+        receipts?: ReceiptV2[];
+        receipt?: ReceiptV2;
+      } = {};
       try {
         const parsed: unknown = JSON.parse(await limitedText(r));
         if (parsed && typeof parsed === "object") doc = parsed as typeof doc;
       } catch {
         doc = {};
       }
+      // The Gateway's deliver route answers { outcome, receipt } with one admission receipt; the
+      // receipt query answers { receipts }. Both reach outbox_advance as a receipt list. Its
+      // refusals carry the code in `error`, which the refusal policy reads as the reason.
+      if (doc.reason == null && typeof doc.error === "string") doc = { ...doc, reason: doc.error };
+      if (!Array.isArray(doc.receipts) && doc.receipt && typeof doc.receipt === "object")
+        doc = { ...doc, receipts: [doc.receipt] };
       return { status: r.status, doc };
     } catch {
       return { status: 0, doc: { reason: "gateway_unreachable" } };
