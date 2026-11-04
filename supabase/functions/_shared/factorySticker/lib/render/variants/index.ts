@@ -3,6 +3,7 @@
 // bundle the engine (Supabase ships only supabase/functions/). Edit the
 // source file and run `bun run sync:edge-sticker`.
 import { buildChryslerPacificaPhevLayout } from "./chryslerPacificaPhev.ts";
+import { CHRYSLER_VOYAGER_GAS_ID, buildChryslerVoyagerGasLayout } from "./chryslerVoyagerGas.ts";
 import { buildFordTransitCarbLayout } from "./fordTransitCarb.ts";
 import { buildHyundaiSantaFeHybridLayout } from "./hyundaiSantaFeHybrid.ts";
 import { HYUNDAI_TUCSON_GAS_ID, buildHyundaiTucsonGasLayout } from "./hyundaiTucsonGas.ts";
@@ -10,6 +11,7 @@ import { buildJeepGrandCherokee4xeLayout } from "./jeepGrandCherokee4xe.ts";
 import { JEEP_WRANGLER_GAS_ID, buildJeepWranglerGasLayout } from "./jeepWranglerGas.ts";
 import { LETTER_VARIANT_CONFIGS, buildLetterVariantLayout } from "./letterMonroney.ts";
 import { buildMitsubishiOutlanderLayout } from "./mitsubishiOutlander.ts";
+import { MITSUBISHI_OUTLANDER_SPORT_ID, buildMitsubishiOutlanderSportLayout } from "./mitsubishiOutlanderSport.ts";
 import type { VariantLayoutBuilder } from "./shared.ts";
 
 export type { VariantLayoutBuilder, VariantRenderInput } from "./shared.ts";
@@ -30,4 +32,6 @@ export const VARIANT_LAYOUTS: Record<string, VariantLayoutBuilder> = {
 export const CATALOG_LAYOUTS: Partial<Record<string, VariantLayoutBuilder>> = {
   [HYUNDAI_TUCSON_GAS_ID]: buildHyundaiTucsonGasLayout,
   [JEEP_WRANGLER_GAS_ID]: buildJeepWranglerGasLayout,
+  [CHRYSLER_VOYAGER_GAS_ID]: buildChryslerVoyagerGasLayout,
+  [MITSUBISHI_OUTLANDER_SPORT_ID]: buildMitsubishiOutlanderSportLayout,
 };

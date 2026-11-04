@@ -68,6 +68,32 @@ describe("template catalog", () => {
       expect(evaluateCatalogTemplate(wrangler, { ...v, model: "Wrangler 4xe" }).matched).toBe(false);
     });
 
+    it("keeps the Outlander Sport and the Voyager apart from their sibling models", () => {
+      const sport = getCatalogTemplate("mitsubishi_2026_outlander_sport_s")!;
+      const m: CatalogVehicleInput = { make: "Mitsubishi", modelYear: 2026, model: "Outlander Sport", trim: "2.0 ES", bodyClass: "SUV", fuelClass: "gasoline", drivetrain: null };
+      expect(evaluateCatalogTemplate(sport, m).matched).toBe(true);
+      expect(evaluateCatalogTemplate(sport, { ...m, drivetrain: "AWD" }).matched).toBe(true);
+      for (const model of ["Outlander", "Outlander PHEV", "Eclipse Cross", "Mirage"]) {
+        expect(evaluateCatalogTemplate(sport, { ...m, model }).matched, model).toBe(false);
+      }
+      expect(evaluateCatalogTemplate(sport, { ...m, modelYear: 2025 }).matched).toBe(false);
+      expect(evaluateCatalogTemplate(sport, { ...m, fuelClass: "phev" }).matched).toBe(false);
+      const outlander = resolveCatalogTemplate({ ...m, model: "Outlander" });
+      expect(outlander.status).toBe("configuration_unsupported");
+      expect(resolveCatalogTemplate(m).status).toBe("pending_match");
+
+      const voyager = getCatalogTemplate("chrysler_2026_voyager_lx")!;
+      const c: CatalogVehicleInput = { make: "Chrysler", modelYear: 2026, model: "Voyager", trim: "LX", bodyClass: "Minivan", fuelClass: "gasoline", drivetrain: "FWD" };
+      expect(evaluateCatalogTemplate(voyager, c).matched).toBe(true);
+      expect(evaluateCatalogTemplate(voyager, { ...c, trim: "Premium", drivetrain: null }).matched).toBe(true);
+      for (const model of ["Pacifica", "Pacifica Hybrid", "Pacifica Plug-in Hybrid", "300", "Town & Country"]) {
+        expect(evaluateCatalogTemplate(voyager, { ...c, model }).matched, model).toBe(false);
+      }
+      expect(evaluateCatalogTemplate(voyager, { ...c, fuelClass: "phev" }).matched).toBe(false);
+      expect(evaluateCatalogTemplate(voyager, { ...c, bodyClass: "Sedan" }).matched).toBe(false);
+      expect(resolveCatalogTemplate({ ...c, model: "Pacifica" }).flags).toEqual(["template_configuration_unsupported"]);
+    });
+
     it("normalizes body styles from record text", () => {
       expect(normalizeBodyClass("Sport Utility")).toBe("SUV");
       expect(normalizeBodyClass("Mini-van")).toBe("MINIVAN");
