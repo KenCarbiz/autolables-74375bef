@@ -23,7 +23,8 @@ describe("template catalog", () => {
 
   it("records the reference page size and orientation", () => {
     expect(getCatalogTemplate("hyundai_2026_tucson_se_awd")!.page).toEqual({ widthPt: 1224, heightPt: 792, orientation: "landscape" });
-    expect(getCatalogTemplate("mitsubishi_2026_outlander_sport_s")!.page.orientation).toBe("portrait");
+    expect(getCatalogTemplate("mitsubishi_2026_outlander_sport_s")!.page).toEqual({ widthPt: 1224, heightPt: 792, orientation: "landscape" });
+    expect(getCatalogTemplate("mitsubishi_2026_outlander_sport_s")!.blockers).toContain("reference_stored_rotated");
     expect(getCatalogTemplate("honda_2026_odyssey_touring")!.page).toMatchObject({ widthPt: 612, heightPt: 792 });
   });
 

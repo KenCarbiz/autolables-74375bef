@@ -40,7 +40,7 @@ export type CatalogBlockerCode =
   | "carb_panel_pending"
   | "powertrain_rule_unverified"
   | "page_size_nonstandard"
-  | "page_size_portrait"
+  | "reference_stored_rotated"
   | "epa_scale_scan_rebuilt"
   | "hope_on_wheels_artwork_not_reproduced"
   | "nhtsa_ratings_not_wired"
@@ -342,13 +342,13 @@ export const TEMPLATE_CATALOG: readonly CatalogTemplate[] = [
     canonicalMake: "MITSUBISHI",
     source: { modelYear: 2026, model: "Outlander Sport", trim: "2.0 S" },
     referenceStatus: "2026_factory_example",
-    page: { widthPt: 792, heightPt: 1224, orientation: "portrait" },
+    page: { widthPt: 1224, heightPt: 792, orientation: "landscape" },
     referencePdf: "Mitsubishi_2026_Outlander_Sport_S.pdf",
     design: { fileKey: "VehaYwRPRnGDHVPNxrppeA", masterNodeId: "1:393" },
     match: { modelYears: [2026], modelPattern: "^outlandersport$|^rvr$", bodyClasses: ["SUV"], fuelClasses: ["gasoline"], },
     approval: "pending_owner_approval",
     layoutStatus: "sample_ready",
-    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "page_size_portrait", "parts_content_not_wired", "warranty_terms_not_wired"],
+    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "reference_stored_rotated", "parts_content_not_wired", "warranty_terms_not_wired"],
   },
   {
     id: "ram_2026_2500_limited",

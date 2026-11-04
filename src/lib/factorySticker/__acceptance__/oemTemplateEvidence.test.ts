@@ -227,7 +227,7 @@ Every printed value comes from the saved vehicle record the generator already re
 | Reproduction banner and disclosure | reproduction.ts | Always printed |
 | Mitsubishi logo | packaged artwork (logoArtwork.ts, owner-authorized 2026-11-01) | Always printed |
 | Title (year model trim) | identity from ymm + listing.trim | Missing parts omitted, never guessed |
-| Exterior / interior color, engine, transmission, drivetrain | build_sheet.colors; mc_attributes.engine / transmission; drivetrain from sourceCorrections.decideDrivetrain | Row omitted |
+| Exterior / interior color line, engine, transmission, emissions, drivetrain | build_sheet.colors; mc_attributes.engine / transmission; drivetrain from sourceCorrections.decideDrivetrain | Row omitted |
 | Emissions line | factoryCodes.emissions (not on current records) | Row omitted |
 | Fuel economy MPG, city, highway, gallons per 100 miles | epa_economy combined / city / highway; gallons from the record or 100 / combined | Panel shows the unavailable message; nothing is zero |
 | Annual fuel cost | epa_economy.annualFuelCost | Not Available |
@@ -241,6 +241,7 @@ Every printed value comes from the saved vehicle record the generator already re
 | Additional equipment (packages, options with price) | build_sheet.packages / options | "None listed."; a missing price prints N/A, an included item INCLUDED |
 | MSRP, total additional equipment, subtotal, destination/handling, total MSRP | build_sheet.pricing base_msrp, factory-installed total, destination_charge; total_msrp (stated), else base + options + destination | NOT AVAILABLE |
 | Warranty coverage | warranty.* (verified OEM terms only) | "Not available for this vehicle." Not wired in the adapter today |
+| Visit-us bar | fixed OEM web address | Always printed |
 | Ship to (original delivering dealer) | dealer block, ONLY when dealerRole is original_delivery | Label printed blank. The current selling rooftop never prints. The orchestrator does not set dealerRole today |
 | Plant / port of entry, method of transport | factory.finalAssemblyPoint, factory.transportMethod | Omitted |
 | VIN, VIN barcode | listing.vin; Code 128 regenerated per vehicle | Always present |
@@ -259,14 +260,15 @@ Status: layout ${t.layoutStatus}, approval ${t.approval}. Production routing can
 ${t.blockers.map((b) => `- ${b}`).join("\n")}
 
 ## Unresolved differences
-- Page: the reference is an 11x17 sheet (792x1224pt, rotation 0) carrying a landscape label printed rotated 90 degrees, so its text reads sideways. This layout is upright on the same 792x1224 page with the panels re-stacked (header, fuel economy, safety and parts content, equipment and pricing, footer). The order and content of the panels follow the reference; their positions do not. The owner should confirm that an upright portrait layout is acceptable (page_size_portrait).
+- Page: the reference PDF is an 11x17 sheet (792x1224pt, rotation 0) that stores a landscape label rotated 90 degrees (reference_stored_rotated). This layout is the upright 17x11 landscape page (1224x792pt) with the reference arrangement: logo and title block above the standard equipment on the left, additional equipment and the MSRP stack in the middle, then the fuel-economy panel, warranty and parts-content panels, safety panel and VIN strip on the right. Geometry is transformed from the rotated page; verticals are compressed to clear the banner and disclosure. The owner should confirm that the upright landscape page is acceptable.
 - Fonts: Helvetica / Helvetica-Bold stand in for the reference's Arial and DIN-style faces (font_substitution).
-- Artwork not reproduced: the 10-year powertrain warranty graphic and its coverage columns, the "Mitsubishi Motors Confidence" included-items list, "Full Tank of Gas INCLUDED", agency seals, the source Smartphone QR (replaced by the Vehicle Passport QR in the footer), the source barcode (regenerated from the VIN), the cumulative accessory weight line, route code, location and the build string.
+- Warranty panel: prints the record's verified warranty terms, else "Not available for this vehicle."; the 10-year graphic and its coverage columns are not reproduced.
+- Artwork not reproduced: the "Mitsubishi Motors Confidence" included-items list, "Full Tank of Gas INCLUDED", agency seals, the source Smartphone QR (replaced by the 0.90in Vehicle Passport QR in the same slot at the foot of the fuel-economy panel, on a white backing square), the source barcode (regenerated from the VIN), the cumulative accessory weight line, route code, location and the build string.
 - Wording not reproduced: the federal-law label statement under the pricing ("This label has been applied to this vehicle pursuant to federal law ...") is not certified here. The footnote reads "Original manufacturer's suggested retail prices shown. Excludes taxes, title, license, dealer-installed items and current selling price."
 - EPA panel: native rebuild with the same indicator semantics (1-10 scores, Not Available for anything else); gradient, bubble shape and spacing are approximated, and the average-vehicle MPG and cost sentence is not printed.
 - Safety: the decode gives one frontal and one side value, so combined rows print where the reference shows driver/passenger and front/rear seat; the reference-match fixture carries per-row values to show the full panel. The footer wording uses www.nhtsa.gov/ratings where the reference prints safercar.gov.
 - Pricing block: prints MSRP, total additional equipment, subtotal, destination/handling and total MSRP from the record; any value the record lacks prints NOT AVAILABLE. The reference-match values reconcile ($24,995 + $455 + $1,795 = $27,245). The stress record reconciles ($27,995 + $410 + $1,445 = $29,850).
-- Fields in the reference with no render-data source: the dealer ship-to block (blank unless the original delivering dealer is proven), port of entry (Baltimore), route code, location, accessory weight, build string. Plant/port prints the final assembly point only when the record has one.
+- Fields in the reference with no render-data source: the "4-DOOR SUV" line, the dealer ship-to block (blank unless the original delivering dealer is proven), port of entry (Baltimore), route code, location, accessory weight, build string. Plant/port prints the final assembly point only when the record has one.
 - OCR: transcription was spot-checked against the PDF only (ocr_unverified). The reference-match fixture normalizes quotation marks and drops registered and trademark marks.
 - Parts content, warranty: not wired by the orchestrator adapter today (blockers parts_content_not_wired, warranty_terms_not_wired); the reference-match render shows the populated state. The stress record shows only the country of final assembly from mc_attributes.made_in.
 - Equipment: the reference prints its 26 items under five headings; the stress record prints all 172 at the ladder's compacted size with decoder fragments removed.
@@ -396,6 +398,10 @@ describe.skipIf(!DIR)("OEM template evidence", () => {
       results.push(await writeSample(spec, outDir, refPdf, matchData, "reference-match (visual comparison only)", true));
 
       sh("pdftoppm", ["-r", "100", "-png", "-singlefile", refPdf, join(outDir, "_ref100")]);
+      if (t.page.widthPt > t.page.heightPt && /Page size:\s+([\d.]+) x ([\d.]+) pts/.test(sh("pdfinfo", [refPdf]))) {
+        const rs = /Page size:\s+([\d.]+) x ([\d.]+) pts/.exec(sh("pdfinfo", [refPdf]))!;
+        if (Number(rs[1]) < Number(rs[2])) sh("convert", [join(outDir, "_ref100.png"), "-rotate", "90", join(outDir, "_ref100.png")]);
+      }
       sh("pdftoppm", ["-r", "100", "-png", "-singlefile", join(outDir, "reference-match.pdf"), join(outDir, "_match100")]);
       sh("montage", [
         "-label", "OEM reference (original PDF)", join(outDir, "_ref100.png"),

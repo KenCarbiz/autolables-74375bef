@@ -7,7 +7,7 @@ import { canonicalPassportUrl, PASSPORT_QR_CAPTION, REPRODUCTION_BANNER, REPRODU
 import { encodeQrMatrix } from "../qrMatrix";
 import { TEMPLATE_CATALOG, getCatalogTemplate } from "../../oem/templateCatalog";
 import { PASSPORT_QR_PT } from "./hyundaiTucsonGas";
-import { MITSUBISHI_OUTLANDER_SPORT_ID, PORTRAIT_HEIGHT, PORTRAIT_WIDTH } from "./mitsubishiOutlanderSport";
+import { MITSUBISHI_OUTLANDER_SPORT_ID } from "./mitsubishiOutlanderSport";
 
 const theme: FactoryStickerTheme = {
   oemThemeId: "oem-mitsubishi", oemThemeVersion: "1", canonicalOemId: "mitsubishi", templateFamilyId: "x",
@@ -29,13 +29,13 @@ describe("Mitsubishi Outlander Sport gasoline template", () => {
   describe("off-year layout stress test (2024 Eclipse Cross record), not a production candidate", () => {
     const m = sample(real);
 
-    it("renders exactly one 792x1224 portrait page that equals the catalog reference size", () => {
+    it("renders exactly one 1224x792 landscape page, the upright size of the rotated reference label", () => {
       const page = getCatalogTemplate(MITSUBISHI_OUTLANDER_SPORT_ID)!.page;
       expect(m.fit.ok).toBe(true);
       expect(m.pages).toHaveLength(1);
       expect([m.width, m.height]).toEqual([page.widthPt, page.heightPt]);
-      expect([m.width, m.height]).toEqual([PORTRAIT_WIDTH, PORTRAIT_HEIGHT]);
-      expect(page.orientation).toBe("portrait");
+      expect(page.orientation).toBe("landscape");
+      expect(getCatalogTemplate(MITSUBISHI_OUTLANDER_SPORT_ID)!.blockers).toContain("reference_stored_rotated");
       expect(pageStrings(m, 0)).toContain("PAGE 1 OF 1");
     });
 
@@ -111,8 +111,11 @@ describe("Mitsubishi Outlander Sport gasoline template", () => {
         const b = textBBox(t);
         expect(hits(b.x0, b.y0, b.x1, b.y1), t.str).toBe(false);
       }
+      const whites = m.pages[0].primitives.filter((p) => p.kind === "rect" && p.fill === "#ffffff" && p.x === qr.x && p.y === qr.y && p.w === qr.size);
+      expect(whites).toHaveLength(1);
       for (const p of m.pages[0].primitives) {
-        if ((p.kind === "rect" && p.fill) || p.kind === "barcode" || p.kind === "image") {
+        const backing = p.kind === "rect" && p.x <= qr.x && p.y <= qr.y && p.x + p.w >= qr.x + qr.size && p.y + p.h >= qr.y + qr.size;
+        if ((p.kind === "rect" && p.fill && !backing) || p.kind === "barcode" || p.kind === "image") {
           expect(hits(p.x, p.y, p.x + p.w, p.y + p.h)).toBe(false);
         }
       }
@@ -196,7 +199,7 @@ describe("Mitsubishi Outlander Sport gasoline template", () => {
       const xs: number[] = [];
       for (const score of [1, 5, 10]) {
         const model = sample({ ...ref, epa: { ...ref.epa!, ghgScore: score, smogScore: null } });
-        const label = texts(model).find((t) => t.str === String(score) && t.color === "#ffffff" && t.x > 214 && t.x < 500 && t.align === "center");
+        const label = texts(model).find((t) => t.str === String(score) && t.color === "#ffffff" && t.x > 800 && t.x < 1030 && t.align === "center");
         expect(label).toBeDefined();
         xs.push(label!.x);
       }
@@ -271,7 +274,7 @@ describe("Mitsubishi Outlander Sport gasoline template", () => {
         expect(buildRenderLayout(ref, theme).height).toBe(612);
         mutable.layoutStatus = "approved";
         const routed = buildRenderLayout(ref, theme);
-        expect([routed.width, routed.height]).toEqual([792, 1224]);
+        expect([routed.width, routed.height]).toEqual([1224, 792]);
         expect(routed.fit.ok && routed.fit.figmaMaster).toBe(true);
         expect(buildRenderLayout({ ...ref, identity: { ...ref.identity, year: "2025" } }, theme).height).toBe(612);
       } finally {

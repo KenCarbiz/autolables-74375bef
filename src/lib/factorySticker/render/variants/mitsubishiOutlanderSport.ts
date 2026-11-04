@@ -1,45 +1,36 @@
-// 11x17 portrait reproduction layout for the 2026 Mitsubishi Outlander Sport,
-// translated from the handoff geometry of "Mitsubishi_2026_Outlander_Sport_S"
-// (Figma file VehaYwRPRnGDHVPNxrppeA, master 1:393). The reference is a
-// landscape label printed rotated onto an 792x1224pt portrait sheet. The
-// primitives here are axis-aligned (a rotated QR or barcode is a scanning
-// risk), so the same panels are laid out upright and stacked on the same
-// 792x1224 page. Coordinates are PDF points.
+// 17x11 reproduction layout for the 2026 Mitsubishi Outlander Sport, translated
+// from the handoff geometry of "Mitsubishi_2026_Outlander_Sport_S" (Figma file
+// VehaYwRPRnGDHVPNxrppeA, master 1:393). The reference PDF stores a landscape
+// label rotated 90 degrees on a 792x1224pt page (reference_stored_rotated); the
+// geometry below is the upright landscape arrangement, written in the upright
+// label's own points and mapped onto the 1224x792 page by Y(), which keeps the
+// horizontals and compresses verticals so the content clears the mandatory
+// reproduction banner above and disclosure below.
 //
 // Every printed value comes from render data; nothing from the reference
 // sample (VIN, prices, ratings, QR, barcode, parts content, dealer) is used as
-// a default. The logo is the packaged Mitsubishi artwork. The warranty
-// graphic, the "Confidence" included-items list, agency seals, the source QR,
-// the cumulative-accessory-weight line and the federal-law label statement are
+// a default. The 10-year powertrain warranty graphic, the "Confidence"
+// included-items list, agency seals, the source QR, the cumulative-accessory
+// weight line, route code, location and the federal-law label statement are
 // intentionally not reproduced.
 
 import type { FactoryStickerData } from "../../types.ts";
-import {
-  Painter, fitOk, fuelCategoryLabel, formatMoney, measureText, validateModel, type LayoutModel,
-} from "../layout.ts";
-import { PASSPORT_QR_CAPTION, REPRODUCTION_BANNER, reproductionDisclosureLines } from "../../reproduction.ts";
+import { Painter, fuelCategoryLabel, formatMoney, measureText, type LayoutModel } from "../layout.ts";
+import { PASSPORT_QR_CAPTION } from "../../reproduction.ts";
 import { VARIANT_LOGOS } from "./logoArtwork.ts";
-import { EPA_BLUE, INK, PAPER, type VariantLayoutBuilder, type VariantRenderInput } from "./shared.ts";
-import { PASSPORT_QR_PT, R, T, paintScale, scaleState, wrap } from "./hyundaiTucsonGas.ts";
+import { EPA_BLUE, INK, PAPER, type VariantLayoutBuilder } from "./shared.ts";
+import { PASSPORT_QR_PT, R, T, Y, paintScale, scaleState, wrap } from "./hyundaiTucsonGas.ts";
 import {
-  MAX_EXTRA_COLUMNS, assemblyLabel, buildSections, colorText, dealerLines, flow, paintPlaced, paintSafetyPanel,
-  partsFacts, placedResult, priceRowsWithoutColors, styleLadder, toEntries, totalMsrp, underlined, warrantySection,
-  type FlowStyle,
+  TABLOID_HEIGHT, TABLOID_WIDTH, assembleTabloid, assemblyLabel, buildSections, colorText, dealerLines, flow, paintPlaced,
+  paintSafetyPanel, partsFacts, placedResult, priceRowsWithoutColors, toEntries, totalMsrp, warrantySection,
+  type ColumnSpec, type FirstPageContext, type FirstPageResult, type FlowStyle, type TabloidSpec,
 } from "./tabloidCommon.ts";
 
 export const MITSUBISHI_OUTLANDER_SPORT_ID = "mitsubishi_2026_outlander_sport_s";
 
-export const PORTRAIT_WIDTH = 792;
-export const PORTRAIT_HEIGHT = 1224;
-
 const Q = (pt: number): number => pt / 0.612;
-const DISPLAY_PT = 0.612;
-const EQ_STYLE: FlowStyle = { size: 13.4, lh: 15.6, hang: 6, inset: 10 };
+const EQ_STYLE: FlowStyle = { size: 12.4, lh: 14.2, hang: 6, inset: 9 };
 const FLOOR_PT = 5.5;
-
-const X0 = 24;
-const X1 = 768;
-const W = X1 - X0;
 
 const Tx = (
   p: Painter, s: string, x: number, top: number, size: number, font: "body" | "bold" = "body",
@@ -52,179 +43,182 @@ const fitSize = (s: string, font: "body" | "bold", size: number, maxW: number, f
   return z;
 };
 
+// Left box, middle column and right column, in upright-label points.
+const BOX_X = 40;
+const BOX_W = 604;
+const MID_X = 443;
+const MID_R = 640;
+const RIGHT_X = 652;
+const RIGHT_W = 526;
+const SAFETY_X = 851;
+const SAFETY_W = 327;
+
 // ── Header ────────────────────────────────────────────────────────────
 
-function paintHeader(p: Painter, d: FactoryStickerData, top: number): number {
+function paintHeader(p: Painter, d: FactoryStickerData): void {
   const logo = VARIANT_LOGOS.mitsubishi;
-  const lw = 96;
-  p.image(logo.png, logo.assetId, X0 + 4, top, lw, (lw * 878) / 900);
+  p.image(logo.png, logo.assetId, 72, Y(58), 66, (66 * 878) / 900);
   const v = d.vehicle;
   const title = [v.year > 0 ? String(v.year) : "", v.model, v.trim ?? ""].filter(Boolean).join(" ").toUpperCase();
-  const tx = X0 + 120;
-  Tx(p, title, tx, top + 2, fitSize(title, "bold", 24, X1 - tx - 8, 14), "bold");
-  Tx(p, "Visit us at www.mitsubishicars.com", X1 - 4, top + 34, 10.5, "body", { align: "right" });
-  let y = top + 34;
-  const rows: Array<[string, string | null]> = [
-    ["Exterior Color:", colorText(v.exteriorColor, v.exteriorColorCode)],
-    ["Interior Color:", colorText(v.interiorColor, v.interiorColorCode)],
-    ["Engine:", v.engine ?? null],
-    ["Transmission:", v.transmission ?? null],
-    ["Drivetrain:", v.drivetrain ?? null],
-    ["Emissions:", d.factory.emissionsCode ?? null],
-  ];
-  for (const [label, value] of rows) {
-    if (!value) continue;
-    Tx(p, label, tx, y, 9.5, "bold");
-    const x = tx + measureText(label, "bold", 9.5) + 4;
-    const w = 440 - x;
-    const size = fitSize(value, "body", 9.5, w, 7);
-    for (const line of measureText(value, "body", size) <= w ? [value] : wrap(value, "body", 7, w)) {
-      Tx(p, line.toUpperCase(), x, y, size, "body");
-      y += 11.4;
-    }
+  Tx(p, title, 172, Y(56), fitSize(title, "body", 10.5, 262, 7), "body");
+  let y = Y(84);
+  const colors = [colorText(v.exteriorColor, v.exteriorColorCode), colorText(v.interiorColor, v.interiorColorCode)].filter((s): s is string => !!s);
+  if (colors.length) {
+    const c = colors.join(" / ");
+    Tx(p, c, 172, y, fitSize(c, "body", 10, 262, 6.5), "body");
   }
-  return Math.max(top + 100, y + 4);
+  y = Y(112);
+  for (const s of [v.engine, v.transmission, d.factory.emissionsCode, v.drivetrain]) {
+    if (!s) continue;
+    const line = s.toUpperCase();
+    Tx(p, line, 172, y, fitSize(line, "body", 7.5, 262, 6), "body");
+    y += 10.4;
+  }
 }
 
-// ── Fuel economy and environment ──────────────────────────────────────
+// ── Fuel economy and environment (native rebuild of the label's panel) ──
 
-const EPA_H = 296;
 
-function paintEpa(p: Painter, d: FactoryStickerData, y0: number): void {
+const EPA_BOTTOM = 384;
+const DX = (x: number): number => RIGHT_X + (x - 625) * 0.956;
+const EY = (ref: number): number => Y(ref - 60);
+
+function paintEpa(p: Painter, d: FactoryStickerData): void {
   const r = d.regulatory;
-  const x = X0;
-  R(p, x, y0, W, EPA_H, INK);
-  Tx(p, "EPA", x + 5, y0 + 4, 9.5, "bold", { color: PAPER, lh: 10 });
-  Tx(p, "DOT", x + 5, y0 + 14, 9.5, "bold", { color: PAPER, lh: 10 });
-  Tx(p, "Fuel Economy and Environment", x + 52, y0 + 9, 17, "bold", { color: PAPER });
-  R(p, x + W - 196, y0 + 4, 192, 26, EPA_BLUE);
-  if (d.vehicle.fuelType) Tx(p, fuelCategoryLabel(d.vehicle.fuelType), x + W - 12, y0 + 11, 11, "bold", { align: "right" });
+  const top = EY(101);
+  const bottom = Y(EPA_BOTTOM);
+  const panelBottom = EY(350);
+  const left = RIGHT_X;
+  const width = RIGHT_W;
+  R(p, left, top, width, bottom - top, INK);
+  R(p, left + 3, EY(138), width - 6, panelBottom - EY(138), PAPER);
+  Tx(p, "EPA", left + 4, EY(106), 9.5, "bold", { color: PAPER, lh: 10 });
+  Tx(p, "DOT", left + 4, EY(106) + 10.2, 9.5, "bold", { color: PAPER, lh: 10 });
+  Tx(p, "Fuel Economy and Environment", DX(684), EY(112), 16, "bold", { color: PAPER });
+  R(p, DX(1003), EY(106), 160, EY(134) - EY(106), EPA_BLUE);
+  if (d.vehicle.fuelType) Tx(p, fuelCategoryLabel(d.vehicle.fuelType), left + width - 11, EY(114), 10.5, "bold", { align: "right" });
 
-  const topY = y0 + 36;
-  const topH = 134;
-  R(p, x + 3, topY, W - 6, topH, PAPER);
-  const lowY = topY + topH + 4;
-  const lowH = 72;
-  R(p, x + 3, lowY, W - 6, lowH, PAPER);
-  R(p, x + 172, lowY, 2, lowH, INK);
-
+  const rule = EY(265);
+  R(p, left + 3, rule, width - 6, 2.2, INK);
+  R(p, DX(779), rule, 2.2, panelBottom - rule, INK);
   const verified = r.epaStatus === "VERIFIED";
   const mpgOk = verified && r.combinedMpg !== undefined;
-  Tx(p, "Fuel Economy", x + 20, topY + 8, 11.5, "bold");
 
+  Tx(p, "Annual fuel", DX(639), EY(281.4), 12, "bold");
+  Tx(p, "cost", DX(639) + measureText("Annual fuel", "bold", 12) + 4, EY(274), 18, "bold");
+  if (verified && r.annualFuelCost !== undefined) Tx(p, formatMoney(r.annualFuelCost).replace(/\.00$/, ""), DX(645), EY(303), 34, "bold");
+  else Tx(p, "Not Available", DX(645), EY(312), 11, "bold");
+
+  const ghgHead = "Fuel Economy & Greenhouse Gas Rating";
+  const gx = DX(792);
+  Tx(p, ghgHead, gx, EY(273.7), 8.6, "bold");
+  Tx(p, "(tailpipe only)", gx + measureText(ghgHead, "bold", 8.6) + 3, EY(275.5), 6, "body");
+  paintScale(p, gx + 2, EY(308), 214, scaleState(verified ? r.greenhouseGasRating : undefined), 13);
+  const sx = DX(1045);
+  Tx(p, "Smog Rating", sx, EY(273.7), 8.6, "bold");
+  Tx(p, "(tailpipe only)", sx + measureText("Smog Rating", "bold", 8.6) + 3, EY(275.5), 6, "body");
+  paintScale(p, sx + 2, EY(308), 105, scaleState(verified ? r.smogRating : undefined), 13);
+  if (verified && r.co2TailpipeGpm !== undefined) {
+    const line = `This vehicle emits ${Math.round(r.co2TailpipeGpm)} grams CO2 per mile (tailpipe only). The best emits 0 grams per mile (tailpipe only). Producing and distributing fuel also create emissions; learn more at fueleconomy.gov.`;
+    wrap(line, "body", 5.8, 340).slice(0, 2).forEach((l, i) => Tx(p, l, gx + 2, EY(334) + i * 6.6, 5.8, "body", { lh: 6.6 }));
+  }
+
+  Tx(p, "Fuel Economy", DX(667), EY(148), 11, "bold");
   if (!mpgOk) {
-    wrap("Fuel economy and environment information is not available from verified EPA records for this exact configuration.", "bold", 12, 470)
-      .forEach((l, i) => Tx(p, l, x + 20, topY + 34 + i * 15, 12, "bold", { lh: 15 }));
+    wrap("Fuel economy and environment information is not available from verified EPA records for this exact configuration.", "bold", 12, 330)
+      .forEach((l, i) => Tx(p, l, DX(667), EY(172) + i * 15, 12, "bold", { lh: 15 }));
   } else {
-    p.text(String(Math.round(r.combinedMpg!)), x + 18, topY + 90, 60, "bold", INK);
-    Tx(p, "combined city/hwy", x + 20, topY + 94, 8, "body");
-    Tx(p, "MPG", x + 138, topY + 22, 20, "bold");
+    p.text(String(Math.round(r.combinedMpg!)), DX(664), EY(224), 60, "bold", INK);
+    Tx(p, "MPG", DX(752), EY(173), 18, "bold");
+    Tx(p, "combined city/hwy", DX(664), EY(225.5), 8, "body");
     if (r.cityMpg !== undefined) {
-      Tx(p, String(Math.round(r.cityMpg)), x + 142, topY + 52, 24, "bold");
-      Tx(p, "city", x + 142, topY + 80, 8, "body");
+      Tx(p, String(Math.round(r.cityMpg)), DX(760), EY(198.4), 20, "bold");
+      Tx(p, "city", DX(760), EY(220), 8, "body");
     }
     if (r.highwayMpg !== undefined) {
-      Tx(p, String(Math.round(r.highwayMpg)), x + 196, topY + 52, 24, "bold");
-      Tx(p, "highway", x + 196, topY + 80, 8, "body");
+      Tx(p, String(Math.round(r.highwayMpg)), DX(805), EY(198.4), 20, "bold");
+      Tx(p, "highway", DX(805), EY(220), 8, "body");
     }
-    if (r.epaClassNote) wrap(r.epaClassNote, "body", 8, 190).slice(0, 4).forEach((l, i) => Tx(p, l, x + 262, topY + 12 + i * 9, 8, "body", { lh: 9 }));
+    if (r.epaClassNote) wrap(r.epaClassNote, "body", 7.5, 150).slice(0, 3).forEach((l, i) => Tx(p, l, DX(838), EY(170) + i * 8.4, 7.5, "body", { lh: 8.4 }));
     const gallons = r.gallonsPer100Miles ?? (r.combinedMpg! > 0 ? 100 / r.combinedMpg! : undefined);
     if (gallons !== undefined) {
       const g = gallons.toFixed(1);
-      Tx(p, g, x + 20, topY + 108, 20, "bold");
-      Tx(p, "gallons per 100 miles", x + 20 + measureText(g, "bold", 20) + 5, topY + 118, 8, "body");
+      Tx(p, g, DX(662), EY(241.5), 20, "bold");
+      Tx(p, "gallons per 100 miles", DX(662) + measureText(g, "bold", 20) + 4, EY(250.9), 8, "body");
     }
   }
   const delta = verified ? r.fiveYearCostDifference : undefined;
-  const bx = x + 520;
+  const bx = DX(1018);
   if (delta !== undefined && delta !== 0) {
-    Tx(p, delta > 0 ? "You save" : "You spend", bx, topY + 8, 20, "bold");
-    Tx(p, formatMoney(Math.abs(delta)).replace(/\.00$/, ""), bx, topY + 34, 34, "bold");
+    Tx(p, delta > 0 ? "You save" : "You spend", bx, EY(142), 19, "bold");
+    Tx(p, formatMoney(Math.abs(delta)).replace(/\.00$/, ""), bx, EY(170), 32, "bold");
     ["in fuel costs over 5 years", "compared to the average", "new vehicle."].forEach((l, i) =>
-      Tx(p, l, bx, topY + 78 + i * 12, i === 0 ? 11 : 9.5, i === 0 ? "bold" : "body", { lh: 12 }));
+      Tx(p, l, bx + 4, EY(211) + i * 12, i === 0 ? 10 : 9, i === 0 ? "bold" : "body", { lh: 12 }));
   } else {
-    Tx(p, "5-year fuel cost comparison", bx, topY + 40, 9.5, "bold");
-    Tx(p, "Not Available", bx, topY + 54, 11, "bold");
+    Tx(p, "5-year fuel cost comparison", bx, EY(180), 9, "bold");
+    Tx(p, "Not Available", bx, EY(194), 11, "bold");
   }
 
-  Tx(p, "Annual fuel", x + 16, lowY + 8, 13, "bold");
-  Tx(p, "cost", x + 16 + measureText("Annual fuel", "bold", 13) + 4, lowY + 4, 19, "bold");
-  if (verified && r.annualFuelCost !== undefined) Tx(p, formatMoney(r.annualFuelCost).replace(/\.00$/, ""), x + 16, lowY + 26, 32, "bold");
-  else Tx(p, "Not Available", x + 16, lowY + 34, 11, "bold");
-
-  const ghgHead = "Fuel Economy & Greenhouse Gas Rating";
-  Tx(p, ghgHead, x + 186, lowY + 4, 9, "bold");
-  Tx(p, "(tailpipe only)", x + 186 + measureText(ghgHead, "bold", 9) + 3, lowY + 5.5, 6.5, "body");
-  paintScale(p, x + 190, lowY + 32, 270, scaleState(verified ? r.greenhouseGasRating : undefined), 14);
-  Tx(p, "Smog Rating", x + 500, lowY + 4, 9, "bold");
-  Tx(p, "(tailpipe only)", x + 500 + measureText("Smog Rating", "bold", 9) + 3, lowY + 5.5, 6.5, "body");
-  paintScale(p, x + 504, lowY + 32, 220, scaleState(verified ? r.smogRating : undefined), 14);
-  if (verified && r.co2TailpipeGpm !== undefined) {
-    const line = `This vehicle emits ${Math.round(r.co2TailpipeGpm)} grams CO2 per mile (tailpipe only). The best emits 0 grams per mile (tailpipe only). Producing and distributing fuel also create emissions; learn more at fueleconomy.gov.`;
-    wrap(line, "body", 6.2, 540).slice(0, 2).forEach((l, i) => Tx(p, l, x + 186, lowY + 56 + i * 6.8, 6.2, "body", { lh: 6.8 }));
-  }
-
-  const footY = lowY + lowH + 4;
-  Tx(p, "fueleconomy.gov", x + 10, footY + 4, 21, "bold", { color: PAPER });
-  Tx(p, "Calculate personalized estimates and compare vehicles", x + 10, footY + 32, 8, "bold", { color: PAPER });
+  const foot = panelBottom + 4;
+  Tx(p, "fueleconomy.gov", DX(632), foot + 30, 21, "bold", { color: PAPER });
+  Tx(p, "Calculate personalized estimates and compare vehicles", DX(632), foot + 58, 7.6, "bold", { color: PAPER });
   const note = "Actual results will vary for many reasons, including driving conditions and how you drive and maintain your vehicle. Cost estimates are current EPA estimates and may differ from those printed on the original label.";
-  wrap(note, "bold", 7.5, 470).forEach((l, i) => Tx(p, l, x + 256, footY + 5 + i * 9, 7.5, "bold", { color: PAPER, lh: 9 }));
+  wrap(note, "bold", 6.6, 400).forEach((l, i) => Tx(p, l, DX(632), foot + 3 + i * 7.4, 6.6, "bold", { color: PAPER, lh: 7.4 }));
 }
 
-// ── Safety and parts content ──────────────────────────────────────────
+function paintPassport(p: Painter, url: string): void {
+  if (!url) return;
+  const size = PASSPORT_QR_PT;
+  const x = RIGHT_X + RIGHT_W - size - 8;
+  const y = EY(350) + 5;
+  p.rect(x, y, size, size, PAPER);
+  p.qr(x, y, size, url, INK);
+  Tx(p, PASSPORT_QR_CAPTION, x + size / 2, y + size + 1.5, 6, "bold", { align: "center", color: PAPER });
+}
 
-const SAFETY_W = 404;
-const PANEL_H = 232;
+// ── Warranty, parts content ───────────────────────────────────────────
 
-function paintSafety(p: Painter, d: FactoryStickerData, top: number): void {
-  const r = d.regulatory;
-  const ratings = [r.overallRating, r.frontalDriverRating, r.frontalPassengerRating, r.sideFrontRating, r.sideRearRating, r.rolloverRating, r.frontalRating, r.sideRating];
-  const anyRated = r.nhtsaStatus === "VERIFIED" && ratings.some((n) => n !== undefined && n > 0);
-  if (anyRated) {
-    paintSafetyPanel(p, d, Q(X0), Q(top), Q(SAFETY_W), Q(PANEL_H), {
-      headerH: 36, footerH: 80, subFrac: 0.29, valFrac: 0.57,
-      titleSize: 21, labelSize: 16.4, noteSize: 11.2, footSize: 13, stretch: 1.04,
-    });
+function paintWarranty(p: Painter, d: FactoryStickerData): void {
+  const top = Y(392);
+  const bottom = Y(504);
+  const w = 190;
+  R(p, RIGHT_X, top, w, bottom - top, null, 2.4);
+  Tx(p, "WARRANTY COVERAGE", RIGHT_X + w / 2, top + 5, 9.5, "bold", { align: "center" });
+  const section = warrantySection(d, "Warranty");
+  if (!section) {
+    Tx(p, "Not available for this vehicle.", RIGHT_X + w / 2, top + 26, 9.5, "body", { align: "center" });
     return;
   }
-  const message = r.nhtsaStatus === "UNAVAILABLE"
-    ? "Government 5-star safety ratings are not available from a verified NHTSA record for this vehicle."
-    : "This vehicle has not been rated by the government for overall vehicle score, frontal crash, side crash, or rollover risk.";
-  const headerH = 24;
-  const msgH = 64;
-  const footH = 34;
-  R(p, X0, top, SAFETY_W, headerH + msgH + footH, INK);
-  Tx(p, "GOVERNMENT 5-STAR SAFETY RATINGS", X0 + SAFETY_W / 2, top + 6, 13, "bold", { align: "center", color: PAPER });
-  R(p, X0 + 4, top + headerH, SAFETY_W - 8, msgH, PAPER);
-  wrap(message, "body", 11, SAFETY_W - 28).forEach((l, i) => Tx(p, l, X0 + 12, top + headerH + 8 + i * 13, 11, "body", { lh: 13 }));
-  const foot = top + headerH + msgH;
-  Tx(p, "Source: National Highway Traffic Safety Administration (NHTSA)", X0 + SAFETY_W / 2, foot + 6, 8.4, "bold", { align: "center", color: PAPER });
-  Tx(p, "www.nhtsa.gov/ratings", X0 + SAFETY_W / 2, foot + 19, 8.4, "bold", { align: "center", color: PAPER });
+  const width = w - 16;
+  const lines = (size: number): string[] => section.items.flatMap((i) => wrap(i, "body", size, width));
+  let size = 8.5;
+  while (size > FLOOR_PT && 20 + lines(size).length * size * 1.15 > bottom - top - 4) size -= 0.25;
+  lines(size).forEach((l, i) => Tx(p, l, RIGHT_X + 8, top + 20 + i * size * 1.15, size, "body"));
 }
 
-function paintParts(p: Painter, d: FactoryStickerData, top: number): void {
-  const px = X0 + SAFETY_W + 12;
-  const pw = X1 - px;
-  const bottom = top + PANEL_H;
-  R(p, px, top, pw, PANEL_H, null, 2.4);
+function paintParts(p: Painter, d: FactoryStickerData): void {
+  const top = Y(510);
+  const bottom = Y(658);
+  const w = 190;
+  R(p, RIGHT_X, top, w, bottom - top, null, 2.4);
   const f = partsFacts(d);
   const hasCarline = !!f.usCan || f.other.length > 0;
   const hasVehicle = !!f.assembly || !!f.engine || !!f.trans;
-  const cx = px + pw / 2;
-  Tx(p, "PARTS CONTENT INFORMATION", cx, top + 6, 11, "bold", { align: "center" });
+  const cx = RIGHT_X + w / 2;
+  Tx(p, "PARTS CONTENT INFORMATION", cx, top + 5, 9, "bold", { align: "center" });
   if (!hasCarline && !hasVehicle) {
-    Tx(p, "Not available for this vehicle.", cx, top + 30, 10, "body", { align: "center" });
+    Tx(p, "Not available for this vehicle.", cx, top + 24, 9.5, "body", { align: "center" });
     return;
   }
-  const width = pw - 16;
-  const limit = bottom - 5;
-  let y = top + 24;
+  const width = w - 14;
+  const limit = bottom - 4;
+  let y = top + 18;
   const run = (draw: boolean, size: number): void => {
-    y = top + 24;
-    const step = size * 1.12;
+    y = top + 18;
+    const step = size * 1.1;
     const line = (s: string): void => {
       for (const l of wrap(s.toUpperCase(), "bold", size, width)) {
-        if (draw) Tx(p, l, px + 8, y, size, "bold");
+        if (draw) Tx(p, l, RIGHT_X + 7, y, size, "bold");
         y += step;
       }
     };
@@ -233,11 +227,11 @@ function paintParts(p: Painter, d: FactoryStickerData, top: number): void {
       if (f.usCan) line(`U.S./CANADIAN PARTS CONTENT: ${f.usCan.value}`);
       if (f.other.length) line("MAJOR SOURCES OF FOREIGN PARTS CONTENT:");
       for (const e of f.other) line(/foreign/i.test(e.label) ? e.value : `${e.label}: ${e.value}`);
-      for (const l of wrap("Note: parts content does not include final assembly, distribution, or other non-parts costs.", "body", size - 1, width)) {
-        if (draw) Tx(p, l, px + 8, y, size - 1, "body");
-        y += (size - 1) * 1.12;
+      for (const l of wrap("Note: parts content does not include final assembly, distribution, or other non-parts costs.", "body", Math.max(FLOOR_PT, size - 1), width)) {
+        if (draw) Tx(p, l, RIGHT_X + 7, y, Math.max(FLOOR_PT, size - 1), "body");
+        y += (size - 1) * 1.1;
       }
-      y += 3;
+      y += 2;
     }
     if (hasVehicle) {
       line("FOR THIS VEHICLE:");
@@ -249,202 +243,174 @@ function paintParts(p: Painter, d: FactoryStickerData, top: number): void {
       }
     }
   };
-  let size = 10;
+  let size = 9;
   run(false, size);
-  while (y > limit && size > FLOOR_PT + 1) {
-    size -= 0.5;
+  while (y > limit && size > FLOOR_PT + 0.5) {
+    size -= 0.25;
     run(false, size);
   }
   if (y <= limit) run(true, size);
 }
 
+// ── Safety ────────────────────────────────────────────────────────────
+
+function paintSafety(p: Painter, d: FactoryStickerData): void {
+  const r = d.regulatory;
+  const top = Y(392);
+  const h = Y(658) - top;
+  const ratings = [r.overallRating, r.frontalDriverRating, r.frontalPassengerRating, r.sideFrontRating, r.sideRearRating, r.rolloverRating, r.frontalRating, r.sideRating];
+  const anyRated = r.nhtsaStatus === "VERIFIED" && ratings.some((n) => n !== undefined && n > 0);
+  if (anyRated) {
+    paintSafetyPanel(p, d, Q(SAFETY_X), Q(top), Q(SAFETY_W), Q(h), {
+      headerH: 36, footerH: 80, subFrac: 0.29, valFrac: 0.57,
+      titleSize: 21, labelSize: 16.4, noteSize: 11.2, footSize: 13, stretch: 1.04,
+    });
+    return;
+  }
+  const message = r.nhtsaStatus === "UNAVAILABLE"
+    ? "Government 5-star safety ratings are not available from a verified NHTSA record for this vehicle."
+    : "This vehicle has not been rated by the government for overall vehicle score, frontal crash, side crash, or rollover risk.";
+  const headerH = 22;
+  const msgH = 46;
+  const footH = 32;
+  R(p, SAFETY_X, top, SAFETY_W, headerH + msgH + footH, INK);
+  Tx(p, "GOVERNMENT 5-STAR SAFETY RATINGS", SAFETY_X + SAFETY_W / 2, top + 5.5, 12.4, "bold", { align: "center", color: PAPER });
+  R(p, SAFETY_X + 4, top + headerH, SAFETY_W - 8, msgH, PAPER);
+  wrap(message, "body", 10.5, SAFETY_W - 24).forEach((l, i) => Tx(p, l, SAFETY_X + 10, top + headerH + 5 + i * 12.4, 10.5, "body", { lh: 12.4 }));
+  const foot = top + headerH + msgH;
+  Tx(p, "Source: National Highway Traffic Safety Administration (NHTSA)", SAFETY_X + SAFETY_W / 2, foot + 5, 8.4, "bold", { align: "center", color: PAPER });
+  Tx(p, "www.nhtsa.gov/ratings", SAFETY_X + SAFETY_W / 2, foot + 17, 8.4, "bold", { align: "center", color: PAPER });
+}
+
 // ── Additional equipment and pricing ──────────────────────────────────
 
-const PRICE_X = 584;
-const PRICE_W = X1 - PRICE_X;
-
-/** Returns the y below the pricing column, or null when its rows cannot fit above `limit`. */
-function paintPricing(p: Painter, d: FactoryStickerData, top: number, limit: number): number | null {
+/** Returns the y below the additional-equipment rows, or null when the totals stack cannot fit. */
+function paintPricing(p: Painter, d: FactoryStickerData, totalsTop: number): number | null {
   const pr = d.pricing;
-  let y = top;
-  Tx(p, "ADDITIONAL EQUIPMENT", PRICE_X, y, 10, "bold");
-  y += 14;
+  let y = Y(58);
+  Tx(p, "Additional Equipment", MID_X, y, 9.5, "bold");
+  y = Y(76);
   const rows = priceRowsWithoutColors(d);
   if (!rows.length) {
-    Tx(p, "None listed.", PRICE_X, y, 8.5, "body");
-    y += 11;
+    Tx(p, "None listed.", MID_X, y, 8, "body");
+    y += 10;
   }
   for (const row of rows) {
     const rowTop = y;
-    for (const l of wrap(row.label, "body", 8.5, PRICE_W - 52)) {
-      Tx(p, l, PRICE_X, y, 8.5, "body");
-      y += 9.6;
+    for (const l of wrap(row.label, "body", 7.8, 150)) {
+      Tx(p, l, MID_X, y, 7.8, "body");
+      y += 8.8;
     }
-    if (row.amount) Tx(p, row.amount, X1, rowTop, 8.5, "body", { align: "right" });
+    if (row.amount) Tx(p, row.amount, MID_R, rowTop, 7.8, "body", { align: "right" });
     for (const f of row.features) {
-      for (const l of wrap(f, "body", 7.5, PRICE_W - 10)) {
-        Tx(p, l, PRICE_X + 8, y, 7.5, "body");
-        y += 8.4;
+      for (const l of wrap(f, "body", 6.8, 175)) {
+        Tx(p, l, MID_X + 8, y, 6.8, "body");
+        y += 7.8;
       }
     }
+    y += 2;
   }
   if (pr.gasGuzzlerTax !== undefined) {
-    Tx(p, "Gas Guzzler Tax", PRICE_X, y, 8.5, "body");
-    Tx(p, formatMoney(pr.gasGuzzlerTax), X1, y, 8.5, "body", { align: "right" });
-    y += 10;
+    Tx(p, "Gas Guzzler Tax", MID_X, y, 7.8, "body");
+    Tx(p, formatMoney(pr.gasGuzzlerTax), MID_R, y, 7.8, "body", { align: "right" });
+    y += 9;
   }
-  y += 8;
-  const money = (n: number | null | undefined): string => (n === null || n === undefined ? "NOT AVAILABLE" : formatMoney(n));
+  const money = (n: number | undefined): string => (n === undefined ? "NOT AVAILABLE" : formatMoney(n));
   const base = pr.baseMsrp;
-  const optionsTotal = pr.factoryInstalledTotal;
-  const subtotal = base !== undefined && optionsTotal !== undefined ? base + optionsTotal : undefined;
-  const total = totalMsrp(d);
+  const options = pr.factoryInstalledTotal;
+  const subtotal = base !== undefined && options !== undefined ? base + options : undefined;
   const lines: Array<[string, string, boolean]> = [
     ["MSRP*:", money(base), false],
-    ["Total Additional Equipment:", money(optionsTotal), false],
+    ["Total Additional Equipment:", money(options), false],
     ["Subtotal:", money(subtotal), false],
     ["Destination/Handling:", money(pr.destinationCharge), false],
-    ["Total MSRP*:", money(total), true],
+    ["Total MSRP*:", money(totalMsrp(d)), true],
   ];
-  const need = lines.length * 14 + 56;
-  if (y + need > limit) return null;
-  R(p, PRICE_X, y - 3, PRICE_W, 1.2, INK);
+  const need = lines.length * 13 + 10;
+  if (y + 4 > totalsTop - need) return null;
+  let ty = totalsTop - need;
   for (const [label, value, strong] of lines) {
-    const size = strong ? 11 : 9;
-    Tx(p, label, PRICE_X, y, size, strong ? "bold" : "body");
+    const size = strong ? 10.5 : 8.8;
     const unavailable = value === "NOT AVAILABLE";
-    Tx(p, value, X1, y + (unavailable ? 1 : 0), unavailable ? 7.5 : size, "bold", { align: "right" });
-    y += strong ? 17 : 13;
+    Tx(p, label, MID_R - 66, ty, size, strong ? "bold" : "body", { align: "right" });
+    Tx(p, value, MID_R, ty + (unavailable ? 1 : 0), unavailable ? 7 : size, "bold", { align: "right" });
+    ty += strong ? 15 : 12.5;
   }
-  Tx(p, "*MSRP (Manufacturer's Suggested Retail Price)", PRICE_X, y, 6.5, "body");
-  y += 14;
-  Tx(p, "WARRANTY COVERAGE", PRICE_X, y, 9, "bold");
-  y += 12;
-  const w = warrantySection(d, "Warranty");
-  for (const item of w ? w.items : ["Not available for this vehicle."]) {
-    for (const l of wrap(item, "body", 7.5, PRICE_W)) {
-      if (y > limit) return null;
-      Tx(p, l, PRICE_X, y, 7.5, "body");
-      y += 8.6;
-    }
-  }
+  Tx(p, "*MSRP (Manufacturer's Suggested Retail Price)", MID_R, ty - 1, 5.6, "body", { align: "right" });
   return y;
 }
 
 // ── Footer ────────────────────────────────────────────────────────────
 
-const FOOT_H = 96;
-
-function paintFooter(p: Painter, d: FactoryStickerData, barcodePayload: string, passportUrl: string, top: number): void {
-  R(p, X0, top, W, 1.2, INK);
-  const y = top + 6;
-  Tx(p, "VIN:", X0 + 4, y + 1, 8.5, "bold");
-  Tx(p, d.vehicle.vin, X0 + 26, y, 13, "bold");
-  if (barcodePayload) p.barcode(X0 + 4, y + 18, 250, 34, barcodePayload, INK);
-  const assembly = d.factory.finalAssemblyPoint;
-  if (assembly) Tx(p, `Plant/Port of Entry: ${assembly.toUpperCase()}`, X0 + 4, y + 58, 7.5, "body");
-  if (d.factory.transportMethod) Tx(p, `Method of Transport: ${d.factory.transportMethod.toUpperCase()}`, X0 + 4, y + 68, 7.5, "body");
-
-  Tx(p, "SHIP TO:", 300, y, 8, "bold");
+function paintFooter(p: Painter, d: FactoryStickerData, barcodePayload: string, bottom: number): void {
+  const top = Y(667);
+  R(p, RIGHT_X, top, RIGHT_W, bottom - top, null, 2.4);
+  if (barcodePayload) p.barcode(RIGHT_X + 330, top + 5, 186, 26, barcodePayload, INK);
+  Tx(p, "VIN:", RIGHT_X + 330, top + 36, 8, "bold");
+  Tx(p, d.vehicle.vin, RIGHT_X + 350, top + 34, 10.5, "bold");
+  let y = top + 5;
+  Tx(p, "SHIP TO:", RIGHT_X + 8, y, 7.5, "bold");
   const code = d.factory.dealerCode;
-  if (code) Tx(p, code.toUpperCase(), 300 + measureText("SHIP TO:", "bold", 8) + 4, y, 8, "bold");
-  dealerLines(d).slice(0, 4).forEach((l, i) => Tx(p, l, 300, y + 11 + i * 9.4, 8, "body"));
+  if (code) Tx(p, code.toUpperCase(), RIGHT_X + 8 + measureText("SHIP TO:", "bold", 7.5) + 4, y, 7.5, "bold");
+  dealerLines(d).slice(0, 3).forEach((l, i) => Tx(p, l, RIGHT_X + 8, y + 9 + i * 8.4, 7, "body"));
+  y = top + 37;
+  if (d.factory.transportMethod) Tx(p, `Method of Transport: ${d.factory.transportMethod.toUpperCase()}`, RIGHT_X + 8, y, 6.8, "body");
+  const assembly = d.factory.finalAssemblyPoint;
+  if (assembly) Tx(p, `Plant/Port of Entry: ${assembly.toUpperCase()}`, RIGHT_X + 8, y + 8.4, 6.8, "body");
   const note = "* Original manufacturer's suggested retail prices shown. Excludes taxes, title, license, dealer-installed items and current selling price.";
-  wrap(note, "body", 6.5, 260).forEach((l, i) => Tx(p, l, 300, y + 56 + i * 7.6, 6.5, "body", { lh: 7.6 }));
-
-  if (passportUrl) {
-    const qx = X1 - PASSPORT_QR_PT - 2;
-    p.qr(qx, y, PASSPORT_QR_PT, passportUrl, INK);
-    Tx(p, "VEHICLE PASSPORT", qx - 8, y + 20, 8.5, "bold", { align: "right" });
-    Tx(p, PASSPORT_QR_CAPTION, qx - 8, y + 33, 7.5, "body", { align: "right" });
-  }
+  wrap(note, "body", 6, RIGHT_W - 20).forEach((l, i) => Tx(p, l, RIGHT_X + 8, top + 56 + i * 7, 6, "body", { lh: 7 }));
 }
 
 // ── Page ──────────────────────────────────────────────────────────────
 
-interface PortraitResult {
-  rest: number;
-  printed: string[];
+function equipmentColumns(first: ColumnSpec, second: ColumnSpec, third: ColumnSpec, extra: number): ColumnSpec[] {
+  const n = 2 + extra;
+  const gap = 10;
+  const x0 = first.x;
+  const w = (second.x + second.w - x0 - gap * (n - 1)) / n;
+  const split = Array.from({ length: n }, (_, i) => ({ ...first, x: x0 + i * (w + gap), w }));
+  return [...split, third];
 }
 
-function paintPage(p: Painter, input: VariantRenderInput, d: FactoryStickerData, frameBottom: number, style: FlowStyle, extra: number): PortraitResult | null {
-  R(p, X0 - 8, 40, W + 16, frameBottom - 40, null, 2.4);
-  const headBottom = paintHeader(p, d, 50);
-  const epaTop = Math.max(headBottom + 2, 152);
-  paintEpa(p, d, epaTop);
-  const panelTop = epaTop + EPA_H + 8;
-  paintSafety(p, d, panelTop);
-  paintParts(p, d, panelTop);
+const spec: TabloidSpec = {
+  eqStyle: EQ_STYLE,
+  paintFirst(p: Painter, ctx: FirstPageContext): FirstPageResult | null {
+    const { d, input } = ctx;
+    const bottomLimit = Math.min(Y(745), ctx.footerTop * 0.612 - 9);
+    const barH = 15;
+    const totalsTop = bottomLimit - barH - 2;
+    const pricingBottom = paintPricing(p, d, totalsTop);
+    if (pricingBottom === null) return null;
 
-  const footTop = frameBottom - FOOT_H - 4;
-  paintFooter(p, d, input.layout.barcodePayload, d.document.passportUrl.trim(), footTop);
+    R(p, BOX_X, Y(40), BOX_W, bottomLimit - Y(40), null, 2.4);
+    R(p, BOX_X, bottomLimit - barH, BOX_W, barH, INK);
+    Tx(p, "Visit us at www.mitsubishicars.com", BOX_X + BOX_W / 2, bottomLimit - barH + 2.5, 10.5, "bold", { align: "center", color: PAPER });
+    paintHeader(p, d);
+    paintEpa(p, d);
+    paintPassport(p, d.document.passportUrl.trim());
+    paintWarranty(p, d);
+    paintParts(p, d);
+    paintSafety(p, d);
+    paintFooter(p, d, input.layout.barcodePayload, bottomLimit);
 
-  const eqTop = panelTop + PANEL_H + 12;
-  const eqBottom = footTop - 6;
-  const lower = paintPricing(p, d, eqTop, eqBottom);
-  if (lower === null) return null;
-
-  const head = "STANDARD EQUIPMENT";
-  underlined(p, head, Q(X0 + 2), Q(eqTop), Q(10));
-  const noteText = "(UNLESS REPLACED BY ADDITIONAL EQUIPMENT)";
-  Tx(p, noteText, X0 + 2 + measureText(head, "bold", 10) + 6, eqTop + 2, 7, "body");
-  const sections = buildSections(input);
-  if (!sections.length) Tx(p, "Standard equipment not available for this vehicle.", X0 + 2, eqTop + 16, 8.5, "body");
-  const entries = toEntries(sections, (s) => s, 5, undefined, input.equipmentNote);
-  const n = 3 + extra;
-  const gap = 12;
-  const regionW = PRICE_X - 14 - X0;
-  const colW = (regionW - gap * (n - 1)) / n;
-  const colsFor = (bottom: number) =>
-    Array.from({ length: n }, (_, i) => ({ x: Q(X0 + i * (colW + gap)), w: Q(colW), top: Q(eqTop + 16), bottom: Q(bottom) }));
-  let bottom = eqTop + 16 + 40;
-  while (bottom < eqBottom && flow(entries, colsFor(bottom), style).rest.length) bottom += 4;
-  const { placed, rest } = flow(entries, colsFor(Math.min(bottom, eqBottom)), style);
-  paintPlaced(p, placed, style, { bullet: "square" });
-  const result = placedResult(entries, rest);
-  return { rest: result.rest.length, printed: result.printed };
-}
-
-function assemblePortrait(input: VariantRenderInput): LayoutModel | null {
-  const d = input.layout.data;
-  const paragraphs = [...reproductionDisclosureLines(input.layout.factoryBuild), ...input.layout.disclaimers];
-  const discLines = paragraphs.flatMap((para) => wrap(para, "body", 8, W));
-  const discHeight = 14 + discLines.length * 10.2;
-  const discTop = PORTRAIT_HEIGHT - 12 - discHeight;
-  const frameBottom = discTop - 8;
-
-  for (const style of styleLadder(EQ_STYLE)) {
-    for (let extra = 0; extra <= MAX_EXTRA_COLUMNS; extra++) {
-      const probe = paintPage(new Painter(null), input, d, frameBottom, style, extra);
-      if (probe === null) return null;
-      if (probe.rest) continue;
-      const drawn: string[] = [];
-      const p = new Painter(drawn);
-      R(p, X0 - 8, 12, W + 16, 20, null, 1.6);
-      Tx(p, REPRODUCTION_BANNER, X0, 16, 11.5, "bold");
-      Tx(p, "PAGE 1 OF 1", X1, 18, 8, "bold", { align: "right" });
-      paintPage(p, input, d, frameBottom, style, extra);
-      Tx(p, REPRODUCTION_BANNER, X0 - 8, discTop, 11.5, "bold");
-      discLines.forEach((l, i) => Tx(p, l, X0 - 8, discTop + 15 + i * 10.2, 8, "body", { lh: 10.2 }));
-      const model: LayoutModel = {
-        width: PORTRAIT_WIDTH,
-        height: PORTRAIT_HEIGHT,
-        mode: style === EQ_STYLE ? "STANDARD" : "DENSE",
-        pages: [{ primitives: p.primitives }],
-        drawnStrings: drawn,
-        printedEquipment: probe.printed,
-        fontFamilies: { heading: "Helvetica-Bold", body: "Helvetica", numeric: "Courier" },
-        fit: fitOk(0, style.size * DISPLAY_PT),
-      };
-      validateModel(model);
-      return model;
-    }
-  }
-  return null;
-}
+    const sections = buildSections(input);
+    const eqTop = Y(163);
+    if (!sections.length) Tx(p, "Standard equipment not available for this vehicle.", 47, eqTop, 8, "body");
+    const entries = toEntries(sections, (s) => s, 5, undefined, input.equipmentNote);
+    const cols = equipmentColumns(
+      { x: Q(47), w: Q(185), top: Q(eqTop), bottom: Q(totalsTop - 4) },
+      { x: Q(245), w: Q(191), top: Q(eqTop), bottom: Q(totalsTop - 4) },
+      { x: Q(MID_X), w: Q(200), top: Q(pricingBottom + 6), bottom: Q(totalsTop - 70) },
+      ctx.extraColumns,
+    );
+    const { placed, rest } = flow(entries, cols, ctx.style);
+    paintPlaced(p, placed, ctx.style, { bullet: "square", headingFont: "bold" });
+    return placedResult(entries, rest);
+  },
+};
 
 export const buildMitsubishiOutlanderSportLayout: VariantLayoutBuilder = (input): LayoutModel | null => {
-  const model = assemblePortrait(input);
-  if (model && (model.width !== PORTRAIT_WIDTH || model.height !== PORTRAIT_HEIGHT)) return null;
+  const model = assembleTabloid(input, spec);
+  if (model && (model.width !== TABLOID_WIDTH || model.height !== TABLOID_HEIGHT)) return null;
   return model;
 };
