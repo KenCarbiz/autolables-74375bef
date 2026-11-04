@@ -1,0 +1,1 @@
+DO $$ DECLARE def text;BEGIN def:=pg_get_functiondef('public.gw_service_execute(text,text,text,timestamptz,text,text,inet)'::regprocedure);IF position('sum(units)' IN def)=0 THEN RAISE EXCEPTION 'budget anchor absent';END IF;EXECUTE replace(def,'sum(units)','sum(gw_service_receipts.units)');END $$;

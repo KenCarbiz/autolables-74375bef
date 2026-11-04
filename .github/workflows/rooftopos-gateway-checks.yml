@@ -4,6 +4,14 @@ on:
   pull_request:
     paths:
       - 'src/lib/rooftopos-parked/**'
+      - 'supabase/proposed/rtgip_v2_delivery.proposed.sql'
+      - 'supabase/proposed/rtgip_source_readers.proposed.sql'
+      - 'supabase/proposed/20261109000000_vehicle_history_foundation.sql'
+      - 'supabase/tests/rtgip/**'
+      - 'supabase/hosted/autolabels/**'
+      - 'supabase/proposed/20261030000000_rooftopos_spine.sql'
+      - 'supabase/proposed/20261108000000_canonical_store_registry.sql'
+      - 'supabase/proposed/rtgip_labels_effects.proposed.sql'
       - 'supabase/functions/_shared/integrations/envelope.ts'
       - '.github/workflows/rooftopos-gateway-checks.yml'
   workflow_dispatch:
@@ -35,9 +43,102 @@ jobs:
             echo "Parked adapter imported from active source"
             exit 1
           fi
-      - name: Targeted contract tests
+      - name: Targeted contract tests (corpus, receipt vectors and vendored-hash checks included)
         run: npx vitest run src/lib/rooftopos-parked
+      - name: Six-direction matrix results (in-memory simulation)
+        run: |
+          RTGIP_MATRIX_OUT=rtgip-matrix-results.json npx vitest run src/lib/rooftopos-parked/rtgip2-matrix/matrix.test.ts
+          node -e 'const r=require("./rtgip-matrix-results.json"); console.log(JSON.stringify({kind:r.kind,checks:r.checks,unexpected:r.unexpected,routes:Object.keys(r.results).length})); if (r.unexpected.length) process.exit(1)'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rtgip-matrix-results
+          path: rtgip-matrix-results.json
       - name: TypeScript typecheck
         run: npx tsc --noEmit -p tsconfig.app.json
       - name: Production artifact build (no publish)
         run: npm run build
+
+  rtgip_sql:
+    name: rtgip/2 proposed SQL - real Postgres receipt, role, atomicity, concurrency and crash tests (throwaway cluster)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run against a disposable local cluster (no Supabase connection)
+        run: bash supabase/tests/rtgip/pg_concurrency.sh
+
+  al_hosted_package:
+    name: AutoLabels hosted package - apply plan, idempotence, post checks, forward recovery, checksums (throwaway cluster)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run against a disposable local cluster (no Supabase or Lovable connection)
+        run: bash supabase/tests/rtgip/al-hosted-package-test.sh
+
+  rtgip_pg_integration:
+    name: rtgip/2 admission and AutoLabels source readers on real Postgres (full history replay, throwaway cluster)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: TypeScript admission boundary + inbox_admit, Gateway contract cases, PR #46 readers (no Supabase connection)
+        run: bash supabase/tests/rtgip/pg_integration.sh
+
+  rtgip_local_staging:
+    name: rtgip/2 four-node acceptance (real app nodes and adapters; actual Gateway candidate code; needs peer repo token)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: Peer app checkouts (AutoCurb, AutoFrame) need a read-only token
+        id: peers
+        env:
+          PEER_TOKEN: ${{ secrets.ROOFTOPOS_PEER_REPO_TOKEN }}
+        run: |
+          if [ -z "$PEER_TOKEN" ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Four-node staging NOT RUN: secret ROOFTOPOS_PEER_REPO_TOKEN is absent, so the AutoCurb and AutoFrame nodes cannot be built. This is not a pass."
+            echo "### Four-node staging: NOT RUN (peer repositories unavailable). Not a pass." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.peers.outputs.available == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: KenCarbiz/hartecash-2edb8fec
+          ref: claude/project-thread-ixjske
+          token: ${{ secrets.ROOFTOPOS_PEER_REPO_TOKEN }}
+          path: peers/autocurb
+      - if: steps.peers.outputs.available == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: KenCarbiz/showroom-photo-polish
+          ref: claude/project-thread-ixjske
+          token: ${{ secrets.ROOFTOPOS_PEER_REPO_TOKEN }}
+          path: peers/autoframe
+      - if: steps.peers.outputs.available == 'true'
+        uses: oven-sh/setup-bun@v2
+      - if: steps.peers.outputs.available == 'true'
+        run: (cd peers/autocurb && npm ci --no-audit --no-fund) && (cd peers/autoframe && bun install --frozen-lockfile)
+      - name: Six directions over HTTP with committed transactions, failure, replay and attack cases
+        if: steps.peers.outputs.available == 'true'
+        run: AC_REPO="$PWD/peers/autocurb" AF_REPO="$PWD/peers/autoframe" RTGIP_STG_REPORT=staging-report.json bash supabase/tests/rtgip/pg_staging.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rtgip-local-staging-report
+          path: staging-report.json
+          if-no-files-found: ignore

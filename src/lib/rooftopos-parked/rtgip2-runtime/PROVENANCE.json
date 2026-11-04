@@ -1,0 +1,17 @@
+{
+  "schema": "rtgip2-runtime-provenance/1",
+  "runtime": {
+    "pg-harness.ts": "8e9010a7e26fcaba5cc97f5d7748f57818f9205cf516f3539c5736c51d3095c5",
+    "provenance.test.ts": "69876cddb0b7e18701cdd972c2190f7a013f8ab8d64bcf99be21b1ebdd3509f5",
+    "runtime.test.ts": "673aeba45bfd2f801ebc25c0a47da40564a8470c899482438ca3d5c35e1b264b",
+    "runtime.ts": "e772e666687e96c620b31883520c9b6a5c9ff8d9347f45fb0d79bb1677790be1"
+  },
+  "core": {
+    "admission.ts": "993cd8852fe90586a8c68b828ab9fd5debede3a651de9dbe920ed92ef3fcc870",
+    "delivery.ts": "bd5a8c3113f461d98aa6c62e6723066798d1749786425a83c8dc7109e08e2f93",
+    "produce.ts": "e0edfafa441d19f1bd85af10654272e6d246a5c3dfa050b9fa17de91b41b78f1",
+    "protocol.ts": "dfa5ba596d752c264230e192639fb7068ac50bcb3c6ff9be839b83c3e1eaa7c9",
+    "receipt-query.ts": "bd5955f58444722540240cc5117b288138aa916bcd95988dde24252ee8936018",
+    "receipt-v2.ts": "835407a7708ea822c728eb92f50398278040cf7725164da94105ba81564bb5ec"
+  }
+}

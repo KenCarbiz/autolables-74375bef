@@ -1,0 +1,5 @@
+-- Future synthetic applies only; never rewrite committed forensic projections or immutable outbox events.
+DO $$ DECLARE def text;anchor text:='if v_section = ''listing'' then'; BEGIN def:=pg_get_functiondef('public.gw_apply_internal(bigint,text)'::regprocedure); IF position(anchor IN def)=0 THEN RAISE EXCEPTION 'apply section anchor missing';END IF; def:=replace(def,anchor,'if v_section = ''appraisal'' then
+      v_payload := jsonb_build_object(''appraisal_completed'',o.event_type=''appraisal.completed'' OR coalesce((v_state->''appraisal''->>''appraisal_completed'')::boolean,false),''audit_ref'',CASE WHEN o.event_type=''appraisal.completed'' THEN o.event_id::text ELSE v_state->''appraisal''->>''audit_ref'' END,''completed_at'',CASE WHEN o.event_type=''appraisal.completed'' THEN to_jsonb(o.occurred_at) ELSE v_state->''appraisal''->''completed_at'' END);
+    end if;
+    '||anchor); EXECUTE def; END $$;

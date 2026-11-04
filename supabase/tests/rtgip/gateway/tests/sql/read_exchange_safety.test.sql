@@ -1,0 +1,32 @@
+-- Fresh per-run facts. Every change rolls back; success is the explicit sentinel.
+DO $$ DECLARE actor uuid:=gen_random_uuid(); run text:=replace(gen_random_uuid()::text,'-','');
+ inst text:='vi-ex-safe-'||run; ep text:='ep-ex-safe-'||run; ep2 text:='ep-ex-safe2-'||run;
+ vin text:='DEVSYNEX'||upper(substr(run,1,9)); base jsonb; r jsonb; n int; passed int:=0;
+BEGIN
+ INSERT INTO gw_tenant_members(user_id,tenant_id,role)VALUES(actor,'grp-syn-northwind','admin');
+ PERFORM set_config('request.jwt.claims',jsonb_build_object('sub',actor,'role','authenticated')::text,true);
+ base:=jsonb_build_object('schema_version',1,'tenant_id','grp-syn-northwind','rooftop_id','rt-syn-nw-01','source_app','autolabels','event_type','inventory.updated','occurred_at',clock_timestamp(),'emitted_at',clock_timestamp(),'vehicle',jsonb_build_object('vin',vin,'instance_id',inst,'episode_id',ep));
+ r:=gw_publish(base||jsonb_build_object('event_id',gen_random_uuid(),'aggregate',jsonb_build_object('type','vehicle_instance','id',inst,'revision',1),'payload',jsonb_build_object('status','active','price_cents',2400000)));
+ IF r->>'status' IS DISTINCT FROM 'accepted' THEN RAISE EXCEPTION 'setup %',r;END IF;
+ r:=gw_read_exchange('film-nw-x1','pending-'||run,clock_timestamp(),'grp-syn-northwind','rt-syn-nw-01','autolabels','listing_context',jsonb_build_array(jsonb_build_object('vin',vin,'instance_id',inst)));
+ IF r->'items'->0->'facts' ? 'listing' OR (r->'items'->0->'freshness'->>'stale')::boolean IS DISTINCT FROM true THEN RAISE EXCEPTION 'pending facts mixed';END IF;passed:=passed+1;
+ FOR n IN 1..5 LOOP PERFORM gw_worker_step('ex-safe',100,50);END LOOP;
+ r:=gw_read_exchange('film-nw-x1','fresh-'||run,clock_timestamp(),'grp-syn-northwind','rt-syn-nw-01','autolabels','listing_context',jsonb_build_array(jsonb_build_object('vin',vin,'instance_id',inst)));
+ IF (r->'items'->0->'facts'->'listing'->>'price_cents')::int IS DISTINCT FROM 2400000 THEN RAISE EXCEPTION 'fresh canonical price missing';END IF;passed:=passed+1;
+ r:=gw_read_exchange('film-nw-x1','fresh-'||run,clock_timestamp(),'grp-syn-northwind','rt-syn-nw-01','autolabels','listing_context',jsonb_build_array(jsonb_build_object('vin',vin,'instance_id',inst)));
+ IF (r->>'http_status')::int IS DISTINCT FROM 409 THEN RAISE EXCEPTION 'nonce reused';END IF;passed:=passed+1;
+ r:=gw_publish(base||jsonb_build_object('event_id',gen_random_uuid(),'event_type','listing.sold','aggregate',jsonb_build_object('type','vehicle_instance','id',inst,'revision',2),'payload',jsonb_build_object('sold_at',clock_timestamp())));
+ FOR n IN 1..4 LOOP PERFORM gw_worker_step('ex-safe',100,50);END LOOP;
+ r:=gw_publish(base||jsonb_build_object('event_id',gen_random_uuid(),'vehicle',jsonb_build_object('vin',vin,'instance_id',inst,'episode_id',ep2),'aggregate',jsonb_build_object('type','vehicle_instance','id',inst,'revision',3),'payload','{"status":"active"}'::jsonb));
+ r:=gw_read_exchange('film-nw-x1','episode-'||run,clock_timestamp(),'grp-syn-northwind','rt-syn-nw-01','autolabels','listing_context',jsonb_build_array(jsonb_build_object('vin',vin,'instance_id',inst)));
+ IF r->'items'->0->'facts' ? 'listing' OR r->'items'->0->>'episode_id' IS DISTINCT FROM ep2 THEN RAISE EXCEPTION 'old episode mixed';END IF;passed:=passed+1;
+ FOR n IN 1..4 LOOP PERFORM gw_worker_step('ex-safe',100,50);END LOOP;
+ r:=gw_read_exchange('film-nw-x1','episode-fresh-'||run,clock_timestamp(),'grp-syn-northwind','rt-syn-nw-01','autolabels','listing_context',jsonb_build_array(jsonb_build_object('vin',vin,'instance_id',inst)));
+ IF r->'items'->0->'facts'->'listing' ? 'price_cents' OR r->'items'->0->'facts'->'sold_history'->0->>'episode_id' IS DISTINCT FROM ep THEN RAISE EXCEPTION 'sale episode price/history mixed';END IF;passed:=passed+1;
+ UPDATE gw_read_exchange_grants SET revoked_at=clock_timestamp() WHERE key_id='film-nw-x1' AND source_app='autolabels';
+ r:=gw_read_exchange('film-nw-x1','revoked-'||run,clock_timestamp(),'grp-syn-northwind','rt-syn-nw-01','autolabels','listing_context',jsonb_build_array(jsonb_build_object('vin',vin,'instance_id',inst)));
+ IF (r->>'http_status')::int IS DISTINCT FROM 403 THEN RAISE EXCEPTION 'grant revocation bypass';END IF;passed:=passed+1;
+ r:=gw_exchange_safe_fact('{"approval":{"role":"inventory_manager","approval_id":"apr-test","approved_at":"2026-11-02T00:00:00Z","contact":{"email":"canary@example.test"}},"data_base64":"AAAA"}','media','autoframe');
+ IF r::text LIKE '%canary%' OR r ? 'data_base64' THEN RAISE EXCEPTION 'nested PII/binary leak';END IF;passed:=passed+1;
+ RAISE EXCEPTION 'GW_TESTS_PASSED: %',passed;
+END $$;

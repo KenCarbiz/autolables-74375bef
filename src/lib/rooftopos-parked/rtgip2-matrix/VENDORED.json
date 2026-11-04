@@ -1,0 +1,65 @@
+{
+  "note": "Regenerate with the evidence script after any change to the shared core or a vendored adapter; all three repos must carry the same core hashes.",
+  "files": {
+    "rtgip2/protocol.ts": {
+      "origin": "shared core (byte-identical in all three repos)",
+      "sha256": "dfa5ba596d752c264230e192639fb7068ac50bcb3c6ff9be839b83c3e1eaa7c9"
+    },
+    "rtgip2/receipt-v2.ts": {
+      "origin": "shared core (byte-identical in all three repos)",
+      "sha256": "835407a7708ea822c728eb92f50398278040cf7725164da94105ba81564bb5ec"
+    },
+    "rtgip2/receipt-query.ts": {
+      "origin": "shared core (byte-identical in all three repos)",
+      "sha256": "bd5955f58444722540240cc5117b288138aa916bcd95988dde24252ee8936018"
+    },
+    "rtgip2/delivery.ts": {
+      "origin": "shared core (byte-identical in all three repos)",
+      "sha256": "bd5a8c3113f461d98aa6c62e6723066798d1749786425a83c8dc7109e08e2f93"
+    },
+    "rtgip2/harness.ts": {
+      "origin": "shared core (byte-identical in all three repos)",
+      "sha256": "d219c3ee9ddc5a1c11eb245038c0869e9c74c1c8f30b0b1e67b7a56158e4de94"
+    },
+    "rtgip2/produce.ts": {
+      "origin": "shared core (byte-identical in all three repos)",
+      "sha256": "e0edfafa441d19f1bd85af10654272e6d246a5c3dfa050b9fa17de91b41b78f1"
+    },
+    "rtgip2/fixtures.ts": {
+      "origin": "shared core (byte-identical in all three repos)",
+      "sha256": "cf53cb274a5274465042f412ac7e8f0bb40087bb7becea2156913c355871170d"
+    },
+    "rtgip2/admission.ts": {
+      "origin": "shared core (byte-identical in all three repos)",
+      "sha256": "993cd8852fe90586a8c68b828ab9fd5debede3a651de9dbe920ed92ef3fcc870"
+    },
+    "rtgip2/rtgip2-corpus.v2.json": {
+      "origin": "shared core (byte-identical in all three repos)",
+      "sha256": "9a95e5a0f72e2d1f220546ca7c7ff6b23c9f101e5737c9843adf739625d8658d"
+    },
+    "rtgip2/rtgip2-gateway-contract.v1.json": {
+      "origin": "shared core (byte-identical in all three repos)",
+      "sha256": "89c9a46effd6f740e7cffc7176492163e3b5cf2e38a9d5142781cff27a72eff8"
+    },
+    "denylist.ts": {
+      "origin": "KenCarbiz/hartecash-2edb8fec:src/lib/rooftopos/denylist.ts",
+      "sha256": "15ccf5763175ec14f9551dee8b7919b43b484d696fe137520ef330cd70bea966"
+    },
+    "rtgip2-autocurb/producer.ts": {
+      "origin": "KenCarbiz/hartecash-2edb8fec:src/lib/rooftopos/rtgip2-autocurb/producer.ts",
+      "sha256": "39e3ebb70eebaf1930b616e3045df1a9ab286d1077b578d385094d59ca2c6f4c"
+    },
+    "rtgip2-autocurb/consumer.ts": {
+      "origin": "KenCarbiz/hartecash-2edb8fec:src/lib/rooftopos/rtgip2-autocurb/consumer.ts",
+      "sha256": "87dd22bfc71f74ad2afab57c0aeb948a832d9f9da48cd0cb543498485fb56705"
+    },
+    "rtgip2-autoframe/producer.ts": {
+      "origin": "KenCarbiz/showroom-photo-polish:src/lib/af/rtgip2-autoframe/producer.ts",
+      "sha256": "ff98bc9be8182492f3f0552c7e01bda2f5a59daa6ce2c2ee2b2b41fc6418da40"
+    },
+    "rtgip2-autoframe/consumer.ts": {
+      "origin": "KenCarbiz/showroom-photo-polish:src/lib/af/rtgip2-autoframe/consumer.ts",
+      "sha256": "6144b7acd2639939a125e552b69ba3c69aa9482e0953116677760865ac4de77d"
+    }
+  }
+}

@@ -1,0 +1,1 @@
+DO $$ DECLARE def text; BEGIN def:=pg_get_functiondef('public.gw_exchange_safe_fact(jsonb,text,public.gw_app)'::regprocedure); IF position('{1,256}' IN def)=0 THEN RAISE EXCEPTION 'regex anchor missing'; END IF; EXECUTE replace(def,'{1,256}','{1,255}'); END $$;

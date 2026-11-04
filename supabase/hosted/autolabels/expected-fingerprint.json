@@ -1,0 +1,38 @@
+{
+  "after_install_component_digests": {
+    "D": "d2b38fdc666ffa406b034c2e8b5b9d02",
+    "E": "4794f427afc762d4ef5b40b5842e37ce",
+    "R": "8a8156a72bfc4259836e9084fdd80bab",
+    "S1": "2e6e815d213242e4dc57fbc2635ff381",
+    "S2": "c06a7260884e34bfe27d701c53ba4f57",
+    "S3": "cc7e6e9a10f4ace44c2d4246620e0c9c"
+  },
+  "after_install_grants_md5": "67962bdb9ce46502db311ce7d7f1ec80",
+  "component_object_counts": {
+    "D": [
+      45,
+      45
+    ],
+    "E": [
+      13,
+      13
+    ],
+    "R": [
+      9,
+      9
+    ],
+    "S1": [
+      19,
+      19
+    ],
+    "S2": [
+      2,
+      2
+    ],
+    "S3": [
+      49,
+      49
+    ]
+  },
+  "hosted_apply_payment_estimator_settings_md5_before_S2": "cbdf88f87b7fb0041e84437d71e04ed0"
+}

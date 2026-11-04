@@ -1,0 +1,716 @@
+{
+  "repository": "KenCarbiz/rooftop-vehicle-signal-hub",
+  "lovable_project": "f8ad9239-44ff-429d-bec3-14b1e29bf8d4",
+  "commit": "da5118a43e7174dd8b003425b597bc3b8ef71da0",
+  "rule": "Vendored files are byte-identical to the commit. Never edit them; fixes land as separate commits and are listed under amendments.",
+  "layout": "src/lib/gateway/{config,reconcile,reconcile-request}.ts and rtgip2/* keep their relative imports under rtgip2-gateway/; the KAT fixture sits at its @/test/fixtures alias path; SQL and scripts keep their repo-relative paths under supabase/tests/rtgip/gateway/.",
+  "upstream_results_at_commit": {
+    "unit_tests": "439/439 (22 files, vitest)",
+    "sql_assertions": "396 across 22/22 suites (scripts/test-gateway-disposable.py, PostgreSQL 16.x disposable)",
+    "disposable_checks": "24/24 (scripts/test-rtgip2-disposable.ts)"
+  },
+  "files": [
+    {
+      "source": "src/lib/gateway/rtgip2/AGENTS.md",
+      "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/AGENTS.md",
+      "git_blob": "c1b886640f60bdbbcbd84d9a6b54e62086857668",
+      "sha256": "4e42b654afe82eda600235ce533b80667150e58507ed5b8f94c5f3306a6d300a",
+      "bytes": 753
+    },
+    {
+      "source": "src/lib/gateway/rtgip2/activation.ts",
+      "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/activation.ts",
+      "git_blob": "edaa5a97ed8f5d1c498147398e5c1b7e754c4988",
+      "sha256": "d99ab7edaeba1a0b2ccd1f5866f2f453a77af109a852e9a6dcaca04c72fcce40",
+      "bytes": 1370
+    },
+    {
+      "source": "src/lib/gateway/rtgip2/core.ts",
+      "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/core.ts",
+      "git_blob": "736a940c7da94af63efafcffb58cbe790c9cccbb",
+      "sha256": "ef5c599495dbee5e3c5cb36274c3911d50e31010f1cc03b0174289586ea10502",
+      "bytes": 45092
+    },
+    {
+      "source": "src/lib/gateway/rtgip2/dispatcher.server.ts",
+      "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/dispatcher.server.ts",
+      "git_blob": "532b9a0abaded73f3569350bb437df107814ab53",
+      "sha256": "ab67af26402153e2f06f3383d4c7cb282e43954971ffd29ae732b229cd7c4a69",
+      "bytes": 2823
+    },
+    {
+      "source": "src/lib/gateway/rtgip2/handler.server.ts",
+      "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/handler.server.ts",
+      "git_blob": "0346bb2a98ddd4c62bf07365d70fedf5fbd17314",
+      "sha256": "6e9bd3293453501c1869d053ea482b58062f57ce1b7503c24d26fd380e7c549c",
+      "bytes": 3062
+    },
+    {
+      "source": "src/lib/gateway/rtgip2/receipt.test.ts",
+      "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/receipt.test.ts",
+      "git_blob": "7d076123c4029a5a0ff401621e9606c9cff90e35",
+      "sha256": "f58ba4b228299a121e69e54df725587c61ab077394560d7015e379ab11dbab46",
+      "bytes": 11738
+    },
+    {
+      "source": "src/lib/gateway/rtgip2/receipt.ts",
+      "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/receipt.ts",
+      "git_blob": "f1a92e66dc0e2c5435ac4370145f997e08c48a76",
+      "sha256": "3271418ea49b0a984884e492ef86c76b925ee536e56c3a9f3e6cce91cf5b6188",
+      "bytes": 7162
+    },
+    {
+      "source": "src/lib/gateway/rtgip2/reconciliation.test.ts",
+      "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/reconciliation.test.ts",
+      "git_blob": "89a82da4e6b5a538c39728a0e15b898b7c15c598",
+      "sha256": "08675b1be5b22f720370aacf73124081a5152c6545d4a35e4d3cf737a0894a74",
+      "bytes": 1647
+    },
+    {
+      "source": "src/lib/gateway/rtgip2/reconciliation.ts",
+      "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/reconciliation.ts",
+      "git_blob": "5b0873dec4a08039af8405f56916242c5c61284f",
+      "sha256": "8f8f9a665bc28b594228a93db9759482d0e408d019390e74661bdf0812d671e5",
+      "bytes": 902
+    },
+    {
+      "source": "src/lib/gateway/rtgip2/store.server.ts",
+      "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/store.server.ts",
+      "git_blob": "aeafd155739e66ff1e33e7d906e90f355ace1ed0",
+      "sha256": "172b019c99e626ef2db0e7a896d1b0a77e9ef3a511b942527194ea10b7965648",
+      "bytes": 2833
+    },
+    {
+      "source": "src/lib/gateway/rtgip2/vectors.test.ts",
+      "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/vectors.test.ts",
+      "git_blob": "736dc7c33ae9384adfeb15eb486731a7a8dbdaf6",
+      "sha256": "e81834c71f0a49242c6ea6b220b6dab2f733abf4f8353d1c70b1883b0a15ac9f",
+      "bytes": 1083
+    },
+    {
+      "source": "src/lib/gateway/rtgip2/verify.ts",
+      "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/verify.ts",
+      "git_blob": "1856950fdeb4848e2bfd4e1613641d61a55c0f63",
+      "sha256": "1f8ef536eab9760063ab35adaaa79ae5ff6665de97755ea94c4c0bfdd8a208af",
+      "bytes": 4024
+    },
+    {
+      "source": "src/lib/gateway/rtgip2/wire.ts",
+      "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/wire.ts",
+      "git_blob": "70650f0e3737080b5bcfe66cd080b2e1e4565c75",
+      "sha256": "8e683103e768d18754355e41a6c0736014443df0da540bf3326409d46c034e1a",
+      "bytes": 7374
+    },
+    {
+      "source": "src/lib/gateway/config.ts",
+      "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/config.ts",
+      "git_blob": "acdd8348c3e8262e096a790cbc9ab028007c5a7b",
+      "sha256": "0468430d5e2458814f8228714a748c20f21686d3abf41824515ed52fab938432",
+      "bytes": 851
+    },
+    {
+      "source": "src/lib/gateway/reconcile.ts",
+      "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/reconcile.ts",
+      "git_blob": "6fa7937b09b9dba77ddbed4f50ce295332911873",
+      "sha256": "25c91f35e2b14c1c48a2cd9822461a3f24505db1476a35a872526b9346edfa79",
+      "bytes": 3569
+    },
+    {
+      "source": "src/lib/gateway/reconcile-request.ts",
+      "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/reconcile-request.ts",
+      "git_blob": "25c24e9eee401b0d540417238dd7c1ecfcda441f",
+      "sha256": "4b1b0987a6d017f15e78f132d9d61cb517f4f261cd49b4d48f52cbc14601e1e9",
+      "bytes": 1900
+    },
+    {
+      "source": "src/test/fixtures/rtgip2-gateway-kat.v1.json",
+      "vendored": "src/test/fixtures/rtgip2-gateway-kat.v1.json",
+      "git_blob": "cadccca19d893f0eabb431d0209ce0a908cefd54",
+      "sha256": "15e6d39794ac5242308dbbe100f0e7060bef2569afa210109d62e7ea0d503895",
+      "bytes": 84515
+    },
+    {
+      "source": "docs/proposals/final-execution/rtgip2.sql",
+      "vendored": "supabase/tests/rtgip/gateway/docs/proposals/final-execution/rtgip2.sql",
+      "git_blob": "400f9af5043fe2fc1417e5ca35e05f00881d1585",
+      "sha256": "242d7cff6c6d4237dc7155bf9512bec5fd2f1653217f6dbe078671c670d7a4e8",
+      "bytes": 21747
+    },
+    {
+      "source": "docs/proposals/final-execution/reconciliation-v3.sql",
+      "vendored": "supabase/tests/rtgip/gateway/docs/proposals/final-execution/reconciliation-v3.sql",
+      "git_blob": "6214948ee95d4bf3c6ccc71f64ad52fc20ec82d2",
+      "sha256": "b589692ecd0d041b0f3a5ffbb03fd43ef571a2f26355c4470dbc9f6bcd094e2e",
+      "bytes": 5262
+    },
+    {
+      "source": "drizzle/migrations/0000_gateway_schema.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0000_gateway_schema.sql",
+      "git_blob": "74a5375b31ad5ea53f66d78d8ffccad32373cbcd",
+      "sha256": "66a657704809ef0e0c866b11764daa5a641751ddd3d12598f58acf05d40373f1",
+      "bytes": 12855
+    },
+    {
+      "source": "drizzle/migrations/0001_gateway_engine.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0001_gateway_engine.sql",
+      "git_blob": "5e515984dccb4443cf3fab600128dab395641fa7",
+      "sha256": "03162ac773e574320d8cebd5d9b49bccf2a780ba7312a8419cf1883cadd80b9e",
+      "bytes": 35932
+    },
+    {
+      "source": "drizzle/migrations/0002_gateway_seed_synthetic.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0002_gateway_seed_synthetic.sql",
+      "git_blob": "9e26d9e33986c356f7eb81f9100cc31714ecaaf8",
+      "sha256": "2d35afa39594b1a19e2371ca365c274103579137ec62ca17bb3a999e3fccb8a8",
+      "bytes": 5471
+    },
+    {
+      "source": "drizzle/migrations/0003_gateway_stats_views.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0003_gateway_stats_views.sql",
+      "git_blob": "a72e02b486438f2508961fc99d713fce0d609759",
+      "sha256": "ffd0ce7e43237a6dbe55f2e742ad7c9e135e23414acb66aeff3be82edd2dd33d",
+      "bytes": 1075
+    },
+    {
+      "source": "drizzle/migrations/0004_gateway_harden_functions.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0004_gateway_harden_functions.sql",
+      "git_blob": "93278667bf24e1ad6e44c37538bd61d494c5d69e",
+      "sha256": "f56849abab55a928cc138f039a189d026f69b12cf718fd9fae210b99d349e92d",
+      "bytes": 387
+    },
+    {
+      "source": "drizzle/migrations/0005_contract_freeze_and_fail_closed_enrollment.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0005_contract_freeze_and_fail_closed_enrollment.sql",
+      "git_blob": "6de491431e7443343d818d1ea9d30f493ca19068",
+      "sha256": "ba208744355d91ae8cc086326b49bee0ce4e4183df8c682688196c147efeb9d9",
+      "bytes": 9570
+    },
+    {
+      "source": "drizzle/migrations/0006_enrollment_revoke_default_grants.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0006_enrollment_revoke_default_grants.sql",
+      "git_blob": "4fb563c04eb34dd0db64c32b71990b4da05f1935",
+      "sha256": "d8c43e6f9ded8f54becdaf3bd2ffcf0a0ed4aca9904a6657d3870a2aec8b6bc9",
+      "bytes": 353
+    },
+    {
+      "source": "drizzle/migrations/0007_blocked_cross_contract_mappings.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0007_blocked_cross_contract_mappings.sql",
+      "git_blob": "2ea0cb07873e3086fa73eaa48cd6cce76081b5ed",
+      "sha256": "bdf83b72494009afded389ba7d06f604f35435e17a5b03d53ad73fdb4b90ac25",
+      "bytes": 3016
+    },
+    {
+      "source": "drizzle/migrations/0008_claim_recheck_status_under_lock.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0008_claim_recheck_status_under_lock.sql",
+      "git_blob": "2abfdcf7b29a51c75e941329a490aacc40b30e81",
+      "sha256": "769e509e8fbb25f9a896d6ab01e7f36668c1ad9f0a79cfe846fe72e1e0be2f0a",
+      "bytes": 1887
+    },
+    {
+      "source": "drizzle/migrations/0009_worker_step_consistent_lock_order.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0009_worker_step_consistent_lock_order.sql",
+      "git_blob": "26750945b5dec0245537d94571bbaed8703c8ab5",
+      "sha256": "b8bf2010a74cd5d5b6c2d0315aafb6de1cf26021f78d1a02115bb4a55464b2df",
+      "bytes": 1254
+    },
+    {
+      "source": "drizzle/migrations/0010_additive_lifecycle_events_refs_state_machine.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0010_additive_lifecycle_events_refs_state_machine.sql",
+      "git_blob": "0d9f9481d7edef516ba800dac0d8ad303cc369db",
+      "sha256": "ba853ec457c373c43730f859d505399e5c6033afbe2dbf8fb7f2eed22e270c37",
+      "bytes": 20437
+    },
+    {
+      "source": "drizzle/migrations/0011_autoframe_media_approved_v1.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0011_autoframe_media_approved_v1.sql",
+      "git_blob": "e6d7e86698eece7113fc6d83db7c547c70139796",
+      "sha256": "b9f0d7c2733ea148e625d715f9298d032e01393f45ce85c9bd28349a3ad97670",
+      "bytes": 23562
+    },
+    {
+      "source": "drizzle/migrations/0012_fix_media_objref_regex.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0012_fix_media_objref_regex.sql",
+      "git_blob": "380337e567b76174e6cc557c6156ffc0857c8865",
+      "sha256": "87b3cc8b5f520f2269f2d6f621df41d10a7d78dd1d60fa88bbf7cd46fbef23d9",
+      "bytes": 474
+    },
+    {
+      "source": "drizzle/migrations/0013_media_approved_instance_episode_binding.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0013_media_approved_instance_episode_binding.sql",
+      "git_blob": "6fd5b72713c439d3e203d90da78cc1688f8e3640",
+      "sha256": "efaa53f236a747d77c45323680c8d1ec8728e4dd9bb869c4e4efda35e9779b1a",
+      "bytes": 1679
+    },
+    {
+      "source": "drizzle/migrations/0014_dev_signed_ingress_and_ops_snapshot.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0014_dev_signed_ingress_and_ops_snapshot.sql",
+      "git_blob": "de63b078de14300eab84d25950bceb503a838971",
+      "sha256": "6296abd6b25a903d9d1184d4b2b111c44921855789f38c77847d7dd931e02eb4",
+      "bytes": 10195
+    },
+    {
+      "source": "drizzle/migrations/0015_ingress_tables_tighten_grants.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0015_ingress_tables_tighten_grants.sql",
+      "git_blob": "91ba30962ecc4634a3c0547a7942d47af6fd8643",
+      "sha256": "cf4a4f0b76fe05183284e0b881b62856e0bd6add9ae70f6cf45d73d995d1942d",
+      "bytes": 540
+    },
+    {
+      "source": "drizzle/migrations/0016_gw_tables_revoke_direct_writes.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0016_gw_tables_revoke_direct_writes.sql",
+      "git_blob": "30e8bad2083e41cdaa6d3ec938644c637133f747",
+      "sha256": "86df14bd9c2b5b870f2377f92da7476549d58dbefd7c3a6670400e682b2f7d0e",
+      "bytes": 641
+    },
+    {
+      "source": "drizzle/migrations/0017_read_contract_authority_grants.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0017_read_contract_authority_grants.sql",
+      "git_blob": "adc2a08b202d251f94f57a08b777219a0a97e111",
+      "sha256": "66a42a13407ec42f8365b0c5b6aeaa87ff51949fe90b3471a279f53483de67be",
+      "bytes": 17605
+    },
+    {
+      "source": "drizzle/migrations/0018_read_fetch_current_episode_media.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0018_read_fetch_current_episode_media.sql",
+      "git_blob": "0eacd8fc98409a1dd3435d1aa2a60372f845edea",
+      "sha256": "d5dba76d51c42e162db5444e8663f09661878f041ce22c9262c7821ae8932281",
+      "bytes": 8689
+    },
+    {
+      "source": "drizzle/migrations/0019_read_tables_select_only.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0019_read_tables_select_only.sql",
+      "git_blob": "44a972cc2a20c0e44d548cae96954c6b05d59778",
+      "sha256": "7a40601ee0981b2edfe5c19439e4d17a2fb2ffa9ad2616f8a976103b827cbc41",
+      "bytes": 450
+    },
+    {
+      "source": "drizzle/migrations/0020_source_connections_registry.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0020_source_connections_registry.sql",
+      "git_blob": "e94cce6ee64d409752e3f09ca201805187dfbe42",
+      "sha256": "74821b9a594678c718b00950e09ebb92e7bb26cfcfea3ef6d8687351c070b951",
+      "bytes": 1984
+    },
+    {
+      "source": "drizzle/migrations/0021_recovery_accounting_v2_and_crash_points.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0021_recovery_accounting_v2_and_crash_points.sql",
+      "git_blob": "0d588357b0737bd1bcf2e1daf4823c0214402c42",
+      "sha256": "2213b0916e60670809f9f792042e83ba1b032c4d54f59974765fb09b04a2d11d",
+      "bytes": 19814
+    },
+    {
+      "source": "drizzle/migrations/0022_durable_recovery_forensics.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0022_durable_recovery_forensics.sql",
+      "git_blob": "b973b78e406d1d7c05d95e218b1314717c78c330",
+      "sha256": "ad115c894ea7fe77098a35f471ba2d567a36902f43072a97ed7637132aaa3ed1",
+      "bytes": 5411
+    },
+    {
+      "source": "drizzle/migrations/0023_twelve_pair_authorized_read_exchange.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0023_twelve_pair_authorized_read_exchange.sql",
+      "git_blob": "b1d748df5f80920c884a5d41e8ae2bfb28121521",
+      "sha256": "8a1935373f35ac07538082af8d974452b1cf42409784f204b4087ba472d10a56",
+      "bytes": 13070
+    },
+    {
+      "source": "drizzle/migrations/0024_read_exchange_verified_evidence_and_readonly_keys.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0024_read_exchange_verified_evidence_and_readonly_keys.sql",
+      "git_blob": "8949da809fbea09d6030ec95f8be33bd0d3216c8",
+      "sha256": "75b2aabc2d79265dc90549925d0f93e07269f8bd79889f363e5f98fd1a968414",
+      "bytes": 3987
+    },
+    {
+      "source": "drizzle/migrations/0025_read_exchange_sql_scope_fixes.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0025_read_exchange_sql_scope_fixes.sql",
+      "git_blob": "462f6014bc4b4b28980a686fd9958dc7c3e9fa5d",
+      "sha256": "5d0bf3332475fb8c1647d2badd51b9d180980477ed98015dd66606712c7c8dd4",
+      "bytes": 765
+    },
+    {
+      "source": "drizzle/migrations/0026_read_exchange_optional_history_and_bounded_lookups.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0026_read_exchange_optional_history_and_bounded_lookups.sql",
+      "git_blob": "cfacb7436d9b5e412bb0dbb1df7f24dc6d572a73",
+      "sha256": "77f6ea5f45a4fa1cab3e7443fdae0fac780fb5619eecb6f54022b14a6c7750e9",
+      "bytes": 534
+    },
+    {
+      "source": "drizzle/migrations/0027_read_exchange_optional_video_absence.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0027_read_exchange_optional_video_absence.sql",
+      "git_blob": "d7068aa6a94e489e933c03446ff3b987ab6fdcb8",
+      "sha256": "9c738d7111a7694b062d137033519e9dec4ec37a6267fd8b75a4ec101605a061",
+      "bytes": 748
+    },
+    {
+      "source": "drizzle/migrations/0028_read_exchange_receipt_bound_owned_facts.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0028_read_exchange_receipt_bound_owned_facts.sql",
+      "git_blob": "9abc481054f1f96d71c9e9c5aed571c6d9c805d5",
+      "sha256": "9a7f30da2fd1485878d17c607277464f54d9d0bb2e10d2851c14badbdd455174",
+      "bytes": 9587
+    },
+    {
+      "source": "drizzle/migrations/0029_read_exchange_reference_regex_portability.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0029_read_exchange_reference_regex_portability.sql",
+      "git_blob": "c6cff510ed00cc231ce5e16c1ae1c58765a1eb81",
+      "sha256": "daaa551af18d19d8fddb00aa34b8179eec249952223c100df31c609cc02dc28d",
+      "bytes": 261
+    },
+    {
+      "source": "drizzle/migrations/0030_read_exchange_fail_closed_stale_sections.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0030_read_exchange_fail_closed_stale_sections.sql",
+      "git_blob": "64adc8e9f1614a46fe3b405bc129ed52cc62c73a",
+      "sha256": "00fd020a8eebd2375d5cc7501e9bc30dbc85cf2679134e9c841790480c01e7c6",
+      "bytes": 515
+    },
+    {
+      "source": "drizzle/migrations/0031_appraisal_read_privacy_and_privileged_audit.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0031_appraisal_read_privacy_and_privileged_audit.sql",
+      "git_blob": "b15312066e1f007a8fa2b66628b39d201182f4f2",
+      "sha256": "c3cf729f48652248e623d03545dd6a46864b0cada23652d4b51ea58b39e734ec",
+      "bytes": 5116
+    },
+    {
+      "source": "drizzle/migrations/0032_appraisal_projection_positive_allowlist.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0032_appraisal_projection_positive_allowlist.sql",
+      "git_blob": "bf02cb947158f5e841098179720e9cd833608c34",
+      "sha256": "10b3fb12c08263d10eb24b4f77d63951b3dc4078f712c44973525fb5cb69d7e1",
+      "bytes": 914
+    },
+    {
+      "source": "drizzle/migrations/0033_appraisal_projection_replace_on_next_apply.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0033_appraisal_projection_replace_on_next_apply.sql",
+      "git_blob": "df735ce0d543018af29fea37e8c2422ff3884d42",
+      "sha256": "42d744db21be68b20b97f40a61904e72a665f3e8865fb06fc7436542989e23f7",
+      "bytes": 391
+    },
+    {
+      "source": "drizzle/migrations/0034_private_service_staging_boundary.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0034_private_service_staging_boundary.sql",
+      "git_blob": "2bea134251f4ea9d5b7d07f795627a78933206f7",
+      "sha256": "1ee984c5d168de237eb2fa4ce58390d685df31cd66bd92a440e270afbda3c668",
+      "bytes": 15943
+    },
+    {
+      "source": "drizzle/migrations/0035_service_staging_budget_and_null_guards.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0035_service_staging_budget_and_null_guards.sql",
+      "git_blob": "43c70203c90be84e6e9b341d142d2854910117d7",
+      "sha256": "763d9e217d8f7a99a4d98def8b03035924e36c15375a50ce9bd5f8f46dfde107",
+      "bytes": 1318
+    },
+    {
+      "source": "drizzle/migrations/0036_service_budget_column_qualification.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0036_service_budget_column_qualification.sql",
+      "git_blob": "303a29379de9fba3d28f255465865c57c26b63d9",
+      "sha256": "53d8c81a8e16684516d20ebddc3c426ff15f27100d9932b009a07d3fd62ff969",
+      "bytes": 299
+    },
+    {
+      "source": "drizzle/migrations/0037_private_service_read_delegate_and_gate_locks.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0037_private_service_read_delegate_and_gate_locks.sql",
+      "git_blob": "97003c5eb2b6973ee3f353e0040a76a6f44a62c8",
+      "sha256": "d985c5e37783c26eb8ebd62b03a27b6e19375c11aa3f14e3696f36223e87d9a6",
+      "bytes": 1357
+    },
+    {
+      "source": "drizzle/migrations/0038_disabled_phase4_contract_extensions.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0038_disabled_phase4_contract_extensions.sql",
+      "git_blob": "a4414beab15aeb5889a08e9f4d520fe9c12d6337",
+      "sha256": "b844bf9499f4f5c3c39dfe85959b80b18d39f103a65c51dbdeea0d1bb5b8e5f5",
+      "bytes": 20808
+    },
+    {
+      "source": "drizzle/migrations/0039_phase4_minimal_reader_boundary_and_catalog_revoke.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0039_phase4_minimal_reader_boundary_and_catalog_revoke.sql",
+      "git_blob": "55a9b0dc0f619d8010cff6f58b106b8efe272398",
+      "sha256": "b3ebf15b66a5c33579f19dde8f3b4e6683a1b9b6ca372567d4b7d4d0e5c1f4b8",
+      "bytes": 5265
+    },
+    {
+      "source": "drizzle/migrations/0040_phase4_receipt_qualification_and_strict_shape.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0040_phase4_receipt_qualification_and_strict_shape.sql",
+      "git_blob": "3288db5aa14d0e8863b9deef87b156aae503328e",
+      "sha256": "f6f8521c3a0b23ea3724ee5eb38653b5b87f3d6bf1334200566efdde5df345d0",
+      "bytes": 2370
+    },
+    {
+      "source": "drizzle/migrations/0041_phase4_vehicle_types_and_strict_field_set.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0041_phase4_vehicle_types_and_strict_field_set.sql",
+      "git_blob": "5fd221539bc83cba9f86e88e1a7b55d3c3714e3e",
+      "sha256": "d10a22e0b278a850eb08833cc080712b0b443cd8674e9704f64c46d3d6eedf28",
+      "bytes": 802
+    },
+    {
+      "source": "drizzle/migrations/0042_dev_reconciliation_covering_indexes.sql",
+      "vendored": "supabase/tests/rtgip/gateway/drizzle/migrations/0042_dev_reconciliation_covering_indexes.sql",
+      "git_blob": "899b31dbcb9f7ba4bc88cc880b6fd7dcd2498489",
+      "sha256": "534bac167a4a6f7f0f680e1e3efb2314963a2f635522ba2567ce84affc6a1aea",
+      "bytes": 1057
+    },
+    {
+      "source": "tests/sql/appraisal_merge_privacy.test.sql",
+      "vendored": "supabase/tests/rtgip/gateway/tests/sql/appraisal_merge_privacy.test.sql",
+      "git_blob": "3a4a45cd7c674a3d65d12baaab5dad2d940d6428",
+      "sha256": "5528047ea4d68dc6a0840d942971bbe5989d4d892b623fe9229c89af91b90571",
+      "bytes": 2395
+    },
+    {
+      "source": "tests/sql/appraisal_privacy.test.sql",
+      "vendored": "supabase/tests/rtgip/gateway/tests/sql/appraisal_privacy.test.sql",
+      "git_blob": "96867e45da655c449702f8bd8c51f1e7bf5f54df",
+      "sha256": "051c3503247f1a6e0d9ef4dbc32d449507761c1c18c4f9793ccdf3d8a704c334",
+      "bytes": 6302
+    },
+    {
+      "source": "tests/sql/autoframe_media.test.sql",
+      "vendored": "supabase/tests/rtgip/gateway/tests/sql/autoframe_media.test.sql",
+      "git_blob": "c57e1bf698a403037e55bc64e3fff2aa2bafca0b",
+      "sha256": "d75e7098928cab8cd6b067fecae8ec464c37e571e33296a11d524ded7fd9a771",
+      "bytes": 11342
+    },
+    {
+      "source": "tests/sql/blocked_mappings.test.sql",
+      "vendored": "supabase/tests/rtgip/gateway/tests/sql/blocked_mappings.test.sql",
+      "git_blob": "a83808e1fc749ca705f8eb29a30b17ced9e8d71f",
+      "sha256": "02238c96f22b531ad89ea0d79f72e45f3b759c11546f2c3ed6ca63bebecdc419",
+      "bytes": 4183
+    },
+    {
+      "source": "tests/sql/enrollment_contract.test.sql",
+      "vendored": "supabase/tests/rtgip/gateway/tests/sql/enrollment_contract.test.sql",
+      "git_blob": "d4924fe5647c973ac89944a2f3e868c793bcd27b",
+      "sha256": "cd1a2249d2eff4541377c748a4a5bc35fbb2a2f7417016a4d2720184958ad2af",
+      "bytes": 11834
+    },
+    {
+      "source": "tests/sql/extensions.test.sql",
+      "vendored": "supabase/tests/rtgip/gateway/tests/sql/extensions.test.sql",
+      "git_blob": "69dc3ac62d885f44e414816cbba17ded30e610c4",
+      "sha256": "c4158b6698d89134855d9e7d2a3327c6180da7ae8b3afa0f0c9f27123efa89b7",
+      "bytes": 11916
+    },
+    {
+      "source": "tests/sql/extensions_types.test.sql",
+      "vendored": "supabase/tests/rtgip/gateway/tests/sql/extensions_types.test.sql",
+      "git_blob": "16595734a1bda23c80d288e32fd086421b9883c3",
+      "sha256": "fc0cbf5cdb9834cb4a08a71394fc2ae365d26117e83fe5f93799767805fa1e31",
+      "bytes": 1717
+    },
+    {
+      "source": "tests/sql/gateway_engine.test.sql",
+      "vendored": "supabase/tests/rtgip/gateway/tests/sql/gateway_engine.test.sql",
+      "git_blob": "a648b02d42082faef053a61d57d7b66d4dbf4896",
+      "sha256": "39909cadc2ade2e460a266f8f5993f3db1d9e7ddd0170365c79f0ea2cf8412a8",
+      "bytes": 14132
+    },
+    {
+      "source": "tests/sql/ingress_and_drills.test.sql",
+      "vendored": "supabase/tests/rtgip/gateway/tests/sql/ingress_and_drills.test.sql",
+      "git_blob": "eb56339569054f9925daf23110ddefd54778d34c",
+      "sha256": "20353bc0ecdf9f159abd8919ee88134ea3d57b1c80ae62ce21d7569279f53d0d",
+      "bytes": 15990
+    },
+    {
+      "source": "tests/sql/lifecycle_v1_additive.test.sql",
+      "vendored": "supabase/tests/rtgip/gateway/tests/sql/lifecycle_v1_additive.test.sql",
+      "git_blob": "877a82a228ce1239550935cf136268cd81ae0fe5",
+      "sha256": "5df750fb5c28ceb492e4fb8437ed2732a0a187b9923d2bcc66a66af386ec868b",
+      "bytes": 18642
+    },
+    {
+      "source": "tests/sql/read_contract.test.sql",
+      "vendored": "supabase/tests/rtgip/gateway/tests/sql/read_contract.test.sql",
+      "git_blob": "8e6363f0354da2c89554f10b6c0f95173de198c8",
+      "sha256": "51ba48bb405f06025568bd0c8d7a0d4e1ae7c2d4af69811d604f8292b80380c3",
+      "bytes": 20507
+    },
+    {
+      "source": "tests/sql/read_exchange.test.sql",
+      "vendored": "supabase/tests/rtgip/gateway/tests/sql/read_exchange.test.sql",
+      "git_blob": "9287a7811ddead0a1a66d8277e1681872de5126d",
+      "sha256": "d76c1ef65a3efe234fde99b4d4b17270a3e9a08227aa046a5f85f608ff2ef033",
+      "bytes": 6439
+    },
+    {
+      "source": "tests/sql/read_exchange_safety.test.sql",
+      "vendored": "supabase/tests/rtgip/gateway/tests/sql/read_exchange_safety.test.sql",
+      "git_blob": "1228874886b96ddd6ebe470d0b63f022b6b9a191",
+      "sha256": "66562a60218d523ab5943d047bc61946c1fd16e2ae50f89f852c80c853435de6",
+      "bytes": 4592
+    },
+    {
+      "source": "tests/sql/reconciliation_v3.test.sql",
+      "vendored": "supabase/tests/rtgip/gateway/tests/sql/reconciliation_v3.test.sql",
+      "git_blob": "123d5da6c2da2bbba6e16726b5a93cc3ecd45c95",
+      "sha256": "e15674a52b16b78df5f2f52def9b8411cfd72234e42bb6ed4a596bc82b2420c8",
+      "bytes": 1190
+    },
+    {
+      "source": "tests/sql/recovery_accounting.test.sql",
+      "vendored": "supabase/tests/rtgip/gateway/tests/sql/recovery_accounting.test.sql",
+      "git_blob": "70a0f2b2806fae759639c0f226d20be6d322fb58",
+      "sha256": "50fbc5e06214ab8f4bcd279e163b75232923a624c5ff0afd68378de0d658c6c9",
+      "bytes": 18070
+    },
+    {
+      "source": "tests/sql/recovery_forensics.test.sql",
+      "vendored": "supabase/tests/rtgip/gateway/tests/sql/recovery_forensics.test.sql",
+      "git_blob": "448b58d38ac27f7bebe64791bdf8e2e8de325ff9",
+      "sha256": "2a1d6eb979c10b85f008043883716d7657811e044a62c5581fa26ae361a38884",
+      "bytes": 4287
+    },
+    {
+      "source": "tests/sql/role_authority.test.sql",
+      "vendored": "supabase/tests/rtgip/gateway/tests/sql/role_authority.test.sql",
+      "git_blob": "df59844fd8a5f1f40e32ca643105bc3f2d337313",
+      "sha256": "2f386f3958923bd53d093dcbcd792419b790d6f1525086c32024b7891f0235bd",
+      "bytes": 2076
+    },
+    {
+      "source": "tests/sql/scheduler_fairness.test.sql",
+      "vendored": "supabase/tests/rtgip/gateway/tests/sql/scheduler_fairness.test.sql",
+      "git_blob": "bf792784100b0b1672ff6cdc3a9cec60dfbabea6",
+      "sha256": "88f79927bf529fec9c251c7e0437365edf74fe95a7b27b9e882212c92d21f85c",
+      "bytes": 5456
+    },
+    {
+      "source": "tests/sql/service_staging.test.sql",
+      "vendored": "supabase/tests/rtgip/gateway/tests/sql/service_staging.test.sql",
+      "git_blob": "6e5a59033450b34609dbf9ff349a7500b5e27b97",
+      "sha256": "00d7724ad7d8f4816820f8be2ffc3bf245cb63d54b58b6c42e7b23f0a41f4122",
+      "bytes": 6633
+    },
+    {
+      "source": "tests/sql/service_staging_crash.test.sql",
+      "vendored": "supabase/tests/rtgip/gateway/tests/sql/service_staging_crash.test.sql",
+      "git_blob": "67a34ee6d8898594161010d6385128a2efea2791",
+      "sha256": "b3e0f1c60f40e817f7126742b79523ada6634d7337a182cafc56c310d6536246",
+      "bytes": 4024
+    },
+    {
+      "source": "tests/sql/service_staging_provision.test.sql",
+      "vendored": "supabase/tests/rtgip/gateway/tests/sql/service_staging_provision.test.sql",
+      "git_blob": "a43aad1d80e75713e0077c56fde0ef031affc9bf",
+      "sha256": "048b528a96b4c7f0ddc79cf3894d5d7ddec2e7c8dd54c670e769a69397b8f7bb",
+      "bytes": 1926
+    },
+    {
+      "source": "tests/sql/service_staging_read.test.sql",
+      "vendored": "supabase/tests/rtgip/gateway/tests/sql/service_staging_read.test.sql",
+      "git_blob": "ff286dac6766af78ed53b76952f6dc8796842bda",
+      "sha256": "1b2cca62251553762746d1179f1d1109b477cc943e8a728fb30e944889c5345b",
+      "bytes": 4051
+    },
+    {
+      "source": "scripts/test-rtgip2-disposable.ts",
+      "vendored": "supabase/tests/rtgip/gateway/scripts/test-rtgip2-disposable.ts",
+      "git_blob": "b8530cf4818d516cc9df91dd7acfc5213f3deb04",
+      "sha256": "230d501bf969acd02c145ddf1c28d2dbbf43c4a5a0a72a801b5874608a19b12a",
+      "bytes": 18282
+    },
+    {
+      "source": "scripts/rtgip2-crash-child.ts",
+      "vendored": "supabase/tests/rtgip/gateway/scripts/rtgip2-crash-child.ts",
+      "git_blob": "747fbbc2ad1f8b51199885b68d35679a9ad341e3",
+      "sha256": "3c863df8d3853baf046e842e7b916dca3aea69e5803247009e02dc790869f2b3",
+      "bytes": 652
+    },
+    {
+      "source": "scripts/bootstrap-gateway-disposable.py",
+      "vendored": "supabase/tests/rtgip/gateway/scripts/bootstrap-gateway-disposable.py",
+      "git_blob": "228b5dc8d0926a3b801148b315e2cbeb739d25a9",
+      "sha256": "1922818db6dcc0f57689e8645bfd96d0974283b35fc7c32e01a75b5812866ef8",
+      "bytes": 2422
+    },
+    {
+      "source": "scripts/gateway-disposable-fixtures.sql",
+      "vendored": "supabase/tests/rtgip/gateway/scripts/gateway-disposable-fixtures.sql",
+      "git_blob": "3f72bf9532b42bca387f37a5444ad3edff4e98fd",
+      "sha256": "501517ebd40844d24bc981d0ee93e011de7fc9f3fa9208e3da9db519170f099a",
+      "bytes": 3012
+    },
+    {
+      "source": "scripts/test-gateway-disposable.py",
+      "vendored": "supabase/tests/rtgip/gateway/scripts/test-gateway-disposable.py",
+      "git_blob": "2063b43103656065495162b8828b2caa9dfa4d6a",
+      "sha256": "c98fa06e25b36ebbd0f1537d8d8d49a7c8ea77116f44b7c80818316353bcd799",
+      "bytes": 3566
+    },
+    {
+      "source": "scripts/recon/capture_forensic_drill.sql",
+      "vendored": "supabase/tests/rtgip/gateway/scripts/recon/capture_forensic_drill.sql",
+      "git_blob": "f66bd3a2cef51e5598ae485d3029dbed53636c28",
+      "sha256": "3cc5f6cdd6912d022036823a5cae86be94ea6e92119a1a8b2d2cef4591718f73",
+      "bytes": 11949
+    }
+  ],
+  "amendments": [
+    {
+      "id": "GW-F2",
+      "summary": "authorize() selects the one active connection granting the envelope's rooftop and refuses an ambiguous one; identical to the shared core protocol.ts at f2c40e36",
+      "files": [
+        {
+          "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/core.ts",
+          "sha256_after": "219afd00abcf2251047de2a846151b7b28890939795fd4bb4cc2224fd3e23cad"
+        }
+      ]
+    },
+    {
+      "id": "GW-F3",
+      "summary": "verifyReceiptV2 requires the connection authorize() selected to be the receipt's expected connection",
+      "files": [
+        {
+          "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/receipt.ts",
+          "sha256_after": "c3498d6aadd02bfcec46a77fa4c92a10096d639e5dc06d6f2ead42400c8bb90e"
+        }
+      ]
+    },
+    {
+      "id": "GW-F1",
+      "summary": "Held and quarantined target_inbox outcomes: gw_r2_record_uncommitted stores the signed evidence in append-only gw_r2_uncommitted_receipts; quarantined sets state quarantined (redrivable), held parks target_persisted with a 30 s backoff and no attempt charge; dispatcher and store gain the optional recordUncommitted port",
+      "files": [
+        {
+          "vendored": "supabase/tests/rtgip/gateway/docs/proposals/final-execution/rtgip2.sql",
+          "sha256_after": "d3d7c0682de48474656ff39431941621dc3f23b74a45fd63088ae63433c3241e"
+        },
+        {
+          "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/dispatcher.server.ts",
+          "sha256_after": "94de3bed7b6bfd3ba5046b9901f3c3a43641d02198afc711d115ccf54935a463"
+        },
+        {
+          "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/store.server.ts",
+          "sha256_after": "e8fc18e4646aeccd7e1cd017ef4eddc79c54f4f4bcf92392068abfd04d2d8bd9"
+        }
+      ]
+    },
+    {
+      "id": "GW-F6",
+      "summary": "Permanent refusals are 4xx: verification failures map to 400/401/403/413 by reason, an admission conflict is 409 and a SQL authorization refusal under locks is 403; registry and durability failures stay 503. The candidate's own disposable checks now expect 409 for the conflict and 403 for the transactional key revocation",
+      "files": [
+        {
+          "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/handler.server.ts",
+          "sha256_after": "0ec60dcdbb80ce51b5e6423200d6ab05b6431fa6371b78f1d4b47fa7eaead120"
+        },
+        {
+          "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/store.server.ts",
+          "sha256_after": "10e04487244c5fecf36d5ad9d4f53461d169aecda22136cb21bd796754b1e72e"
+        },
+        {
+          "vendored": "supabase/tests/rtgip/gateway/scripts/test-rtgip2-disposable.ts",
+          "sha256_after": "ea37972002e75716c1c230b98c4cab0d99cd1d0841d262f31a4b068466ddab61"
+        }
+      ]
+    },
+    {
+      "id": "GW-F7",
+      "summary": "A source nonce reused over different bytes (gw_r2_admit 'nonce conflict') is a permanent 401 nonce_reused, matching the shared core's reason, instead of a retryable 503",
+      "files": [
+        {
+          "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/handler.server.ts",
+          "sha256_after": "d2b88b0cef9dfa6dcd6b6b827f0f3e9baf8471379e960b403c5b2bd5ac402a4f"
+        },
+        {
+          "vendored": "src/lib/rooftopos-parked/rtgip2-gateway/rtgip2/store.server.ts",
+          "sha256_after": "1493b39afeeae51915b9d8feb3f1a7bff8a101c76c8b67b8c0b290568f759052"
+        }
+      ]
+    }
+  ]
+}

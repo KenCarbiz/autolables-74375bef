@@ -1,0 +1,10 @@
+{
+  "schema": "rtgip2-key-import-provenance/1",
+  "files": {
+    "key-import.test.ts": "467ca2fe6d37dcec2f65e7859ed89bbfc449597d6163e0357323aef0fdebddce",
+    "key-import.ts": "0377e488a7756571baadf47365ec476fc17b542bad9d049d2ebfccf399fc1af2",
+    "key_import.removal.sql": "755cb1a16a3fb6a1c51d10339a9b57c1d5218322a51a3f090830596697c34035",
+    "key_import.staging.sql": "a9e0257b7053ee798713e7193433ab5c6b19449b97d0115deab2ea4e9aecdc22",
+    "provenance.test.ts": "50439ec5737ea5f6abae6d0dbcdf62e6ef36d5b3f779dfee39b2eba5d45e1eef"
+  }
+}
