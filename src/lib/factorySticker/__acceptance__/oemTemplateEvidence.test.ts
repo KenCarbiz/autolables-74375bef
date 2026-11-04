@@ -17,6 +17,16 @@ import { referenceMatchData, tucsonListings, tucsonRenderData } from "../render/
 import { wranglerReferenceMatchData, wranglerRenderData } from "../render/__fixtures__/wrangler";
 import { voyagerReferenceMatchData, voyagerRenderData } from "../render/__fixtures__/voyager";
 import { outlanderSportReferenceMatchData, outlanderSportRenderData } from "../render/__fixtures__/outlanderSport";
+import { sorentoReferenceMatchData, sorentoRenderData } from "../render/__fixtures__/sorento";
+import { foresterReferenceMatchData, foresterRenderData } from "../render/__fixtures__/forester";
+import { gv80ReferenceMatchData, gv80RenderData } from "../render/__fixtures__/gv80";
+import { durangoReferenceMatchData, durangoRenderData } from "../render/__fixtures__/durango";
+import { envistaReferenceMatchData, envistaRenderData } from "../render/__fixtures__/envista";
+import { KIA_SORENTO_GAS_ID } from "../render/variants/kiaSorentoGas";
+import { SUBARU_FORESTER_GAS_ID } from "../render/variants/subaruForesterGas";
+import { GENESIS_GV80_GAS_ID } from "../render/variants/genesisGv80Gas";
+import { DODGE_DURANGO_GAS_ID } from "../render/variants/dodgeDurangoGas";
+import { BUICK_ENVISTA_GAS_ID } from "../render/variants/buickEnvistaGas";
 import { CHRYSLER_VOYAGER_GAS_ID } from "../render/variants/chryslerVoyagerGas";
 import { MITSUBISHI_OUTLANDER_SPORT_ID } from "../render/variants/mitsubishiOutlanderSport";
 import { HYUNDAI_TUCSON_GAS_ID } from "../render/variants/hyundaiTucsonGas";
@@ -275,6 +285,145 @@ ${t.blockers.map((b) => `- ${b}`).join("\n")}
 - Matching: model Outlander Sport (or RVR), SUV body, gasoline. The full-size Outlander and the Outlander PHEV are not matched and flag template_configuration_unsupported. A record that states no drivetrain still matches.
 `;
 
+interface BrandDoc {
+  title: string;
+  logo: string;
+  rows: string[];
+  sample: string[];
+  differences: string[];
+}
+
+const mappingFor = (b: BrandDoc): string => `# ${b.title} - data source mapping
+
+Every printed value comes from the saved vehicle record the generator already reads (vehicle_listings.mc_attributes from NeoVIN, vehicle_listings.epa_economy from the verified fueleconomy.gov match, dealer_profiles.settings). No provider call is made. Reference-sample values are never used as defaults; they appear only in the reference-match fixture used for side-by-side comparison.
+
+| Printed region | Source field | When missing |
+|---|---|---|
+| Reproduction banner and disclosure | reproduction.ts | Always printed |
+| ${b.logo} | packaged vector-rendered artwork cropped from the reference PDF (logoArtwork.ts) | Always printed |
+${b.rows.join("\n")}
+| Optional equipment / added features (packages, options with price) | build_sheet.packages / options | Nothing listed; a missing price prints N/A, an included item INCLUDED; unpriced paint and trim rows already printed as colours are not repeated |
+| MSRP, destination, total | build_sheet.pricing base_msrp, destination_charge, total_msrp (stated, else base + options + destination) | NOT AVAILABLE |
+| Standard equipment | build_sheet.standard + key_features through equipmentSelection and catalog hygiene (full list when it fits, else selected lines plus the Passport pointer line) | Unavailable line |
+| Warranty | warranty.* (verified OEM terms only) | "Not available for this vehicle." Not wired in the adapter today |
+| Fuel economy, annual fuel cost, gallons per 100 miles | epa_economy combined / city / highway / annualFuelCost; gallons from the record or 100 / combined | Unavailable message; nothing is zero |
+| You save / You spend over 5 years | epa.fiveYearCostDifference | "5-year fuel cost comparison: Not Available" |
+| Greenhouse gas and smog scales | epa_economy.ghgScore, smogScore (integer 1-10) | Not Available; any value outside 1-10 is unavailable |
+| CO2 sentence, fuel type tag | epa_economy.co2TailpipeGpm, fuelType | Omitted |
+| Government 5-star safety ratings | NHTSA rows in the NeoVIN decode (only when the Standard-NHTSA row is present; IIHS rows never feed stars). One combined frontal and one combined side value print as one row each, never as driver/passenger or seat rows | Not Rated / Not Available / explicit message panel |
+| Parts content, final assembly, engine / transmission origin | factory.partsContent (AALA); country of final assembly from the decode made_in value | "Not available for this vehicle." |
+| Original delivering dealer (SOLD TO / dealer lines) | dealer block, ONLY when dealerRole is original_delivery | Label printed blank. The current selling rooftop never prints |
+| VIN barcode | barcodePayload (= VIN), Code 128 regenerated per vehicle | Always present |
+| Passport QR (0.90in including quiet zone) | canonicalPassportUrl(listing.slug); placed in the OEM Smartphone QR slot of the fuel-economy panel${b.title.includes("Durango") ? " (below the parts box for this family)" : ""} | Omitted with its caption when no Passport URL |
+`;
+
+const differencesFor = (b: BrandDoc, t: CatalogTemplate): string => `# ${b.title} - differences from the OEM reference
+
+Status: layout ${t.layoutStatus}, approval ${t.approval}. Production routing cannot select this template until the owner approves it.
+
+## Sample data
+- reference-match: the reference sticker's own transcribed values, for side-by-side comparison only. It is never used for another vehicle.
+${b.sample.join("\n")}
+
+## Blockers (stable codes)
+${t.blockers.map((x) => `- ${x}`).join("\n")}
+
+## Unresolved differences
+- Page: the reference PDF is 1224x792pt, rotation 0 (upright landscape); the render is the same size and exactly one page.
+- Fonts: Helvetica / Helvetica-Bold stand in for the reference faces (font_substitution).
+- Layout compression: vertical positions are compressed to clear the mandatory reproduction banner and disclosure.
+- Artwork not reproduced: agency seals and the source Smartphone QR (replaced by the 0.90in Vehicle Passport QR). The source barcode is regenerated from the VIN.
+- Wording not reproduced: the federal-law label statement ("affixed ... pursuant to federal law") and any Monroney wording; the footnote reads "Original manufacturer's suggested retail prices shown. Excludes taxes, title, license, dealer-installed items and current selling price."
+- EPA panel: native rebuild with the same indicator semantics (1-10 scores, Not Available for anything else); gradient, bubble shape and spacing are approximated, and the average-vehicle MPG and cost sentence is not printed.
+- Safety: the decode gives one frontal and one side value, so combined rows print where the reference shows driver/passenger and front/rear seat; the reference-match fixture carries per-row values to show the full panel.
+- OCR: transcription was spot-checked against the PDF only (ocr_unverified). The reference-match fixture drops trademark and registered marks and normalizes dashes (WinAnsi sanitation).
+- Parts content, warranty: not wired by the orchestrator adapter today (blockers parts_content_not_wired, warranty_terms_not_wired); the reference-match render shows the populated state.
+- Equipment: decoder fragments (rating rows, speed thresholds, bare counts and letters, engine and drive labels) are dropped before selection; when the full list does not fit at 5.5pt the ranked selection prints with the fixed Passport pointer line.
+${b.differences.join("\n")}
+`;
+
+const BRAND_DOCS: Record<string, BrandDoc> = {
+  sorento: {
+    title: "Kia 2026 Sorento (gasoline)",
+    logo: "Kia logo",
+    rows: [
+      "| Title (year model trim drivetrain) | identity from ymm + listing.trim; drivetrain from sourceCorrections.decideDrivetrain | Missing parts omitted, never guessed |",
+      "| Exterior / interior colour, VEHICLE ID NUMBER, assembly point | build_sheet.colors; listing.vin; factory.finalAssemblyPoint | Row omitted |",
+      "| Sold To / Ship To | original delivering dealer only (dealerCode + dealer lines) | Labels print blank |",
+    ],
+    sample: ["- sticker-5XYRLDJC9RG278742: off-year layout stress test (2024 Sorento S, used), not a production candidate. Production has no 2026 Sorento."],
+    differences: [
+      "- Model/opt code, ship-to code, total additional weight, Kia Connect and privacy footnotes: no render-data source or not certified; not printed. The port-of-entry row prints the final assembly point as ASSEMBLY POINT.",
+      "- Optional equipment: the reference prints paint and floor mats as additional installed equipment; options print as listed on the record.",
+      "- Matching: 2026 Sorento, SUV, gasoline. Sorento Hybrid and Plug-In Hybrid (by model name or powertrain) are not matched and flag template_configuration_unsupported.",
+    ],
+  },
+  forester: {
+    title: "Subaru 2026 Forester (gasoline)",
+    logo: "Subaru logo",
+    rows: [
+      "| Model wordmark | identity.model printed as text (the reference prints a model logotype) | Omitted |",
+      "| VIN, Vehicle, Port/Assembly, Deliver by/Carrier | listing.vin; identity; factory.finalAssemblyPoint; transportMethod | Row omitted |",
+      "| Exterior colour, optional equipment, destination and total | build_sheet.colors, packages, options, pricing | Row omitted / NOT AVAILABLE |",
+      "| SOLD TO | original delivering dealer only | Label printed blank |",
+    ],
+    sample: ["- sticker-JF2SKAJC9MH531918: off-year layout stress test (2021 Forester Premium, used), not a production candidate. Production has no 2026 Forester."],
+    differences: [
+      "- Artwork not reproduced: the Consumer Reports Recommended panel, the Subaru Added Security panel, the privacy-notice strip and its QR. The promotional panel's slot carries the parts-content box; the fuel-economy panel sits below the safety panel as in the reference.",
+      "- Model code (TFH), Full Tank of Gas INCLD row and the privacy notice: not printed.",
+      "- The bottom-left strip holds the SOLD TO block, the footnote and the regenerated barcode.",
+      "- Matching: 2026 Forester, SUV, gasoline. The Forester Hybrid (by model, trim or powertrain) is not matched and flags template_configuration_unsupported.",
+    ],
+  },
+  gv80: {
+    title: "Genesis 2026 GV80 (gasoline)",
+    logo: "Genesis logo",
+    rows: [
+      "| Title and VIN lines | identity (year model trim drivetrain); listing.vin printed top left and top right | Missing parts omitted |",
+      "| Header program panel | warranty.* (verified terms only) in the slot the reference uses for The Genesis Experience | \"Not available for this vehicle.\" |",
+      "| VIN, exterior, interior/seat colour, transport, assembly point, emissions cells | listing.vin; build_sheet.colors; transportMethod; finalAssemblyPoint; emissionsCode | Cell prints \"Not available\" |",
+      "| SOLD TO / SHIPPED TO | original delivering dealer only | Labels print blank |",
+    ],
+    sample: ["- sticker-KMTG34SC6RU142669: off-year, other-model layout stress test (2024 G70 sedan, used), not a production candidate. Production has no GV80 and no 2026 Genesis record."],
+    differences: [
+      "- The Genesis Experience program claims (complimentary maintenance, valet, map care, connected services) are not reproduced: they are not verified terms. The panel prints the record's verified warranty instead.",
+      "- Model code, accessory weight, the production strip and the third VIN line: not printed. The reference's two empty frames beside the safety panel are replaced by the footnote text.",
+      "- Matching: 2026 GV80, SUV, gasoline. GV80 Coupe and any non-gasoline powertrain are not matched and flag template_configuration_unsupported.",
+    ],
+  },
+  durango: {
+    title: "Dodge 2026 Durango (gasoline)",
+    logo: "Dodge logo",
+    rows: [
+      "| Model-year digits, title | identity.year (stacked) and model trim drivetrain | Omitted, never guessed |",
+      "| Spec line, Exterior / Interior colour, Engine, Transmission | identity; build_sheet.colors; mc_attributes.engine / transmission | Row omitted |",
+      "| Base Price box, destination, total | build_sheet.pricing | NOT AVAILABLE |",
+      "| Assembly Point/Port of Entry, SOLD TO | factory.finalAssemblyPoint; original delivering dealer only | Omitted / blank |",
+    ],
+    sample: ["- sticker-2D8HN54P68R833362: off-year, other-model layout stress test (2008 Grand Caravan SXT, used, no saved EPA match), not a production candidate. Production has no Durango record."],
+    differences: [
+      "- Shared FCA layout family (fcaCommon.ts, also used by the Wrangler and Voyager); only the logo, black frame, title and contact line are Durango-specific.",
+      "- Artwork not reproduced: the FlexCare vehicle protection advertisement and the 5-year/60,000-mile powertrain warranty graphic; the italic title face is bold upright. The \"FCA US LLC\" line and the L4-VON / S.L. / SHIP TO fields are not printed.",
+      "- Matching: 2026 Durango, SUV, gasoline. SRT Hellcat is gasoline and matches. Any plug-in or hybrid powertrain is not matched.",
+    ],
+  },
+  envista: {
+    title: "Buick 2026 Envista (gasoline)",
+    logo: "Buick logo",
+    rows: [
+      "| Title, EXTERIOR, INTERIOR, ENGINE, TRANSMISSION | identity; build_sheet.colors; mc_attributes.engine / transmission | Row omitted |",
+      "| Standard vehicle price, options and pricing, totals | build_sheet.pricing, options; total options from the record | NOT AVAILABLE |",
+      "| VIN, dealer to whom delivered, assembly point | listing.vin; original delivering dealer only; factory.finalAssemblyPoint | Label printed blank / omitted |",
+    ],
+    sample: ["- sticker-KL47LCEP0TB000001: SYNTHETIC stress fixture (invented values). No Buick row exists in the saved vehicle_listings, so no real record was available; it is not a real vehicle."],
+    differences: [
+      "- Artwork not reproduced: the adhesive-strip notice, the OnStar advertisement and its QR, the order-information QR, the driving-range bars and the flex-fuel E85 tag (the fuel tag prints the verified EPA fuel type); sales codes and order numbers have no render-data source.",
+      "- Standard equipment prints in the reference's column arrangement; the reference's pricing box occupies two columns, this layout gives pricing the right-hand column.",
+      "- Matching: 2026 Envista, SUV, gasoline. A non-SUV body or non-gasoline powertrain is not matched.",
+    ],
+  },
+};
+
 const packages: PackageSpec[] = [{
   templateId: HYUNDAI_TUCSON_GAS_ID,
   dirName: "hyundai-2026-tucson-gas",
@@ -311,7 +460,19 @@ const packages: PackageSpec[] = [{
   }),
   mappingMd: OUTLANDER_MAPPING,
   differencesMd: OUTLANDER_DIFFERENCES,
-}];
+}, ...([
+  [KIA_SORENTO_GAS_ID, "kia-2026-sorento", "sorento", () => [sorentoRenderData()], "off-year layout stress test (2024 Sorento S record), not a production candidate", sorentoReferenceMatchData],
+  [SUBARU_FORESTER_GAS_ID, "subaru-2026-forester", "forester", () => [foresterRenderData()], "off-year layout stress test (2021 Forester Premium record), not a production candidate", foresterReferenceMatchData],
+  [GENESIS_GV80_GAS_ID, "genesis-2026-gv80", "gv80", () => [gv80RenderData()], "off-year, other-model layout stress test (2024 G70 record), not a production candidate", gv80ReferenceMatchData],
+  [DODGE_DURANGO_GAS_ID, "dodge-2026-durango", "durango", () => [durangoRenderData()], "off-year, other-model layout stress test (2008 Grand Caravan record), not a production candidate", durangoReferenceMatchData],
+  [BUICK_ENVISTA_GAS_ID, "buick-2026-envista", "envista", () => [envistaRenderData()], "SYNTHETIC stress fixture (no saved Buick record exists), not a real vehicle", envistaReferenceMatchData],
+] as const).map(([templateId, dirName, key, real, realLabel, reference]): PackageSpec => ({
+  templateId,
+  dirName,
+  build: () => ({ real: real(), realLabel, reference: reference as (first: FactoryStickerRenderData) => FactoryStickerRenderData }),
+  mappingMd: mappingFor(BRAND_DOCS[key]),
+  differencesMd: (t) => differencesFor(BRAND_DOCS[key], t),
+}))];
 
 const smallestFont = (m: LayoutModel): number =>
   Math.min(...m.pages.flatMap((p) => p.primitives.flatMap((x) => (x.kind === "text" ? [x.size] : []))));
