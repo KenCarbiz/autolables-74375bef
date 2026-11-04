@@ -22,6 +22,7 @@ import {
   type ClassifiedItem, type EquipmentLine, type EquipmentSelectionBase,
 } from "../equipmentSelection.ts";
 import { resolveReferenceVariant } from "../oem/referenceVariants.ts";
+import { withCatalogEquipment } from "./catalogEquipment.ts";
 import { CATALOG_LAYOUTS, VARIANT_LAYOUTS, type VariantLayoutBuilder, type VariantRenderInput } from "./variants/index.ts";
 import {
   getCatalogTemplate, resolveCatalogTemplate, type CatalogResolution, type CatalogTemplate,
@@ -603,8 +604,11 @@ export function buildRenderLayout(
   policy: EquipmentScopePolicy = EQUIPMENT_SCOPE_POLICY,
   options: BuildRenderOptions = {},
 ): LayoutModel {
-  const input = adaptRenderData(data);
-  const route = resolveVariantRoute(data, theme, input, options.sampleTemplateId ?? null);
+  const baseInput = adaptRenderData(data);
+  const route = resolveVariantRoute(data, theme, baseInput, options.sampleTemplateId ?? null);
+  const isCatalog = !!route && !!CATALOG_LAYOUTS[route.variantKey];
+  if (isCatalog) data = withCatalogEquipment(data);
+  const input = isCatalog ? adaptRenderData(data) : baseInput;
   const genericTheme = resolveRenderTheme(data, theme);
   const base = equipmentBase(data);
   const displayMake = data.identity.make.trim().toUpperCase() === "INFINITI" ? "INFINITI" : titleCase(data.identity.make);

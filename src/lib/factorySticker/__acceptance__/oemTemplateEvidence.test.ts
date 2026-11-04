@@ -64,7 +64,7 @@ Every printed value comes from the saved vehicle record the generator already re
 | Fuel Economy and GHG scale and pointer | epa_economy.ghgScore (integer 1-10) | "Not Available" in place of the scale; any value outside 1-10 is treated as unavailable |
 | Smog scale and pointer | epa.smogScore (not on current records) | "Not Available" |
 | CO2 sentence | epa_economy.co2TailpipeGpm | Omitted |
-| Parts content, final assembly, engine / transmission origin | factory.partsContent (AALA), build_sheet.assembly | Whole block omitted. Not on current records; never inferred from combined U.S./Canadian percentages or assembly country |
+| Parts content, final assembly, engine / transmission origin | factory.partsContent (AALA), build_sheet.assembly | Heading with "Not available for this vehicle." Not on current records; never inferred from combined U.S./Canadian percentages or assembly country |
 | VIN barcode | barcodePayload (= VIN), Code 128 regenerated per vehicle | Always present |
 | Passport QR (0.90in including quiet zone) | passportUrl = canonicalPassportUrl(listing.slug) | Omitted with its caption when no Passport URL |
 `;
@@ -87,8 +87,9 @@ ${t.blockers.map((b) => `- ${b}`).join("\n")}
 - OCR: transcribed text was spot-checked against the PDF only (ocr_unverified). The reference-match fixture normalizes "TM"/registered marks and drops the bullet asterisks on option names.
 - Wireless Android Auto and Apple CarPlay, SHIFTRONIC and similar trademark marks are printed without the trademark glyphs (WinAnsi sanitation).
 - Drivetrain text: records carry the NeoVIN value (for example 4WD) and the existing sourceCorrections rule decides the printed value; a Tucson AWD may print as the source states. Not changed here.
-- Data not wired by the orchestrator adapter today (blockers nhtsa_ratings_not_wired, parts_content_not_wired, warranty_terms_not_wired): NHTSA stars read Not Available, the warranty section and parts-content block are omitted, and smog and the 5-year cost comparison are unavailable. The reference-match render shows the fully populated state for comparison.
+- Data not wired by the orchestrator adapter today (blockers nhtsa_ratings_not_wired, parts_content_not_wired, warranty_terms_not_wired): NHTSA stars read Not Available, the warranty section is omitted, the parts-content box shows its unavailable state, and smog and the 5-year cost comparison are unavailable. The reference-match render shows the fully populated state for comparison.
 - Equipment: the NeoVIN standard list for these records holds 261-271 items. The one-page rule prints the ranked selection (about 167 lines at 5.5pt) with the fixed "Selected standard equipment shown. Scan for complete vehicle specifications." line. The reference prints a short OEM-curated list at 7pt.
+- Equipment hygiene (catalog templates only): decoder fragments that are not equipment are dropped before selection, including IIHS rating rows ("... Rating-Poor"), speed-threshold clauses ("Operates Above 50 Kph/30 Mph"), "Includes/Activates ..." sub-clauses and autonomy-level labels. The approved masters keep their existing equipment path unchanged.
 - The reference-match render passes passportUrl empty, so it has no Passport QR; the real-record renders show the QR.
 `;
 

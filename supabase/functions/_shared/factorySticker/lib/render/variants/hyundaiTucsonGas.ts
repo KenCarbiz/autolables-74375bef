@@ -246,7 +246,11 @@ function paintRight(p: Painter, d: FactoryStickerData, barcodePayload: string): 
   const f = partsFacts(d);
   const hasCarline = !!f.usCan || f.other.length > 0;
   const hasVehicle = !!f.assembly || !!f.engine || !!f.trans;
-  if (!hasCarline && !hasVehicle) return true;
+  if (!hasCarline && !hasVehicle) {
+    T(p, "PARTS CONTENT INFORMATION", left + width / 2, ruleA + 8, 11, "bold", { align: "center" });
+    T(p, "Not available for this vehicle.", left + width / 2, ruleA + 24, 10, "body", { align: "center" });
+    return true;
+  }
   const cx = left + width / 2;
   const limit = ruleB - 3;
   const SIZE = 10;
@@ -361,6 +365,7 @@ const spec: TabloidSpec = {
     const warranty = warrantySection(d, "Warranty");
     const sections = [...(warranty ? [warranty] : []), ...buildSections(input)];
     underlined(p, "STANDARD FEATURES:", Q(30.1), Q(Y(359)), Q(10));
+    if (!sections.length) T(p, "Standard equipment not available for this vehicle.", Q(30.1) * 0.612, Y(373), 8, "body");
     const entries = toEntries(sections, (s) => s.toUpperCase(), 3, undefined, input.equipmentNote);
     const cols = withColumns([{ x: Q(30.1), w: Q(314), top: Q(Y(371)), bottom: Q(Y(743)) }], ctx.extraColumns);
     const { placed, rest } = flow(entries, cols, ctx.style);
