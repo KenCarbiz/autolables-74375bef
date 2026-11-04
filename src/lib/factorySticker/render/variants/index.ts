@@ -3,6 +3,7 @@ import { buildFordTransitCarbLayout } from "./fordTransitCarb.ts";
 import { buildHyundaiSantaFeHybridLayout } from "./hyundaiSantaFeHybrid.ts";
 import { HYUNDAI_TUCSON_GAS_ID, buildHyundaiTucsonGasLayout } from "./hyundaiTucsonGas.ts";
 import { buildJeepGrandCherokee4xeLayout } from "./jeepGrandCherokee4xe.ts";
+import { JEEP_WRANGLER_GAS_ID, buildJeepWranglerGasLayout } from "./jeepWranglerGas.ts";
 import { LETTER_VARIANT_CONFIGS, buildLetterVariantLayout } from "./letterMonroney.ts";
 import { buildMitsubishiOutlanderLayout } from "./mitsubishiOutlander.ts";
 import type { VariantLayoutBuilder } from "./shared.ts";
@@ -24,4 +25,5 @@ export const VARIANT_LAYOUTS: Record<string, VariantLayoutBuilder> = {
 /** Catalog template layouts keyed by catalog id. Having a builder does not make a template routable; approval does. */
 export const CATALOG_LAYOUTS: Partial<Record<string, VariantLayoutBuilder>> = {
   [HYUNDAI_TUCSON_GAS_ID]: buildHyundaiTucsonGasLayout,
+  [JEEP_WRANGLER_GAS_ID]: buildJeepWranglerGasLayout,
 };

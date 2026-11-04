@@ -52,9 +52,13 @@ export interface CatalogMatchRule {
   /** Tested against the model with every non-alphanumeric character removed, upper-cased then lower-cased. */
   modelPattern: string;
   excludedModelPattern?: string;
+  /** Tested against the lower-cased trim; a match excludes the template (for example a plug-in variant sold as a trim). */
+  excludedTrimPattern?: string;
   bodyClasses: readonly CatalogBodyClass[];
   fuelClasses: readonly CatalogFuelClass[];
   drivetrains?: readonly string[];
+  /** A record that states no drivetrain still matches (the model is only built in the named drivetrain). */
+  unknownDrivetrainMatches?: boolean;
   /** Tested against the lower-cased trim; absent means any trim of the model. */
   trimPattern?: string;
 }
@@ -271,10 +275,10 @@ export const TEMPLATE_CATALOG: readonly CatalogTemplate[] = [
     page: { widthPt: 1224, heightPt: 792, orientation: "landscape" },
     referencePdf: "Jeep_2026_Wrangler_Willys_392.pdf",
     design: { fileKey: "iIZJSBEBc0Ywk6fzKIQTFF", masterNodeId: "1:824" },
-    match: { modelYears: [2026], modelPattern: "^wrangler$", excludedModelPattern: "^wrangler4xe", bodyClasses: ["SUV"], fuelClasses: ["gasoline"], drivetrains: ["4WD"], },
+    match: { modelYears: [2026], modelPattern: "^wrangler(2door|4door|unlimited)?$", excludedModelPattern: "^wrangler4xe", excludedTrimPattern: "4xe", bodyClasses: ["SUV"], fuelClasses: ["gasoline"], drivetrains: ["4WD"], unknownDrivetrainMatches: true, },
     approval: "pending_owner_approval",
-    layoutStatus: "not_started",
-    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "layout_not_built"],
+    layoutStatus: "sample_ready",
+    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "epa_scale_scan_rebuilt", "nhtsa_ratings_not_wired", "parts_content_not_wired", "warranty_terms_not_wired"],
   },
   {
     id: "kia_2026_sorento_lx",
@@ -528,8 +532,11 @@ export function evaluateCatalogTemplate(t: CatalogTemplate, v: CatalogVehicleInp
   else if (!r.fuelClasses.includes(v.fuelClass)) reasons.push(`powertrain ${v.fuelClass} is not ${r.fuelClasses.join("/")}`);
   if (r.drivetrains) {
     const d = token(v.drivetrain);
-    if (!d) reasons.push("drivetrain unknown");
+    if (!d) { if (!r.unknownDrivetrainMatches) reasons.push("drivetrain unknown"); }
     else if (!r.drivetrains.some((x) => token(x) === d || (x === "4WD" && d === "AWD"))) reasons.push(`drivetrain ${d} is not ${r.drivetrains.join("/")}`);
+  }
+  if (r.excludedTrimPattern && new RegExp(r.excludedTrimPattern).test(token(v.trim).toLowerCase())) {
+    reasons.push(`trim ${v.trim} is an excluded variant`);
   }
   if (r.trimPattern && !new RegExp(r.trimPattern).test(String(v.trim ?? "").toLowerCase())) {
     reasons.push(`trim ${v.trim ?? "unknown"} does not match ${r.trimPattern}`);

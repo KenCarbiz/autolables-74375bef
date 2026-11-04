@@ -42,7 +42,7 @@ const EQ_STYLE: FlowStyle = { size: 11.5, lh: 13.7, hang: 6, inset: 0 };
 /** Target Passport QR size, quiet zone included: 0.90in. */
 export const PASSPORT_QR_PT = 64.8;
 
-const T = (
+export const T = (
   p: Painter, s: string, x: number, top: number, size: number, font: LayoutFont = "body",
   o: { align?: "left" | "right" | "center"; color?: string; lh?: number } = {},
 ): void => {
@@ -50,12 +50,12 @@ const T = (
   p.text(s, x, baseline(top, sz, o.lh), sz, font, o.color ?? INK, o.align ? { align: o.align } : {});
 };
 
-const R = (p: Painter, x: number, y: number, w: number, h: number, fill: string | null, stroke?: number): void => {
+export const R = (p: Painter, x: number, y: number, w: number, h: number, fill: string | null, stroke?: number): void => {
   if (stroke) p.rect(x + stroke / 2, y + stroke / 2, w - stroke, h - stroke, fill, INK, stroke);
   else p.rect(x, y, w, h, fill);
 };
 
-const wrap = (s: string, font: LayoutFont, size: number, width: number): string[] => wrapText(s, font, size, width);
+export const wrap = (s: string, font: LayoutFont, size: number, width: number): string[] => wrapText(s, font, size, width);
 
 // ── Indicator semantics (ported from the handoff indicator model) ─────
 
@@ -69,7 +69,7 @@ export function scaleState(score: number | undefined | null): ScaleState {
 
 const GRADIENT = ["#e3f1fb", "#d3e8f7", "#c3dff3", "#b3d6ef", "#a3cdea", "#93c4e4", "#85bbdf", "#78b2d9", "#6ca9d3", "#61a1cd"];
 
-function paintScale(p: Painter, x: number, y: number, w: number, state: ScaleState, bubbleSize: number): void {
+export function paintScale(p: Painter, x: number, y: number, w: number, state: ScaleState, bubbleSize: number): void {
   const end = 13;
   const barH = 11;
   if (state.kind === "unavailable") {

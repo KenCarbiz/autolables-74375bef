@@ -740,9 +740,15 @@ export function catalogResolutionFor(data: FactoryStickerRenderData): CatalogRes
     model: data.identity.model,
     trim: data.identity.trim,
     bodyClass: data.bodyClass ?? null,
-    fuelClass: fuelClassOf(data.epa?.fuelType),
+    fuelClass: catalogFuelClassOf(data.epa?.fuelType),
     drivetrain: data.mechanical?.drivetrain ?? null,
   });
+}
+
+/** EPA names a plug-in hybrid "Gasoline and Electricity"; for catalog matching that is never plain gasoline. */
+function catalogFuelClassOf(fuelType: string | null | undefined): ReturnType<typeof fuelClassOf> {
+  const cls = fuelClassOf(fuelType);
+  return cls === "gasoline" && /electric/i.test(String(fuelType ?? "")) ? "phev" : cls;
 }
 
 /**
