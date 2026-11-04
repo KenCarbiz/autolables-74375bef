@@ -236,11 +236,12 @@ function paintPricing(p: Painter, d: FactoryStickerData): boolean {
     y += 22;
     for (const r of rows) {
       const lines = wrapD(r.label, "body", 11.3, 340);
-      lines.forEach((l, i) => {
+      const rowTop = y;
+      lines.forEach((l) => {
         tx(p, l, L, y, 11.3, "body");
-        if (i === 0 && r.amount) tx(p, r.amount, R, y, 11.3, "body", { align: "right" });
         y += 12.2;
       });
+      if (r.amount) tx(p, r.amount, R, rowTop, 11.3, "body", { align: "right" });
       for (const f of r.features) {
         for (const l of wrapD(f, "body", 10.3, 330)) {
           tx(p, l, L + 12, y, 10.3, "body");
@@ -284,7 +285,7 @@ const spec: TabloidSpec = {
     const warranty = warrantySection(d, "Warranty");
     const sections = [...(warranty ? [warranty] : []), ...buildSections(input)];
     underlined(p, "STANDARD FEATURES:", 176, 553, 14);
-    const entries = toEntries(sections, (s) => s.toUpperCase(), 3);
+    const entries = toEntries(sections, (s) => s.toUpperCase(), 3, undefined, input.equipmentNote);
     const { placed, rest } = flow(entries, withColumns([{ x: 176, w: 446, top: 570, bottom: 1076 }], ctx.extraColumns), ctx.style);
     paintPlaced(p, placed, ctx.style, { headingFont: "bold" });
     return placedResult(entries, rest);

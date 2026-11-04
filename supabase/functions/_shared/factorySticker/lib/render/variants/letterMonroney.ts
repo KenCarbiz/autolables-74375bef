@@ -400,11 +400,12 @@ function paintPricing(p: Painter | null, d: FactoryStickerData): boolean {
     top += ITEM_LH;
     for (const r of rows) {
       const wrapped = wrapFigma(r.label.join(" "), "bold", size, labelW);
-      wrapped.forEach((line, i) => {
+      const rowTop = top;
+      wrapped.forEach((line) => {
         draw(line, PRICE_X, top, "bold");
-        if (i === 0 && r.amount) draw(r.amount, amountX, top, "bold", "right");
         top += ITEM_LH;
       });
+      if (r.amount) draw(r.amount, amountX, rowTop, "bold", "right");
       for (const c of r.contents) {
         for (const line of wrapFigma(c, "body", 11, labelW - 10)) {
           if (p) txt(p, line, PRICE_X + 10, top, 11, "body", { lh: 11.8 });
@@ -706,6 +707,10 @@ export function buildLetterVariantLayout(
   const attempts = [false, true].flatMap((runIn) => LETTER_STYLES.map((style) => ({ style, runIn })));
   for (const { style, runIn } of attempts) {
     const blocks = runIn ? flowRunInLines(sections, COL1_W, style.px) : flowLines(sections, COL1_W, style.px);
+    if (input.equipmentNote && blocks.length) {
+      wrapText(input.equipmentNote, "body", pt(style.px), u(COL1_W - 8)).forEach((text, i) =>
+        blocks[blocks.length - 1].lines.push({ text, font: "body", indent: 0, gapBefore: i === 0 ? 12 : 0, heading: false }));
+    }
     const { placed, rest } = placeEquipment(blocks, style.lh);
     if (rest.length) continue;
 

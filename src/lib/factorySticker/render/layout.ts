@@ -47,8 +47,16 @@ export type PageComposition = "standard" | "equipment_priority";
 
 export type OnePageFitReason = "one_page_fit_failed";
 
+/** "key_features" prints the NeoVIN key-feature layer; the complete list stays on the Vehicle Passport. */
+export type EquipmentScope = "full" | "key_features";
+
 export type LayoutFit =
-  | { ok: true; columns: number; equipmentFontPt: number; equipmentMode?: EquipmentMode; composition?: PageComposition }
+  | {
+    ok: true; columns: number; equipmentFontPt: number; equipmentMode?: EquipmentMode; composition?: PageComposition;
+    equipmentScope?: EquipmentScope;
+    /** Set when an approved Figma master drew the page; masters print option names and prices, not internal option codes. */
+    figmaMaster?: boolean;
+  }
   | {
     ok: false;
     reason: OnePageFitReason;
@@ -59,6 +67,7 @@ export type LayoutFit =
     columns: number;
     equipmentMode?: EquipmentMode;
     composition?: PageComposition;
+    equipmentScope?: EquipmentScope;
   };
 
 export const fitOk = (

@@ -215,11 +215,14 @@ export interface FlowEntry {
   gapBefore: number;
   /** Start this entry in the next column when the current one has content. */
   columnBreak?: boolean;
+  /** The fixed key-feature scope line: drawn, never recorded as a printed item. */
+  note?: boolean;
 }
 
 export function toEntries(
   sections: Section[], headingCase: (s: string) => string, gap: number,
   breakBefore?: (heading: string, index: number) => boolean,
+  note?: string,
 ): FlowEntry[] {
   const out: FlowEntry[] = [];
   sections.forEach((s, i) => {
@@ -229,6 +232,7 @@ export function toEntries(
     });
     for (const item of s.items) out.push({ text: item, heading: false, gapBefore: 0 });
   });
+  if (note) out.push({ text: note, heading: false, gapBefore: gap * 3, note: true });
   return out;
 }
 
@@ -494,7 +498,7 @@ export interface FirstPageResult {
 export function placedResult(entries: FlowEntry[], rest: FlowEntry[]): FirstPageResult {
   return {
     rest,
-    printed: entries.slice(0, entries.length - rest.length).filter((e) => !e.heading).map((e) => e.text),
+    printed: entries.slice(0, entries.length - rest.length).filter((e) => !e.heading && !e.note).map((e) => e.text),
   };
 }
 

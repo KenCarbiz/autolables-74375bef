@@ -12,7 +12,7 @@
 // non-empty result as a blocker: the document does not publish.
 
 import type { FactoryStickerRenderData } from "./contract.ts";
-import { sanitize, type LayoutModel } from "./layout.ts";
+import { sanitize, type EquipmentScope, type LayoutModel } from "./layout.ts";
 
 export type ManifestCategory =
   | "identity"
@@ -46,10 +46,10 @@ const money = (n: number): string =>
 const clean = (s: string): string => s.replace(/\s+/g, " ").trim();
 
 /** Verified standard equipment, deduplicated the way the layout prints it. */
-export function expectedStandardEquipment(data: FactoryStickerRenderData): string[] {
+export function expectedStandardEquipment(data: FactoryStickerRenderData, scope: EquipmentScope = "full"): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const source of [data.standardEquipment, data.keyFeatures]) {
+  for (const source of scope === "key_features" ? [data.keyFeatures] : [data.standardEquipment, data.keyFeatures]) {
     for (const items of Object.values(source ?? {})) {
       for (const raw of items) {
         const item = sanitize(raw);
@@ -67,7 +67,7 @@ export function expectedStandardEquipment(data: FactoryStickerRenderData): strin
  * render data the PDF is realized from, so the manifest can never drift
  * from what was supposed to be on the page.
  */
-export function buildContentManifest(data: FactoryStickerRenderData): ManifestItem[] {
+export function buildContentManifest(data: FactoryStickerRenderData, scope: EquipmentScope = "full", optionCodes = true): ManifestItem[] {
   const items: ManifestItem[] = [];
   const push = (category: ManifestCategory, label: string, expected: string | null | undefined) => {
     const value = clean(String(expected ?? ""));
@@ -88,7 +88,7 @@ export function buildContentManifest(data: FactoryStickerRenderData): ManifestIt
 
   for (const opt of data.options) {
     push("option", `Option ${opt.code ?? opt.name}`, opt.name);
-    if (opt.code) push("option", `Option code ${opt.code}`, opt.code);
+    if (opt.code && optionCodes) push("option", `Option code ${opt.code}`, opt.code);
     // Every member of a priced package prints. A package the buyer pays
     // for cannot hide half its contents.
     for (const member of opt.contents ?? []) {
@@ -102,7 +102,7 @@ export function buildContentManifest(data: FactoryStickerRenderData): ManifestIt
     }
   }
 
-  for (const item of expectedStandardEquipment(data)) {
+  for (const item of expectedStandardEquipment(data, scope)) {
     push("standard_equipment", `Standard equipment — ${item}`, item);
   }
 
@@ -147,7 +147,8 @@ export function checkRenderedCompleteness(
 ): CompletenessReport {
   const drawn = model.drawnStrings.map(clean);
   const haystack = drawn.join(" ");
-  const manifest = buildContentManifest(data);
+  const scope = model.fit.ok ? model.fit.equipmentScope ?? "full" : "full";
+  const manifest = buildContentManifest(data, scope, !(model.fit.ok && model.fit.figmaMaster));
 
   const printedCounts = new Map<string, number>();
   for (const item of model.printedEquipment ?? []) {
@@ -169,7 +170,7 @@ export function checkRenderedCompleteness(
     }
   }
 
-  for (const item of expectedStandardEquipment(data)) {
+  for (const item of expectedStandardEquipment(data, scope)) {
     const actualCount = printedCounts.get(item.toUpperCase()) ?? 0;
     if (actualCount > 1) {
       miscounted.push({ label: `Standard equipment ${item} listed once`, expected: item, expectedCount: 1, actualCount });

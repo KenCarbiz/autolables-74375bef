@@ -64,6 +64,16 @@ describe("readBuildSheet", () => {
     expect(sheet.standardCount).toBeGreaterThan(0);
   });
 
+  it("keeps the full standard list on the passport even when a sticker prints only key features", () => {
+    const flat = sheet.standard.flatMap(([, items]) => items);
+    const key = sheet.keyFeatures.flatMap(([, items]) => items);
+    for (const item of ["Automatic Emergency Braking", "LED Headlights"]) {
+      expect(flat).toContain(item);
+      expect(key).not.toContain(item);
+    }
+    expect(sheet.standardCount).toBe(flat.length);
+  });
+
   it("totals visible option value from known MSRPs", () => {
     expect(sheet.estValue).toBe(2900 + 640 + 465);
   });

@@ -887,6 +887,7 @@ async function orchestrateVehicle(
         template_family_id: profileFamily, template_version: TEMPLATE_VERSION,
         renderer_version: FACTORY_STICKER_RENDERER_VERSION,
         oem_theme_id: theme.oemThemeId, generation_fingerprint: fingerprint,
+        equipment_scope: rendered.layout?.fit?.ok ? rendered.layout.fit.equipmentScope ?? "full" : "full",
         reconciliation_status: reconciliationStatus, confidence_level: normalized.confidence,
         template_key: selection.templateKey, selection_status: selection.selectionStatus,
         selection_confidence: selection.confidence,

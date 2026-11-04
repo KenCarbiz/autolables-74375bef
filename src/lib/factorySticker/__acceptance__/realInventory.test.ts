@@ -7,7 +7,8 @@ import {
   publishedDocs, runOrchestrate, sha256,
   type Fixture, type FixtureVehicle, type Listing, type Outcome, type Store,
 } from "./harness";
-import { adaptRenderData, fuelClassOf, MAKE_WIDE_MASTERS, MASTER_APPROVAL, masterFor, type FuelClass } from "../render/contract";
+import { adaptRenderData, equipmentNoteFor, fuelClassOf, MAKE_WIDE_MASTERS, MASTER_APPROVAL, masterFor, type FuelClass } from "../render/contract";
+import { expectedStandardEquipment } from "../render/completeness";
 import { resolveReferenceVariant } from "../oem/referenceVariants";
 import { encodeQrMatrix } from "../render/qrMatrix";
 import { REPRODUCTION_BANNER, REPRODUCTION_DISCLOSURE, FACTORY_BUILD_UNVERIFIED } from "../reproduction";
@@ -72,8 +73,8 @@ const exactVariantRoute = (o: Outcome): boolean => {
 };
 
 const TRIM_TO_ITEMS = 56;
-const PUBLISHED_N = 31;
-const HELD_N = 5;
+const PUBLISHED_N = 35;
+const HELD_N = 1;
 
 /**
  * A one-page-capable subset of a VIN's own saved rows: the first rows of its
@@ -539,7 +540,7 @@ describe("complete builds: one page on the equipment-priority composition, or he
   it("every identified sheet-backed VIN is a verified one-page document or a one-page hold", () => {
     expect(filedList().length + heldList().length).toBe(38);
     expect(filedList().length).toBeGreaterThan(0);
-    expect(heldList().length).toBeGreaterThan(0);
+    expect(heldList()).toHaveLength(0);
   });
 
   it("filed complete builds are exactly one page at the floor or above and print every item once", async () => {
@@ -550,19 +551,43 @@ describe("complete builds: one page on the equipment-priority composition, or he
       expect(Math.round(pdf.getPage(0).getSize().height)).toBe(612);
       const fit = o.rendered.layout.fit;
       expect(fit.ok && fit.equipmentFontPt).toBeGreaterThanOrEqual(5.5);
-      const expected = adaptRenderData(o.normalized.data).data.equipment.standard.flatMap((g) => g.items);
+      const scope = fit.ok ? fit.equipmentScope ?? "full" : "full";
+      const expected = expectedStandardEquipment(o.normalized.data, scope);
       expect([...o.rendered.layout.printedEquipment].sort()).toEqual([...expected].sort());
+      if (scope === "key_features") {
+        const total = adaptRenderData(o.normalized.data).data.equipment.standard.reduce((n, g) => n + g.items.length, 0);
+        expect(o.model.drawnStrings.join(" ")).toContain(equipmentNoteFor(total));
+      }
       expect(o.assessment.completeness.pass).toBe(true);
       expect(untraceable(o)).toEqual([]);
       const qrs = o.model.pages[0].primitives.filter((x) => x.kind === "qr");
-      expect(qrs.some((q) => q.kind === "qr" && q.payload === o.passportUrl && q.size >= 57.6)).toBe(true);
-      expect(o.model.drawnStrings).toContain("Scan for Vehicle Passport");
+      expect(qrs.some((q) => q.kind === "qr" && q.payload === o.passportUrl && q.size >= (fit.ok && fit.figmaMaster ? 30 : 57.6))).toBe(true);
+      if (!(fit.ok && fit.figmaMaster)) expect(o.model.drawnStrings).toContain("Scan for Vehicle Passport");
       expect(o.model.pages[0].primitives.some((x) => x.kind === "barcode" && x.payload === o.listing.vin.toUpperCase())).toBe(true);
     }
   });
 
+  const bloatedListing = (l: Listing): Listing => {
+    const sheet = { ...(l.mc_attributes.build_sheet as Record<string, unknown>) };
+    const grow = (layer: unknown, label: string): Record<string, string[]> => {
+      const out = { ...((layer ?? {}) as Record<string, string[]>) };
+      const key = Object.keys(out)[0] ?? "Exterior";
+      out[key] = [...(out[key] ?? []), ...Array.from({ length: 400 }, (_, i) => `Fit probe ${label} number ${i + 1} with a long descriptive name`)];
+      return out;
+    };
+    return {
+      ...l,
+      mc_attributes: { ...l.mc_attributes, build_sheet: { ...sheet, standard: grow(sheet.standard, "equipment"), key_features: grow(sheet.key_features, "key feature") } },
+    };
+  };
+  const forcedHold = async (): Promise<Held> => {
+    const o = await runOrchestrate(bloatedListing(buildListing(fx, renderable[0])), newStore());
+    expect(o.kind).toBe("one_page_review_required");
+    return o as Held;
+  };
+
   it("held complete builds park REVIEW_REQUIRED with no PDF, no document and the one-page reason", async () => {
-    for (const o of heldList()) {
+    for (const o of [...heldList(), await forcedHold()]) {
       const fit = o.rendered.layout.fit;
       expect(fit.ok).toBe(false);
       if (fit.ok) continue;
@@ -570,7 +595,7 @@ describe("complete builds: one page on the equipment-priority composition, or he
       expect(fit.overflowPt).toBeGreaterThan(0);
       expect(fit.equipmentFontPt).toBeGreaterThanOrEqual(5.5);
       expect(fit.detail).toContain("approved one-page layout adjustment");
-      expect(fit.detail).toContain("run-in");
+      expect(fit.detail).toMatch(/run-in|master/);
       expect(o.rendered.pdfBytes.byteLength).toBe(0);
       expect(o.rendered.previewSvg).toBe("");
       expect(o.model.pages).toHaveLength(1);
@@ -587,13 +612,13 @@ describe("complete builds: one page on the equipment-priority composition, or he
   });
 
   it("an existing published document stays intact when the complete build cannot fit", async () => {
-    const v = renderable.find((x) => auto.get(x.v)?.kind === "one_page_review_required" && (trimmed.get(x.v) as Filed | undefined)?.autoPublish)!;
+    const v = renderable.find((x) => (trimmed.get(x.v) as Filed | undefined)?.autoPublish)!;
     const store = newStore();
     const first = await runOrchestrate(trimmedListing(buildListing(fx, v)), store) as Filed;
     expect(first.autoPublish).toBe(true);
     const before = store.docs.map((d) => [d.id, d.version, d.document_status, d.content_hash]);
     const bytes = sha256(store.docs[0].pdfBytes);
-    const held = await runOrchestrate(buildListing(fx, v), store, { regeneration: { reasonCode: "other", reasonNotes: "full build" } });
+    const held = await runOrchestrate(bloatedListing(buildListing(fx, v)), store, { regeneration: { reasonCode: "other", reasonNotes: "full build" } });
     expect(held.kind).toBe("one_page_review_required");
     expect(store.docs.map((d) => [d.id, d.version, d.document_status, d.content_hash])).toEqual(before);
     expect(sha256(store.docs[0].pdfBytes)).toBe(bytes);
@@ -602,8 +627,8 @@ describe("complete builds: one page on the equipment-priority composition, or he
     expect(store.record.review_required).toBe(true);
   });
 
-  it("no held build was compressed below the floor", () => {
-    for (const o of heldList()) {
+  it("no held build was compressed below the floor", async () => {
+    for (const o of [...heldList(), await forcedHold()]) {
       const fit = o.rendered.layout.fit;
       expect(!fit.ok && fit.equipmentFontPt).toBe(5.5);
     }
@@ -704,7 +729,7 @@ describe("coverage across the inventory", () => {
         coverage.push({
           ...base, reconciliation_status: "n/a", auto_publish_decision: o.kind === "pending_data" ? "refused_no_build_sheet" : "held_manual_review",
           standard_equipment_items: 0, options: 0, pages: 0, fit_overflow_pt: null, equipment_font_pt: null,
-          rendered_on: null, composition: null, equipment_mode: null, smallest_equipment_font_pt: null,
+          rendered_on: null, master: null, equipment_scope: null, composition: null, equipment_mode: null, smallest_equipment_font_pt: null,
           blockers: o.kind === "pending_data" ? "no saved VIN-specific build sheet" : o.plan.kind === "ineligible" ? o.plan.eligibility.status : (o.plan as { reason?: string }).reason ?? "selection_blocked",
           hold_reason: o.kind === "pending_data" ? "No saved VIN-specific build sheet; nothing rendered." : "Record unsupported for an OEM reproduction layout.",
         });
@@ -718,6 +743,8 @@ describe("coverage across the inventory", () => {
         options: o.normalized.data.options.length,
         pages: o.kind === "filed" ? o.rendered.layout.pages : 0,
         rendered_on: o.model.pages[0].primitives.some((x) => x.kind === "image" && x.assetId.startsWith("figma-")) ? "figma_master" : "generic_engine",
+        master: masterFor(o.normalized.data)?.variantKey ?? null,
+        equipment_scope: o.kind === "filed" ? (fit.ok ? fit.equipmentScope ?? "full" : "full") : null,
         composition: fit.composition ?? "standard",
         equipment_mode: fit.equipmentMode ?? "list",
         smallest_equipment_font_pt: fit.equipmentFontPt,
@@ -735,6 +762,8 @@ describe("coverage across the inventory", () => {
         published_eligible_one_page: count((c) => c.result === "published_eligible_one_page"),
         held_one_page_review_required: count((c) => c.result === "held_one_page_review_required"),
         held_other: count((c) => c.result === "held_other" || c.result === "held_unsupported_record"),
+        equipment_scope_full: count((c) => c.equipment_scope === "full"),
+        equipment_scope_key_features: count((c) => c.equipment_scope === "key_features"),
         refused_no_build_sheet: count((c) => c.result === "refused_no_build_sheet"),
       },
       comparison_exact_variant_only: {
@@ -796,6 +825,9 @@ describe("coverage across the inventory", () => {
       cohorts.push({
         cohort: name, vins: members.length, published_eligible: filed.filter((o) => o.autoPublish).length,
         filed_held_other_reason: filed.filter((o) => !o.autoPublish).length, held_one_page_review_required: held.length,
+        master: [...new Set(filed.map((o) => masterFor(o.normalized.data)?.variantKey ?? "generic_engine"))].join("|") || null,
+        equipment_scope_full: filed.filter((o) => o.rendered.layout.fit.ok && (o.rendered.layout.fit.equipmentScope ?? "full") === "full").length,
+        equipment_scope_key_features: filed.filter((o) => o.rendered.layout.fit.ok && o.rendered.layout.fit.equipmentScope === "key_features").length,
         smallest_equipment_font_pt_used: fonts.length ? Math.min(...fonts) : null,
         held_overflow_pt_worst: held.length ? Math.max(...held.map((o) => (o.rendered.layout.fit.ok ? 0 : o.rendered.layout.fit.overflowPt))) : null,
         representative_pdf: pdf,

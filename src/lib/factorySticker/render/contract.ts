@@ -18,20 +18,25 @@ import type {
 import { resolveOem } from "../oem/identity.ts";
 import { classifyStandardItem } from "../equipment.ts";
 import { resolveReferenceVariant } from "../oem/referenceVariants.ts";
-import { VARIANT_LAYOUTS } from "./variants/index.ts";
+import { VARIANT_LAYOUTS, type VariantLayoutBuilder, type VariantRenderInput } from "./variants/index.ts";
 import { getTheme, type OemStickerTheme } from "../oem/themes.ts";
 import { resolveThemeProfile, type ResolvedThemeProfile } from "../oem/profiles.ts";
-import { buildStickerLayout, type LayoutFit, type LayoutModel, type StickerLayoutInput } from "./layout.ts";
+import {
+  buildStickerLayout,
+  type EquipmentScope, type LayoutFit, type LayoutModel, type StickerLayoutInput,
+} from "./layout.ts";
 import type { FactoryBuildProvenance } from "../reproduction.ts";
 import { realizePdf, type PdfLibModule } from "./toPdf.ts";
 import { layoutToSvg } from "./previewSvg.ts";
 
+// 1.3.0: an approved make-wide master is always used for its make; content it
+// cannot hold under the equipment scope policy is review-required, never generic.
 // 1.2.0: exactly one physical page for every OEM layout. No continuation
 // pages; content that cannot fit at the validated minimum sizes is a
 // review-required fit failure with no PDF. Reproduction banner + disclosure
 // (reproduction.ts DISCLOSURE_VERSION) are unchanged. Part of the generation
 // fingerprint, so existing documents regenerate as new versions.
-export const RENDERER_VERSION = "1.2.0";
+export const RENDERER_VERSION = "1.3.0";
 
 /**
  * Make-wide master routing. Every vehicle of a make with verified data
@@ -499,26 +504,117 @@ export function resolveRenderProfile(data: FactoryStickerRenderData): ResolvedTh
   return resolveThemeProfile(data.identity.make, Number.isFinite(year) ? year : null);
 }
 
+/**
+ * What a routed Figma master may print in its equipment region, in order:
+ * full_then_key_features - the full verified standard list, else the NeoVIN
+ *   key-feature layer with a fixed Passport pointer line;
+ * key_features - the key-feature layer only;
+ * full_only - the full list, else REVIEW_REQUIRED.
+ * A master that cannot hold the permitted content is REVIEW_REQUIRED; an
+ * approved make-wide master never falls back to the generic layout.
+ */
+export type EquipmentScopePolicy = "full_then_key_features" | "key_features" | "full_only";
+export const EQUIPMENT_SCOPE_POLICY: EquipmentScopePolicy = "full_then_key_features";
+
+const SCOPE_ORDER: Record<EquipmentScopePolicy, EquipmentScope[]> = {
+  full_then_key_features: ["full", "key_features"],
+  key_features: ["key_features"],
+  full_only: ["full"],
+};
+
+/** Source-order hints the masters map to their own sections. */
+export const CATEGORY_MASTER_HINT: Record<EquipmentCategory, string> = {
+  EXTERIOR: "exterior",
+  INTERIOR: "interior",
+  COMFORT_CONVENIENCE: "comfort convenience",
+  FUNCTIONAL: "functional",
+  POWERTRAIN: "mechanical",
+  SAFETY_SECURITY: "safety",
+  TECHNOLOGY: "technology",
+  OTHER: "other",
+};
+
+export const equipmentNoteFor = (n: number): string =>
+  `Complete factory equipment list (${n} items): scan the Vehicle Passport QR`;
+
 export function buildRenderLayout(
   data: FactoryStickerRenderData,
   theme: FactoryStickerTheme,
+  policy: EquipmentScopePolicy = EQUIPMENT_SCOPE_POLICY,
 ): LayoutModel {
   const input = adaptRenderData(data);
-  const variant = resolveVariantLayout(data, theme, input);
-  return variant ?? buildStickerLayout(input, resolveRenderTheme(data, theme));
+  const route = resolveVariantRoute(data, theme, input);
+  if (!route) return buildStickerLayout(input, resolveRenderTheme(data, theme));
+  if (!route.masterRouted) {
+    const exactInput: VariantRenderInput = {
+      layout: input,
+      equipmentGroups: Object.entries(data.standardEquipment).map(([hint, items]) => ({ hint, items })),
+      displayMake: data.identity.make.trim().toUpperCase() === "INFINITI" ? "INFINITI" : titleCase(data.identity.make),
+    };
+    return route.build(exactInput) ?? buildStickerLayout(input, resolveRenderTheme(data, theme));
+  }
+  for (const scope of SCOPE_ORDER[policy]) {
+    const vi = variantInput(input, data, scope);
+    if (!vi) continue;
+    const model = route.build(vi);
+    if (model && model.fit.ok) return { ...model, fit: { ...model.fit, equipmentScope: scope, figmaMaster: true } };
+  }
+  return masterHold(route.variantKey, policy, buildStickerLayout(input, resolveRenderTheme(data, theme)));
+}
+
+function variantInput(
+  input: StickerLayoutInput,
+  data: FactoryStickerRenderData,
+  scope: EquipmentScope,
+): VariantRenderInput | null {
+  const displayMake = data.identity.make.trim().toUpperCase() === "INFINITI" ? "INFINITI" : titleCase(data.identity.make);
+  if (scope === "full") {
+    return { layout: input, equipmentGroups: masterGroups(input.data.equipment.standard), displayMake };
+  }
+  const key = groupStandardEquipment([data.keyFeatures ?? {}]);
+  if (!key.length) return null;
+  const total = input.data.equipment.standard.reduce((n, g) => n + g.items.length, 0);
+  return { layout: input, equipmentGroups: masterGroups(key), displayMake, equipmentNote: equipmentNoteFor(total) };
+}
+
+const masterGroups = (groups: StandardEquipmentGroup[]): Array<{ hint: string; items: string[] }> =>
+  groups.map((g) => ({ hint: CATEGORY_MASTER_HINT[g.category], items: g.items }));
+
+function masterHold(variantKey: string, policy: EquipmentScopePolicy, base: LayoutModel): LayoutModel {
+  return {
+    ...base,
+    mode: "REVIEW_REQUIRED",
+    printedEquipment: [],
+    fit: {
+      ok: false,
+      reason: "one_page_fit_failed",
+      overflowPt: base.fit.ok ? 1 : base.fit.overflowPt,
+      equipmentFontPt: 5.5,
+      columns: 2,
+      detail: `verified content does not fit the approved ${variantKey} master at 5.5pt or above under the ${policy} equipment scope; an approved one-page layout adjustment is required`,
+    },
+  };
+}
+
+interface VariantRoute {
+  variantKey: string;
+  masterRouted: boolean;
+  build: VariantLayoutBuilder;
 }
 
 /**
- * Dedicated reference layout, used only for an exact registry match whose
- * layout is implemented and only when no template override is in force.
- * Anything else, or content the variant cannot hold faithfully, renders
- * on the generic reproduction layout.
+ * Dedicated reference layout, used for an exact registry match whose layout
+ * is implemented, or for the approved make-wide master of the vehicle's make
+ * and fuel class, and only when no template override is in force. A
+ * make-wide master is always used for its make; anything with no approved
+ * master, or a fuel class the master does not support, renders on the
+ * generic reproduction layout.
  */
-function resolveVariantLayout(
+function resolveVariantRoute(
   data: FactoryStickerRenderData,
   theme: FactoryStickerTheme,
   input: StickerLayoutInput,
-): LayoutModel | null {
+): VariantRoute | null {
   if (String(theme.templateOverrideKey ?? "").trim()) return null;
   const year = Number(data.identity.year);
   const match = resolveReferenceVariant({
@@ -533,13 +629,10 @@ function resolveVariantLayout(
   const master = exact ? null : masterFor(data);
   if (exact && MASTER_APPROVAL[match.variant!.key] !== "approved") return null;
   if (!exact && (!master || input.generic)) return null;
-  const build = VARIANT_LAYOUTS[exact ? match.variant!.key : master!.variantKey];
+  const variantKey = exact ? match.variant!.key : master!.variantKey;
+  const build = VARIANT_LAYOUTS[variantKey];
   if (!build) return null;
-  return build({
-    layout: input,
-    equipmentGroups: Object.entries(data.standardEquipment).map(([hint, items]) => ({ hint, items })),
-    displayMake: data.identity.make.trim().toUpperCase() === "INFINITI" ? "INFINITI" : titleCase(data.identity.make),
-  });
+  return { variantKey, masterRouted: !exact, build };
 }
 
 function titleCase(s: string): string {

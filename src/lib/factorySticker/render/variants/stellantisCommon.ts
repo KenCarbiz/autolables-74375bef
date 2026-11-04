@@ -207,6 +207,11 @@ function flowLines(sections: Array<{ id: SectionId; items: string[] }>, width: n
   return lines;
 }
 
+function withNote(lines: FlowLine[], note: string | undefined, px: number): FlowLine[] {
+  if (!note) return lines;
+  return [...lines, ...wrapFigma(note, "body", px, COL1_W).map((text) => ({ text, font: "body" as const, indent: 0, heading: false }))];
+}
+
 interface PlacedLine extends FlowLine {
   x: number;
   top: number;
@@ -313,12 +318,13 @@ function paintStack(p: Painter | null, d: FactoryStickerData, pitch: number, sta
     rows.forEach((r) => {
       const font: LayoutFont = r.isPackage ? "bold" : "body";
       const lines = wrapFigma(r.name, font, ITEM_PX, lineW);
+      const rowTop = y;
       lines.forEach((line, i) => {
         say(line, COL2_X + (i ? 6 : 0), y, ITEM_PX, font);
-        if (i === 0 && r.amount) say(r.amount, right, y, ITEM_PX, font, "right");
         lastTop = y;
         y += pitch;
       });
+      if (r.amount) say(r.amount, right, rowTop, ITEM_PX, font, "right");
       for (const c of r.contents) {
         for (const line of wrapFigma(c, "body", ITEM_PX, lineW - 12)) {
           say(line, COL2_X + 6.25, y, ITEM_PX, "body");
@@ -827,7 +833,7 @@ export function buildStellantisPhevLayout(
   for (const step of EQUIPMENT_STEPS) {
     const stackH = paintStack(null, d, step.stackPitch, COL2_TOP) - COL2_TOP;
     if (stackH > COL_BOTTOM - COL2_TOP) continue;
-    const trial = placeStd(flowLines(sections, COL1_W, step.px), step.pitch, step.px, col1Top, COL_BOTTOM - stackH);
+    const trial = placeStd(withNote(flowLines(sections, COL1_W, step.px), input.equipmentNote, step.px), step.pitch, step.px, col1Top, COL_BOTTOM - stackH);
     if (trial.rest.length) continue;
     const stackTop = trial.placed.some((l) => l.x >= COL2_X) ? trial.col2End : COL2_TOP;
     if (paintStack(null, d, step.stackPitch, stackTop) > COL_BOTTOM + 4) continue;
