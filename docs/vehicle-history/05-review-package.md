@@ -35,23 +35,24 @@ The column comment says it "never asserts sold". Sale evidence exists only in tw
 - custody milestones, in the proposed vehicle history tables;
 - `vehicle_files.deal_status` (`signed` or `delivered`).
 
-`vehicle_files.updated_at` moves on any edit, and the table keeps one row per tenant and VIN forever. A deal status therefore cannot be dated, and a delivery from a car's earlier stay could mark a relisted car sold. The rule below accounts for that.
+`vehicle_files` keeps one row per tenant and VIN forever, and `vehicle_listings` is unique per tenant and VIN, so the same listing row is reused when a car comes back. Neither can tell this stay from an earlier one. **Revised 2026-11-04:** a deal record never labels a car, and a custody milestone counts only when it is tied to this stay.
 
-### Disposition rule (`supabase/functions/_shared/listingDisposition.ts`)
+### Disposition rule (`supabase/functions/_shared/listingDisposition.ts`, revised 2026-11-04)
+
+A milestone belongs to this stay only when the newest episode for the tenant+VIN is bound to this listing (`vehicle_instances.listing_id`) and its milestone `occurred_at` is at or after the listing's current `published_at`.
 
 | Evidence | Disposition | Customer label | Purchase actions |
 |---|---|---|---|
-| Custody `delivered` | `sold` | Sold | Off |
-| Custody `sold` or `awaiting_delivery` | `sale_pending` | Sale pending | Off |
-| Custody `transferred_out` | `transferred` | No longer at this dealership | Off |
-| Listing archived and deal `delivered` | `sold` (basis `deal_record`) | Sold | Off |
-| Listing archived and deal `signed` | `sale_pending` | Sale pending | Off |
+| Custody `delivered`, tied to this stay | `sold` | Sold | Off |
+| Custody `sold` or `awaiting_delivery`, tied to this stay | `sale_pending` | Sale pending | Off |
+| Custody `transferred_out`, tied to this stay | `transferred` | No longer at this dealership | Off |
+| Any sale custody state not provably from this stay (other listing, no listing, no or older milestone date, no publish date) | `unknown` (basis `ambiguous_sale_evidence`) | No longer listed | Off |
 | Archived, `left_feed` or `removed_from_feed` | `missing_from_feed` | No longer listed | Off |
 | Archived, `duplicate_reconciled` or `withdrawn` | `withdrawn` | No longer listed | Off |
 | Archived, no or unknown reason | `unknown` | No longer listed | Off |
-| Published, no contrary custody evidence | `available` | (none) | On |
+| Published, newest episode in stock or none | `available` | (none) | On |
 
-Archived alone never produces "Sold". A published listing is never marked sold by a `vehicle_files` deal record, because that record cannot be dated. Without the custody tables in production, that case stays a known gap until the custody milestones are applied and recorded.
+Archived alone never produces "Sold", and neither does `vehicle_files.deal_status`. A published listing whose newest episode is an older delivery (a car relisted before its reappearance review opened a new episode) is not purchasable until the review resolves. Without the custody tables in production, no car reads "Sold"; every non-current car reads "No longer listed".
 
 ### Changes
 

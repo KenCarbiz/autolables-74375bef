@@ -1,9 +1,13 @@
 // Customer-facing availability of a Passport listing.
 //
-// "Archived" only means the listing left advertised inventory. It is never
-// read as a sale on its own: a sale needs a recorded custody milestone or a
-// dealer deal record. Pure module, imported by public-listing-view (Deno) and
-// by the Passport (browser).
+// "Archived" only means the listing left advertised inventory. It is never read
+// as a sale on its own. "Sold" needs a custody milestone that provably belongs to
+// the stay this listing advertises. The dealer deal record (vehicle_files) is one
+// row per tenant+VIN forever and the listing row is reused when a car comes back,
+// so neither can tell this stay from an earlier one: a deal record therefore never
+// labels a car sold. Any sale evidence that cannot be tied to this stay is
+// ambiguous, which reads "No longer listed" with purchase actions off. Pure
+// module, imported by public-listing-view (Deno) and by the Passport (browser).
 
 export type ListingDisposition =
   | "available"
@@ -14,23 +18,27 @@ export type ListingDisposition =
   | "missing_from_feed"
   | "unknown";
 
-export type DispositionBasis = "custody_milestone" | "deal_record" | "listing_status" | "feed_absence" | "none";
+export type DispositionBasis =
+  | "custody_milestone"
+  | "ambiguous_sale_evidence"
+  | "listing_status"
+  | "feed_absence"
+  | "none";
 
 export interface DispositionListingInput {
+  id?: string | null;
   status?: string | null;
   archived_at?: string | null;
   archive_reason?: string | null;
   published_at?: string | null;
 }
 
+// The newest custody episode for the listing's tenant+VIN, with the time of the
+// milestone that put it in its current state.
 export interface CustodyEvidence {
   custody_state?: string | null;
-  changed_at?: string | null;
-}
-
-export interface DealEvidence {
-  deal_status?: string | null;
-  updated_at?: string | null;
+  listing_id?: string | null;
+  occurred_at?: string | null;
 }
 
 export interface PassportAvailability {
@@ -43,8 +51,15 @@ export interface PassportAvailability {
 
 const FEED_ABSENCE = new Set(["left_feed", "removed_from_feed"]);
 const WITHDRAWN = new Set(["duplicate_reconciled", "withdrawn", "dealer_withdrawn", "unpublished"]);
+const SALE_STATES: Record<string, ListingDisposition> = {
+  delivered: "sold",
+  sold: "sale_pending",
+  awaiting_delivery: "sale_pending",
+  transferred_out: "transferred",
+};
 
 const isArchived = (l: DispositionListingInput) => l.status === "archived" || !!l.archived_at;
+const ms = (t: string | null | undefined) => (t ? Date.parse(t) : NaN);
 
 const result = (disposition: ListingDisposition, basis: DispositionBasis, as_of: string | null): PassportAvailability => ({
   disposition,
@@ -54,24 +69,26 @@ const result = (disposition: ListingDisposition, basis: DispositionBasis, as_of:
   as_of,
 });
 
+// A milestone belongs to this stay only when its episode is bound to this listing
+// and it happened at or after the listing's current publish. Missing data on
+// either side is not proof.
+function belongsToThisStay(listing: DispositionListingInput, custody: CustodyEvidence): boolean {
+  if (!listing.id || !custody.listing_id || custody.listing_id !== listing.id) return false;
+  const at = ms(custody.occurred_at);
+  const published = ms(listing.published_at);
+  return Number.isFinite(at) && Number.isFinite(published) && at >= published;
+}
+
 export function deriveListingDisposition(
   listing: DispositionListingInput,
   custody: CustodyEvidence | null = null,
-  deal: DealEvidence | null = null,
 ): PassportAvailability {
-  const state = custody?.custody_state ?? null;
-  if (state === "delivered") return result("sold", "custody_milestone", custody?.changed_at ?? null);
-  if (state === "sold" || state === "awaiting_delivery") return result("sale_pending", "custody_milestone", custody?.changed_at ?? null);
-  if (state === "transferred_out") return result("transferred", "custody_milestone", custody?.changed_at ?? null);
-
-  // vehicle_files is one row per tenant+VIN forever and its updated_at moves on
-  // any edit, so it cannot date a deal: a delivery from an earlier stay of the
-  // same car would mark a relisted car sold. The deal record therefore only
-  // explains a listing that has already left advertised inventory.
-  const dealStatus = deal?.deal_status ?? null;
-  const dealCounts = state !== "in_stock" && isArchived(listing);
-  if (dealCounts && dealStatus === "delivered") return result("sold", "deal_record", deal?.updated_at ?? null);
-  if (dealCounts && dealStatus === "signed") return result("sale_pending", "deal_record", deal?.updated_at ?? null);
+  const sale = custody?.custody_state ? SALE_STATES[custody.custody_state] : undefined;
+  if (sale && custody) {
+    return belongsToThisStay(listing, custody)
+      ? result(sale, "custody_milestone", custody.occurred_at ?? null)
+      : result("unknown", "ambiguous_sale_evidence", listing.archived_at ?? null);
+  }
 
   if (!isArchived(listing)) {
     return listing.status === "published"
@@ -94,6 +111,7 @@ export function readPassportAvailability(row: unknown): PassportAvailability {
     return result(a.disposition as ListingDisposition, (a.basis as DispositionBasis) ?? "none", typeof a.as_of === "string" ? a.as_of : null);
   }
   return deriveListingDisposition({
+    id: typeof r.id === "string" ? r.id : null,
     status: typeof r.status === "string" ? r.status : null,
     archived_at: typeof r.archived_at === "string" ? r.archived_at : null,
     archive_reason: typeof r.archive_reason === "string" ? r.archive_reason : null,

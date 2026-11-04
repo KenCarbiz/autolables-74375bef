@@ -29,17 +29,35 @@ VALUES
    '{"name":"Synthetic Demo Motors","phone":"(555) 010-0100"}'),
   ('5e1d0000-0000-4000-8000-0000000000a8', '5e1d0000-0000-4000-8000-000000000001', '5e1d0000-0000-4000-8000-000000000001',
    '5YJ3E1EA0SF000008', 'demo-transferred', '2021 Chevrolet Tahoe', 'LT', 29870, 'used', 52900, 'archived', now() - interval '50 days', now() - interval '4 days', 'left_feed',
+   '{"name":"Synthetic Demo Motors","phone":"(555) 010-0100"}'),
+  ('5e1d0000-0000-4000-8000-0000000000a9', '5e1d0000-0000-4000-8000-000000000001', '5e1d0000-0000-4000-8000-000000000001',
+   '5YJ3E1EA0SF000009', 'demo-prior-episode-sold', '2017 Lexus RX', '350', 88010, 'used', 22900, 'archived', now() - interval '40 days', now() - interval '2 days', 'left_feed',
+   '{"name":"Synthetic Demo Motors","phone":"(555) 010-0100"}'),
+  ('5e1d0000-0000-4000-8000-0000000000aa', '5e1d0000-0000-4000-8000-000000000001', '5e1d0000-0000-4000-8000-000000000001',
+   '5YJ3E1EA0SF000010', 'demo-relisted-unreviewed', '2016 Audi Q5', 'Premium', 97400, 'used', 15900, 'published', now() - interval '4 days', NULL, NULL,
    '{"name":"Synthetic Demo Motors","phone":"(555) 010-0100"}');
 
--- Deal records: a signed deal on a car that has left the feed (sale pending), and
--- a delivery from an earlier stay of a car that is listed again (must not read sold).
+-- Deal records. None of them may make a car read as sold: vehicle_files is one row
+-- per tenant+VIN forever, so it cannot say which stay a deal belongs to.
 INSERT INTO public.vehicle_files (tenant_id, vin, deal_status, updated_at) VALUES
   ('5e1d0000-0000-4000-8000-000000000001', '5YJ3E1EA0SF000004', 'signed', now() - interval '1 day'),
-  ('5e1d0000-0000-4000-8000-000000000001', '5YJ3E1EA0SF000005', 'delivered', now() - interval '200 days');
+  ('5e1d0000-0000-4000-8000-000000000001', '5YJ3E1EA0SF000005', 'delivered', now() - interval '200 days'),
+  ('5e1d0000-0000-4000-8000-000000000001', '5YJ3E1EA0SF000009', 'delivered', now() - interval '1 day');
 
 \if :with_foundation
-INSERT INTO public.vehicles (vin) VALUES ('5YJ3E1EA0SF000003'), ('5YJ3E1EA0SF000008') ON CONFLICT DO NOTHING;
-INSERT INTO public.vehicle_instances (tenant_id, vin, custody_state, status, disposition, opened_reason)
-VALUES ('5e1d0000-0000-4000-8000-000000000001', '5YJ3E1EA0SF000003', 'delivered', 'disposed', 'retail_sale', 'backfill'),
-       ('5e1d0000-0000-4000-8000-000000000001', '5YJ3E1EA0SF000008', 'transferred_out', 'disposed', 'transfer', 'backfill');
+-- Custody episodes. demo-sold and demo-transferred: bound to the listing, milestone
+-- after the current publish (this stay). demo-prior-episode-sold and
+-- demo-relisted-unreviewed: the newest episode is a delivery that predates the
+-- current publish of the same listing row (an earlier stay), so it is ambiguous.
+INSERT INTO public.vehicles (vin) VALUES ('5YJ3E1EA0SF000003'), ('5YJ3E1EA0SF000008'), ('5YJ3E1EA0SF000009'), ('5YJ3E1EA0SF000010') ON CONFLICT DO NOTHING;
+INSERT INTO public.vehicle_instances (id, tenant_id, vin, listing_id, custody_state, status, disposition, opened_reason) VALUES
+  ('5e1d0000-0000-4000-8000-0000000000c3', '5e1d0000-0000-4000-8000-000000000001', '5YJ3E1EA0SF000003', '5e1d0000-0000-4000-8000-0000000000a3', 'delivered', 'disposed', 'retail_sale', 'backfill'),
+  ('5e1d0000-0000-4000-8000-0000000000c8', '5e1d0000-0000-4000-8000-000000000001', '5YJ3E1EA0SF000008', '5e1d0000-0000-4000-8000-0000000000a8', 'transferred_out', 'disposed', 'transfer', 'backfill'),
+  ('5e1d0000-0000-4000-8000-0000000000c9', '5e1d0000-0000-4000-8000-000000000001', '5YJ3E1EA0SF000009', '5e1d0000-0000-4000-8000-0000000000a9', 'delivered', 'disposed', 'retail_sale', 'backfill'),
+  ('5e1d0000-0000-4000-8000-0000000000ca', '5e1d0000-0000-4000-8000-000000000001', '5YJ3E1EA0SF000010', '5e1d0000-0000-4000-8000-0000000000aa', 'delivered', 'disposed', 'retail_sale', 'backfill');
+INSERT INTO public.vehicle_custody_milestones (tenant_id, instance_id, vin, milestone, from_state, to_state, occurred_at, source) VALUES
+  ('5e1d0000-0000-4000-8000-000000000001', '5e1d0000-0000-4000-8000-0000000000c3', '5YJ3E1EA0SF000003', 'delivered', 'awaiting_delivery', 'delivered', now() - interval '3 days', 'backfill'),
+  ('5e1d0000-0000-4000-8000-000000000001', '5e1d0000-0000-4000-8000-0000000000c8', '5YJ3E1EA0SF000008', 'transferred_out', 'in_stock', 'transferred_out', now() - interval '5 days', 'backfill'),
+  ('5e1d0000-0000-4000-8000-000000000001', '5e1d0000-0000-4000-8000-0000000000c9', '5YJ3E1EA0SF000009', 'delivered', 'awaiting_delivery', 'delivered', now() - interval '300 days', 'backfill'),
+  ('5e1d0000-0000-4000-8000-000000000001', '5e1d0000-0000-4000-8000-0000000000ca', '5YJ3E1EA0SF000010', 'delivered', 'awaiting_delivery', 'delivered', now() - interval '200 days', 'backfill');
 \endif

@@ -41,7 +41,7 @@ fi
 
 export WITH_FOUNDATION="${WITH_FOUNDATION:-1}" PUBLIC_VIEW_DB_URL="postgresql://postgres@127.0.0.1:$PGPORT/scratch" PUBLIC_VIEW_PORT="$GWPORT"
 export SUPABASE_URL="http://127.0.0.1:$GWPORT" SUPABASE_SERVICE_ROLE_KEY="local-service-key-not-real" SUPABASE_ANON_KEY="local-anon-key-not-real"
-export AUTOCURB_SYNC_SECRET="synthetic-legacy-curb-secret" AUTOLABELS_LOOKUP_SECRET="synthetic-legacy-lookup-secret" DMS_SECRET_VAUTO="synthetic-legacy-vauto-secret"
+export AUTOCURB_SYNC_SECRET="synthetic-legacy-curb-secret" AUTOLABELS_LOOKUP_SECRET="synthetic-legacy-lookup-secret" DMS_SECRET_VAUTO="synthetic-legacy-vauto-secret" DMS_SECRET_GENERIC="synthetic-legacy-generic-secret"
 (cd "$HERE" && deno run -A --node-modules-dir=none --import-map=import_map.json gateway.ts) >"$WORK/logs/gateway.log" 2>&1 &
 GW_PID=$!
 for _ in $(seq 1 120); do grep -q "gateway listening" "$WORK/logs/gateway.log" && break; sleep 0.5; done
@@ -51,7 +51,7 @@ rc=0
 if [ "${SERVE:-0}" = 1 ]; then
   echo "gateway on http://127.0.0.1:$GWPORT (Ctrl-C to stop)"; wait "$GW_PID"
 else
-  PUBLIC_VIEW_URL="http://127.0.0.1:$GWPORT" WITH_FOUNDATION="${WITH_FOUNDATION:-1}" deno test -A --node-modules-dir=none --import-map="$HERE/import_map.json" "$HERE/public_view.test.ts" "$HERE/legacy_feeds_http.test.ts" 2>&1 | tee "$WORK/logs/test.log"
+  PUBLIC_VIEW_URL="http://127.0.0.1:$GWPORT" WITH_FOUNDATION="${WITH_FOUNDATION:-1}" deno test -A --node-modules-dir=none --import-map="$HERE/import_map.json" "$HERE/public_view.test.ts" "$HERE/legacy_feeds_http.test.ts" "$HERE/legacy_premigration.test.ts" 2>&1 | tee "$WORK/logs/test.log"
   rc=${PIPESTATUS[0]}
 fi
 exit $rc

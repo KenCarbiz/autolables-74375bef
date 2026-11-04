@@ -4,7 +4,7 @@ import { resolveCustomerPassportRouting, type PassportAgent } from "../_shared/p
 import { matchIihsAward, type IihsAward } from "../_shared/iihs-awards.ts";
 import { resolvePassportVersion } from "../_shared/passport-version.ts";
 import { projectPublicPaymentEstimator } from "../_shared/paymentEstimatorProjection.ts";
-import { deriveListingDisposition, type CustodyEvidence, type DealEvidence } from "../_shared/listingDisposition.ts";
+import { deriveListingDisposition, type CustodyEvidence } from "../_shared/listingDisposition.ts";
 import { PUBLIC_VIEW_DENY, scrubTitleVerification, applyRecallProjection } from "../_shared/lotFeedRow.ts";
 import {
   PUBLIC_MARKET_FLAGS_FIELD, projectPublicMarketFlags,
@@ -629,29 +629,32 @@ serve(async (req) => {
       }
     } catch { /* alternatives optional — module hides when absent */ }
 
-    // ── Availability. An archived listing is not proof of sale; a sale needs a
-    // custody milestone or the dealer's deal record. Either read failing (the
-    // custody tables are not installed everywhere) leaves only the listing
-    // columns, which can say "no longer listed" but never "sold".
+    // ── Availability. An archived listing is not proof of sale. "Sold" needs a
+    // custody milestone on the newest episode for this tenant+VIN, bound to this
+    // listing and dated at or after its current publish; anything weaker reads
+    // "No longer listed". The deal record (vehicle_files) is not read: it cannot
+    // tell this stay from an earlier one. A failed read (the custody tables are not
+    // installed everywhere) leaves only the listing columns, which never say "sold".
     {
       let custody: CustodyEvidence | null = null;
-      let deal: DealEvidence | null = null;
       if (row.tenant_id && row.vin) {
         const vinU = String(row.vin).toUpperCase();
-        const [inst, file] = await Promise.all([
-          admin.from("vehicle_instances").select("custody_state, updated_at")
-            .eq("tenant_id", row.tenant_id).eq("vin", vinU).order("created_at", { ascending: false }).limit(1)
-            .then((r: { data: unknown; error: unknown }) => r, () => ({ data: null, error: true })),
-          admin.from("vehicle_files").select("deal_status, updated_at")
-            .eq("tenant_id", row.tenant_id).eq("vin", vinU).limit(1)
-            .then((r: { data: unknown; error: unknown }) => r, () => ({ data: null, error: true })),
-        ]);
+        const inst = await admin.from("vehicle_instances").select("id, custody_state, listing_id")
+          .eq("tenant_id", row.tenant_id).eq("vin", vinU).order("created_at", { ascending: false }).limit(1)
+          .then((r: { data: unknown; error: unknown }) => r, () => ({ data: null, error: true }));
         const i0 = !inst.error && Array.isArray(inst.data) ? inst.data[0] as Record<string, string> | undefined : undefined;
-        const f0 = !file.error && Array.isArray(file.data) ? file.data[0] as Record<string, string> | undefined : undefined;
-        if (i0) custody = { custody_state: i0.custody_state ?? null, changed_at: i0.updated_at ?? null };
-        if (f0) deal = { deal_status: f0.deal_status ?? null, updated_at: f0.updated_at ?? null };
+        if (i0 && i0.custody_state && i0.custody_state !== "in_stock") {
+          const ms = await admin.from("vehicle_custody_milestones").select("occurred_at")
+            .eq("tenant_id", row.tenant_id).eq("instance_id", i0.id).eq("to_state", i0.custody_state)
+            .order("occurred_at", { ascending: false }).limit(1)
+            .then((r: { data: unknown; error: unknown }) => r, () => ({ data: null, error: true }));
+          const m0 = !ms.error && Array.isArray(ms.data) ? ms.data[0] as Record<string, string> | undefined : undefined;
+          custody = { custody_state: i0.custody_state, listing_id: i0.listing_id ?? null, occurred_at: m0?.occurred_at ?? null };
+        } else if (i0) {
+          custody = { custody_state: i0.custody_state ?? null, listing_id: i0.listing_id ?? null, occurred_at: null };
+        }
       }
-      const availability = deriveListingDisposition(row, custody, deal);
+      const availability = deriveListingDisposition(row, custody);
       row.availability = availability;
       if (!availability.purchasable) {
         // The last advertised price stays visible as history; nothing that reads

@@ -20,22 +20,37 @@ describe("deriveListingDisposition", () => {
     expect(deriveListingDisposition({ ...leftFeed, archive_reason: "something_new" }).disposition).toBe("unknown");
   });
 
-  it("custody milestones decide sold, pending and transferred, even over a stale live listing", () => {
-    expect(deriveListingDisposition(live, { custody_state: "delivered" })).toMatchObject({ disposition: "sold", basis: "custody_milestone", purchasable: false });
-    expect(deriveListingDisposition(live, { custody_state: "sold" }).disposition).toBe("sale_pending");
-    expect(deriveListingDisposition(live, { custody_state: "awaiting_delivery" }).disposition).toBe("sale_pending");
-    expect(deriveListingDisposition(leftFeed, { custody_state: "transferred_out" }).disposition).toBe("transferred");
+  const L = "11111111-1111-4111-8111-111111111111";
+  const liveL = { ...live, id: L };
+  const leftFeedL = { ...leftFeed, id: L };
+  const thisStay = (state: string) => ({ custody_state: state, listing_id: L, occurred_at: "2026-10-19T00:00:00Z" });
+
+  it("custody milestones bound to this stay decide sold, pending and transferred, even over a stale live listing", () => {
+    expect(deriveListingDisposition(leftFeedL, thisStay("delivered"))).toMatchObject({ disposition: "sold", basis: "custody_milestone", purchasable: false });
+    expect(deriveListingDisposition(liveL, { ...thisStay("delivered"), occurred_at: "2026-10-30T00:00:00Z" }).disposition).toBe("sold");
+    expect(deriveListingDisposition(leftFeedL, thisStay("sold")).disposition).toBe("sale_pending");
+    expect(deriveListingDisposition(leftFeedL, thisStay("awaiting_delivery")).disposition).toBe("sale_pending");
+    expect(deriveListingDisposition(leftFeedL, thisStay("transferred_out")).disposition).toBe("transferred");
   });
 
-  it("a deal record explains an archived listing only", () => {
-    expect(deriveListingDisposition(leftFeed, null, { deal_status: "delivered" })).toMatchObject({ disposition: "sold", basis: "deal_record" });
-    expect(deriveListingDisposition(leftFeed, null, { deal_status: "signed" }).disposition).toBe("sale_pending");
-    expect(deriveListingDisposition(live, null, { deal_status: "delivered", updated_at: "2026-10-30T00:00:00Z" }).disposition).toBe("available");
-    expect(deriveListingDisposition(leftFeed, null, { deal_status: "unwound" }).disposition).toBe("missing_from_feed");
+  it("a delivery from an earlier stay of the same listing row is ambiguous, not sold", () => {
+    const earlier = { custody_state: "delivered", listing_id: L, occurred_at: "2026-08-01T00:00:00Z" };
+    expect(deriveListingDisposition(leftFeedL, earlier)).toMatchObject({ disposition: "unknown", basis: "ambiguous_sale_evidence", purchasable: false });
+    expect(deriveListingDisposition(liveL, earlier)).toMatchObject({ disposition: "unknown", purchasable: false });
+    expect(availabilityCopy(deriveListingDisposition(leftFeedL, earlier))?.label).toBe("No longer listed");
   });
 
-  it("a reacquired car in stock is not sold by an old deal record", () => {
-    expect(deriveListingDisposition(leftFeed, { custody_state: "in_stock" }, { deal_status: "delivered" }).disposition).toBe("missing_from_feed");
+  it("sale evidence that cannot be tied to this listing is ambiguous", () => {
+    expect(deriveListingDisposition(leftFeedL, { ...thisStay("delivered"), listing_id: null }).basis).toBe("ambiguous_sale_evidence");
+    expect(deriveListingDisposition(leftFeedL, { ...thisStay("delivered"), listing_id: "22222222-2222-4222-8222-222222222222" }).disposition).toBe("unknown");
+    expect(deriveListingDisposition(leftFeedL, { ...thisStay("delivered"), occurred_at: null }).disposition).toBe("unknown");
+    expect(deriveListingDisposition({ ...leftFeedL, published_at: null }, thisStay("delivered")).disposition).toBe("unknown");
+    expect(deriveListingDisposition(leftFeed, thisStay("delivered")).disposition).toBe("unknown");
+  });
+
+  it("a reacquired car in stock reads from the listing columns", () => {
+    expect(deriveListingDisposition(leftFeedL, { custody_state: "in_stock", listing_id: L }).disposition).toBe("missing_from_feed");
+    expect(deriveListingDisposition(liveL, { custody_state: "in_stock", listing_id: L }).disposition).toBe("available");
   });
 
   it("drafts are not available", () => {

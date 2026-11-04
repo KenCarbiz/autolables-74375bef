@@ -31,6 +31,32 @@ INSERT INTO public.integration_connections (id, tenant_id, app, display_name, st
 INSERT INTO public.integration_direction_flags (tenant_id, direction, enabled)
   SELECT tenant_a, 'film_to_labels', true FROM _ids UNION ALL SELECT tenant_b, 'film_to_labels', true FROM _ids;
 
+-- S0. Out of the box every history policy is off: the migration writes no setting
+-- rows, and each of the five resolves to its safe default for any dealer.
+DO $$
+DECLARE t uuid; n int; k text;
+BEGIN
+  SELECT tenant_a INTO t FROM _ids;
+  SELECT count(*) INTO n FROM public.vehicle_history_settings;
+  IF n <> 0 THEN RAISE EXCEPTION 'FAIL: % setting rows exist after migration', n; END IF;
+  FOREACH k IN ARRAY ARRAY['service.attach_enabled','service.allow_service_only_vehicle',
+      'integration.outbound_capture_enabled','access.prior_owner_keeps_transaction_records'] LOOP
+    IF public.vehicle_history_flag(t, NULL, k) OR public.vehicle_history_flag(NULL, NULL, k) THEN
+      RAISE EXCEPTION 'FAIL: % is on by default', k;
+    END IF;
+  END LOOP;
+  FOREACH k IN ARRAY ARRAY['service.attach_enabled','service.allow_service_only_vehicle',
+      'integration.outbound_capture_enabled','access.prior_owner_keeps_transaction_records','integration.replay_max_batch'] LOOP
+    IF public.vehicle_history_effective_setting(t, NULL, k)->>'source' <> 'safe_default' THEN
+      RAISE EXCEPTION 'FAIL: % resolves from %, not the safe default', k, public.vehicle_history_effective_setting(t, NULL, k);
+    END IF;
+  END LOOP;
+  IF public.vehicle_history_effective_setting(t, NULL, 'integration.replay_max_batch')->'value' <> '25'::jsonb THEN
+    RAISE EXCEPTION 'FAIL: replay_max_batch default is %', public.vehicle_history_effective_setting(t, NULL, 'integration.replay_max_batch');
+  END IF;
+  RAISE NOTICE 'PASS: all five history policies are off (replay cap 25) until a versioned approval writes them';
+END $$;
+
 CREATE FUNCTION public._vh_enqueue(p_conn uuid, p_tenant uuid, p_type text, p_record text, p_version bigint,
   p_vin text, p_visit text, p_payload jsonb DEFAULT '{}'::jsonb) RETURNS uuid
 LANGUAGE sql AS $$

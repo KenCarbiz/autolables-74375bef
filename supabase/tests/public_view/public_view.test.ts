@@ -19,17 +19,29 @@ async function view(slug: string) {
 const cases: Array<[string, string, string]> = [
   ["demo-available", "available", "listing_status"],
   ["demo-left-feed", "missing_from_feed", "feed_absence"],
-  ["demo-deal-signed", "sale_pending", "deal_record"],
+  // A signed or delivered deal record never labels a car: it cannot be tied to this stay.
+  ["demo-deal-signed", "missing_from_feed", "feed_absence"],
   ["demo-relisted", "available", "listing_status"],
   ["demo-duplicate", "withdrawn", "listing_status"],
   ["demo-archived-no-reason", "unknown", "listing_status"],
 ];
 if (withFoundation) {
-  cases.push(["demo-sold", "sold", "custody_milestone"], ["demo-transferred", "transferred", "custody_milestone"]);
+  cases.push(
+    ["demo-sold", "sold", "custody_milestone"],
+    ["demo-transferred", "transferred", "custody_milestone"],
+    // The newest episode is a delivery from an earlier stay of the same listing row.
+    ["demo-prior-episode-sold", "unknown", "ambiguous_sale_evidence"],
+    ["demo-relisted-unreviewed", "unknown", "ambiguous_sale_evidence"],
+  );
 } else {
   // Without the custody tables, an archived car that was really delivered can
   // only be called "no longer listed": archived alone never reads as sold.
-  cases.push(["demo-sold", "missing_from_feed", "feed_absence"], ["demo-transferred", "missing_from_feed", "feed_absence"]);
+  cases.push(
+    ["demo-sold", "missing_from_feed", "feed_absence"],
+    ["demo-transferred", "missing_from_feed", "feed_absence"],
+    ["demo-prior-episode-sold", "missing_from_feed", "feed_absence"],
+    ["demo-relisted-unreviewed", "available", "listing_status"],
+  );
 }
 
 for (const [slug, disposition, basis] of cases) {

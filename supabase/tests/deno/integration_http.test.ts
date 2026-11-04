@@ -456,7 +456,12 @@ test("dispatch: native and AutoFilm connections are signed in their own formats 
       await admin`insert into public.integration_outbox (tenant_id, connection_id, event_id, event_type, envelope)
         values (${s.tenantId}, ${s.connId}, ${env.event_id}, ${env.event_type}, ${admin.json(env as never)})`;
     }
-    const dispatch = async () => (await (await srv.post("/dispatch", "{}", SERVICE_HEADERS)).json()) as { outcomes: Record<string, number> };
+    // Dispatch compares a millisecond JS clock with microsecond row timestamps, so a
+    // row written in the same millisecond is not yet due. Step past it.
+    const dispatch = async () => {
+      await new Promise((r) => setTimeout(r, 5));
+      return (await (await srv.post("/dispatch", "{}", SERVICE_HEADERS)).json()) as { outcomes: Record<string, number> };
+    };
     const out = await dispatch();
     assert.equal(out.outcomes.delivered, 2);
 
