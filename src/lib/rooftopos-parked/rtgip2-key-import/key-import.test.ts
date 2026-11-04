@@ -16,7 +16,7 @@ const FP = createHash("sha256").update(SECRET).digest("hex");
 const TICKET = "0b7a2f4e-8c1d-4e5f-9a6b-1c2d3e4f5a6b";
 const TOKEN = "a1".repeat(32);
 
-type Call = { text: string; params?: unknown[] };
+type Call = { text: string; params?: unknown[] | undefined };
 function fakeSql(answer: (text: string, params: unknown[] | undefined) => unknown[] | Error) {
   const calls: Call[] = [];
   const end = vi.fn(async () => {});
