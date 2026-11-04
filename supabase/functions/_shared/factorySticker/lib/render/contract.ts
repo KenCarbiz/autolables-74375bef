@@ -26,7 +26,10 @@ import {
   type ClassifiedItem, type EquipmentLine, type EquipmentSelectionBase,
 } from "../equipmentSelection.ts";
 import { resolveReferenceVariant } from "../oem/referenceVariants.ts";
-import { VARIANT_LAYOUTS, type VariantLayoutBuilder, type VariantRenderInput } from "./variants/index.ts";
+import { CATALOG_LAYOUTS, VARIANT_LAYOUTS, type VariantLayoutBuilder, type VariantRenderInput } from "./variants/index.ts";
+import {
+  getCatalogTemplate, resolveCatalogTemplate, type CatalogResolution, type CatalogTemplate,
+} from "../oem/templateCatalog.ts";
 import { getTheme, type OemStickerTheme } from "../oem/themes.ts";
 import { resolveThemeProfile, type ResolvedThemeProfile } from "../oem/profiles.ts";
 import {
@@ -165,6 +168,8 @@ export interface FactoryStickerRenderData {
   /** Powertrain identity for the spec grid; optional for older payloads. */
   mechanical?: { engine: string | null; transmission: string | null; drivetrain: string | null };
   stockNumber?: string | null;
+  /** Body style from the record (mc_attributes.body_type); used only to match catalog templates. */
+  bodyClass?: string | null;
   transportMethod?: string | null;
   /** Factory administrative codes for the Monroney top strip. */
   factoryCodes?: {
@@ -587,13 +592,23 @@ function withLines(input: StickerLayoutInput, lines: EquipmentLine[], note: bool
 const masterGroups = (groups: StandardEquipmentGroup[]): Array<{ hint: string; items: string[] }> =>
   groups.map((g) => ({ hint: CATEGORY_MASTER_HINT[g.category], items: g.items }));
 
+export interface BuildRenderOptions {
+  /**
+   * Explicit sample render of one catalog template, for owner review and
+   * tests. It ignores approval but never production routing: the automatic
+   * path never passes it.
+   */
+  sampleTemplateId?: string;
+}
+
 export function buildRenderLayout(
   data: FactoryStickerRenderData,
   theme: FactoryStickerTheme,
   policy: EquipmentScopePolicy = EQUIPMENT_SCOPE_POLICY,
+  options: BuildRenderOptions = {},
 ): LayoutModel {
   const input = adaptRenderData(data);
-  const route = resolveVariantRoute(data, theme, input);
+  const route = resolveVariantRoute(data, theme, input, options.sampleTemplateId ?? null);
   const genericTheme = resolveRenderTheme(data, theme);
   const base = equipmentBase(data);
   const displayMake = data.identity.make.trim().toUpperCase() === "INFINITI" ? "INFINITI" : titleCase(data.identity.make);
@@ -685,7 +700,12 @@ function resolveVariantRoute(
   data: FactoryStickerRenderData,
   theme: FactoryStickerTheme,
   input: StickerLayoutInput,
+  sampleTemplateId: string | null = null,
 ): VariantRoute | null {
+  if (sampleTemplateId) {
+    const build = CATALOG_LAYOUTS[sampleTemplateId];
+    return build && getCatalogTemplate(sampleTemplateId) ? { variantKey: sampleTemplateId, masterRouted: true, build } : null;
+  }
   if (String(theme.templateOverrideKey ?? "").trim()) return null;
   const year = Number(data.identity.year);
   const match = resolveReferenceVariant({
@@ -699,12 +719,53 @@ function resolveVariantRoute(
   const exact = match.status === "matched" && match.rendering === "variant_layout" && !!match.variant;
   const master = exact ? null : masterFor(data);
   if (exact && MASTER_APPROVAL[match.variant!.key] !== "approved") return null;
+  if (!exact && !master && !input.generic) {
+    const resolved = catalogResolutionFor(data);
+    const build = resolved.template ? CATALOG_LAYOUTS[resolved.template.id] : undefined;
+    return resolved.status === "approved_match" && resolved.template && build
+      ? { variantKey: resolved.template.id, masterRouted: true, build } : null;
+  }
   if (!exact && (!master || input.generic)) return null;
   const variantKey = exact ? match.variant!.key : master!.variantKey;
   const build = VARIANT_LAYOUTS[variantKey];
   if (!build) return null;
   return { variantKey, masterRouted: !exact, build };
 }
+
+export function catalogResolutionFor(data: FactoryStickerRenderData): CatalogResolution {
+  const year = Number(data.identity.year);
+  return resolveCatalogTemplate({
+    make: data.identity.make,
+    modelYear: Number.isFinite(year) ? year : null,
+    model: data.identity.model,
+    trim: data.identity.trim,
+    bodyClass: data.bodyClass ?? null,
+    fuelClass: fuelClassOf(data.epa?.fuelType),
+    drivetrain: data.mechanical?.drivetrain ?? null,
+  });
+}
+
+/**
+ * Recorded template-routing facts for one vehicle: which catalog template
+ * (if any) matches, and the flags to persist. A vehicle already served by an
+ * approved master or reference variant carries no flag: its routing is
+ * unchanged and complete. Rendering never depends on the flags.
+ */
+export function templateRoutingFacts(data: FactoryStickerRenderData): CatalogResolution & { servedByApprovedMaster: boolean } {
+  const catalog = catalogResolutionFor(data);
+  const year = Number(data.identity.year);
+  const exact = resolveReferenceVariant({
+    make: data.identity.make, modelYear: Number.isFinite(year) ? year : null, model: data.identity.model,
+    trim: data.identity.trim, drivetrain: data.mechanical?.drivetrain ?? null, fuelType: data.epa?.fuelType ?? null,
+  });
+  const servedByApprovedMaster = !data.generic && (
+    (exact.status === "matched" && exact.rendering === "variant_layout" && !!exact.variant &&
+      MASTER_APPROVAL[exact.variant.key] === "approved") || masterFor(data) !== null
+  );
+  return servedByApprovedMaster ? { ...catalog, flags: [], servedByApprovedMaster } : { ...catalog, servedByApprovedMaster };
+}
+
+export type { CatalogTemplate };
 
 function titleCase(s: string): string {
   return s.trim().toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase());

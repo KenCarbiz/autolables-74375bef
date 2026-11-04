@@ -12,7 +12,8 @@ import {
   type OemTemplateSelectionResult, type TemplateOverrideOption,
 } from "./oem/selection.ts";
 import { resolveReferenceVariant, type ReferenceVariantResolution } from "./oem/referenceVariants.ts";
-import { resolveRenderProfile, type FactoryStickerRenderData, type FactoryStickerTheme } from "./render/contract.ts";
+import { resolveRenderProfile, templateRoutingFacts, type FactoryStickerRenderData, type FactoryStickerTheme } from "./render/contract.ts";
+import type { CatalogResolution } from "./oem/templateCatalog.ts";
 import { fitOk } from "./render/layout.ts";
 import { checkRenderedCompleteness, type CompletenessReport } from "./render/completeness.ts";
 import type { ResolvedThemeProfile } from "./oem/profiles.ts";
@@ -77,6 +78,8 @@ export type GenerationPlan =
     profileFamily: string;
     theme: FactoryStickerTheme;
     reconciliation: MsrpReconciliation;
+    /** Catalog template match and flags for the audit trail; rendering never reads it. */
+    templateRouting: CatalogResolution & { servedByApprovedMaster: boolean };
   };
 
 export function planGeneration(input: GenerationPlanInput): GenerationPlan {
@@ -166,6 +169,7 @@ export function planGeneration(input: GenerationPlanInput): GenerationPlan {
     kind: "ready", eligibility, selection, referenceVariant, storedOverride,
     overrideDiscarded, appliedOverride, make, canonicalOemId, profile,
     profileFamily, theme, reconciliation,
+    templateRouting: templateRoutingFacts(normalized.data),
   };
 }
 

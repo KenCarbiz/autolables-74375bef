@@ -191,6 +191,7 @@ export function normalizeForSticker(
       assembly,
       mechanical,
       stockNumber,
+      bodyClass: str(mc.body_type),
       epa,
       dealer,
       passportUrl,

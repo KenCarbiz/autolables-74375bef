@@ -23,3 +23,6 @@ export const VARIANT_LAYOUTS: Record<string, VariantLayoutBuilder> = {
   "chrysler-2024-pacifica-select-phev": buildChryslerPacificaPhevLayout,
   "ford-2025-transit-250-cargo-rwd-e85-carb": buildFordTransitCarbLayout,
 };
+
+/** Catalog template layouts keyed by catalog id. Having a builder does not make a template routable; approval does. */
+export const CATALOG_LAYOUTS: Partial<Record<string, VariantLayoutBuilder>> = {};
