@@ -26,16 +26,22 @@ const EXTRA_NON_EQUIPMENT: RegExp[] = [
 // labels that the Engine, Transmission and Drivetrain rows already carry.
 const POWERTRAIN_FRAGMENTS: RegExp[] = [
   /^\d+$|^[a-z]$/i,
-  /^\d+-cyl$|^in-line$|^(short|long|extended) wheelbase$|^(full|mid|compact)[- ]size mpv$|^(unleaded|premium unleaded|diesel)$/i,
+  /^\d+-cyl$|^in-line$|^(short|long|extended) wheelbase$|^(full|mid|compact)[- ]size mpv$|^(unleaded|premium unleaded|regular unleaded|gasoline|diesel)$/i,
   /^(fwd|rwd|awd|4wd|2wd)$|^(four|front|rear|all) wheel drive( type-.*)?$/i,
 ];
 
-const FRAGMENT_TEMPLATES = new Set(["mitsubishi_2026_outlander_sport_s", "chrysler_2026_voyager_lx"]);
+const SIZE_AND_ENGINE_FRAGMENTS = /^(mid|upper|lower|medium|upper medium|lower medium|horizontal|turbo)$/i;
+
+const LATER_TEMPLATES = [
+  "kia_2026_sorento_lx", "subaru_2026_forester_wilderness", "genesis_2026_gv80_3.5t_prestige", "dodge_2026_durango_gt_blacktop", "buick_2026_envista_avenir",
+];
+const FRAGMENT_TEMPLATES = new Set(["mitsubishi_2026_outlander_sport_s", "chrysler_2026_voyager_lx", ...LATER_TEMPLATES]);
 
 export const isCatalogNonEquipment = (raw: string, templateId?: string): boolean => {
   const s = String(raw ?? "").replace(/\s+/g, " ").trim();
   if (!s || isRatingMetadata(s) || isDecoderNoise(s) || EXTRA_NON_EQUIPMENT.some((re) => re.test(s))) return true;
-  return !!templateId && FRAGMENT_TEMPLATES.has(templateId) && POWERTRAIN_FRAGMENTS.some((re) => re.test(s));
+  if (!templateId || !FRAGMENT_TEMPLATES.has(templateId)) return false;
+  return POWERTRAIN_FRAGMENTS.some((re) => re.test(s)) || (LATER_TEMPLATES.includes(templateId) && SIZE_AND_ENGINE_FRAGMENTS.test(s));
 };
 
 const clean = (groups: Record<string, string[]> | undefined, templateId?: string): Record<string, string[]> => {
