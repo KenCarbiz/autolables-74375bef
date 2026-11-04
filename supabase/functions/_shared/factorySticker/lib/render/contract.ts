@@ -21,6 +21,10 @@ import type {
 } from "../types.ts";
 import { resolveOem } from "../oem/identity.ts";
 import { classifyStandardItem } from "../equipment.ts";
+import {
+  SELECTED_EQUIPMENT_NOTE, normalizeEquipment, selectEquipment,
+  type ClassifiedItem, type EquipmentLine, type EquipmentSelectionBase,
+} from "../equipmentSelection.ts";
 import { resolveReferenceVariant } from "../oem/referenceVariants.ts";
 import { VARIANT_LAYOUTS, type VariantLayoutBuilder, type VariantRenderInput } from "./variants/index.ts";
 import { getTheme, type OemStickerTheme } from "../oem/themes.ts";
@@ -33,6 +37,8 @@ import type { FactoryBuildProvenance } from "../reproduction.ts";
 import { realizePdf, type PdfLibModule } from "./toPdf.ts";
 import { layoutToSvg } from "./previewSvg.ts";
 
+// 1.4.0: standard equipment prints in full when it fits, else as normalized, ranked
+// selected lines with a Passport pointer; applies to every template.
 // 1.3.0: an approved make-wide master is always used for its make; content it
 // cannot hold under the equipment scope policy is review-required, never generic.
 // 1.2.0: exactly one physical page for every OEM layout. No continuation
@@ -40,7 +46,7 @@ import { layoutToSvg } from "./previewSvg.ts";
 // review-required fit failure with no PDF. Reproduction banner + disclosure
 // (reproduction.ts DISCLOSURE_VERSION) are unchanged. Part of the generation
 // fingerprint, so existing documents regenerate as new versions.
-export const RENDERER_VERSION = "1.3.0";
+export const RENDERER_VERSION = "1.4.0";
 
 /**
  * Make-wide master routing. Every vehicle of a make with verified data
@@ -509,22 +515,16 @@ export function resolveRenderProfile(data: FactoryStickerRenderData): ResolvedTh
 }
 
 /**
- * What a routed Figma master may print in its equipment region, in order:
- * full_then_key_features - the full verified standard list, else the NeoVIN
- *   key-feature layer with a fixed Passport pointer line;
- * key_features - the key-feature layer only;
- * full_only - the full list, else REVIEW_REQUIRED.
- * A master that cannot hold the permitted content is REVIEW_REQUIRED; an
- * approved make-wide master never falls back to the generic layout.
+ * How much standard equipment a sticker may print, in order:
+ * full_then_selected - every verified item when it fits, else the most
+ *   significant normalized items that fit, with a fixed Passport pointer line;
+ * full_only - every verified item, else REVIEW_REQUIRED.
+ * Priced options and packages are never ranked away. A make with an approved
+ * master that cannot hold the permitted content is REVIEW_REQUIRED, never
+ * generic.
  */
-export type EquipmentScopePolicy = "full_then_key_features" | "key_features" | "full_only";
-export const EQUIPMENT_SCOPE_POLICY: EquipmentScopePolicy = "full_then_key_features";
-
-const SCOPE_ORDER: Record<EquipmentScopePolicy, EquipmentScope[]> = {
-  full_then_key_features: ["full", "key_features"],
-  key_features: ["key_features"],
-  full_only: ["full"],
-};
+export type EquipmentScopePolicy = "full_then_selected" | "full_only";
+export const EQUIPMENT_SCOPE_POLICY: EquipmentScopePolicy = "full_then_selected";
 
 /** Source-order hints the masters map to their own sections. */
 export const CATEGORY_MASTER_HINT: Record<EquipmentCategory, string> = {
@@ -538,8 +538,52 @@ export const CATEGORY_MASTER_HINT: Record<EquipmentCategory, string> = {
   OTHER: "other",
 };
 
-export const equipmentNoteFor = (n: number): string =>
-  `Complete factory equipment list (${n} items): scan the Vehicle Passport QR`;
+/** Verified standard items with their classified category, source order and key-feature flag. */
+export function classifiedEquipment(data: FactoryStickerRenderData): ClassifiedItem[] {
+  const keyItems = new Set(Object.values(data.keyFeatures ?? {}).flat().map((i) => i.trim().toUpperCase()));
+  const out: ClassifiedItem[] = [];
+  const seen = new Set<string>();
+  for (const source of [data.standardEquipment, data.keyFeatures ?? {}]) {
+    for (const [hint, items] of Object.entries(source)) {
+      const hinted = categoryForHint(hint);
+      for (const raw of items) {
+        const item = raw.trim();
+        if (!item || seen.has(item.toUpperCase())) continue;
+        seen.add(item.toUpperCase());
+        out.push({
+          item, order: out.length, key: keyItems.has(item.toUpperCase()),
+          category: hinted === "OTHER" ? classifyStandardItem(item) : hinted,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+export const equipmentBase = (data: FactoryStickerRenderData): EquipmentSelectionBase =>
+  normalizeEquipment(classifiedEquipment(data));
+
+/** The lines a sticker prints when `lineCount` lines fit, as the layout and the completeness check both derive them. */
+export const selectedEquipmentLines = (data: FactoryStickerRenderData, lineCount: number): EquipmentLine[] =>
+  selectEquipment(equipmentBase(data).lines, lineCount);
+
+const CATEGORY_ORDER = CATEGORY_SEQUENCE;
+
+function linesToGroups(lines: EquipmentLine[]): StandardEquipmentGroup[] {
+  return CATEGORY_ORDER.filter((c) => lines.some((l) => l.category === c))
+    .map((category) => ({ category, items: lines.filter((l) => l.category === category).map((l) => l.text) }));
+}
+
+function withLines(input: StickerLayoutInput, lines: EquipmentLine[], note: boolean): StickerLayoutInput {
+  return {
+    ...input,
+    data: { ...input.data, equipment: { ...input.data.equipment, standard: linesToGroups(lines) } },
+    ...(note ? { equipmentNote: SELECTED_EQUIPMENT_NOTE } : {}),
+  };
+}
+
+const masterGroups = (groups: StandardEquipmentGroup[]): Array<{ hint: string; items: string[] }> =>
+  groups.map((g) => ({ hint: CATEGORY_MASTER_HINT[g.category], items: g.items }));
 
 export function buildRenderLayout(
   data: FactoryStickerRenderData,
@@ -548,41 +592,62 @@ export function buildRenderLayout(
 ): LayoutModel {
   const input = adaptRenderData(data);
   const route = resolveVariantRoute(data, theme, input);
-  if (!route) return buildStickerLayout(input, resolveRenderTheme(data, theme));
-  if (!route.masterRouted) {
-    const exactInput: VariantRenderInput = {
-      layout: input,
-      equipmentGroups: Object.entries(data.standardEquipment).map(([hint, items]) => ({ hint, items })),
-      displayMake: data.identity.make.trim().toUpperCase() === "INFINITI" ? "INFINITI" : titleCase(data.identity.make),
-    };
-    return route.build(exactInput) ?? buildStickerLayout(input, resolveRenderTheme(data, theme));
-  }
-  for (const scope of SCOPE_ORDER[policy]) {
-    const vi = variantInput(input, data, scope);
-    if (!vi) continue;
-    const model = route.build(vi);
-    if (model && model.fit.ok) return { ...model, fit: { ...model.fit, equipmentScope: scope, figmaMaster: true } };
-  }
-  return masterHold(route.variantKey, policy, buildStickerLayout(input, resolveRenderTheme(data, theme)));
-}
-
-function variantInput(
-  input: StickerLayoutInput,
-  data: FactoryStickerRenderData,
-  scope: EquipmentScope,
-): VariantRenderInput | null {
+  const genericTheme = resolveRenderTheme(data, theme);
+  const base = equipmentBase(data);
   const displayMake = data.identity.make.trim().toUpperCase() === "INFINITI" ? "INFINITI" : titleCase(data.identity.make);
-  if (scope === "full") {
-    return { layout: input, equipmentGroups: masterGroups(input.data.equipment.standard), displayMake };
-  }
-  const key = groupStandardEquipment([data.keyFeatures ?? {}]);
-  if (!key.length) return null;
-  const total = input.data.equipment.standard.reduce((n, g) => n + g.items.length, 0);
-  return { layout: input, equipmentGroups: masterGroups(key), displayMake, equipmentNote: equipmentNoteFor(total) };
-}
+  const state: { hold: LayoutModel | null } = { hold: null };
 
-const masterGroups = (groups: StandardEquipmentGroup[]): Array<{ hint: string; items: string[] }> =>
-  groups.map((g) => ({ hint: CATEGORY_MASTER_HINT[g.category], items: g.items }));
+  const tag = (m: LayoutModel, scope: EquipmentScope, printed: number, lines: number, master: boolean): LayoutModel =>
+    (!m.fit.ok ? m : { ...m, fit: { ...m.fit, equipmentScope: scope, equipmentCounts: { printed, total: base.total, lines }, ...(master ? { figmaMaster: true } : {}) } });
+
+  const tryTarget = (target: "variant" | "generic"): LayoutModel | null => {
+    const masterRouted = target === "variant" && !!route?.masterRouted;
+    const build = (selected: EquipmentLine[] | null): LayoutModel | null => {
+      const printed = selected ? selected.reduce((n, l) => n + l.sources.length, 0) : base.total;
+      const inp = selected ? withLines(input, selected, printed < base.total) : input;
+      let m: LayoutModel | null;
+      if (target === "variant") {
+        const groups = selected || masterRouted ? masterGroups(inp.data.equipment.standard)
+          : Object.entries(data.standardEquipment).map(([hint, items]) => ({ hint, items }));
+        m = route!.build({ layout: inp, equipmentGroups: groups, displayMake, ...(inp.equipmentNote ? { equipmentNote: inp.equipmentNote } : {}) });
+      } else {
+        m = buildStickerLayout(inp, genericTheme);
+        if (m && !m.fit.ok) {
+          if (!selected) state.hold = m;
+          m = null;
+        }
+      }
+      return m && m.fit.ok ? m : null;
+    };
+
+    const full = build(null);
+    if (full) return tag(full, "full", base.total, base.lines.length, masterRouted);
+    if (policy === "full_only" || !base.lines.length) return null;
+
+    const cache = new Map<number, LayoutModel | null>();
+    const probe = (n: number): LayoutModel | null => {
+      if (!cache.has(n)) cache.set(n, build(selectEquipment(base.lines, n)));
+      return cache.get(n)!;
+    };
+    if (!probe(1)) return null;
+    let lo = 1;
+    let hi = base.lines.length;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      if (probe(mid)) lo = mid;
+      else hi = mid - 1;
+    }
+    const lines = selectEquipment(base.lines, lo);
+    const printed = lines.reduce((n, l) => n + l.sources.length, 0);
+    return tag(probe(lo)!, printed < base.total ? "selected" : "full", printed, lo, masterRouted);
+  };
+
+  const viaVariant = route ? tryTarget("variant") : null;
+  if (viaVariant) return viaVariant;
+  if (route?.masterRouted) return masterHold(route.variantKey, policy, buildStickerLayout(input, genericTheme));
+  const viaGeneric = tryTarget("generic");
+  return viaGeneric ?? state.hold ?? buildStickerLayout(input, genericTheme);
+}
 
 function masterHold(variantKey: string, policy: EquipmentScopePolicy, base: LayoutModel): LayoutModel {
   return {
@@ -595,7 +660,7 @@ function masterHold(variantKey: string, policy: EquipmentScopePolicy, base: Layo
       overflowPt: base.fit.ok ? 1 : base.fit.overflowPt,
       equipmentFontPt: 5.5,
       columns: 2,
-      detail: `verified content does not fit the approved ${variantKey} master at 5.5pt or above under the ${policy} equipment scope; an approved one-page layout adjustment is required`,
+      detail: `verified mandatory content (priced options and packages, pricing, regulatory blocks) does not fit the approved ${variantKey} master at 5.5pt or above under the ${policy} equipment scope; an approved one-page layout adjustment is required`,
     },
   };
 }

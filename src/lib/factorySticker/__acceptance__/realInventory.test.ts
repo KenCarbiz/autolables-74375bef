@@ -7,8 +7,9 @@ import {
   publishedDocs, runOrchestrate, sha256,
   type Fixture, type FixtureVehicle, type Listing, type Outcome, type Store,
 } from "./harness";
-import { adaptRenderData, equipmentNoteFor, fuelClassOf, MAKE_WIDE_MASTERS, MASTER_APPROVAL, masterFor, type FuelClass } from "../render/contract";
+import { adaptRenderData, fuelClassOf, MAKE_WIDE_MASTERS, MASTER_APPROVAL, masterFor, type FuelClass } from "../render/contract";
 import { expectedStandardEquipment } from "../render/completeness";
+import { SELECTED_EQUIPMENT_NOTE } from "../equipmentSelection";
 import { resolveReferenceVariant } from "../oem/referenceVariants";
 import { encodeQrMatrix } from "../render/qrMatrix";
 import { REPRODUCTION_BANNER, REPRODUCTION_DISCLOSURE, FACTORY_BUILD_UNVERIFIED } from "../reproduction";
@@ -74,7 +75,7 @@ const exactVariantRoute = (o: Outcome): boolean => {
 
 const TRIM_TO_ITEMS = 56;
 const PUBLISHED_N = 35;
-const HELD_N = 1;
+const HELD_N = 0;
 
 /**
  * A one-page-capable subset of a VIN's own saved rows: the first rows of its
@@ -552,11 +553,15 @@ describe("complete builds: one page on the equipment-priority composition, or he
       const fit = o.rendered.layout.fit;
       expect(fit.ok && fit.equipmentFontPt).toBeGreaterThanOrEqual(5.5);
       const scope = fit.ok ? fit.equipmentScope ?? "full" : "full";
-      const expected = expectedStandardEquipment(o.normalized.data, scope);
+      const counts = fit.ok ? fit.equipmentCounts : undefined;
+      const expected = expectedStandardEquipment(o.normalized.data, scope, counts?.lines ?? 0);
       expect([...o.rendered.layout.printedEquipment].sort()).toEqual([...expected].sort());
-      if (scope === "key_features") {
-        const total = adaptRenderData(o.normalized.data).data.equipment.standard.reduce((n, g) => n + g.items.length, 0);
-        expect(o.model.drawnStrings.join(" ")).toContain(equipmentNoteFor(total));
+      expect(counts && counts.printed <= counts.total).toBe(true);
+      if (scope === "selected") {
+        expect(counts!.printed).toBeLessThan(counts!.total);
+        expect(o.model.drawnStrings.join(" ")).toContain(SELECTED_EQUIPMENT_NOTE);
+      } else {
+        expect(o.model.drawnStrings.join(" ")).not.toContain("Selected standard equipment shown");
       }
       expect(o.assessment.completeness.pass).toBe(true);
       expect(untraceable(o)).toEqual([]);
@@ -569,16 +574,11 @@ describe("complete builds: one page on the equipment-priority composition, or he
 
   const bloatedListing = (l: Listing): Listing => {
     const sheet = { ...(l.mc_attributes.build_sheet as Record<string, unknown>) };
-    const grow = (layer: unknown, label: string): Record<string, string[]> => {
-      const out = { ...((layer ?? {}) as Record<string, string[]>) };
-      const key = Object.keys(out)[0] ?? "Exterior";
-      out[key] = [...(out[key] ?? []), ...Array.from({ length: 400 }, (_, i) => `Fit probe ${label} number ${i + 1} with a long descriptive name`)];
-      return out;
-    };
-    return {
-      ...l,
-      mc_attributes: { ...l.mc_attributes, build_sheet: { ...sheet, standard: grow(sheet.standard, "equipment"), key_features: grow(sheet.key_features, "key feature") } },
-    };
+    const options = [
+      ...(Array.isArray(sheet.options) ? sheet.options as Array<Record<string, unknown>> : []),
+      ...Array.from({ length: 300 }, (_, i) => ({ name: `Fit probe priced option number ${i + 1} with a long descriptive name`, msrp: 100 + i })),
+    ];
+    return { ...l, mc_attributes: { ...l.mc_attributes, build_sheet: { ...sheet, options } } };
   };
   const forcedHold = async (): Promise<Held> => {
     const o = await runOrchestrate(bloatedListing(buildListing(fx, renderable[0])), newStore());
@@ -729,7 +729,7 @@ describe("coverage across the inventory", () => {
         coverage.push({
           ...base, reconciliation_status: "n/a", auto_publish_decision: o.kind === "pending_data" ? "refused_no_build_sheet" : "held_manual_review",
           standard_equipment_items: 0, options: 0, pages: 0, fit_overflow_pt: null, equipment_font_pt: null,
-          rendered_on: null, master: null, equipment_scope: null, composition: null, equipment_mode: null, smallest_equipment_font_pt: null,
+          rendered_on: null, master: null, equipment_scope: null, equipment_printed: null, equipment_total: null, composition: null, equipment_mode: null, smallest_equipment_font_pt: null,
           blockers: o.kind === "pending_data" ? "no saved VIN-specific build sheet" : o.plan.kind === "ineligible" ? o.plan.eligibility.status : (o.plan as { reason?: string }).reason ?? "selection_blocked",
           hold_reason: o.kind === "pending_data" ? "No saved VIN-specific build sheet; nothing rendered." : "Record unsupported for an OEM reproduction layout.",
         });
@@ -745,6 +745,8 @@ describe("coverage across the inventory", () => {
         rendered_on: o.model.pages[0].primitives.some((x) => x.kind === "image" && x.assetId.startsWith("figma-")) ? "figma_master" : "generic_engine",
         master: masterFor(o.normalized.data)?.variantKey ?? null,
         equipment_scope: o.kind === "filed" ? (fit.ok ? fit.equipmentScope ?? "full" : "full") : null,
+        equipment_printed: fit.ok ? fit.equipmentCounts?.printed ?? null : null,
+        equipment_total: fit.ok ? fit.equipmentCounts?.total ?? null : null,
         composition: fit.composition ?? "standard",
         equipment_mode: fit.equipmentMode ?? "list",
         smallest_equipment_font_pt: fit.equipmentFontPt,
@@ -763,7 +765,7 @@ describe("coverage across the inventory", () => {
         held_one_page_review_required: count((c) => c.result === "held_one_page_review_required"),
         held_other: count((c) => c.result === "held_other" || c.result === "held_unsupported_record"),
         equipment_scope_full: count((c) => c.equipment_scope === "full"),
-        equipment_scope_key_features: count((c) => c.equipment_scope === "key_features"),
+        equipment_scope_selected: count((c) => c.equipment_scope === "selected"),
         refused_no_build_sheet: count((c) => c.result === "refused_no_build_sheet"),
       },
       comparison_exact_variant_only: {
@@ -827,7 +829,8 @@ describe("coverage across the inventory", () => {
         filed_held_other_reason: filed.filter((o) => !o.autoPublish).length, held_one_page_review_required: held.length,
         master: [...new Set(filed.map((o) => masterFor(o.normalized.data)?.variantKey ?? "generic_engine"))].join("|") || null,
         equipment_scope_full: filed.filter((o) => o.rendered.layout.fit.ok && (o.rendered.layout.fit.equipmentScope ?? "full") === "full").length,
-        equipment_scope_key_features: filed.filter((o) => o.rendered.layout.fit.ok && o.rendered.layout.fit.equipmentScope === "key_features").length,
+        equipment_scope_selected: filed.filter((o) => o.rendered.layout.fit.ok && o.rendered.layout.fit.equipmentScope === "selected").length,
+        equipment_printed_total: filed.map((o) => (o.rendered.layout.fit.ok ? `${o.rendered.layout.fit.equipmentCounts?.printed}/${o.rendered.layout.fit.equipmentCounts?.total}` : "")).join(" "),
         smallest_equipment_font_pt_used: fonts.length ? Math.min(...fonts) : null,
         held_overflow_pt_worst: held.length ? Math.max(...held.map((o) => (o.rendered.layout.fit.ok ? 0 : o.rendered.layout.fit.overflowPt))) : null,
         representative_pdf: pdf,

@@ -15,7 +15,7 @@
 // actually drew, and reports what is missing. The orchestrator treats a
 // non-empty result as a blocker: the document does not publish.
 
-import type { FactoryStickerRenderData } from "./contract.ts";
+import { equipmentBase, selectedEquipmentLines, type FactoryStickerRenderData } from "./contract.ts";
 import { sanitize, type EquipmentScope, type LayoutModel } from "./layout.ts";
 
 export type ManifestCategory =
@@ -49,11 +49,19 @@ const money = (n: number): string =>
 
 const clean = (s: string): string => s.replace(/\s+/g, " ").trim();
 
-/** Verified standard equipment, deduplicated the way the layout prints it. */
-export function expectedStandardEquipment(data: FactoryStickerRenderData, scope: EquipmentScope = "full"): string[] {
+/**
+ * Standard equipment the document must print: every verified item, or for the
+ * selected scope the normalized lines the layout reports it printed.
+ */
+export function expectedStandardEquipment(
+  data: FactoryStickerRenderData, scope: EquipmentScope = "full", lineCount = 0,
+): string[] {
+  if (scope === "selected") {
+    return selectedEquipmentLines(data, lineCount).map((l) => sanitize(l.text)).filter(Boolean);
+  }
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const source of scope === "key_features" ? [data.keyFeatures] : [data.standardEquipment, data.keyFeatures]) {
+  for (const source of [data.standardEquipment, data.keyFeatures]) {
     for (const items of Object.values(source ?? {})) {
       for (const raw of items) {
         const item = sanitize(raw);
@@ -66,12 +74,16 @@ export function expectedStandardEquipment(data: FactoryStickerRenderData, scope:
   return out;
 }
 
+/** Every verified source item behind a printed selected line, to prove nothing printed is invented. */
+const verifiedLineSources = (data: FactoryStickerRenderData): Set<string> =>
+  new Set(equipmentBase(data).lines.flatMap((l) => l.sources.map((x) => sanitize(x).toUpperCase())));
+
 /**
  * Everything this document must print. Derived from the same immutable
  * render data the PDF is realized from, so the manifest can never drift
  * from what was supposed to be on the page.
  */
-export function buildContentManifest(data: FactoryStickerRenderData, scope: EquipmentScope = "full", optionCodes = true): ManifestItem[] {
+export function buildContentManifest(data: FactoryStickerRenderData, scope: EquipmentScope = "full", optionCodes = true, lineCount = 0): ManifestItem[] {
   const items: ManifestItem[] = [];
   const push = (category: ManifestCategory, label: string, expected: string | null | undefined) => {
     const value = clean(String(expected ?? ""));
@@ -106,7 +118,7 @@ export function buildContentManifest(data: FactoryStickerRenderData, scope: Equi
     }
   }
 
-  for (const item of expectedStandardEquipment(data, scope)) {
+  for (const item of expectedStandardEquipment(data, scope, lineCount)) {
     push("standard_equipment", `Standard equipment — ${item}`, item);
   }
 
@@ -152,7 +164,8 @@ export function checkRenderedCompleteness(
   const drawn = model.drawnStrings.map(clean);
   const haystack = drawn.join(" ");
   const scope = model.fit.ok ? model.fit.equipmentScope ?? "full" : "full";
-  const manifest = buildContentManifest(data, scope, !(model.fit.ok && model.fit.figmaMaster));
+  const lineCount = model.fit.ok ? model.fit.equipmentCounts?.lines ?? 0 : 0;
+  const manifest = buildContentManifest(data, scope, !(model.fit.ok && model.fit.figmaMaster), lineCount);
 
   const printedCounts = new Map<string, number>();
   for (const item of model.printedEquipment ?? []) {
@@ -174,10 +187,27 @@ export function checkRenderedCompleteness(
     }
   }
 
-  for (const item of expectedStandardEquipment(data, scope)) {
+  for (const item of expectedStandardEquipment(data, scope, lineCount)) {
     const actualCount = printedCounts.get(item.toUpperCase()) ?? 0;
     if (actualCount > 1) {
       miscounted.push({ label: `Standard equipment ${item} listed once`, expected: item, expectedCount: 1, actualCount });
+    }
+  }
+
+  if (scope === "selected") {
+    const expected = new Set(expectedStandardEquipment(data, scope, lineCount).map((x) => x.toUpperCase()));
+    for (const item of model.printedEquipment ?? []) {
+      if (!expected.has(item.toUpperCase())) {
+        miscounted.push({ label: `Printed equipment ${item} is not a selected verified line`, expected: item, expectedCount: 0, actualCount: 1 });
+      }
+    }
+    const verified = verifiedLineSources(data);
+    for (const line of selectedEquipmentLines(data, lineCount)) {
+      for (const source of line.sources) {
+        if (!verified.has(sanitize(source).toUpperCase())) {
+          miscounted.push({ label: `Selected line source ${source} is not verified`, expected: source, expectedCount: 0, actualCount: 1 });
+        }
+      }
     }
   }
 

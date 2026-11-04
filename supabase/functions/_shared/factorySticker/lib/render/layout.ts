@@ -51,13 +51,15 @@ export type PageComposition = "standard" | "equipment_priority";
 
 export type OnePageFitReason = "one_page_fit_failed";
 
-/** "key_features" prints the NeoVIN key-feature layer; the complete list stays on the Vehicle Passport. */
-export type EquipmentScope = "full" | "key_features";
+/** "selected" prints the most significant normalized lines; the complete list stays on the Vehicle Passport. */
+export type EquipmentScope = "full" | "selected";
 
 export type LayoutFit =
   | {
     ok: true; columns: number; equipmentFontPt: number; equipmentMode?: EquipmentMode; composition?: PageComposition;
     equipmentScope?: EquipmentScope;
+    /** Source items printed, verified source items in total, and printed lines. */
+    equipmentCounts?: { printed: number; total: number; lines: number };
     /** Set when an approved Figma master drew the page; masters print option names and prices, not internal option codes. */
     figmaMaster?: boolean;
   }
@@ -197,6 +199,8 @@ export interface StickerLayoutInput {
   generic: boolean;
   /** Authenticated factory-build evidence; absent means unverified. */
   factoryBuild?: FactoryBuildProvenance | null;
+  /** Fixed line printed in the equipment area when only selected equipment is shown. */
+  equipmentNote?: string;
 }
 
 // ── Font metrics (Helvetica / Helvetica-Bold AFM widths, units per 1000 em;
@@ -1090,6 +1094,17 @@ function balancedColumnHeight(
   return Math.min(h, maxHeight);
 }
 
+function paintEquipmentFootnote(p: Painter, ctx: BuildContext, y: number): void {
+  const owner = "* See Owner's Manual for complete details, limitations and exclusions.";
+  const note = ctx.input.equipmentNote;
+  if (!note) {
+    p.text(owner, LX + LW / 2, y, 5.5, "body", "#4c5157", { align: "center" });
+    return;
+  }
+  p.text(note, LX, y, 5.5, "body", "#4c5157");
+  p.text(owner, LX + LW, y, 5.5, "body", "#4c5157", { align: "right" });
+}
+
 function paintStandardEquipment(
   p: Painter,
   y: number,
@@ -1137,10 +1152,7 @@ function paintStandardEquipment(
     p.rect(LX - 3, colTop - 2, LW + 6, usedHeight + 6, null, "#3a3d42", 0.75);
   }
   let end = colTop + usedHeight + (boxed ? 13 : 7);
-  p.text(
-    "* See Owner's Manual for complete details, limitations and exclusions.",
-    LX + LW / 2, end, 5.5, "body", "#4c5157", { align: "center" },
-  );
+  paintEquipmentFootnote(p, ctx, end);
   end += 4;
   p.rule(LX, end, LW, 1.4, BLACK);
   return { yEnd: end + 1.4, leftover, overflowPt, printed: placedItems };
@@ -2290,10 +2302,7 @@ function buildAttempt(
     const areaBottom = bottomTop - footnoteH;
     const priceTop = areaBottom - stackedH;
     paintPricingSplit(p, priceTop, ctx);
-    p.text(
-      "* See Owner's Manual for complete details, limitations and exclusions.",
-      LX + LW / 2, areaBottom + 8, 5.5, "body", "#4c5157", { align: "center" },
-    );
+    paintEquipmentFootnote(p, ctx, areaBottom + 8);
     p.rule(LX, areaBottom + 11, LW, 1.4, BLACK);
     pricingOverflow = hasStandard ? Math.max(0, regionTop + 40 - priceTop) : 0;
     y = areaBottom;

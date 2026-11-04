@@ -105,6 +105,7 @@ describe("one-page rule", () => {
     const model = buildRenderLayout(
       { ...data, standardEquipment: { ...data.standardEquipment, Technology: extra } },
       themeFor("infiniti"),
+      "full_only",
     );
     expect(model.pages.length).toBe(1);
     expect(model.fit.ok).toBe(false);

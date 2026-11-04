@@ -888,6 +888,8 @@ async function orchestrateVehicle(
         renderer_version: FACTORY_STICKER_RENDERER_VERSION,
         oem_theme_id: theme.oemThemeId, generation_fingerprint: fingerprint,
         equipment_scope: rendered.layout?.fit?.ok ? rendered.layout.fit.equipmentScope ?? "full" : "full",
+        equipment_printed: rendered.layout?.fit?.ok ? rendered.layout.fit.equipmentCounts?.printed ?? null : null,
+        equipment_total: rendered.layout?.fit?.ok ? rendered.layout.fit.equipmentCounts?.total ?? null : null,
         reconciliation_status: reconciliationStatus, confidence_level: normalized.confidence,
         template_key: selection.templateKey, selection_status: selection.selectionStatus,
         selection_confidence: selection.confidence,

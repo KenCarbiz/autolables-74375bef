@@ -74,6 +74,18 @@ describe("readBuildSheet", () => {
     expect(sheet.standardCount).toBe(flat.length);
   });
 
+  it("exposes the complete verified list exactly as sourced, including siblings, spec rows and body-class labels", () => {
+    const standard = {
+      exterior: ["LED Headlights-Low Beam", "LED Headlights-High Beam", "Front Wheel Width (8 in)", "Rear Wheel Width (8 in)"],
+      misc: ["Full Size SUV", "Executive SUV", "led headlights-low beam"],
+    };
+    const full = readBuildSheet(listingWith({ ...SHEET, standard }))!;
+    for (const item of [...standard.exterior.slice(0, 4), "Full Size SUV", "Executive SUV"]) expect(full.completeEquipment).toContain(item);
+    expect(full.completeEquipment).not.toContain("led headlights-low beam");
+    for (const item of ["ProPILOT Assist", "Heated Front Seats"]) expect(full.completeEquipment).toContain(item);
+    expect(full.completeEquipment.length).toBe(6 + 5);
+  });
+
   it("totals visible option value from known MSRPs", () => {
     expect(sheet.estValue).toBe(2900 + 640 + 465);
   });

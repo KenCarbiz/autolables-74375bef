@@ -367,7 +367,7 @@ const spec: TabloidSpec = {
     });
     paintBottomBox(p, d);
 
-    const entries = toEntries(buildSections(input), (s) => s, 9, (h) => /safety/i.test(h));
+    const entries = toEntries(buildSections(input), (s) => s, 9, (h) => /safety/i.test(h), input.equipmentNote);
     const { placed, rest } = flow(
       entries,
       withColumns([

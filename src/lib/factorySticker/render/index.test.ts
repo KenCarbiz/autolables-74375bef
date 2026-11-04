@@ -16,8 +16,8 @@ import {
 const sha256 = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
 
 describe("renderFactorySticker (orchestrator contract)", () => {
-  it("exports renderer version 1.3.0", () => {
-    expect(FACTORY_STICKER_RENDERER_VERSION).toBe("1.3.0");
+  it("exports renderer version 1.4.0", () => {
+    expect(FACTORY_STICKER_RENDERER_VERSION).toBe("1.4.0");
   });
 
   it("satisfies the orchestrator QA invariants", async () => {
@@ -40,8 +40,10 @@ describe("renderFactorySticker (orchestrator contract)", () => {
     expect(a.layout).toEqual(b.layout);
   });
 
-  it("flags review instead of adding a page when equipment cannot fit one readable page", async () => {
-    const result = await renderFactorySticker(longEquipmentFixture(), themeFor("infiniti"));
+  it("flags review instead of adding a page when mandatory content cannot fit one readable page", async () => {
+    const long = longEquipmentFixture();
+    const options = Array.from({ length: 400 }, (_, i) => ({ ...long.options[0], name: `Verified Priced Option ${i} with a long descriptive name`, code: `X${i}` }));
+    const result = await renderFactorySticker({ ...long, options }, themeFor("infiniti"));
     expect(result.layout.pages).toBe(1);
     expect(result.layout.fit.ok).toBe(false);
     if (!result.layout.fit.ok) {

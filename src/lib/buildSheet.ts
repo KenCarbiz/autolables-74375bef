@@ -51,6 +51,8 @@ export interface ShopperBuildSheet {
   keyFeatures: [string, string[]][];   // shopper-ordered [category, items]
   standard: [string, string[]][];      // shopper-ordered, full reference list
   standardCount: number;
+  /** Every verified standard item and key feature exactly as sourced (exact duplicates only), for complete-spec views. */
+  completeEquipment: string[];
   keyFeatureCount: number;
   generic: boolean;                    // typical-for-trim fallback — label, never assert
   estValue: number | null;             // sum of known package + option MSRPs
@@ -101,6 +103,22 @@ const num = (v: unknown): number | undefined => {
   return Number.isFinite(n) && n > 0 ? n : undefined;
 };
 
+const completeList = (...layers: unknown[]): string[] => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const layer of layers) {
+    if (!layer || typeof layer !== "object" || Array.isArray(layer)) continue;
+    for (const items of Object.values(layer as Record<string, unknown>)) {
+      if (!Array.isArray(items)) continue;
+      for (const raw of items) {
+        const item = String(raw ?? "").trim();
+        if (item && !seen.has(item.toLowerCase())) { seen.add(item.toLowerCase()); out.push(item); }
+      }
+    }
+  }
+  return out;
+};
+
 export function readBuildSheet(listing: VehicleListing): ShopperBuildSheet | null {
   const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
   const raw = mc.build_sheet as Record<string, unknown> | null | undefined;
@@ -131,6 +149,7 @@ export function readBuildSheet(listing: VehicleListing): ShopperBuildSheet | nul
     return { name, msrp: num(src?.msrp) };
   });
 
+  const completeEquipment = completeList(raw.standard, raw.key_features);
   const keyFeatures = toOrderedGroups(raw.key_features);
   const standard = toOrderedGroups(raw.standard);
   const keyFeatureCount = keyFeatures.reduce((a, [, items]) => a + items.length, 0);
@@ -145,6 +164,7 @@ export function readBuildSheet(listing: VehicleListing): ShopperBuildSheet | nul
     keyFeatures,
     standard,
     standardCount,
+    completeEquipment,
     keyFeatureCount,
     generic: raw.generic === true,
     estValue: msrps.length ? msrps.reduce((a, b) => a + b, 0) : null,

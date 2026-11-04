@@ -234,7 +234,7 @@ const spec: TabloidSpec = {
 
     const warranty = warrantySection(d, "Warranty");
     const sections = [...buildSections(input), ...(warranty ? [warranty] : [])];
-    const entries = toEntries(sections, (s) => s.toUpperCase(), 14, (h) => h !== "Warranty");
+    const entries = toEntries(sections, (s) => s.toUpperCase(), 14, (h) => h !== "Warranty", input.equipmentNote);
     const style = ctx.style;
     const upper = entries.map((e) => (e.heading ? e : { ...e, text: e.text.toUpperCase() }));
     const { placed, rest } = flow(

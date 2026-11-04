@@ -108,10 +108,17 @@ describe("Letter reference variant layouts", () => {
         const long = buildRenderLayout(
           { ...data, standardEquipment: { ...data.standardEquipment, technology: extra } },
           themeFor(theme),
+          "full_only",
         );
         expect(long.pages.length).toBe(1);
         expect(long.fit.ok).toBe(false);
         expect(long.mode).toBe("REVIEW_REQUIRED");
+        const selected = buildRenderLayout(
+          { ...data, standardEquipment: { ...data.standardEquipment, technology: extra } },
+          themeFor(theme),
+        );
+        expect(selected.pages.length).toBe(1);
+        expect(selected.fit.ok && selected.fit.equipmentScope).toBe("selected");
       });
 
       it("draws the owner-authorized logo artwork in the master logo slot", () => {

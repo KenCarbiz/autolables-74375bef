@@ -41,7 +41,7 @@ describe("toPdf", () => {
   });
 
   it("refuses to realize a review-required layout into any PDF", async () => {
-    const model = buildRenderLayout(longEquipmentFixture(), themeFor("infiniti"));
+    const model = buildRenderLayout(longEquipmentFixture(), themeFor("infiniti"), "full_only");
     expect(model.fit.ok).toBe(false);
     await expect(realizePdf(model, lib)).rejects.toThrow(/one_page_review_required/);
   });

@@ -180,7 +180,7 @@ export interface RenderedLayoutFacts {
   drawnStrings: string[];
   printedEquipment: string[];
   /** Absent on a legacy payload; treated as a pass so old callers still run. */
-  fit?: { ok: boolean; detail?: string; equipmentScope?: "full" | "key_features"; figmaMaster?: boolean };
+  fit?: { ok: boolean; detail?: string; equipmentScope?: "full" | "selected"; equipmentCounts?: { printed: number; total: number; lines: number }; figmaMaster?: boolean };
 }
 
 export interface RenderAssessment {
@@ -225,6 +225,7 @@ export function assessRenderedSticker(input: {
     printedEquipment: layout.printedEquipment || [],
     fontFamilies: { heading: "", body: "", numeric: "" },
     fit: { ...fitOk(0, 0), ...(layout.fit?.equipmentScope ? { equipmentScope: layout.fit.equipmentScope } : {}),
+      ...(layout.fit?.equipmentCounts ? { equipmentCounts: layout.fit.equipmentCounts } : {}),
       ...(layout.fit?.figmaMaster ? { figmaMaster: true } : {}) },
   });
   const qaChecks = {
