@@ -12,8 +12,10 @@
 //     never a default, and an absent fact omits its line or prints an
 //     explicit "not available" state, never a zero
 //   * the logo slot carries the owner-authorized artwork from the master
-//   * EPA agency seals and the source QR are not reproduced; the QR slot
-//     carries a new Vehicle Passport QR only when a Passport URL exists
+//   * EPA agency seals and the source QR are not reproduced; the Vehicle
+//     Passport QR prints at 0.90in (quiet zone included) in the free foot of
+//     the pricing column, and drops to the EPA footer slot only when the
+//     price list leaves no room; it prints only when a Passport URL exists
 //   * the OEM publication/phone footer is omitted until verified per OEM
 //   * equipment is compacted down to the 5.5pt floor on the single page;
 //     content that still does not fit returns null so the generic one-page
@@ -139,6 +141,12 @@ const PRICE_W = 298;
 const PRICE_BOTTOM = COLS_TOP + 750;
 const RIGHT_X = BODY_X + 836;
 const ITEM_PX = 11.4;
+// 0.90in printed, four-module quiet zone included (2 Figma units per point).
+export const PASSPORT_QR_TARGET = 129.6;
+const PASSPORT_QR_FOOTER = 64;
+const QR_HEAD = 16;
+const QR_CAPTION = 16;
+const QR_GAP = 16;
 const ITEM_LH = 12.2;
 
 interface LetterStyle { px: number; lh: number }
@@ -362,8 +370,8 @@ function priceAmount(price: number | undefined, status: string): string | null {
   return formatPlain(price);
 }
 
-/** Returns false when the pricing column cannot hold every row. */
-function paintPricing(p: Painter | null, d: FactoryStickerData): boolean {
+/** Returns the bottom of the pricing content; above PRICE_BOTTOM means it fits. */
+function paintPricing(p: Painter | null, d: FactoryStickerData): number {
   const eq = d.equipment;
   const pr = d.pricing;
   const rows: PriceRow[] = [
@@ -422,16 +430,31 @@ function paintPricing(p: Painter | null, d: FactoryStickerData): boolean {
   draw("Total*", PRICE_X, top, "bold");
   draw(total !== undefined ? formatMoney(total) : "NOT AVAILABLE", amountX, top, "bold", "right");
   top += ITEM_LH + 6;
-  if (p) {
-    for (const line of wrapFigma("*Total of the original manufacturer's suggested retail prices shown. Excludes taxes, title, license, dealer-installed items and current selling price.", "body", 10, PRICE_W)) {
-      txt(p, line, PRICE_X, top, 10, "body", { lh: 11.5 });
-      top += 11.5;
-    }
+  for (const line of wrapFigma("*Total of the original manufacturer's suggested retail prices shown. Excludes taxes, title, license, dealer-installed items and current selling price.", "body", 10, PRICE_W)) {
+    if (p) txt(p, line, PRICE_X, top, 10, "body", { lh: 11.5 });
+    top += 11.5;
   }
-  return top <= PRICE_BOTTOM;
+  return top;
 }
 
-function paintEpa(p: Painter, d: FactoryStickerData): void {
+interface QrPlacement { x: number; y: number; size: number }
+
+/** The largest Passport QR, up to 0.90in, that fits below the price list; null when it fits only the footer slot. */
+function pricingColumnQr(pricingBottom: number): QrPlacement | null {
+  const room = PRICE_BOTTOM - pricingBottom - QR_GAP - QR_HEAD - QR_CAPTION;
+  const size = Math.min(PASSPORT_QR_TARGET, room);
+  if (size <= PASSPORT_QR_FOOTER) return null;
+  return { x: PRICE_X + (PRICE_W - size) / 2, y: PRICE_BOTTOM - QR_CAPTION - size, size };
+}
+
+function paintPassportQr(p: Painter, passportUrl: string, q: QrPlacement): void {
+  const cx = PRICE_X + PRICE_W / 2;
+  txt(p, "VEHICLE PASSPORT", cx, q.y - QR_HEAD, 10.4, "bold", { align: "center" });
+  p.qr(u(q.x), u(q.y), u(q.size), passportUrl, INK);
+  txt(p, PASSPORT_QR_CAPTION, cx, q.y + q.size + 3, 10.4, "body", { align: "center" });
+}
+
+function paintEpa(p: Painter, d: FactoryStickerData, footerQrUrl: string): void {
   const r = d.regulatory;
   const X = RIGHT_X;
   const Y = BODY_Y;
@@ -451,7 +474,7 @@ function paintEpa(p: Painter, d: FactoryStickerData): void {
     ).entries()) {
       txt(p, line, X + 44, Y + 80 + i * 20, 16, "bold", { lh: 20 });
     }
-    paintEpaFooter(p, d.document.passportUrl.trim());
+    paintEpaFooter(p, footerQrUrl);
     return;
   }
 
@@ -503,7 +526,7 @@ function paintEpa(p: Painter, d: FactoryStickerData): void {
     txt(p, String(r.smogRating), rx + 294, ry + 16, 22, "bold");
     scale(p, rx + 294, ry + 42, 146);
   }
-  paintEpaFooter(p, d.document.passportUrl.trim());
+  paintEpaFooter(p, footerQrUrl);
 }
 
 
@@ -520,7 +543,7 @@ function paintEpaFooter(p: Painter, passportUrl: string): void {
     const slotX = X + 512;
     box(p, slotX, Y, 130, 95, PAPER);
     txt(p, "VEHICLE PASSPORT", slotX + 65, Y + 3, 10.4, "bold", { align: "center" });
-    const qr = 64;
+    const qr = PASSPORT_QR_FOOTER;
     p.qr(u(slotX + 65 - qr / 2), u(Y + 16), u(qr), passportUrl, INK);
     txt(p, PASSPORT_QR_CAPTION, slotX + 65, Y + 82, 10.4, "body", { align: "center" });
   }
@@ -691,7 +714,10 @@ export function buildLetterVariantLayout(
   const config = LETTER_VARIANT_CONFIGS[variantKey];
   if (!config) return null;
   const d = input.layout.data;
-  if (!paintPricing(null, d)) return null;
+  const pricingBottom = paintPricing(null, d);
+  if (pricingBottom > PRICE_BOTTOM) return null;
+  const passportUrl = d.document.passportUrl.trim();
+  const columnQr = passportUrl ? pricingColumnQr(pricingBottom) : null;
 
   const groups = input.equipmentGroups.length
     ? input.equipmentGroups
@@ -716,7 +742,8 @@ export function buildLetterVariantLayout(
     paintHeader(p, d, config, input.displayMake);
     paintEquipment(p, placed, style);
     paintPricing(p, d);
-    paintEpa(p, d);
+    if (columnQr) paintPassportQr(p, passportUrl, columnQr);
+    paintEpa(p, d, columnQr ? "" : passportUrl);
     paintSafety(p, d);
     paintOrigin(p, d);
     paintOwnership(p, d, config);

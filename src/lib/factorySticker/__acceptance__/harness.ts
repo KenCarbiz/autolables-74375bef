@@ -20,8 +20,9 @@ import { renderFactorySticker } from "../render/index.ts";
 import { buildRenderLayout, type FactoryStickerRenderResult } from "../render/contract.ts";
 import type { LayoutModel } from "../render/layout.ts";
 import { REGENERATION_REASONS } from "../regenerationReason.ts";
+import { PASSPORT_PUBLIC_BASE, canonicalPassportUrl } from "../reproduction.ts";
 
-export const APP_BASE = "https://app.autolabels.io";
+export const APP_BASE = PASSPORT_PUBLIC_BASE;
 export const TEMPLATE_VERSION = "1.0.0";
 export const NEW_TITLE = "Factory Window Sticker — Configuration & MSRP";
 
@@ -78,7 +79,7 @@ export function buildListing(fx: Fixture, v: FixtureVehicle): Listing {
   };
 }
 
-export const passportUrlFor = (listing: Listing): string => `${APP_BASE}/v/${listing.slug}`;
+export const passportUrlFor = (listing: Listing): string => canonicalPassportUrl(listing.slug);
 
 export const sha256 = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
 

@@ -16,8 +16,8 @@ import {
 const sha256 = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
 
 describe("renderFactorySticker (orchestrator contract)", () => {
-  it("exports renderer version 1.4.0", () => {
-    expect(FACTORY_STICKER_RENDERER_VERSION).toBe("1.4.0");
+  it("exports renderer version 1.5.0", () => {
+    expect(FACTORY_STICKER_RENDERER_VERSION).toBe("1.5.0");
   });
 
   it("satisfies the orchestrator QA invariants", async () => {

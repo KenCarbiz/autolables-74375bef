@@ -35,6 +35,7 @@ import {
   REFERENCE_VARIANT_REGISTRY_VERSION, DISCLOSURE_VERSION,
 } from "../_shared/factorySticker/render.ts";
 import { parseYmm } from "../_shared/factorySticker/lib/ymm.ts";
+import { canonicalPassportUrl as passportUrlFor } from "../_shared/factorySticker/lib/reproduction.ts";
 import { structuredSheet } from "../_shared/neovinSheet.ts";
 import { shouldDecodeVin, MAX_SPEC_ATTEMPTS } from "../_shared/factorySticker/lib/sourceData.ts";
 import { AUTO_PUBLISH_POLICY_VERSION } from "../_shared/factorySticker/lib/autoPublish.ts";
@@ -130,20 +131,6 @@ const STICKER_ROLE_PERMS: Record<string, string[]> = {
   service_manager: VIEWER_PERMS, service_advisor: VIEWER_PERMS,
   detail: [], third_party_vendor: [],
 };
-
-// Same resolveAppBase pattern as generate-vehicle-forms: caller app_base →
-// browser Origin → APP_BASE_URL secret → app host. The canonical passport
-// URL (the QR payload) is derived from this.
-function resolveAppBase(req: Request, appBase?: string): string {
-  const isHttp = (u?: string | null): u is string => !!u && /^https?:\/\//i.test(u);
-  const clean = (u: string) => u.replace(/\/+$/, "");
-  if (isHttp(appBase)) return clean(appBase);
-  const origin = req.headers.get("origin");
-  if (isHttp(origin)) return clean(origin);
-  const env = Deno.env.get("APP_BASE_URL");
-  if (isHttp(env)) return clean(env);
-  return "https://app.autolabels.io";
-}
 
 async function sha256Hex(input: Uint8Array | string): Promise<string> {
   const bytes = typeof input === "string" ? new TextEncoder().encode(input) : input;
@@ -358,7 +345,7 @@ async function identityFromListing(
 async function orchestrateVehicle(
   admin: Admin, req: Request, tenantId: string, vehicleId: string,
   opts: {
-    force?: boolean; reason?: string; appBase?: string;
+    force?: boolean; reason?: string;
     /** Permission-gated: retrieve provider data when none is saved. */
     allowSourceFetch?: boolean;
     regeneration?: {
@@ -587,8 +574,7 @@ async function orchestrateVehicle(
     // ── Normalize
     await setRecord(admin, record.id, { generation_status: "NORMALIZING" });
     const slug = String(listing.slug || "").trim();
-    const appBase = resolveAppBase(req, opts.appBase);
-    const canonicalPassportUrl = slug ? `${appBase}/v/${slug}` : null;
+    const canonicalPassportUrl = slug ? passportUrlFor(slug) : null;
 
     const condRaw = String(listing.condition || "used").toLowerCase();
     const title = condRaw === "new"
@@ -1115,7 +1101,6 @@ serve(async (req) => {
         force,
         allowSourceFetch,
         reason: action === "regenerate" ? `manual_regenerate:${reasonCode}` : String(body.reason || "ingest"),
-        appBase: body.app_base ? String(body.app_base) : undefined,
         regeneration: action === "regenerate"
           ? { reasonCode: reasonCode as string, reasonNotes, dataSource, userId: callerUserId }
           : undefined,
@@ -1563,7 +1548,6 @@ serve(async (req) => {
               const res = await orchestrateVehicle(admin, req, String(row.tenant_id), row.id, {
                 reason: "nightly_sweep",
                 allowSourceFetch: mayFetch,
-                appBase: body.app_base ? String(body.app_base) : undefined,
               });
               // Decrement on EVERY fetch-enabled pass. Charging the budget only
               // when a sheet came back exempted precisely the fruitless calls

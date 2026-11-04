@@ -156,8 +156,8 @@ export const cleanEquipmentList = (items: string[]): string[] => {
 // Semi-Aniline Leather", "Graphite Leather") — only the color actually in the
 // car belongs on its equipment list, so mismatched color variants are dropped
 // against the listing's selected interior color.
-const UPHOLSTERY_RE = /\b(leather(ette)?|cloth|upholstery|semi.?aniline|nappa|suede|ultrasuede|vinyl)\b/i;
-const COLOR_WORDS = ["black", "white", "red", "blue", "gray", "grey", "brown", "tan", "beige", "ivory", "cream", "charcoal", "graphite", "ebony", "vermilion", "saddle", "camel", "stone", "slate", "espresso", "cocoa", "chestnut", "sand", "linen", "oyster", "parchment", "mocha", "burgundy", "wine", "navy", "titanium", "ash", "walnut", "cognac", "caramel", "terracotta"];
+export const UPHOLSTERY_RE = /\b(leather(ette)?|cloth|upholstery|semi.?aniline|nappa|suede|ultrasuede|vinyl)\b/i;
+export const COLOR_WORDS = ["black", "white", "red", "blue", "gray", "grey", "brown", "tan", "beige", "ivory", "cream", "charcoal", "graphite", "ebony", "vermilion", "saddle", "camel", "stone", "slate", "espresso", "cocoa", "chestnut", "sand", "linen", "oyster", "parchment", "mocha", "burgundy", "wine", "navy", "titanium", "ash", "walnut", "cognac", "caramel", "terracotta"];
 
 export const listingEquipment = (listing: VehicleListing): string[] => {
   const toList = (v: unknown): string[] => Array.isArray(v)

@@ -33,6 +33,8 @@ import type { FactoryBuildProvenance } from "../reproduction.ts";
 import { realizePdf, type PdfLibModule } from "./toPdf.ts";
 import { layoutToSvg } from "./previewSvg.ts";
 
+// 1.5.0: the Letter masters print the Passport QR at 0.90in (quiet zone included)
+// in the pricing column, and the payload is the canonical autolabels.io URL.
 // 1.4.0: standard equipment prints in full when it fits, else as normalized, ranked
 // selected lines with a Passport pointer; applies to every template.
 // 1.3.0: an approved make-wide master is always used for its make; content it
@@ -42,7 +44,7 @@ import { layoutToSvg } from "./previewSvg.ts";
 // review-required fit failure with no PDF. Reproduction banner + disclosure
 // (reproduction.ts DISCLOSURE_VERSION) are unchanged. Part of the generation
 // fingerprint, so existing documents regenerate as new versions.
-export const RENDERER_VERSION = "1.4.0";
+export const RENDERER_VERSION = "1.5.0";
 
 /**
  * Make-wide master routing. Every vehicle of a make with verified data
