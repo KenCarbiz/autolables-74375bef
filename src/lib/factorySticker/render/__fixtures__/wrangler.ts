@@ -46,6 +46,7 @@ export function wranglerReferenceMatchData(base: FactoryStickerRenderData): Fact
     ...base,
     vin: WRANGLER_REFERENCE_VIN,
     barcodePayload: WRANGLER_REFERENCE_VIN,
+    neovin: undefined,
     passportUrl: "",
     title: "Reference match (side-by-side comparison only)",
     condition: "new",

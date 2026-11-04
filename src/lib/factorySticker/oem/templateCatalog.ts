@@ -473,6 +473,12 @@ export const TEMPLATE_CATALOG: readonly CatalogTemplate[] = [
     blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "reference_is_2025", "missing_source_artwork", "powertrain_rule_unverified", "layout_not_built"],
   },];
 
+/** True when the catalog holds at least one template with a built layout for this make. */
+export const hasBuiltCatalogTemplates = (make: string | null | undefined): boolean => {
+  const m = token(make);
+  return !!m && TEMPLATE_CATALOG.some((t) => t.canonicalMake === m && t.layoutStatus !== "not_started");
+};
+
 export const getCatalogTemplate = (id: string): CatalogTemplate | null =>
   TEMPLATE_CATALOG.find((t) => t.id === id) ?? null;
 

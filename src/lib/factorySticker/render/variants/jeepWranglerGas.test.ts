@@ -76,9 +76,12 @@ describe("Jeep Wrangler gasoline template", () => {
       expect(s).toContain("23");
       expect(s).toContain("Gasoline Vehicle");
       expect(s.join(" ")).toContain("388 grams CO2");
-      expect(s.filter((x) => x === "Not Available")).toHaveLength(2);
+      expect(s.filter((x) => x === "Not Available")).toHaveLength(5);
+      expect(s).toContain("Overall Vehicle Score");
+      expect(s).not.toContain("Driver");
+      expect(s).not.toContain("Passenger");
+      expect(s).toContain("Rear seat");
       expect(s).toContain("5-year fuel cost comparison");
-      expect(s.join(" ")).toContain("not available from a verified NHTSA record");
       expect(s).not.toContain("0");
     });
 

@@ -5,8 +5,9 @@
 // dealer_profiles.settings. It performs NO provider calls and invents no
 // facts: missing fields stay null and lower the confidence grade.
 import { parseYmm } from "../_shared/factorySticker/lib/ymm.ts";
-import { decideDrivetrain, splitRatingMetadata, type DrivetrainEvidence } from "../_shared/factorySticker/lib/oem/sourceCorrections.ts";
+import { decideDrivetrain, isRatingMetadata, splitRatingMetadata, type DrivetrainEvidence } from "../_shared/factorySticker/lib/oem/sourceCorrections.ts";
 
+import { hasBuiltCatalogTemplates } from "../_shared/factorySticker/lib/oem/templateCatalog.ts";
 import type { FactoryStickerRenderData } from "../_shared/factorySticker/lib/render/contract.ts";
 
 // deno-lint-ignore no-explicit-any
@@ -198,6 +199,19 @@ export function normalizeForSticker(
       barcodePayload: String(listing.vin || "").toUpperCase(),
       generic,
       disclaimers,
+      // Only makes with catalog templates carry the decode facts; every other
+      // make's data (and fingerprint) is unchanged.
+      ...(hasBuiltCatalogTemplates(identity.make)
+        ? {
+            neovin: {
+              ratingMetadata: [
+                ...standard.ratingMetadata,
+                ...Object.values(catMap(sheet?.key_features)).flat().filter(isRatingMetadata),
+              ],
+              madeIn: str(mc.made_in),
+            },
+          }
+        : {}),
     },
     confidence,
     missing,

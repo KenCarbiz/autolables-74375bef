@@ -24,7 +24,7 @@ import { INK, PAPER } from "./shared.ts";
 import { PASSPORT_QR_PT, R, T, Y, paintScale, scaleState, wrap } from "./hyundaiTucsonGas.ts";
 import {
   TABLOID_HEIGHT, TABLOID_WIDTH, assembleTabloid, buildSections, colorText, dealerLines, flow, paintPlaced,
-  paintSafetyPanel, partsFacts, placedResult, priceRows, toEntries, totalMsrp, underlined, warrantySection,
+  assemblyLabel, paintSafetyPanel, partsFacts, placedResult, priceRows, toEntries, totalMsrp, underlined, warrantySection,
   type ColumnSpec, type FirstPageContext, type FirstPageResult, type FlowStyle, type TabloidSpec,
 } from "./tabloidCommon.ts";
 import type { VariantLayoutBuilder } from "./shared.ts";
@@ -205,6 +205,7 @@ function paintSafety(p: Painter, d: FactoryStickerData): void {
   const r = d.regulatory;
   const top = Y(442);
   const ratings = [r.overallRating, r.frontalDriverRating, r.frontalPassengerRating, r.sideFrontRating, r.sideRearRating, r.rolloverRating];
+  ratings.push(r.frontalRating, r.sideRating);
   const anyRated = r.nhtsaStatus === "VERIFIED" && ratings.some((n) => n !== undefined && n > 0);
   if (anyRated) {
     paintSafetyPanel(p, d, Q(SAFETY_X), Q(top), Q(SAFETY_W), Q(235), {
@@ -271,7 +272,7 @@ function paintParts(p: Painter, d: FactoryStickerData): void {
     }
     if (hasVehicle) {
       line("FOR THIS VEHICLE:");
-      if (f.assembly) line(`FINAL ASSEMBLY POINT: ${f.assembly}`);
+      if (f.assembly) line(`${assemblyLabel(d)}: ${f.assembly}`);
       if (f.engine || f.trans) {
         line("COUNTRY OF ORIGIN:");
         if (f.engine) line(`ENGINE: ${f.engine.value}`);

@@ -82,6 +82,7 @@ export function referenceMatchData(base: FactoryStickerRenderData): FactoryStick
     ...base,
     vin: REFERENCE_MATCH_VIN,
     barcodePayload: REFERENCE_MATCH_VIN,
+    neovin: undefined,
     passportUrl: "",
     title: "Reference match (side-by-side comparison only)",
     identity: { year: "2026", make: "Hyundai", model: "Tucson", trim: "SE" },

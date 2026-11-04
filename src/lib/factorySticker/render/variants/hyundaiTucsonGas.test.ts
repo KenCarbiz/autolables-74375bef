@@ -73,7 +73,11 @@ describe("Hyundai Tucson gasoline template", () => {
         const s = m.drawnStrings;
         expect(s).toContain("26");
         expect(s).toContain("Gasoline Vehicle");
-        expect(s.filter((x) => x === "Not Available").length).toBe(6 + 1);
+        expect(s.filter((x) => x === "Not Available").length).toBe(1);
+        expect(s).toContain("Overall Vehicle Score");
+        expect(s).not.toContain("Driver");
+        expect(s).not.toContain("Front seat");
+        expect(s.join(" ")).toContain("COUNTRY OF FINAL ASSEMBLY: USA");
         expect(s).toContain("5");
         expect(m.drawnStrings.join(" ")).toContain("337 grams CO2");
         expect(s).not.toContain("0");

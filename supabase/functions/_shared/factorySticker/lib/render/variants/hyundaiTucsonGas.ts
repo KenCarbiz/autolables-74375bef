@@ -25,7 +25,7 @@ import { VARIANT_LOGOS } from "./logoArtwork.ts";
 import { EPA_BLUE, INK, PAPER, baseline, type VariantLayoutBuilder } from "./shared.ts";
 import {
   TABLOID_HEIGHT, TABLOID_WIDTH, assembleTabloid, buildSections, colorText, dealerLines, flow, paintPlaced,
-  paintSafetyPanel, partsFacts, placedResult, priceRows, toEntries, totalMsrp, underlined, warrantySection,
+  assemblyLabel, paintSafetyPanel, partsFacts, placedResult, priceRows, toEntries, totalMsrp, underlined, warrantySection,
   withColumns, type FirstPageContext, type FirstPageResult, type FlowStyle, type TabloidSpec,
 } from "./tabloidCommon.ts";
 
@@ -276,7 +276,7 @@ function paintRight(p: Painter, d: FactoryStickerData, barcodePayload: string): 
     if (hasVehicle) {
       if (draw) T(p, "FOR THIS VEHICLE:", 710.4, y, SIZE, "bold");
       y += STEP;
-      if (f.assembly) line(`FINAL ASSEMBLY POINT: ${f.assembly}`, draw);
+      if (f.assembly) line(`${assemblyLabel(d)}: ${f.assembly}`, draw);
       if (f.engine || f.trans) {
         line("COUNTRY OF ORIGIN:", draw);
         if (f.engine) line(`ENGINE: ${f.engine.value}`, draw);

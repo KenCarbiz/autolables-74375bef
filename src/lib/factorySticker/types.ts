@@ -113,6 +113,11 @@ export interface StickerRegulatory {
   sideFrontRating?: number;
   sideRearRating?: number;
   rolloverRating?: number;
+  /** Combined category values, for sources that give one frontal and one side rating. */
+  frontalRating?: number;
+  sideRating?: number;
+  /** The ratings come from NHTSA rows in the NeoVIN decode; a category the decode lacks is Not Available. */
+  nhtsaDecodeOnly?: boolean;
   nhtsaSourceReference?: string;
 }
 

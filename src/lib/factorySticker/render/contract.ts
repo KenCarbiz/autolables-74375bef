@@ -23,6 +23,7 @@ import {
 } from "../equipmentSelection.ts";
 import { resolveReferenceVariant } from "../oem/referenceVariants.ts";
 import { withCatalogEquipment } from "./catalogEquipment.ts";
+import { withCatalogNeovin } from "./catalogNeovin.ts";
 import { CATALOG_LAYOUTS, VARIANT_LAYOUTS, type VariantLayoutBuilder, type VariantRenderInput } from "./variants/index.ts";
 import {
   getCatalogTemplate, resolveCatalogTemplate, type CatalogResolution, type CatalogTemplate,
@@ -200,10 +201,20 @@ export interface FactoryStickerRenderData {
     sideFront: number | null;
     sideRear: number | null;
     rollover: number | null;
+    /** Combined category values when the source gives one frontal and one side rating. */
+    frontal?: number | null;
+    side?: number | null;
+    /** Ratings read from NHTSA rows in the NeoVIN decode: an absent category is Not Available. */
+    fromDecode?: boolean;
   } | null;
   /** Tested-but-unrated / not-applicable NHTSA state. Renders the honest
    *  not-rated panel; stars are never fabricated to fill it. */
   nhtsaNotRated?: boolean;
+  /**
+   * NeoVIN decode facts that only catalog templates read (see catalogNeovin.ts).
+   * Set only for makes that have catalog templates, so other makes' data is unchanged.
+   */
+  neovin?: { ratingMetadata: string[]; madeIn: string | null };
   /** Which dealer the block describes. Only a proven original selling or
    *  delivery dealer may print; the current listing rooftop never does. */
   dealerRole?: "original_delivery" | null;
@@ -415,6 +426,9 @@ export function adaptRenderData(d: FactoryStickerRenderData): StickerLayoutInput
             ...opt("sideFrontRating", d.safety.sideFront),
             ...opt("sideRearRating", d.safety.sideRear),
             ...opt("rolloverRating", d.safety.rollover),
+            ...opt("frontalRating", d.safety.frontal ?? null),
+            ...opt("sideRating", d.safety.side ?? null),
+            ...(d.safety.fromDecode ? { nhtsaDecodeOnly: true } : {}),
           }
         : d.nhtsaNotRated
           ? { nhtsaStatus: "NOT_RATED" as const }
@@ -607,7 +621,7 @@ export function buildRenderLayout(
   const baseInput = adaptRenderData(data);
   const route = resolveVariantRoute(data, theme, baseInput, options.sampleTemplateId ?? null);
   const isCatalog = !!route && !!CATALOG_LAYOUTS[route.variantKey];
-  if (isCatalog) data = withCatalogEquipment(data);
+  if (isCatalog) data = withCatalogNeovin(withCatalogEquipment(data));
   const input = isCatalog ? adaptRenderData(data) : baseInput;
   const genericTheme = resolveRenderTheme(data, theme);
   const base = equipmentBase(data);
