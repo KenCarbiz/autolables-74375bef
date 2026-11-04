@@ -16,6 +16,12 @@ const FRAGMENTS = [
   "Brakes At Low Speed",
   "Disc Brakes-2",
   "Disc Brakes-4",
+  "Large SUV",
+  "Small SUV",
+  "Lower Medium SUV",
+  "Paint-Metallic",
+  "Front Seats Head Restraints-2",
+  "Rear Seats Head Restraints-3",
 ];
 const REAL = ["Heated Door Mirrors", "Forward Collision-Avoidance Assist", "Apple CarPlay", "Disc Brakes"];
 

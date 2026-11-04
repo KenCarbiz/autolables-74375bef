@@ -21,6 +21,9 @@ const EXTRA_NON_EQUIPMENT: RegExp[] = [
   /^autonomous drive\b/i,
   /^brakes at low speed$/i,
   /disc brakes\s*-\s*\d+$/i,
+  /^(sub-?compact|compact|(lower |upper )?(medium|mid-?size)|full[- ]size|large|executive|small|mini)( [a-z]+)? (suv|sedan|coupe|crossover|truck|pickup|van|minivan|wagon|hatchback)$/i,
+  /^paint\s*-\s*(gloss|metallic|pearl|matte|solid|flat)$/i,
+  /^(front|rear) seats head restraints\s*-\s*\d+$/i,
 ];
 
 export const isCatalogNonEquipment = (raw: string): boolean => {
