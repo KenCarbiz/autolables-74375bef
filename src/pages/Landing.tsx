@@ -1170,6 +1170,30 @@ const SaturdayPremiumAddendum = lazy(() =>
   import("@/components/saturday/SaturdayPremiumAddendum").then((m) => ({ default: m.SaturdayPremiumAddendum })),
 );
 
+// The showcase is decoration, not the page's point. Its chunk is fetched on
+// demand, so a stale or half-deployed bundle can make it fail to arrive — and
+// an uncaught chunk error takes the whole landing page down to the app-level
+// "Something went wrong" screen. Catch it here and keep the reserved box.
+export class ShowcaseChunkBoundary extends React.Component<
+  { children: React.ReactNode },
+  { failed: boolean }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { failed: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    if (this.state.failed) return <div className="h-full w-full bg-slate-50" />;
+    return this.props.children;
+  }
+}
+
+
 // A real vehicle from real inventory, not invented numbers. Every figure below
 // is the Harte INFINITI QX60 as it actually prints: the arithmetic is the
 // template's own, so the showcase reconciles the same way the customer's copy
@@ -1226,16 +1250,19 @@ const AddendumMock = () => (
     style={{ width: `${ADDENDUM_W_IN * ADDENDUM_SCALE}in`, height: `${ADDENDUM_H_IN * ADDENDUM_SCALE}in` }}
   >
     <Suspense fallback={<div className="h-full w-full bg-slate-50" />}>
-      <div
-        style={{
-          width: `${ADDENDUM_W_IN}in`,
-          height: `${ADDENDUM_H_IN}in`,
-          transform: `scale(${ADDENDUM_SCALE})`,
-          transformOrigin: "top left",
-        }}
-      >
-        <SaturdayPremiumAddendum data={SHOWCASE_ADDENDUM as never} />
-      </div>
+      <ShowcaseChunkBoundary>
+        <div
+          style={{
+            width: `${ADDENDUM_W_IN}in`,
+            height: `${ADDENDUM_H_IN}in`,
+            transform: `scale(${ADDENDUM_SCALE})`,
+            transformOrigin: "top left",
+          }}
+        >
+          <SaturdayPremiumAddendum data={SHOWCASE_ADDENDUM as never} />
+        </div>
+      </ShowcaseChunkBoundary>
+
     </Suspense>
   </div>
 );
