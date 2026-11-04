@@ -1,5 +1,4 @@
-import type { StoredPriceRow } from "@/lib/admin/pricing/feeBasis";
-import { PROPOSED_FEE_INCLUSIVE_DISCLOSURE } from "./vautoExport";
+import { PROPOSED_CT_DISCLOSURE_TEMPLATE, renderDisclosure, type StoreDisclosure, type StoredPriceRow } from "./vautoExport";
 
 // One synthetic vehicle used to prove that the price breakdown, the
 // description, the disclosure and the exported vAuto text agree. Every name,
@@ -19,7 +18,7 @@ export interface SyntheticFact {
 const fact = (id: string, label: string, value: string, source: string, sentence: string): SyntheticFact =>
   ({ id, label, value, source, status: "verified", sentence });
 
-export const SYNTHETIC_STORE = { name: "Example Motors North", city: "Example City", state: "CT" };
+export const SYNTHETIC_STORE = { id: "store-synthetic-north", name: "Example Motors North", city: "Example City", state: "CT" };
 
 export const SYNTHETIC_VEHICLE = {
   id: "veh-synthetic-1",
@@ -43,7 +42,22 @@ export const SYNTHETIC_PRICE_ROW: StoredPriceRow = {
   docFee: 499,
 };
 
-export const SYNTHETIC_DISCLOSURE = PROPOSED_FEE_INCLUSIVE_DISCLOSURE;
+/** The proposed Connecticut template, rendered with the synthetic $499 fee. */
+export const SYNTHETIC_DISCLOSURE_TEMPLATE = PROPOSED_CT_DISCLOSURE_TEMPLATE;
+export const SYNTHETIC_DISCLOSURE = renderDisclosure(PROPOSED_CT_DISCLOSURE_TEMPLATE, 499).text;
+
+/** The store disclosure as it stands: proposed, awaiting counsel. */
+export const SYNTHETIC_PENDING_DISCLOSURE: StoreDisclosure = {
+  storeId: "store-synthetic-north", basis: "includes_fee", template: PROPOSED_CT_DISCLOSURE_TEMPLATE, version: "disc_synthetic",
+  status: "pending_legal_review", legalReviewedBy: null, legalReviewedAt: null, legalReference: null, plainTextFormatAccepted: false,
+  approvedBy: null, approvedAt: null,
+};
+
+/** The same wording with counsel's approval SIMULATED, to prove the gate opens only when everything agrees. */
+export const SYNTHETIC_APPROVED_DISCLOSURE: StoreDisclosure = {
+  ...SYNTHETIC_PENDING_DISCLOSURE, status: "approved", legalReviewedBy: "Synthetic counsel (simulated)", legalReviewedAt: "2026-11-04T12:00:00Z",
+  legalReference: "SYNTHETIC-ONLY", plainTextFormatAccepted: true, approvedBy: "Synthetic owner (simulated)", approvedAt: "2026-11-04T12:05:00Z",
+};
 export const SYNTHETIC_CTA = "Contact Example Motors North to confirm availability and schedule a test drive.";
 
 export const SYNTHETIC_FACTS: SyntheticFact[] = [
