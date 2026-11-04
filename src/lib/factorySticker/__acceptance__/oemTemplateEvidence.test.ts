@@ -14,7 +14,9 @@ import { realizePdf } from "../render/toPdf";
 import { textBBox, type LayoutModel, type TextPrimitive } from "../render/layout";
 import { expectNoTextOverlap } from "../render/__fixtures__/layoutAsserts";
 import { referenceMatchData, tucsonListings, tucsonRenderData } from "../render/__fixtures__/tucson";
+import { wranglerReferenceMatchData, wranglerRenderData } from "../render/__fixtures__/wrangler";
 import { HYUNDAI_TUCSON_GAS_ID } from "../render/variants/hyundaiTucsonGas";
+import { JEEP_WRANGLER_GAS_ID } from "../render/variants/jeepWranglerGas";
 import { TEMPLATE_CATALOG, evaluateCatalogTemplate, type CatalogTemplate } from "../oem/templateCatalog";
 import { CATALOG_LAYOUTS } from "../render/variants";
 
@@ -29,7 +31,7 @@ const sh = (cmd: string, args: string[]): string => execFileSync(cmd, args, { en
 interface PackageSpec {
   templateId: string;
   dirName: string;
-  records: Array<{ label: string; data: FactoryStickerRenderData; referenceOnly: boolean }>;
+  build: () => { real: FactoryStickerRenderData[]; realLabel: string; reference: (first: FactoryStickerRenderData) => FactoryStickerRenderData };
   mappingMd: string;
   differencesMd: (t: CatalogTemplate) => string;
 }
@@ -48,7 +50,7 @@ Every printed value comes from the saved vehicle record the generator already re
 | Exterior / interior colour | build_sheet.colors.exterior / interior (name and code) | Row omitted |
 | Transport | transportMethod (not on current records) | Row omitted |
 | Emissions line | factoryCodes.emissions (not on current records) | Row omitted |
-| Government 5-star safety panel | safety.* (NHTSA); nhtsaNotRated | Not Available (no verified NHTSA record), Not Rated (tested but unrated, or a category without a rating). Today the orchestrator adapter supplies no safety block, so every category reads Not Available |
+| Government 5-star safety panel | NHTSA ratings via NeoVIN decode: the decoder's own rating rows (Overall, Frontal Crash, Side Impact, Rollover) in the standard and key-feature lists, used only when the "Standard-NHTSA" row is present; IIHS rows never feed stars. NeoVIN gives frontal and side as one value each, so the panel prints combined "Frontal Crash" and "Side Crash" rows and never copies the value into driver, passenger, front-seat or rear-seat rows. A saved NHTSA block (safety, nhtsaNotRated) takes precedence | Not Available for any category the decode lacks (and for all rows when there is no NHTSA row); Not Rated only when NHTSA states the vehicle is not rated |
 | Standard features | build_sheet.standard + key_features through equipmentSelection (full list when it fits, else normalized selected lines plus the Passport pointer line) | Section omitted |
 | Warranty section | warranty.* (verified OEM terms) | Omitted. Not wired in the adapter today |
 | Added features (options, packages, port options) | build_sheet.options / packages (name, code, msrp) | A missing price prints N/A, an included item prints INCLUDED |
@@ -64,7 +66,7 @@ Every printed value comes from the saved vehicle record the generator already re
 | Fuel Economy and GHG scale and pointer | epa_economy.ghgScore (integer 1-10) | "Not Available" in place of the scale; any value outside 1-10 is treated as unavailable |
 | Smog scale and pointer | epa.smogScore (not on current records) | "Not Available" |
 | CO2 sentence | epa_economy.co2TailpipeGpm | Omitted |
-| Parts content, final assembly, engine / transmission origin | factory.partsContent (AALA), build_sheet.assembly | Heading with "Not available for this vehicle." Not on current records; never inferred from combined U.S./Canadian percentages or assembly country |
+| Parts content, final assembly, engine / transmission origin | factory.partsContent (AALA); country of final assembly from mc_attributes.made_in (printed as "COUNTRY OF FINAL ASSEMBLY: <country>", no plant or city invented); build_sheet.assembly city/plant when present | Heading with "Not available for this vehicle." when nothing is known. Parts-content percentages and engine / transmission origin are not on current records and stay unavailable; never inferred from the made-in country |
 | VIN barcode | barcodePayload (= VIN), Code 128 regenerated per vehicle | Always present |
 | Passport QR (0.90in including quiet zone) | passportUrl = canonicalPassportUrl(listing.slug) | Omitted with its caption when no Passport URL |
 `;
@@ -87,18 +89,89 @@ ${t.blockers.map((b) => `- ${b}`).join("\n")}
 - OCR: transcribed text was spot-checked against the PDF only (ocr_unverified). The reference-match fixture normalizes "TM"/registered marks and drops the bullet asterisks on option names.
 - Wireless Android Auto and Apple CarPlay, SHIFTRONIC and similar trademark marks are printed without the trademark glyphs (WinAnsi sanitation).
 - Drivetrain text: records carry the NeoVIN value (for example 4WD) and the existing sourceCorrections rule decides the printed value; a Tucson AWD may print as the source states. Not changed here.
-- Data not wired by the orchestrator adapter today (blockers nhtsa_ratings_not_wired, parts_content_not_wired, warranty_terms_not_wired): NHTSA stars read Not Available, the warranty section is omitted, the parts-content box shows its unavailable state, and smog and the 5-year cost comparison are unavailable. The reference-match render shows the fully populated state for comparison.
+- NHTSA: stars come from the NeoVIN decode rating rows (combined frontal and side values, overall, rollover). The reference prints driver/passenger and front/rear-seat rows; the decode does not give them, so the combined rows print instead and nothing is split.
+- Data not wired by the orchestrator adapter today (blockers parts_content_not_wired, warranty_terms_not_wired): the warranty section is omitted, parts-content percentages and engine/transmission origin are unavailable, and smog and the 5-year cost comparison are unavailable. The reference-match render shows the fully populated state for comparison.
+- Other NeoVIN fields on the record: engine (2.5L I4), transmission, fuel_type (Unleaded), drivetrain and body type have no matching region on this reference except the standard-features list, which already carries the powertrain lines; the reference's MODEL: code row has no decode field. fuel_type does not fill the Gasoline Vehicle tag, which stays tied to the verified EPA match. Seating capacity appears only inside the equipment list.
 - Equipment: the NeoVIN standard list for these records holds 261-271 items. The one-page rule prints the ranked selection (about 167 lines at 5.5pt) with the fixed "Selected standard equipment shown. Scan for complete vehicle specifications." line. The reference prints a short OEM-curated list at 7pt.
 - Equipment hygiene (catalog templates only): decoder fragments that are not equipment are dropped before selection, including IIHS rating rows ("... Rating-Poor"), speed-threshold clauses ("Operates Above 50 Kph/30 Mph"), "Includes/Activates ..." sub-clauses and autonomy-level labels. The approved masters keep their existing equipment path unchanged.
 - The reference-match render passes passportUrl empty, so it has no Passport QR; the real-record renders show the QR.
 `;
 
+const WRANGLER_MAPPING = `# Jeep 2026 Wrangler (gasoline) - data source mapping
+
+Every printed value comes from the saved vehicle record the generator already reads (vehicle_listings.mc_attributes from NeoVIN, vehicle_listings.epa_economy from the verified fueleconomy.gov match, dealer_profiles.settings). No provider call is made. No vehicle value is a literal in the layout: only fixed labels, OEM boilerplate headings (including the jeep.com contact line) and the Jeep logo artwork are. The reference sample's values (VIN 1C4RJXSJ5TW323044, Willys 392, Anvil paint, prices, EPA figures, parts content, QR, barcode) appear only in the reference-match fixture, and a test renders an empty record to prove none leaks.
+
+| Printed region | Source field | When missing |
+|---|---|---|
+| Reproduction banner and disclosure | reproduction.ts | Always printed |
+| Jeep logo | packaged artwork (logoArtwork.ts, owner-authorized 2026-11-01) | Always printed |
+| Model-year line | identity.year | Omitted |
+| Title (model trim drivetrain) | identity from ymm + listing.trim; drivetrain from sourceCorrections.decideDrivetrain | Missing parts omitted, never guessed |
+| Spec line, Exterior / Interior color | identity make, model, trim, drivetrain; build_sheet.colors | Row omitted |
+| Engine, Transmission | mc_attributes.engine / transmission (or build_sheet.mechanical) | Row omitted |
+| Base Price box, destination, total | build_sheet.pricing base_msrp, destination_charge, total_msrp (stated, else base + options + destination) | NOT AVAILABLE |
+| Optional equipment (packages, options with price) | build_sheet.packages / options | Nothing listed; a missing price prints N/A, an included item INCLUDED |
+| Standard equipment | build_sheet.standard + key_features through equipmentSelection and catalog hygiene (full list when it fits, else selected lines plus the Passport pointer line) | Unavailable line |
+| Warranty coverage | warranty.* (verified OEM terms only) | "Not available for this vehicle." Not wired in the adapter today |
+| Fuel Economy MPG, city, highway, gallons per 100 miles | epa_economy combined / city / highway; gallons from the record or 100 / combined | Panel shows the unavailable message; nothing is zero |
+| Annual fuel cost | epa_economy.annualFuelCost | Not Available |
+| You save / You spend over 5 years | epa.fiveYearCostDifference | "5-year fuel cost comparison: Not Available" |
+| Greenhouse gas scale and pointer | epa_economy.ghgScore (integer 1-10) | Not Available; any value outside 1-10 is unavailable |
+| Smog scale and pointer | epa.smogScore (not on current records) | Not Available |
+| CO2 sentence | epa_economy.co2TailpipeGpm | Omitted |
+| Fuel type tag | epa_economy.fuelType | Omitted |
+| Government 5-star safety ratings | NHTSA ratings via NeoVIN decode (rating rows in the standard and key-feature lists, only when the Standard-NHTSA row is present; IIHS rows never feed stars). Combined Frontal Crash and Side Crash rows; never split into driver, passenger or seat rows. A saved NHTSA block takes precedence | Compact panel: "has not been rated by the government" when NHTSA states not rated, "not available from a verified NHTSA record" when there is no NHTSA row; otherwise Not Available per absent category |
+| Parts content box | factory.partsContent (AALA); country of final assembly from mc_attributes.made_in; assembly city/plant when present | "Not available for this vehicle." |
+| Original delivering dealer (SOLD TO) | dealer block, ONLY when dealerRole is original_delivery | Label printed blank. The current selling rooftop never prints. The orchestrator does not set dealerRole today |
+| Assembly Point / Port of Entry | factory.finalAssemblyPoint | Omitted |
+| VIN, VIN barcode | listing.vin; Code 128 regenerated per vehicle | Always present |
+| Passport QR (0.90in including quiet zone) | canonicalPassportUrl(listing.slug) | Omitted with its caption when no Passport URL |
+`;
+
+const WRANGLER_DIFFERENCES = (t: CatalogTemplate): string => `# Jeep 2026 Wrangler (gasoline) - differences from the OEM reference
+
+Status: layout ${t.layoutStatus}, approval ${t.approval}. Production routing cannot select this template until the owner approves it.
+
+## Sample data
+- reference-match: the reference sticker's own transcribed values, for side-by-side comparison only (reference VIN, prices, EPA figures, parts content). It is never used for another vehicle.
+- sticker-1C4HJXDN4PW657311: off-year layout stress test (2023 record), not a production candidate. Production has no 2026 Wrangler. It is a 2023 Wrangler Altitude (used) with 173 equipment items and ten priced options; the template does not match it (year), so it renders only through the explicit sample path. The read-only extract (vin, slug, ymm, trim, condition, build_sheet, epa_economy, body_type) carries no engine, transmission, drivetrain or made_in fields, so those rows and the assembly line are omitted. Its stated total (51,225) does not equal base + options + destination (52,020) because the record's option list includes dealer-installed lines; the sticker prints the stated total and the lines as saved.
+
+## Blockers (stable codes)
+${t.blockers.map((b) => `- ${b}`).join("\n")}
+
+## Unresolved differences
+- Fonts: Helvetica / Helvetica-Bold stand in for the reference's Arial Narrow and Arial (font_substitution); the title and body text are wider than the original.
+- Layout compression: vertical positions are compressed by 7% to clear the mandatory banner and disclosure. The olive frame is drawn as four bands with square inner corners.
+- Artwork not reproduced: the FlexCare vehicle protection advertisement and the 5-year/60,000-mile powertrain warranty graphic, agency seals, the source Smartphone QR (replaced by the Vehicle Passport QR in the free area below the parts box), the source barcode (regenerated from the VIN), "FCA US LLC".
+- Wording not reproduced: the reference's "THIS LABEL IS ADDED TO THIS VEHICLE TO COMPLY WITH FEDERAL LAW" statement and the "manufactured to meet specific United States requirements" statement (neither is certified here); the footnote is replaced by "Original manufacturer's suggested retail prices shown. Excludes taxes, title, license, dealer-installed items and current selling price."
+- EPA panel: native rebuild of what the reference prints as a scanned image (epa_scale_scan_rebuilt); the 5-year cost comparison and "These estimates reflect new EPA methods" sentence are omitted when not on the record or for space; the average-vehicle MPG and cost sentence is not printed (not on the record).
+- Safety: the decode gives one frontal and one side value, so combined rows print where the reference's full panel would show driver/passenger and front/rear seat; NHTSA often does not rate the Wrangler and the not-rated and not-available states are shown honestly.
+- Fields in the reference with no render-data source: L4-VON, S.L., SHIP TO, the "Interior:" seat-material line, the production strip. Not printed.
+- Optional equipment order: the reference lists the paint line before the package; packages print before options here.
+- OCR: transcribed text was spot-checked against the PDF only (ocr_unverified). The reference-match fixture drops registered and trademark marks and normalizes en-dashes (WinAnsi sanitation).
+- Drivetrain text: the title prints the decoded drivetrain (4WD) where the reference prints 4X4.
+- Parts content, warranty: not wired by the orchestrator adapter today (blockers parts_content_not_wired, warranty_terms_not_wired); the reference-match render shows the populated state.
+- Other NeoVIN fields: engine and transmission are printed in the specification rows; fuel_type does not fill the fuel tag (tied to the verified EPA match); seating capacity and version have no region on this reference.
+- Equipment: the reference prints a short curated list at 9pt; the stress record prints its full 173 items at the ladder's compacted size. Decoder fragments (rating rows, speed thresholds) are dropped before selection.
+- Matching: model names such as "Wrangler 4-Door" match; the 4xe is excluded by model, trim and plug-in fuel text. A record that states no drivetrain still matches; a stated non-4WD drivetrain does not. The 4xe plug-in is unsupported by this template and keeps its existing approved-master rendering.
+`;
+
 const packages: PackageSpec[] = [{
   templateId: HYUNDAI_TUCSON_GAS_ID,
   dirName: "hyundai-2026-tucson-gas",
-  records: [],
+  build: () => ({ real: tucsonListings().map(tucsonRenderData), realLabel: "real saved record", reference: referenceMatchData }),
   mappingMd: TUCSON_MAPPING,
   differencesMd: TUCSON_DIFFERENCES,
+}, {
+  templateId: JEEP_WRANGLER_GAS_ID,
+  dirName: "jeep-2026-wrangler-gas",
+  build: () => ({
+    real: [wranglerRenderData()],
+    realLabel: "off-year layout stress test (2023 record), not a production candidate",
+    reference: wranglerReferenceMatchData,
+  }),
+  mappingMd: WRANGLER_MAPPING,
+  differencesMd: WRANGLER_DIFFERENCES,
 }];
 
 const smallestFont = (m: LayoutModel): number =>
@@ -178,10 +251,11 @@ describe.skipIf(!DIR)("OEM template evidence", () => {
       const refSrc = join(root, "reference-pdfs", t.referencePdf);
       const refPdf = join(outDir, "reference.pdf");
       copyFileSync(refSrc, refPdf);
-      const real = tucsonListings().map(tucsonRenderData);
-      const matchData = referenceMatchData(real[0]);
+      const built = spec.build();
+      const real = built.real;
+      const matchData = built.reference(real[0]);
       const results: Array<Record<string, unknown>> = [];
-      for (const d of real) results.push(await writeSample(spec, outDir, refPdf, d, "real saved record", false));
+      for (const d of real) results.push(await writeSample(spec, outDir, refPdf, d, built.realLabel, false));
       results.push(await writeSample(spec, outDir, refPdf, matchData, "reference-match (visual comparison only)", true));
 
       sh("pdftoppm", ["-r", "100", "-png", "-singlefile", refPdf, join(outDir, "_ref100")]);

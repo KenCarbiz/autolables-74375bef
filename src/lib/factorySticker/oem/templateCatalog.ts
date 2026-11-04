@@ -260,7 +260,7 @@ export const TEMPLATE_CATALOG: readonly CatalogTemplate[] = [
     match: { modelYears: [2026], modelPattern: "^tucson$", excludedModelPattern: "^tucsonhybrid|^tucsonplug", bodyClasses: ["SUV"], fuelClasses: ["gasoline"], },
     approval: "pending_owner_approval",
     layoutStatus: "sample_ready",
-    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "epa_scale_scan_rebuilt", "hope_on_wheels_artwork_not_reproduced", "nhtsa_ratings_not_wired", "parts_content_not_wired", "warranty_terms_not_wired"],
+    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "epa_scale_scan_rebuilt", "hope_on_wheels_artwork_not_reproduced", "parts_content_not_wired", "warranty_terms_not_wired"],
   },
   {
     id: "jeep_2026_wrangler_willys_392",
@@ -274,7 +274,7 @@ export const TEMPLATE_CATALOG: readonly CatalogTemplate[] = [
     match: { modelYears: [2026], modelPattern: "^wrangler(2door|4door|unlimited)?$", excludedModelPattern: "^wrangler4xe", excludedTrimPattern: "4xe", bodyClasses: ["SUV"], fuelClasses: ["gasoline"], drivetrains: ["4WD"], unknownDrivetrainMatches: true, },
     approval: "pending_owner_approval",
     layoutStatus: "sample_ready",
-    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "epa_scale_scan_rebuilt", "nhtsa_ratings_not_wired", "parts_content_not_wired", "warranty_terms_not_wired"],
+    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "epa_scale_scan_rebuilt", "parts_content_not_wired", "warranty_terms_not_wired"],
   },
   {
     id: "kia_2026_sorento_lx",
