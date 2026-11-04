@@ -560,6 +560,9 @@ describe("edge function gateway configuration", () => {
       "rtgip-inbound": false,
       "rtgip-dispatch": false,
       "rtgip-publish": true,
+      // One-time staging Vault key import, dark behind its own compiled
+      // literal: a single-use owner-issued ticket is checked in SQL.
+      "rtgip-key-import": false,
     });
   });
 

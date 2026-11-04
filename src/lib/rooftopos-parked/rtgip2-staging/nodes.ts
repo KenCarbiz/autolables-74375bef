@@ -176,10 +176,14 @@ export const keyFor = (reg: Registry, owner: ServiceKey["owner"]): ServiceKey =>
 };
 
 /** Mirror the registry connections and keys into one app node's delivery tables and Vault stand-in. */
-export async function seedNode(sql: Sql, reg: Registry, app: App): Promise<void> {
+/** opts.vaultImported: key ids whose Vault secret was placed by the S1 key import; their Vault rows are kept, never rewritten. */
+export async function seedNode(sql: Sql, reg: Registry, app: App, opts: { vaultImported?: ReadonlySet<string> } = {}): Promise<void> {
+  const kept = [...(opts.vaultImported ?? [])].map((k) => `rtgip:${k}`);
   await sql.begin(async (tx) => {
     await tx.unsafe("DELETE FROM rtgip.signing_keys");
-    await tx.unsafe("DELETE FROM vault.decrypted_secrets WHERE name LIKE 'rtgip:%'");
+    await tx`DELETE FROM vault.decrypted_secrets WHERE name LIKE 'rtgip:%' AND name <> ALL (${tx.array(kept)}::text[])`;
+    const have = await tx`SELECT count(*)::int AS n FROM vault.decrypted_secrets WHERE name = ANY (${tx.array(kept)}::text[])`;
+    if (have[0]!.n !== kept.length) throw new Error("seedNode: an imported Vault key is missing");
     const ids = reg.connections.map((c) => c.connection_id);
     for (const c of reg.connections)
       await tx`INSERT INTO rtgip.connections (connection_id, source_app, target_app, tenant_id, rooftop_ids, event_types, purposes, producer_enabled, reader_enabled, status)
@@ -191,7 +195,7 @@ export async function seedNode(sql: Sql, reg: Registry, app: App): Promise<void>
     for (const k of reg.keys) {
       await tx`INSERT INTO rtgip.signing_keys (key_id, owner, dialect, connection_ids, status, not_before, not_after, secret_ref)
         VALUES (${k.key_id}, ${k.owner}, ${k.dialect}, ${tx.array([...k.connection_ids])}, ${k.status}, to_timestamp(${k.not_before}), to_timestamp(${k.not_after}), ${"rtgip:" + k.key_id})`;
-      await tx`INSERT INTO vault.decrypted_secrets (name, decrypted_secret) VALUES (${"rtgip:" + k.key_id}, ${k.secret})`;
+      if (!opts.vaultImported?.has(k.key_id)) await tx`INSERT INTO vault.decrypted_secrets (name, decrypted_secret) VALUES (${"rtgip:" + k.key_id}, ${k.secret})`;
     }
     await tx`UPDATE rtgip.delivery_config SET local_app = ${app}`;
   });

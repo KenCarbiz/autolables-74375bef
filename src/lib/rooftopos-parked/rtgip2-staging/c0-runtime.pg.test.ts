@@ -34,6 +34,8 @@ import {
   type App, type RegistryExports, type Sql,
 } from "./nodes.ts";
 import { denoAvailable, liftTransportCheck, setTransport, startRuntimeServer, type DenoServer } from "../rtgip2-runtime/pg-harness.ts";
+import { keySecretName } from "../rtgip2-key-import/key-import.ts";
+import { serveKeyImport } from "./key-import-harness.ts";
 import {
   appDispatch, armCrash, crashesLeft, gatewayDispatch, gatewayRegistrySync, installCrashTrigger, queryChain, startForwardProxy, startGatewayServer,
   type Child, type Proxy,
@@ -60,6 +62,21 @@ const BUNDLES: Record<App, string> = {
 };
 const STAGING_REFS: Record<App, string> = { autolabels: "uakiwvigsmrlyfpsalai", autocurb: "zzwuxpbxkfxgtrnfxgia", autoframe: "mubzldoczujeoatzdwko" };
 const SERVICE_KEY = `svc-${randomUUID()}`;
+// RTGIP_C0_KEY_IMPORT=1: the four initial keys get the staging ids and reach every app Vault only through
+// the S1 one-time import (install, ticket, the app's rtgip-key-import bundle under Deno, removal), and
+// seedNode never rewrites those Vault rows. The frozen inbox_admit / receipt_check_signature then read them.
+const KEY_IMPORT = process.env.RTGIP_C0_KEY_IMPORT === "1";
+const KI_DIRS: Record<App, string> = {
+  autolabels: path.join(ROOT, "src/lib/rooftopos-parked/rtgip2-key-import"),
+  autocurb: path.join(process.env.AC_REPO ?? "", "src/lib/rooftopos/rtgip2-key-import"),
+  autoframe: path.join(process.env.AF_REPO ?? "", "src/lib/af/rtgip2-key-import"),
+};
+const KI_BUNDLES: Record<App, string> = {
+  autolabels: path.join(ROOT, "supabase/functions/_shared/rtgip2-key-import.bundle.js"),
+  autocurb: path.join(process.env.AC_REPO ?? "", "supabase/functions/_shared/rtgip2-key-import.bundle.js"),
+  autoframe: path.join(process.env.AF_REPO ?? "", "supabase/functions/_shared/rtgip2-key-import.bundle.js"),
+};
+const vaultImported = new Set<string>();
 const CRON = `cron-${randomUUID()}`;
 const hex32 = () => randomBytes(32).toString("hex");
 
@@ -137,6 +154,41 @@ async function admissionConns(eventId: string, tgt?: App): Promise<string[]> {
   return r.map((x) => x.connection_id as string);
 }
 
+/** S1 on every app node, in the hosted order: install, one ticket and one import per key, removal. */
+async function importInitialKeys(keys: ServiceKey[]) {
+  const stub = readFileSync(path.join(ROOT, "supabase/tests/rtgip/key_import_vault_stub.sql"), "utf8");
+  const keyEnv = Object.fromEntries(keys.map((k) => [keySecretName(k.key_id), k.secret]));
+  const out: Record<string, unknown> = {};
+  for (const a of APPS) {
+    const install = readFileSync(path.join(KI_DIRS[a], "key_import.staging.sql"), "utf8");
+    const removal = readFileSync(path.join(KI_DIRS[a], "key_import.removal.sql"), "utf8");
+    await db[a].unsafe(stub);
+    await db[a].unsafe(install);
+    await db[a].unsafe(install);
+    const srv = await serveKeyImport({ bundleFile: KI_BUNDLES[a], stagingRef: STAGING_REFS[a], dbUrl: URLS[a], keyEnv });
+    try {
+      for (const k of keys) {
+        const t = (await db[a]`SELECT ticket_id::text AS ticket_id, token FROM rtgip.key_import_issue(${k.key_id}, ${await sha256Hex(k.secret)}, 'C0-S1-LOCAL', '5 minutes')`)[0]!;
+        const r = await fetch(`${srv.url}/`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ticket_id: t.ticket_id, token: t.token }) });
+        const doc = (await r.json()) as Record<string, unknown>;
+        expect([a, k.key_id, r.status, doc]).toEqual([a, k.key_id, 200, { key_id: k.key_id, outcome: "imported", fingerprint_verified: true }]);
+      }
+    } finally {
+      await srv.stop();
+    }
+    await db[a].unsafe(removal);
+    await db[a].unsafe(removal);
+    const v = await db[a]`SELECT name, encode(sha256(convert_to(decrypted_secret, 'UTF8')), 'hex') AS h FROM vault.decrypted_secrets WHERE name LIKE 'rtgip:%' ORDER BY name`;
+    const want = await Promise.all([...keys].sort((x, y) => `rtgip:${x.key_id}`.localeCompare(`rtgip:${y.key_id}`)).map(async (k) => [`rtgip:${k.key_id}`, await sha256Hex(k.secret)]));
+    expect(v.map((r) => [r.name, r.h])).toEqual(want);
+    expect((await db[a]`SELECT count(*)::int AS n FROM pg_proc WHERE proname IN ('key_import_issue','key_import_claim','key_import_finish')`)[0]!.n).toBe(0);
+    expect((await db[a]`SELECT count(*)::int AS n FROM pg_roles WHERE rolname = 'rtgip_key_importer'`)[0]!.n).toBe(0);
+    out[a] = { imported: keys.map((k) => k.key_id), vault_verified: true, import_removed: true };
+  }
+  for (const k of keys) vaultImported.add(k.key_id);
+  evidence["s1-key-import"] = out;
+}
+
 const recordKey = async (k: ServiceKey, status: ServiceKey["status"] = k.status) =>
   db.gateway`INSERT INTO gw_r2_keys(id,owner,connections,status,not_before,not_after,fingerprint)
     VALUES(${k.key_id},${k.owner},${db.gateway.array([...k.connection_ids])},${status},to_timestamp(${k.not_before}),to_timestamp(${k.not_after}),${await sha256Hex(k.secret)})
@@ -150,7 +202,7 @@ async function resync() {
   exp = await readExports(db.gateway);
   reg = registryFrom(exp, reg?.keys ?? []);
   for (const a of APPS) {
-    await seedNode(db[a], reg, a);
+    await seedNode(db[a], reg, a, { vaultImported });
     await syncAppMapping(db[a], a, exp, seed.AL_SEED_MAPPER!);
   }
   return s.doc;
@@ -245,7 +297,9 @@ run(`${RESULT_LABEL}`, () => {
     const mkKey = (owner: ServiceKey["owner"], tag: string): ServiceKey => ({
       key_id: `c0-${tag}-${randomBytes(3).toString("hex")}`, owner, dialect: "rtgip/2", connection_ids: [], status: "current", not_before: n - 3600, not_after: n + 86_400, secret: hex32(),
     });
-    const first = (["gateway", "autolabels", "autocurb", "autoframe"] as const).map((o) => mkKey(o, o.slice(0, 2) === "au" ? o.replace("auto", "") : o));
+    const first = (["gateway", "autolabels", "autocurb", "autoframe"] as const).map((o) =>
+      KEY_IMPORT ? { ...mkKey(o, o), key_id: `stg-${o}-1` } : mkKey(o, o.slice(0, 2) === "au" ? o.replace("auto", "") : o),
+    );
     for (const tag of ["legacy", "expired", "prev", "next"]) spare[tag] = mkKey("autolabels", `al-${tag}`);
     spare.gwnext = mkKey("gateway", "gw-next");
     const keySecrets: Record<string, string> = {};
@@ -265,9 +319,10 @@ run(`${RESULT_LABEL}`, () => {
     for (const [i, c] of exp.connections.entries()) expect((await db.gateway`SELECT public.gw_r2_set_connection_enabled(${c.id}, true, true, ${`CHG-C0-ENABLE-${i + 1}`}) AS r`)[0]!.r).toBe("set");
     for (const s of Object.values(spare)) s.connection_ids = reg.keys.find((k) => k.owner === s.owner)!.connection_ids;
 
+    if (KEY_IMPORT) await importInitialKeys(first);
     for (const a of APPS) {
       await liftTransportCheck(db[a]);
-      await seedNode(db[a], reg, a);
+      await seedNode(db[a], reg, a, { vaultImported });
       await syncAppMapping(db[a], a, exp, seed.AL_SEED_MAPPER!);
       await setTransport(db[a], true, a);
       await installCrashTrigger(db[a], LEDGER[a].table);
@@ -296,7 +351,7 @@ run(`${RESULT_LABEL}`, () => {
     if (process.env.RTGIP_C0_REPORT)
       writeFileSync(
         process.env.RTGIP_C0_REPORT,
-        JSON.stringify({ classification: RESULT_LABEL, tenant_is_synthetic: true, keys_generated_at_start: reg?.keys.map((k) => k.key_id), routes: evidence }, null, 2),
+        JSON.stringify({ classification: RESULT_LABEL, key_import_mode: KEY_IMPORT, tenant_is_synthetic: true, keys_generated_at_start: reg?.keys.map((k) => k.key_id), routes: evidence }, null, 2),
       );
   });
 

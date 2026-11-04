@@ -123,3 +123,9 @@ verify_jwt = false
 
 [functions.rtgip-publish]
 verify_jwt = true
+
+# rtgip/2 one-time Vault key import (staging only, dark behind its own compiled literal, removed after
+# provisioning). Carries no Supabase JWT: a single-use ticket issued by the database owner is the
+# authorization, checked and burned in SQL by rtgip.key_import_claim.
+[functions.rtgip-key-import]
+verify_jwt = false

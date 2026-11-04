@@ -1,6 +1,7 @@
 // Deterministic build of supabase/functions/_shared/rtgip2-runtime.bundle.js from the runtime
 // source. `node scripts/rtgip2/build-runtime.mjs` writes it; `--check` fails when it is stale;
 // `--out <file>` writes the build somewhere else (the reproducibility test builds twice that way).
+// `--key-import` selects the one-time staging key-import bundle instead (rtgip2-key-import.bundle.js).
 import { build } from "esbuild";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import path from "node:path";
@@ -9,6 +10,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 export const ENTRY = "src/lib/rooftopos-parked/rtgip2-autolabels/runtime-entry.ts";
 export const OUTFILE = path.join(ROOT, "supabase/functions/_shared/rtgip2-runtime.bundle.js");
+export const KEY_IMPORT_ENTRY = "src/lib/rooftopos-parked/rtgip2-autolabels/key-import-entry.ts";
+export const KEY_IMPORT_OUTFILE = path.join(ROOT, "supabase/functions/_shared/rtgip2-key-import.bundle.js");
 export const POSTGRES_SPECIFIER = "npm:postgres@3.4.5";
 
 const plugin = {
@@ -21,10 +24,10 @@ const plugin = {
   },
 };
 
-export async function buildRuntime() {
+export async function buildRuntime(entry = ENTRY) {
   const r = await build({
     absWorkingDir: ROOT,
-    entryPoints: [ENTRY],
+    entryPoints: [entry],
     bundle: true,
     write: false,
     format: "esm",
@@ -43,14 +46,16 @@ export async function buildRuntime() {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  const text = await buildRuntime();
+  const keyImport = process.argv.includes("--key-import");
+  const outfile = keyImport ? KEY_IMPORT_OUTFILE : OUTFILE;
+  const text = await buildRuntime(keyImport ? KEY_IMPORT_ENTRY : ENTRY);
   if (process.argv.includes("--check")) {
-    if (!existsSync(OUTFILE) || readFileSync(OUTFILE, "utf8") !== text) {
-      console.error("rtgip2-runtime.bundle.js is stale: run node scripts/rtgip2/build-runtime.mjs");
+    if (!existsSync(outfile) || readFileSync(outfile, "utf8") !== text) {
+      console.error(`${path.basename(outfile)} is stale: run node scripts/rtgip2/build-runtime.mjs${keyImport ? " --key-import" : ""}`);
       process.exit(1);
     }
   } else {
     const at = process.argv.indexOf("--out");
-    writeFileSync(at > 0 ? path.resolve(process.argv[at + 1]) : OUTFILE, text);
+    writeFileSync(at > 0 ? path.resolve(process.argv[at + 1]) : outfile, text);
   }
 }
