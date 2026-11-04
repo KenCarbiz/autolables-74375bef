@@ -1164,9 +1164,15 @@ function timeoutSignal(ms) {
   setTimeout(() => c.abort(), ms);
   return c.signal;
 }
-var json = (status, doc) => new Response(JSON.stringify(doc), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
+var json = (status, doc) => new Response(JSON.stringify(doc), {
+  status,
+  headers: { "content-type": "application/json", "cache-control": "no-store" }
+});
 var rowsOf = (v) => v;
-var hex2 = (n) => Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) => b.toString(16).padStart(2, "0")).join("");
+var hex2 = (n) => Array.from(
+  crypto.getRandomValues(new Uint8Array(n)),
+  (b) => b.toString(16).padStart(2, "0")
+).join("");
 async function sameSecret(a, b) {
   const digest = async (s) => new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)));
   const [x, y] = await Promise.all([digest(a), digest(b)]);
@@ -1177,7 +1183,8 @@ async function sameSecret(a, b) {
 var UTF8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 async function readBody(req) {
   const declared = Number(req.headers.get("content-length") ?? "0");
-  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return { ok: false, status: 413, reason: "body_too_large" };
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES)
+    return { ok: false, status: 413, reason: "body_too_large" };
   const chunks = [];
   let size = 0;
   if (req.body) {
@@ -1199,7 +1206,8 @@ async function readBody(req) {
     buf.set(c, at);
     at += c.length;
   }
-  if (buf[0] === 239 && buf[1] === 187 && buf[2] === 191) return { ok: false, status: 400, reason: "bom_not_allowed" };
+  if (buf[0] === 239 && buf[1] === 187 && buf[2] === 191)
+    return { ok: false, status: 400, reason: "bom_not_allowed" };
   try {
     return { ok: true, body: UTF8.decode(buf) };
   } catch {
@@ -1207,10 +1215,17 @@ async function readBody(req) {
   }
 }
 var isJson = (req) => (req.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase() === "application/json";
-var currentKey = (reg, owner, nowSec) => reg.keys.find((k) => k.owner === owner && k.dialect === "rtgip/2" && k.status === "current" && nowSec >= k.not_before && nowSec <= k.not_after) ?? null;
+var currentKey = (reg, owner, nowSec) => reg.keys.find(
+  (k) => k.owner === owner && k.dialect === "rtgip/2" && k.status === "current" && nowSec >= k.not_before && nowSec <= k.not_after
+) ?? null;
 var STATUSES = /* @__PURE__ */ new Set(["current", "previous", "revoked"]);
 var OWNERS = /* @__PURE__ */ new Set(["autolabels", "autocurb", "autoframe", "autofilm", "gateway"]);
-var DIALECTS = /* @__PURE__ */ new Set(["rtgip/2", "autolabels.rooftopos/1", "gateway.operator/1", "autoframe.raw-hash/1"]);
+var DIALECTS = /* @__PURE__ */ new Set([
+  "rtgip/2",
+  "autolabels.rooftopos/1",
+  "gateway.operator/1",
+  "autoframe.raw-hash/1"
+]);
 async function loadRegistry(sql) {
   const { conns, keys } = await sql.begin(async (tx) => {
     await tx.unsafe("SET TRANSACTION READ ONLY");
@@ -1234,7 +1249,8 @@ async function loadRegistry(sql) {
   for (const k of keys) {
     const secret = k["secret"];
     if (typeof secret !== "string" || secret.length < 16) continue;
-    if (!STATUSES.has(String(k["status"])) || !OWNERS.has(String(k["owner"])) || !DIALECTS.has(String(k["dialect"]))) continue;
+    if (!STATUSES.has(String(k["status"])) || !OWNERS.has(String(k["owner"])) || !DIALECTS.has(String(k["dialect"])))
+      continue;
     const nb = Number(k["not_before"]);
     const na = Number(k["not_after"]);
     if (!Number.isFinite(nb) || !Number.isFinite(na)) continue;
@@ -1258,14 +1274,15 @@ function admissionDb(sql) {
       const wrapped = {
         sql: tx,
         admit: async (headers, body, admission, rej) => rowsOf(
-          await tx.unsafe("SELECT * FROM rtgip.inbox_admit($1::text::jsonb, $2::text, $3::text, $4::text::jsonb)", [
-            JSON.stringify(headers),
-            body,
-            admission,
-            rej ? JSON.stringify(rej) : null
-          ])
+          await tx.unsafe(
+            "SELECT * FROM rtgip.inbox_admit($1::text::jsonb, $2::text, $3::text, $4::text::jsonb)",
+            [JSON.stringify(headers), body, admission, rej ? JSON.stringify(rej) : null]
+          )
         ),
-        recordReceipts: async (deliveryId, receipts) => void await tx.unsafe("SELECT rtgip.inbox_record_receipts($1, $2::text[])", [deliveryId, tx.array(receipts)]),
+        recordReceipts: async (deliveryId, receipts) => void await tx.unsafe("SELECT rtgip.inbox_record_receipts($1, $2::text[])", [
+          deliveryId,
+          tx.array(receipts)
+        ]),
         savepoint: async (n) => void await tx.unsafe(`SAVEPOINT ${n}`),
         rollbackTo: async (n) => void await tx.unsafe(`ROLLBACK TO SAVEPOINT ${n}`)
       };
@@ -1312,7 +1329,9 @@ function createAppRuntime(cfg) {
       row = rowsOf(
         await sql.begin(async (tx) => {
           await tx.unsafe("SET TRANSACTION READ ONLY");
-          return tx.unsafe("SELECT transport_enabled, local_app FROM rtgip.delivery_config WHERE id");
+          return tx.unsafe(
+            "SELECT transport_enabled, local_app FROM rtgip.delivery_config WHERE id"
+          );
         })
       )[0];
     } catch {
@@ -1329,7 +1348,8 @@ function createAppRuntime(cfg) {
       if (!gatewayBase()) return refuse("gateway_origin_not_allowed");
       const key = cfg.env("SUPABASE_SERVICE_ROLE_KEY") ?? "";
       const m = /^Bearer (\S+)$/.exec(req.headers.get("authorization") ?? "");
-      if (!key || !m || !await sameSecret(m[1], key)) return json(401, { reason: "unauthorized" });
+      if (!key || !m || !await sameSecret(m[1], key))
+        return json(401, { reason: "unauthorized" });
     }
     let sql = null;
     try {
@@ -1362,7 +1382,14 @@ function createAppRuntime(cfg) {
       return r2.ok ? { ok: true } : { ok: false, reason: r2.reason };
     };
     const headers = Object.fromEntries(req.headers.entries());
-    const r = await admitDelivery(headers, read2.body, { app: cfg.app, registry: reg, nowSec: t, db: admissionDb(sql), effect, receiptKey });
+    const r = await admitDelivery(headers, read2.body, {
+      app: cfg.app,
+      registry: reg,
+      nowSec: t,
+      db: admissionDb(sql),
+      effect,
+      receiptKey
+    });
     return json(r.http_status, { reason: r.reason ?? null, receipts: r.receipts ?? [] });
   });
   async function post(url, headers, body) {
@@ -1398,8 +1425,24 @@ function createAppRuntime(cfg) {
         await tx.unsafe("SET LOCAL ROLE rtgip_dispatcher");
         return fn(tx);
       });
-      const advance = async (id, gen, texts) => rowsOf(await asDispatcher((tx) => tx.unsafe("SELECT rtgip.outbox_advance($1, $2, $3, $4::text[]) AS r", [id, worker, gen, tx.array(texts)])))[0]["r"];
-      const rows = rowsOf(await asDispatcher((tx) => tx.unsafe("SELECT event_id, body, envelope, delivery_id, lease_generation, lease_action FROM rtgip.outbox_claim($1, 100, 60)", [worker])));
+      const advance = async (id, gen, texts) => rowsOf(
+        await asDispatcher(
+          (tx) => tx.unsafe("SELECT rtgip.outbox_advance($1, $2, $3, $4::text[]) AS r", [
+            id,
+            worker,
+            gen,
+            tx.array(texts)
+          ])
+        )
+      )[0]["r"];
+      const rows = rowsOf(
+        await asDispatcher(
+          (tx) => tx.unsafe(
+            "SELECT event_id, body, envelope, delivery_id, lease_generation, lease_action FROM rtgip.outbox_claim($1, 100, 60)",
+            [worker]
+          )
+        )
+      );
       const out = [];
       for (const row of rows) {
         const envelope = row["envelope"];
@@ -1412,24 +1455,64 @@ function createAppRuntime(cfg) {
         let doc = {};
         try {
           if (action === "deliver") {
-            const headers = await signEnvelope(body, envelope, key, nowSec(), `src_${hex2(12)}`);
+            const headers = await signEnvelope(
+              body,
+              envelope,
+              key,
+              nowSec(),
+              `src_${hex2(12)}`
+            );
             ({ status, doc } = await post(`${base}/api/rtgip/v2/deliver`, headers, body));
           } else {
-            const q = await signReceiptQuery({ delivery_id: row["delivery_id"], event_id: eventId }, key, nowSec(), `qry_${hex2(12)}`);
-            ({ status, doc } = await post(`${base}/api/rtgip/v2/receipts`, q.headers, q.body));
+            const q = await signReceiptQuery(
+              { delivery_id: row["delivery_id"], event_id: eventId },
+              key,
+              nowSec(),
+              `qry_${hex2(12)}`
+            );
+            ({ status, doc } = await post(
+              `${base}/api/rtgip/v2/receipts`,
+              q.headers,
+              q.body
+            ));
           }
         } catch {
           doc = { reason: "signing_failed" };
         }
         const advanced = [];
-        if (status === 200 && Array.isArray(doc.receipts) && doc.receipts.length) advanced.push(await advance(eventId, gen, doc.receipts.map((x) => canonicalize(x))));
+        if (status === 200 && Array.isArray(doc.receipts) && doc.receipts.length)
+          advanced.push(
+            await advance(
+              eventId,
+              gen,
+              doc.receipts.map((x) => canonicalize(x))
+            )
+          );
         const last = advanced.at(-1);
         if (last !== "gateway_admitted" && last !== "consumer_committed" && last !== "target_quarantined") {
           const why = last ? last.replace(/^(rejected|pending):/, "") : status >= 400 && status < 500 ? refusalReason(status, doc.reason) : doc.reason ?? `http_${status}`;
-          await asDispatcher((tx) => tx.unsafe("SELECT rtgip.outbox_fail($1, $2, $3, $4, 1, 10)", [eventId, worker, gen, String(why).slice(0, 200)]));
+          await asDispatcher(
+            (tx) => tx.unsafe("SELECT rtgip.outbox_fail($1, $2, $3, $4, 1, 10)", [
+              eventId,
+              worker,
+              gen,
+              String(why).slice(0, 200)
+            ])
+          );
         }
-        const state = String(rowsOf(await sql.unsafe("SELECT state FROM rtgip.outbox WHERE event_id = $1", [eventId]))[0]?.["state"] ?? "unknown");
-        out.push({ event_id: eventId, action, http_status: status, reason: doc.reason ?? null, advanced, state });
+        const state = String(
+          rowsOf(
+            await sql.unsafe("SELECT state FROM rtgip.outbox WHERE event_id = $1", [eventId])
+          )[0]?.["state"] ?? "unknown"
+        );
+        out.push({
+          event_id: eventId,
+          action,
+          http_status: status,
+          reason: doc.reason ?? null,
+          advanced,
+          state
+        });
       }
       return json(200, out);
     },
@@ -1468,7 +1551,8 @@ function createAppRuntime(cfg) {
     let doc;
     try {
       const parsed = JSON.parse(read2.body);
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("shape");
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+        throw new Error("shape");
       doc = parsed;
     } catch {
       return json(400, { reason: "bad_request" });
@@ -1476,7 +1560,8 @@ function createAppRuntime(cfg) {
     const kind = doc["kind"];
     const tenant = doc["tenant_id"];
     const rooftop = doc["rooftop_id"];
-    if (typeof kind !== "string" || !cfg.publish.kinds.includes(kind)) return json(400, { reason: "unknown_kind" });
+    if (typeof kind !== "string" || !cfg.publish.kinds.includes(kind))
+      return json(400, { reason: "unknown_kind" });
     if (typeof tenant !== "string" || !tenant || tenant.length > 128 || typeof rooftop !== "string" || !rooftop || rooftop.length > 64)
       return json(400, { reason: "bad_scope" });
     const ref = {};
@@ -1490,7 +1575,13 @@ function createAppRuntime(cfg) {
     const request = { kind, tenant_id: tenant, rooftop_id: rooftop, ref };
     const decision = await sql.begin(async (tx) => {
       await tx.unsafe("SET TRANSACTION READ ONLY");
-      return cfg.publish.authorize({ query: async (text, params) => rowsOf(await tx.unsafe(text, params ?? [])) }, user.id, request);
+      return cfg.publish.authorize(
+        {
+          query: async (text, params) => rowsOf(await tx.unsafe(text, params ?? []))
+        },
+        user.id,
+        request
+      );
     });
     if (!decision.ok) {
       const why = "reason" in decision ? decision.reason : "";
@@ -1498,9 +1589,16 @@ function createAppRuntime(cfg) {
     }
     let produced;
     try {
-      produced = await cfg.adapter.produce(sql, kind, { tenant_id: tenant, rooftop_id: rooftop }, ref);
+      produced = await cfg.adapter.produce(
+        sql,
+        kind,
+        { tenant_id: tenant, rooftop_id: rooftop },
+        ref
+      );
     } catch (err) {
-      return json(422, { reason: err?.name === "PostgresError" ? "produce_failed" : safeCode(err, "produce_failed") });
+      return json(422, {
+        reason: err?.name === "PostgresError" ? "produce_failed" : safeCode(err, "produce_failed")
+      });
     }
     if (!produced.length) return json(422, { reason: "nothing_to_publish" });
     try {
@@ -1509,13 +1607,19 @@ function createAppRuntime(cfg) {
         const acc = [];
         for (const p of produced) {
           const r = rowsOf(await tx.unsafe("SELECT rtgip.outbox_enqueue($1) AS r", [p.body]))[0]["r"];
-          acc.push({ event_id: p.envelope.event_id, target_app: p.envelope.target_app, result: r });
+          acc.push({
+            event_id: p.envelope.event_id,
+            target_app: p.envelope.target_app,
+            result: r
+          });
         }
         return acc;
       });
       return json(200, { results });
     } catch (err) {
-      return json(422, { reason: err?.name === "PostgresError" ? safeCode(err, "enqueue_failed") : "enqueue_failed" });
+      return json(422, {
+        reason: err?.name === "PostgresError" ? safeCode(err, "enqueue_failed") : "enqueue_failed"
+      });
     }
   });
   return { inbound, dispatch, publish };

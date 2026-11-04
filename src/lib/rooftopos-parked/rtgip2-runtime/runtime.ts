@@ -19,15 +19,29 @@ import {
 } from "../rtgip2/protocol.ts";
 import { signReceiptQuery } from "../rtgip2/receipt-query.ts";
 import type { ReceiptV2 } from "../rtgip2/receipt-v2.ts";
-import { admitDelivery, type AdmissionDb, type AdmissionEffect, type AdmissionTx, type AdmitRow } from "../rtgip2/admission.ts";
+import {
+  admitDelivery,
+  type AdmissionDb,
+  type AdmissionEffect,
+  type AdmissionTx,
+  type AdmitRow,
+} from "../rtgip2/admission.ts";
 import { refusalReason } from "../rtgip2/delivery.ts";
 
 export type Sql = postgres.Sql;
 export type App = "autolabels" | "autocurb" | "autoframe";
 
 export interface RuntimeAdapter {
-  produce(db: Sql, kind: string, scope: { tenant_id: string; rooftop_id: string }, ref: Record<string, string>): Promise<{ envelope: EnvelopeV2; body: string }[]>;
-  apply(tx: Sql, envelope: EnvelopeV2): Promise<{ ok: boolean; reason: string; duplicate?: boolean }>;
+  produce(
+    db: Sql,
+    kind: string,
+    scope: { tenant_id: string; rooftop_id: string },
+    ref: Record<string, string>,
+  ): Promise<{ envelope: EnvelopeV2; body: string }[]>;
+  apply(
+    tx: Sql,
+    envelope: EnvelopeV2,
+  ): Promise<{ ok: boolean; reason: string; duplicate?: boolean }>;
 }
 
 export interface ReadDb {
@@ -40,7 +54,11 @@ export interface PublishRequest {
   ref: Record<string, string>;
 }
 export type PublishDecision = { ok: true } | { ok: false; reason: string };
-export type PublishAuthorizer = (db: ReadDb, userId: string, req: PublishRequest) => Promise<PublishDecision>;
+export type PublishAuthorizer = (
+  db: ReadDb,
+  userId: string,
+  req: PublishRequest,
+) => Promise<PublishDecision>;
 
 export interface AppRuntimeConfig {
   app: App;
@@ -92,13 +110,20 @@ function timeoutSignal(ms: number): AbortSignal {
 }
 
 const json = (status: number, doc: unknown): Response =>
-  new Response(JSON.stringify(doc), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
+  new Response(JSON.stringify(doc), {
+    status,
+    headers: { "content-type": "application/json", "cache-control": "no-store" },
+  });
 
 const rowsOf = (v: unknown): Record<string, unknown>[] => v as unknown as Record<string, unknown>[];
-const hex = (n: number) => Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) => b.toString(16).padStart(2, "0")).join("");
+const hex = (n: number) =>
+  Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) =>
+    b.toString(16).padStart(2, "0"),
+  ).join("");
 
 async function sameSecret(a: string, b: string): Promise<boolean> {
-  const digest = async (s: string) => new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)));
+  const digest = async (s: string) =>
+    new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)));
   const [x, y] = await Promise.all([digest(a), digest(b)]);
   let d = 0;
   for (let i = 0; i < x.length; i++) d |= x[i]! ^ y[i]!;
@@ -111,7 +136,8 @@ const UTF8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 /** Bounded read, then fatal UTF-8 decoding; a byte-order mark is refused, never stripped. */
 async function readBody(req: Request): Promise<BodyRead> {
   const declared = Number(req.headers.get("content-length") ?? "0");
-  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return { ok: false, status: 413, reason: "body_too_large" };
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES)
+    return { ok: false, status: 413, reason: "body_too_large" };
   const chunks: Uint8Array[] = [];
   let size = 0;
   if (req.body) {
@@ -133,7 +159,8 @@ async function readBody(req: Request): Promise<BodyRead> {
     buf.set(c, at);
     at += c.length;
   }
-  if (buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf) return { ok: false, status: 400, reason: "bom_not_allowed" };
+  if (buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf)
+    return { ok: false, status: 400, reason: "bom_not_allowed" };
   try {
     return { ok: true, body: UTF8.decode(buf) };
   } catch {
@@ -141,14 +168,28 @@ async function readBody(req: Request): Promise<BodyRead> {
   }
 }
 
-const isJson = (req: Request) => (req.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase() === "application/json";
+const isJson = (req: Request) =>
+  (req.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase() ===
+  "application/json";
 
 const currentKey = (reg: Registry, owner: ServiceKey["owner"], nowSec: number): ServiceKey | null =>
-  reg.keys.find((k) => k.owner === owner && k.dialect === "rtgip/2" && k.status === "current" && nowSec >= k.not_before && nowSec <= k.not_after) ?? null;
+  reg.keys.find(
+    (k) =>
+      k.owner === owner &&
+      k.dialect === "rtgip/2" &&
+      k.status === "current" &&
+      nowSec >= k.not_before &&
+      nowSec <= k.not_after,
+  ) ?? null;
 
 const STATUSES = new Set(["current", "previous", "revoked"]);
 const OWNERS = new Set(["autolabels", "autocurb", "autoframe", "autofilm", "gateway"]);
-const DIALECTS = new Set(["rtgip/2", "autolabels.rooftopos/1", "gateway.operator/1", "autoframe.raw-hash/1"]);
+const DIALECTS = new Set([
+  "rtgip/2",
+  "autolabels.rooftopos/1",
+  "gateway.operator/1",
+  "autoframe.raw-hash/1",
+]);
 
 /** The registry as this app's own database holds it. A missing or malformed secret leaves the key out. */
 async function loadRegistry(sql: Sql): Promise<Registry> {
@@ -174,7 +215,12 @@ async function loadRegistry(sql: Sql): Promise<Registry> {
   for (const k of keys) {
     const secret = k["secret"];
     if (typeof secret !== "string" || secret.length < 16) continue;
-    if (!STATUSES.has(String(k["status"])) || !OWNERS.has(String(k["owner"])) || !DIALECTS.has(String(k["dialect"]))) continue;
+    if (
+      !STATUSES.has(String(k["status"])) ||
+      !OWNERS.has(String(k["owner"])) ||
+      !DIALECTS.has(String(k["dialect"]))
+    )
+      continue;
     const nb = Number(k["not_before"]);
     const na = Number(k["not_after"]);
     if (!Number.isFinite(nb) || !Number.isFinite(na)) continue;
@@ -202,15 +248,16 @@ function admissionDb(sql: Sql): AdmissionDb {
           sql: tx,
           admit: async (headers, body, admission, rej) =>
             rowsOf(
-              await tx.unsafe("SELECT * FROM rtgip.inbox_admit($1::text::jsonb, $2::text, $3::text, $4::text::jsonb)", [
-                JSON.stringify(headers),
-                body,
-                admission,
-                rej ? JSON.stringify(rej) : null,
-              ]),
+              await tx.unsafe(
+                "SELECT * FROM rtgip.inbox_admit($1::text::jsonb, $2::text, $3::text, $4::text::jsonb)",
+                [JSON.stringify(headers), body, admission, rej ? JSON.stringify(rej) : null],
+              ),
             ) as unknown as AdmitRow[],
           recordReceipts: async (deliveryId, receipts) =>
-            void (await tx.unsafe("SELECT rtgip.inbox_record_receipts($1, $2::text[])", [deliveryId, tx.array(receipts) as never])),
+            void (await tx.unsafe("SELECT rtgip.inbox_record_receipts($1, $2::text[])", [
+              deliveryId,
+              tx.array(receipts) as never,
+            ])),
           savepoint: async (n) => void (await tx.unsafe(`SAVEPOINT ${n}`)),
           rollbackTo: async (n) => void (await tx.unsafe(`ROLLBACK TO SAVEPOINT ${n}`)),
         };
@@ -238,7 +285,11 @@ export function createAppRuntime(cfg: AppRuntimeConfig): AppRuntime {
     let ok = false;
     try {
       const u = new URL(cfg.env("SUPABASE_URL") ?? "");
-      ok = REF.test(cfg.stagingRef) && u.origin === `https://${cfg.stagingRef}.supabase.co` && !u.username && !u.password;
+      ok =
+        REF.test(cfg.stagingRef) &&
+        u.origin === `https://${cfg.stagingRef}.supabase.co` &&
+        !u.username &&
+        !u.password;
     } catch {
       ok = false;
     }
@@ -263,7 +314,9 @@ export function createAppRuntime(cfg: AppRuntimeConfig): AppRuntime {
       row = rowsOf(
         await sql.begin(async (tx) => {
           await tx.unsafe("SET TRANSACTION READ ONLY");
-          return tx.unsafe("SELECT transport_enabled, local_app FROM rtgip.delivery_config WHERE id");
+          return tx.unsafe(
+            "SELECT transport_enabled, local_app FROM rtgip.delivery_config WHERE id",
+          );
         }),
       )[0];
     } catch {
@@ -274,14 +327,19 @@ export function createAppRuntime(cfg: AppRuntimeConfig): AppRuntime {
     return null;
   }
 
-  async function guarded(req: Request, work: (sql: Sql) => Promise<Response>, opts: { dispatch?: boolean } = {}): Promise<Response> {
+  async function guarded(
+    req: Request,
+    work: (sql: Sql) => Promise<Response>,
+    opts: { dispatch?: boolean } = {},
+  ): Promise<Response> {
     const early = staticGate();
     if (early) return early;
     if (opts.dispatch) {
       if (!gatewayBase()) return refuse("gateway_origin_not_allowed");
       const key = cfg.env("SUPABASE_SERVICE_ROLE_KEY") ?? "";
       const m = /^Bearer (\S+)$/.exec(req.headers.get("authorization") ?? "");
-      if (!key || !m || !(await sameSecret(m[1]!, key))) return json(401, { reason: "unauthorized" });
+      if (!key || !m || !(await sameSecret(m[1]!, key)))
+        return json(401, { reason: "unauthorized" });
     }
     let sql: Sql | null = null;
     try {
@@ -317,11 +375,22 @@ export function createAppRuntime(cfg: AppRuntimeConfig): AppRuntime {
         return r.ok ? { ok: true } : { ok: false, reason: r.reason };
       };
       const headers = Object.fromEntries(req.headers.entries());
-      const r = await admitDelivery(headers, read.body, { app: cfg.app as AppId, registry: reg, nowSec: t, db: admissionDb(sql), effect, receiptKey });
+      const r = await admitDelivery(headers, read.body, {
+        app: cfg.app as AppId,
+        registry: reg,
+        nowSec: t,
+        db: admissionDb(sql),
+        effect,
+        receiptKey,
+      });
       return json(r.http_status, { reason: r.reason ?? null, receipts: r.receipts ?? [] });
     });
 
-  async function post(url: string, headers: Record<string, string>, body: string): Promise<{ status: number; doc: { reason?: string | null; receipts?: ReceiptV2[] } }> {
+  async function post(
+    url: string,
+    headers: Record<string, string>,
+    body: string,
+  ): Promise<{ status: number; doc: { reason?: string | null; receipts?: ReceiptV2[] } }> {
     try {
       const r = await doFetch(url, {
         method: "POST",
@@ -358,8 +427,24 @@ export function createAppRuntime(cfg: AppRuntimeConfig): AppRuntime {
             return fn(tx as unknown as Sql);
           }) as Promise<T>;
         const advance = async (id: string, gen: number, texts: string[]) =>
-          rowsOf(await asDispatcher((tx) => tx.unsafe("SELECT rtgip.outbox_advance($1, $2, $3, $4::text[]) AS r", [id, worker, gen, tx.array(texts) as never])))[0]!["r"] as string;
-        const rows = rowsOf(await asDispatcher((tx) => tx.unsafe("SELECT event_id, body, envelope, delivery_id, lease_generation, lease_action FROM rtgip.outbox_claim($1, 100, 60)", [worker])));
+          rowsOf(
+            await asDispatcher((tx) =>
+              tx.unsafe("SELECT rtgip.outbox_advance($1, $2, $3, $4::text[]) AS r", [
+                id,
+                worker,
+                gen,
+                tx.array(texts) as never,
+              ]),
+            ),
+          )[0]!["r"] as string;
+        const rows = rowsOf(
+          await asDispatcher((tx) =>
+            tx.unsafe(
+              "SELECT event_id, body, envelope, delivery_id, lease_generation, lease_action FROM rtgip.outbox_claim($1, 100, 60)",
+              [worker],
+            ),
+          ),
+        );
         const out: DispatchResult[] = [];
         for (const row of rows) {
           const envelope = row["envelope"] as EnvelopeV2;
@@ -372,28 +457,72 @@ export function createAppRuntime(cfg: AppRuntimeConfig): AppRuntime {
           let doc: { reason?: string | null; receipts?: ReceiptV2[] } = {};
           try {
             if (action === "deliver") {
-              const headers = (await signEnvelope(body, envelope, key, nowSec(), `src_${hex(12)}`)) as unknown as Record<string, string>;
+              const headers = (await signEnvelope(
+                body,
+                envelope,
+                key,
+                nowSec(),
+                `src_${hex(12)}`,
+              )) as unknown as Record<string, string>;
               ({ status, doc } = await post(`${base}/api/rtgip/v2/deliver`, headers, body));
             } else {
-              const q = await signReceiptQuery({ delivery_id: row["delivery_id"] as string, event_id: eventId }, key, nowSec(), `qry_${hex(12)}`);
-              ({ status, doc } = await post(`${base}/api/rtgip/v2/receipts`, q.headers as unknown as Record<string, string>, q.body));
+              const q = await signReceiptQuery(
+                { delivery_id: row["delivery_id"] as string, event_id: eventId },
+                key,
+                nowSec(),
+                `qry_${hex(12)}`,
+              );
+              ({ status, doc } = await post(
+                `${base}/api/rtgip/v2/receipts`,
+                q.headers as unknown as Record<string, string>,
+                q.body,
+              ));
             }
           } catch {
             doc = { reason: "signing_failed" };
           }
           const advanced: string[] = [];
-          if (status === 200 && Array.isArray(doc.receipts) && doc.receipts.length) advanced.push(await advance(eventId, gen, doc.receipts.map((x) => canonicalize(x))));
+          if (status === 200 && Array.isArray(doc.receipts) && doc.receipts.length)
+            advanced.push(
+              await advance(
+                eventId,
+                gen,
+                doc.receipts.map((x) => canonicalize(x)),
+              ),
+            );
           const last = advanced.at(-1);
-          if (last !== "gateway_admitted" && last !== "consumer_committed" && last !== "target_quarantined") {
+          if (
+            last !== "gateway_admitted" &&
+            last !== "consumer_committed" &&
+            last !== "target_quarantined"
+          ) {
             const why = last
               ? last.replace(/^(rejected|pending):/, "")
               : status >= 400 && status < 500
                 ? refusalReason(status, doc.reason)
                 : (doc.reason ?? `http_${status}`);
-            await asDispatcher((tx) => tx.unsafe("SELECT rtgip.outbox_fail($1, $2, $3, $4, 1, 10)", [eventId, worker, gen, String(why).slice(0, 200)]));
+            await asDispatcher((tx) =>
+              tx.unsafe("SELECT rtgip.outbox_fail($1, $2, $3, $4, 1, 10)", [
+                eventId,
+                worker,
+                gen,
+                String(why).slice(0, 200),
+              ]),
+            );
           }
-          const state = String(rowsOf(await sql.unsafe("SELECT state FROM rtgip.outbox WHERE event_id = $1", [eventId]))[0]?.["state"] ?? "unknown");
-          out.push({ event_id: eventId, action, http_status: status, reason: doc.reason ?? null, advanced, state });
+          const state = String(
+            rowsOf(
+              await sql.unsafe("SELECT state FROM rtgip.outbox WHERE event_id = $1", [eventId]),
+            )[0]?.["state"] ?? "unknown",
+          );
+          out.push({
+            event_id: eventId,
+            action,
+            http_status: status,
+            reason: doc.reason ?? null,
+            advanced,
+            state,
+          });
         }
         return json(200, out);
       },
@@ -436,7 +565,8 @@ export function createAppRuntime(cfg: AppRuntimeConfig): AppRuntime {
       let doc: Record<string, unknown>;
       try {
         const parsed: unknown = JSON.parse(read.body);
-        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("shape");
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+          throw new Error("shape");
         doc = parsed as Record<string, unknown>;
       } catch {
         return json(400, { reason: "bad_request" });
@@ -444,11 +574,22 @@ export function createAppRuntime(cfg: AppRuntimeConfig): AppRuntime {
       const kind = doc["kind"];
       const tenant = doc["tenant_id"];
       const rooftop = doc["rooftop_id"];
-      if (typeof kind !== "string" || !cfg.publish.kinds.includes(kind)) return json(400, { reason: "unknown_kind" });
-      if (typeof tenant !== "string" || !tenant || tenant.length > 128 || typeof rooftop !== "string" || !rooftop || rooftop.length > 64)
+      if (typeof kind !== "string" || !cfg.publish.kinds.includes(kind))
+        return json(400, { reason: "unknown_kind" });
+      if (
+        typeof tenant !== "string" ||
+        !tenant ||
+        tenant.length > 128 ||
+        typeof rooftop !== "string" ||
+        !rooftop ||
+        rooftop.length > 64
+      )
         return json(400, { reason: "bad_scope" });
       const ref: Record<string, string> = {};
-      const given = doc["ref"] && typeof doc["ref"] === "object" && !Array.isArray(doc["ref"]) ? (doc["ref"] as Record<string, unknown>) : {};
+      const given =
+        doc["ref"] && typeof doc["ref"] === "object" && !Array.isArray(doc["ref"])
+          ? (doc["ref"] as Record<string, unknown>)
+          : {};
       for (const k of cfg.publish.refKeys) {
         const v = given[k];
         if (v === undefined) continue;
@@ -458,7 +599,13 @@ export function createAppRuntime(cfg: AppRuntimeConfig): AppRuntime {
       const request: PublishRequest = { kind, tenant_id: tenant, rooftop_id: rooftop, ref };
       const decision = (await sql.begin(async (tx) => {
         await tx.unsafe("SET TRANSACTION READ ONLY");
-        return cfg.publish.authorize({ query: async (text, params) => rowsOf(await tx.unsafe(text, (params ?? []) as never[])) }, user.id, request);
+        return cfg.publish.authorize(
+          {
+            query: async (text, params) => rowsOf(await tx.unsafe(text, (params ?? []) as never[])),
+          },
+          user.id,
+          request,
+        );
       })) as unknown as PublishDecision;
       if (!decision.ok) {
         const why = "reason" in decision ? decision.reason : "";
@@ -466,9 +613,19 @@ export function createAppRuntime(cfg: AppRuntimeConfig): AppRuntime {
       }
       let produced: { envelope: EnvelopeV2; body: string }[];
       try {
-        produced = await cfg.adapter.produce(sql, kind, { tenant_id: tenant, rooftop_id: rooftop }, ref);
+        produced = await cfg.adapter.produce(
+          sql,
+          kind,
+          { tenant_id: tenant, rooftop_id: rooftop },
+          ref,
+        );
       } catch (err) {
-        return json(422, { reason: (err as { name?: string })?.name === "PostgresError" ? "produce_failed" : safeCode(err, "produce_failed") });
+        return json(422, {
+          reason:
+            (err as { name?: string })?.name === "PostgresError"
+              ? "produce_failed"
+              : safeCode(err, "produce_failed"),
+        });
       }
       if (!produced.length) return json(422, { reason: "nothing_to_publish" });
       try {
@@ -476,14 +633,25 @@ export function createAppRuntime(cfg: AppRuntimeConfig): AppRuntime {
           await tx.unsafe("SET LOCAL ROLE rtgip_outbox_writer");
           const acc: { event_id: string; target_app: string; result: string }[] = [];
           for (const p of produced) {
-            const r = rowsOf(await tx.unsafe("SELECT rtgip.outbox_enqueue($1) AS r", [p.body]))[0]!["r"] as string;
-            acc.push({ event_id: p.envelope.event_id, target_app: p.envelope.target_app, result: r });
+            const r = rowsOf(await tx.unsafe("SELECT rtgip.outbox_enqueue($1) AS r", [p.body]))[0]![
+              "r"
+            ] as string;
+            acc.push({
+              event_id: p.envelope.event_id,
+              target_app: p.envelope.target_app,
+              result: r,
+            });
           }
           return acc;
         })) as unknown as { event_id: string; target_app: string; result: string }[];
         return json(200, { results });
       } catch (err) {
-        return json(422, { reason: (err as { name?: string })?.name === "PostgresError" ? safeCode(err, "enqueue_failed") : "enqueue_failed" });
+        return json(422, {
+          reason:
+            (err as { name?: string })?.name === "PostgresError"
+              ? safeCode(err, "enqueue_failed")
+              : "enqueue_failed",
+        });
       }
     });
 

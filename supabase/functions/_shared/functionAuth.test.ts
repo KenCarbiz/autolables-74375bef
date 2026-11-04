@@ -553,6 +553,13 @@ describe("edge function gateway configuration", () => {
       "integration-apply": false,
       "integration-dispatch": false,
       "integration-health": false,
+      // RTGIP/2 app runtime, dark behind a compiled literal. Inbound carries
+      // no Supabase JWT: the Gateway's HMAC is verified in SQL by inbox_admit.
+      // Dispatch is a service-role bearer compared in constant time. Publish
+      // keeps the gate on and re-derives authority from the caller's rows.
+      "rtgip-inbound": false,
+      "rtgip-dispatch": false,
+      "rtgip-publish": true,
     });
   });
 

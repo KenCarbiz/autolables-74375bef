@@ -76,7 +76,7 @@ describe("the function entry files", () => {
     it(`rtgip-${fn} passes the compiled literal and nothing else`, () => {
       const text = read(`supabase/functions/rtgip-${fn}/index.ts`);
       expect(text).toBe(
-        `import { RTGIP2_APP_RUNTIME_ENABLED, createEntryRuntime } from "../_shared/rtgip2-runtime.bundle.js";\n\n` +
+        `import {\n  RTGIP2_APP_RUNTIME_ENABLED,\n  createEntryRuntime,\n} from "../_shared/rtgip2-runtime.bundle.js";\n\n` +
           `const runtime = createEntryRuntime({ compiledEnabled: RTGIP2_APP_RUNTIME_ENABLED });\n\n` +
           `Deno.serve((req: Request) => runtime.${fn}(req));\n`,
       );
