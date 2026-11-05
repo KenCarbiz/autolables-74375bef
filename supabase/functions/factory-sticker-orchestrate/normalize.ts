@@ -7,6 +7,7 @@
 import { parseYmm } from "../_shared/factorySticker/lib/ymm.ts";
 import { decideDrivetrain, isRatingMetadata, splitRatingMetadata, type DrivetrainEvidence } from "../_shared/factorySticker/lib/oem/sourceCorrections.ts";
 
+import { epaFuelClassConflict } from "../_shared/factorySticker/lib/render/catalogNeovin.ts";
 import { hasBuiltCatalogTemplates } from "../_shared/factorySticker/lib/oem/templateCatalog.ts";
 import type { FactoryStickerRenderData } from "../_shared/factorySticker/lib/render/contract.ts";
 
@@ -210,6 +211,7 @@ export function normalizeForSticker(
               ],
               madeIn: str(mc.made_in),
               ...(/diesel/i.test(String(mc.fuel_type ?? "")) ? { fuelType: String(mc.fuel_type) } : {}),
+              ...(epaFuelClassConflict(epa?.fuelType, str(mc.fuel_type), str(mc.powertrain_type)) ? { epaFuelConflict: true as const } : {}),
             },
           }
         : {}),

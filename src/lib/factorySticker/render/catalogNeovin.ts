@@ -65,3 +65,29 @@ export function withCatalogNeovin(data: FactoryStickerRenderData): FactorySticke
   if (!data.assembly.country && neovin.madeIn) out = { ...out, assembly: { ...out.assembly, country: neovin.madeIn } };
   return out;
 }
+
+type FuelFamily = "gas" | "diesel" | "ev" | "electrified";
+
+function fuelFamily(...texts: Array<string | null | undefined>): FuelFamily | null {
+  const t = texts.map((x) => String(x ?? "")).join(" ").toLowerCase();
+  if (!t.trim()) return null;
+  const electric = /electric|\bev\b|\bbev\b/.test(t);
+  const diesel = /diesel/.test(t);
+  const gas = /gas|flex|e85|petrol|premium|regular|unleaded/.test(t);
+  if (/phev|plug|hybrid/.test(t) || (electric && (gas || diesel))) return "electrified";
+  if (electric) return "ev";
+  if (diesel) return "diesel";
+  return gas ? "gas" : null;
+}
+
+/** True when the saved EPA match names a fuel class the decode's own fuel and powertrain contradict. */
+export function epaFuelClassConflict(epaFuelType: string | null | undefined, decodeFuelType: string | null | undefined, decodePowertrain?: string | null): boolean {
+  const epa = fuelFamily(epaFuelType);
+  const decode = fuelFamily(decodeFuelType, decodePowertrain);
+  return epa !== null && decode !== null && epa !== decode;
+}
+
+/** An EPA match that contradicts the decode is unverified for the catalog templates: no EPA value or fuel-type tag is printed. */
+export function withCatalogEpaGuard(data: FactoryStickerRenderData): FactoryStickerRenderData {
+  return data.neovin?.epaFuelConflict && data.epa ? { ...data, epa: null } : data;
+}

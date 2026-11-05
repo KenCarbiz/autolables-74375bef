@@ -21,6 +21,8 @@ export interface CatalogSuiteConfig {
   stressLabel: string;
   /** The stress record is itself a supported configuration (the synthetic fixture). */
   stressMatches?: boolean;
+  /** The stress record's EPA match contradicts its decode, so the EPA panel must print unavailable. */
+  stressEpaConflict?: boolean;
   listing: () => CatalogListing;
   renderData: (l: CatalogListing) => FactoryStickerRenderData;
   referenceMatch: (base: FactoryStickerRenderData) => FactoryStickerRenderData;
@@ -101,6 +103,11 @@ export function describeCatalogTemplate(c: CatalogSuiteConfig): void {
 
       it("prints EPA values from the record and explicit unavailable states for the rest", () => {
         const s = m.drawnStrings;
+        if (c.stressEpaConflict) {
+          expect(real.neovin?.epaFuelConflict).toBe(true);
+          expect(s.join(" ")).not.toMatch(/Electric Vehicle|Gasoline Vehicle|Diesel Vehicle/);
+          expect(s.filter((x) => x === "Not Available").length).toBeGreaterThanOrEqual(2);
+        }
         if (c.carb) {
           const all = s.join(" ");
           expect(all).toContain("California Air Resources Board");
@@ -346,7 +353,10 @@ export function describeCatalogTemplate(c: CatalogSuiteConfig): void {
       });
 
       it("flags the stress record and every unsupported configuration", () => {
-        expect(templateRoutingFacts(real).flags).toEqual(c.stressMatches ? ["template_pending_owner_approval"] : ["template_configuration_unsupported"]);
+        expect(templateRoutingFacts(real).flags).toEqual([
+          ...(c.stressMatches ? ["template_pending_owner_approval"] : ["template_configuration_unsupported"]),
+          ...(c.stressEpaConflict ? ["epa_match_fuel_class_conflict"] : []),
+        ]);
         for (const u of c.unsupported) {
           const facts = templateRoutingFacts(u.patch(ref));
           expect(facts.flags, u.label).toEqual(["template_configuration_unsupported"]);

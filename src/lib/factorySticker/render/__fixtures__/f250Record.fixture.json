@@ -405,6 +405,7 @@
   "engine": "3.5L V6",
   "transmission": "Automatic",
   "drivetrain": "4WD",
-  "made_in": "USA"
+  "made_in": "USA",
+  "fuel_type": "Unleaded"
  }
 }

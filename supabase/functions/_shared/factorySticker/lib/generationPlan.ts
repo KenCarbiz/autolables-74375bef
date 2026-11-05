@@ -18,6 +18,7 @@ import {
 import { resolveReferenceVariant, type ReferenceVariantResolution } from "./oem/referenceVariants.ts";
 import { resolveRenderProfile, templateRoutingFacts, type FactoryStickerRenderData, type FactoryStickerTheme } from "./render/contract.ts";
 import { withCatalogEquipment } from "./render/catalogEquipment.ts";
+import { withCatalogEpaGuard } from "./render/catalogNeovin.ts";
 import type { CatalogResolution } from "./oem/templateCatalog.ts";
 import { fitOk } from "./render/layout.ts";
 import { checkRenderedCompleteness, type CompletenessReport } from "./render/completeness.ts";
@@ -222,7 +223,7 @@ export function assessRenderedSticker(input: {
   // Fit is never trusted. The manifest states everything the document is
   // required to print and the render is checked against it.
   const completenessData = plan.templateRouting.status === "approved_match" && !plan.templateRouting.servedByApprovedMaster
-    ? withCatalogEquipment(normalized.data) : normalized.data;
+    ? withCatalogEpaGuard(withCatalogEquipment(normalized.data)) : normalized.data;
   const completeness = checkRenderedCompleteness(completenessData, {
     width: Number(layout.widthPt ?? 0),
     height: Number(layout.heightPt ?? 0),

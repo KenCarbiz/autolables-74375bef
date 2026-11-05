@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildRenderLayout, type FactoryStickerRenderData, type FactoryStickerTheme } from "./contract";
-import { nhtsaFromRatingMetadata, withCatalogNeovin } from "./catalogNeovin";
+import { buildRenderLayout, templateRoutingFacts, type FactoryStickerRenderData, type FactoryStickerTheme } from "./contract";
+import { epaFuelClassConflict, nhtsaFromRatingMetadata, withCatalogEpaGuard, withCatalogNeovin } from "./catalogNeovin";
 import { hasBuiltCatalogTemplates } from "../oem/templateCatalog";
 import { tucsonListings, tucsonRenderData } from "./__fixtures__/tucson";
 import { wranglerRenderData } from "./__fixtures__/wrangler";
@@ -80,5 +80,43 @@ describe("NeoVIN decode facts for catalog templates", () => {
     expect(diesel.neovin?.fuelType).toBe("Diesel");
     const gas = normalizeForSticker(withFuel("Unleaded"), {}, canonicalPassportUrl("x"), "t").data;
     expect(gas.neovin?.fuelType).toBeUndefined();
+  });
+});
+
+describe("EPA match fuel-class guard for catalog templates", () => {
+  const cases: Array<[string, string, string, string | null, boolean]> = [
+    ["2024 F-150 XLT with an Electricity EPA row", "Electricity", "Unleaded", null, true],
+    ["Grand Cherokee Electric / Premium Unleaded matched as Regular", "Regular", "Electric / Premium Unleaded", null, true],
+    ["Fusion Electric / Unleaded matched as Regular", "Regular", "Electric / Unleaded", null, true],
+    ["consistent gasoline", "Regular Gasoline", "Unleaded", null, false],
+    ["consistent plug-in", "Gasoline and Electricity", "Electric / Premium Unleaded", null, false],
+    ["no decode fuel", "Electricity", "", null, false],
+  ];
+  for (const [label, epaFuel, decodeFuel, powertrain, expected] of cases) {
+    it(`${expected ? "flags" : "accepts"} ${label}`, () => {
+      expect(epaFuelClassConflict(epaFuel, decodeFuel, powertrain)).toBe(expected);
+    });
+  }
+
+  it("normalizes the conflict only for catalog makes and prints every EPA value as unavailable", () => {
+    const base = tucsonListings()[0];
+    const make = (ymm: string, decodeFuel: string, epaFuel: string) => ({
+      ...base, ymm,
+      mc_attributes: { ...(base.mc_attributes as object), fuel_type: decodeFuel },
+      epa_economy: { combined: 76, city: 78, highway: 72, annualFuelCost: 700, ghgScore: 10, fuelType: epaFuel },
+    });
+    const conflicted = normalizeForSticker(make("2026 Ford F-250", "Unleaded", "Electricity"), {}, canonicalPassportUrl("x"), "t").data;
+    expect(conflicted.neovin?.epaFuelConflict).toBe(true);
+    expect(withCatalogEpaGuard(conflicted).epa).toBeNull();
+    expect(templateRoutingFacts(conflicted).flags).toContain("epa_match_fuel_class_conflict");
+    const consistent = normalizeForSticker(make("2026 Ford F-250", "Unleaded", "Regular Gasoline"), {}, canonicalPassportUrl("x"), "t").data;
+    expect(consistent.neovin?.epaFuelConflict).toBeUndefined();
+    expect(withCatalogEpaGuard(consistent).epa).not.toBeNull();
+    const master = normalizeForSticker(make("2026 Infiniti QX60", "Unleaded", "Electricity"), {}, canonicalPassportUrl("x"), "t").data;
+    expect(master.neovin).toBeUndefined();
+    const layout = buildRenderLayout(conflicted, theme, undefined, { sampleTemplateId: "ford_2026_f250" });
+    const all = layout.drawnStrings.join(" ");
+    expect(all).not.toContain("Electric Vehicle");
+    expect(all).not.toContain("Diesel Vehicle");
   });
 });

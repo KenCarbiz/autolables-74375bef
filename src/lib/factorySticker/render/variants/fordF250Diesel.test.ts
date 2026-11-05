@@ -11,6 +11,7 @@ describeCatalogTemplate({
   make: "Ford",
   model: "F-250 Super Duty",
   stressLabel: "2024 F-150 record",
+  stressEpaConflict: true,
   carb: { safetyPanel: false, plainAmounts: true },
   listing: f250Listing,
   renderData: f250RenderData,
