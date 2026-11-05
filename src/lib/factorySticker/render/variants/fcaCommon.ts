@@ -23,8 +23,8 @@ import type { VariantLayoutBuilder } from "./shared.ts";
 
 const Q = (pt: number): number => pt / 0.612;
 const EQ_STYLE: FlowStyle = { size: 14.7, lh: 17.2, hang: 6, inset: 0 };
-const EPA_X = 625;
-const EPA_W = 547;
+export const EPA_X = 625;
+export const EPA_W = 547;
 const COL2_X = 345;
 const COL2_W = 245;
 const COL2_R = 589;
@@ -177,10 +177,10 @@ function paintEpa(p: Painter, d: FactoryStickerData): void {
 
 // ── Safety ────────────────────────────────────────────────────────────
 
-const SAFETY_X = 625;
+export const SAFETY_X = 625;
 const SAFETY_W = 322;
 
-function paintSafety(p: Painter, d: FactoryStickerData): void {
+export function paintSafety(p: Painter, d: FactoryStickerData): void {
   const r = d.regulatory;
   const top = Y(442);
   const ratings = [r.overallRating, r.frontalDriverRating, r.frontalPassengerRating, r.sideFrontRating, r.sideRearRating, r.rolloverRating];
@@ -210,7 +210,7 @@ function paintSafety(p: Painter, d: FactoryStickerData): void {
 
 // ── Parts content ─────────────────────────────────────────────────────
 
-const PARTS_X = 956;
+export const PARTS_X = 956;
 const PARTS_W = 218;
 
 function paintParts(p: Painter, d: FactoryStickerData): void {
@@ -268,7 +268,7 @@ function paintParts(p: Painter, d: FactoryStickerData): void {
   if (y <= limit) run(true, size);
 }
 
-function paintPassport(p: Painter, url: string): void {
+export function paintPassport(p: Painter, url: string): void {
   if (!url) return;
   const y = Y(649);
   p.qr(PARTS_X + 2, y, PASSPORT_QR_PT, url, INK);
@@ -358,6 +358,8 @@ export interface FcaBrand {
   paintHeader: (p: Painter, d: FactoryStickerData) => void;
   specTitle: (d: FactoryStickerData) => string;
   priceRows: (d: FactoryStickerData) => PriceRow[];
+  /** Replaces the fuel-economy, safety, parts-content and Passport panels on the right (a brand whose reference prints other panels there). */
+  paintRight?: (p: Painter, d: FactoryStickerData) => void;
 }
 
 const makeSpec = (brand: FcaBrand): TabloidSpec => ({
@@ -371,10 +373,14 @@ const makeSpec = (brand: FcaBrand): TabloidSpec => ({
     brand.paintHeader(p, d);
     const specBottom = paintSpec(p, d, brand.specTitle(d));
     paintFooter(p, d, input.layout.barcodePayload, bottomLimit - 2);
-    paintEpa(p, d);
-    paintSafety(p, d);
-    paintParts(p, d);
-    paintPassport(p, d.document.passportUrl.trim());
+    if (brand.paintRight) {
+      brand.paintRight(p, d);
+    } else {
+      paintEpa(p, d);
+      paintSafety(p, d);
+      paintParts(p, d);
+      paintPassport(p, d.document.passportUrl.trim());
+    }
 
     const headY = Math.max(Y(236), specBottom + 2);
     const head = "STANDARD EQUIPMENT";
