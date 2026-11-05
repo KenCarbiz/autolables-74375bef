@@ -29,6 +29,7 @@ import { SUBARU_FORESTER_GAS_ID, buildSubaruForesterGasLayout } from "./subaruFo
 import { ALFA_ROMEO_GIULIA_GAS_ID, buildAlfaRomeoGiuliaGasLayout } from "./alfaRomeoGiuliaGas.ts";
 import { MASERATI_GRANTURISMO_GAS_ID, buildMaseratiGranTurismoGasLayout } from "./maseratiGranTurismoTrofeo.ts";
 import { LINCOLN_NAUTILUS_GAS_ID, buildLincolnNautilusGasLayout } from "./lincolnNautilusGas.ts";
+import { ASTON_MARTIN_VANTAGE_ROADSTER_GAS_ID, buildAstonMartinVantageRoadsterGasLayout } from "./astonMartinVantageRoadsterGas.ts";
 import type { VariantLayoutBuilder } from "./shared.ts";
 
 export type { VariantLayoutBuilder, VariantRenderInput } from "./shared.ts";
@@ -72,4 +73,5 @@ export const CATALOG_LAYOUTS: Partial<Record<string, VariantLayoutBuilder>> = {
   [ALFA_ROMEO_GIULIA_GAS_ID]: buildAlfaRomeoGiuliaGasLayout,
   [MASERATI_GRANTURISMO_GAS_ID]: buildMaseratiGranTurismoGasLayout,
   [LINCOLN_NAUTILUS_GAS_ID]: buildLincolnNautilusGasLayout,
+  [ASTON_MARTIN_VANTAGE_ROADSTER_GAS_ID]: buildAstonMartinVantageRoadsterGasLayout,
 };

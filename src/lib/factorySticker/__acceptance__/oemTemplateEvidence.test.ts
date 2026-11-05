@@ -64,6 +64,8 @@ import { maseratiReferenceMatchData, maseratiRenderData } from "../render/__fixt
 import { MASERATI_GRANTURISMO_GAS_ID } from "../render/variants/maseratiGranTurismoTrofeo";
 import { lincolnReferenceMatchData, lincolnRenderData } from "../render/__fixtures__/lincoln";
 import { LINCOLN_NAUTILUS_GAS_ID } from "../render/variants/lincolnNautilusGas";
+import { astonReferenceMatchData, astonRenderData } from "../render/__fixtures__/aston";
+import { ASTON_MARTIN_VANTAGE_ROADSTER_GAS_ID } from "../render/variants/astonMartinVantageRoadsterGas";
 import { TEMPLATE_CATALOG, evaluateCatalogTemplate, type CatalogTemplate } from "../oem/templateCatalog";
 import { CATALOG_LAYOUTS } from "../render/variants";
 
@@ -378,6 +380,24 @@ ${b.differences.join("\n")}
 `;
 
 const BRAND_DOCS: Record<string, BrandDoc> = {
+  aston: {
+    title: "Aston Martin 2026 Vantage Roadster (gasoline)",
+    logo: "Aston Martin wings emblem",
+    logoNote: "packaged artwork cropped from the reference scan (logoArtwork.ts) as an alpha-masked raster at 300 dpi; the PDF has no vector or text layer",
+    rows: [
+      "| Black header band: dealer, model, model year, exterior and interior colour, VIN, model name | the original delivering dealer only (blank otherwise); identity (model, trim, year); build_sheet.colors; listing.vin | Value omitted, label kept |",
+      "| Owner benefits and standard features | verified warranty terms only; normalized standard equipment grouped by category | \"Warranty terms are not available for this vehicle.\"; \"Standard equipment not available for this vehicle.\" |",
+      "| Suggested retail price and optional equipment | build_sheet.pricing.base_msrp; build_sheet.packages / options | NOT AVAILABLE; nothing listed, a missing price prints N/A |",
+      "| Transportation and handling, gas guzzler, total suggested retail | build_sheet.pricing destination_charge, gas guzzler tax (only when the record states it), total | NOT AVAILABLE / row omitted |",
+    ],
+    sample: ["- sticker-JTEMU5JR2N5993023: off-year, other-make layout stress test (2022 Toyota 4Runner SR5, used), not a production candidate. Production has no Aston Martin record and none has ever been saved, so a saved record of another make is used through the sample path.", "- the reference's printed total (221,525.00) exceeds the sum of its printed lines (205,900.00 base + 4,925.00 options + 3,500.00 transportation and handling = 214,325.00) by 7,200.00, the reference's Import Costs line, which has no field in the render data and is not printed. The reference-match fixture keeps the printed total, so it does not reconcile by 7,200.00."],
+    differences: [
+      "- Page: the reference PDF is stored rotated (Page rot 270, 792x1224) and has no text layer; the render is the upright 1224x792 landscape page and exactly one page. Reference values were read from the raster scan (no_text_layer_in_reference).",
+      "- Layout: Aston Martin's own family (black header band, three-zone body). The free area under the fuel-economy panel, which holds a faded car photograph in the scan, carries a third equipment column so a full standard list fits.",
+      "- Vantage Roadster versus coupe: the match rule is 2026 Vantage, convertible body (roadster, cabriolet, spyder or drophead text), gasoline. A coupe body, other model or year, or any other powertrain is not matched and flags template_configuration_unsupported.",
+      "- Artwork and text not reproduced: the faded car photograph, the engine-number line (the engine, transmission and drivetrain fields have no region on this reference apart from the equipment list), the port-of-entry line, the import-costs line, the bumper-quality paragraph and notice, the Best Sports Car advertisement and window tag, the social icons, agency seals and the source QR.",
+    ],
+  },
   lincoln: {
     title: "Lincoln 2026 Nautilus Premiere (gasoline)",
     logo: "Lincoln star",
@@ -843,6 +863,7 @@ const packages: PackageSpec[] = [{
   [ALFA_ROMEO_GIULIA_GAS_ID, "alfa-romeo-2026-giulia", "alfa", () => [alfaRenderData()], "off-year, other-model layout stress test (2020 Stelvio Ti Sport Carbon record), not a production candidate", alfaReferenceMatchData],
   [MASERATI_GRANTURISMO_GAS_ID, "maserati-2026-granturismo", "maserati", () => [maseratiRenderData()], "off-year, other-make layout stress test (2024 Lexus GX record), not a production candidate", maseratiReferenceMatchData],
   [LINCOLN_NAUTILUS_GAS_ID, "lincoln-2026-nautilus", "lincoln", () => [lincolnRenderData()], "off-year, other-model layout stress test (2008 MKZ Base record), not a production candidate", lincolnReferenceMatchData],
+  [ASTON_MARTIN_VANTAGE_ROADSTER_GAS_ID, "aston-martin-2026-vantage-roadster", "aston", () => [astonRenderData()], "off-year, other-make layout stress test (2022 Toyota 4Runner SR5 record), not a production candidate", astonReferenceMatchData],
 ] as const).map(([templateId, dirName, key, real, realLabel, reference]): PackageSpec => ({
   templateId,
   dirName,

@@ -44,6 +44,7 @@ const LATER_TEMPLATES = [
   "alfa_romeo_2026_giulia_veloce",
   "maserati_2026_granturismo_trofeo",
   "lincoln_2026_nautilus_premiere",
+  "aston_martin_2026_vantage_roadster",
 ];
 const FRAGMENT_TEMPLATES = new Set(["mitsubishi_2026_outlander_sport_s", "chrysler_2026_voyager_lx", ...LATER_TEMPLATES]);
 
