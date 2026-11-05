@@ -323,8 +323,8 @@ export const TEMPLATE_CATALOG: readonly CatalogTemplate[] = [
     design: { fileKey: "e0549oHeHY7hoityL1ljd7", masterNodeId: "1:394" },
     match: { modelYears: [2026], modelPattern: "^nautilus$", bodyClasses: ["SUV"], fuelClasses: ["gasoline"], },
     approval: "pending_owner_approval",
-    layoutStatus: "not_started",
-    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "layout_not_built"],
+    layoutStatus: "sample_ready",
+    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "parts_content_not_wired", "warranty_terms_not_wired"],
   },
   {
     id: "maserati_2026_granturismo_trofeo",

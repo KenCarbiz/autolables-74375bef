@@ -62,6 +62,8 @@ import { alfaReferenceMatchData, alfaRenderData } from "../render/__fixtures__/a
 import { ALFA_ROMEO_GIULIA_GAS_ID } from "../render/variants/alfaRomeoGiuliaGas";
 import { maseratiReferenceMatchData, maseratiRenderData } from "../render/__fixtures__/maserati";
 import { MASERATI_GRANTURISMO_GAS_ID } from "../render/variants/maseratiGranTurismoTrofeo";
+import { lincolnReferenceMatchData, lincolnRenderData } from "../render/__fixtures__/lincoln";
+import { LINCOLN_NAUTILUS_GAS_ID } from "../render/variants/lincolnNautilusGas";
 import { TEMPLATE_CATALOG, evaluateCatalogTemplate, type CatalogTemplate } from "../oem/templateCatalog";
 import { CATALOG_LAYOUTS } from "../render/variants";
 
@@ -376,6 +378,25 @@ ${b.differences.join("\n")}
 `;
 
 const BRAND_DOCS: Record<string, BrandDoc> = {
+  lincoln: {
+    title: "Lincoln 2026 Nautilus Premiere (gasoline)",
+    logo: "Lincoln star",
+    logoNote: "packaged artwork cropped from the reference PDF (logoArtwork.ts) as an alpha-masked raster rendered at 900 dpi",
+    rows: [
+      "| Header: make and model, year drivetrain trim line, engine, transmission, exterior and interior colour | identity; mc_attributes.engine / transmission; build_sheet.colors | Row omitted |",
+      "| Standard equipment included at no extra charge (with the warranty block as the last section) | normalized standard equipment, grouped by category; verified warranty terms only | \"Standard equipment not available for this vehicle.\"; warranty \"Not available for this vehicle.\" |",
+      "| Included on this vehicle / optional equipment and other, with MSRP | build_sheet.packages / options (a no-charge item prints INCLUDED) | Nothing listed; a missing price prints N/A |",
+      "| Price information: base price, total options, total vehicle and options, destination and delivery, total MSRP | build_sheet.pricing (stated, else base + options + destination) | NOT AVAILABLE |",
+      "| Sold to, final assembly plant, method of transportation, VIN, barcode | the original delivering dealer only; factory fields; listing.vin | Label printed blank / row omitted |",
+    ],
+    sample: ["- sticker-3LNHM28T48R625400: off-year, other-model layout stress test (2008 Lincoln MKZ Base, used; the only saved Lincoln record), not a production candidate. Production has no Nautilus record. The standard-equipment list is trimmed to about 100 items."],
+    differences: [
+      "- Layout family: the reference follows the Ford label family (the F-250 module's structure of equipment panel, options and price block, total strip) but carries the EPA and NHTSA panels at the right where the F-250 carries the CARB panel, so the layout is its own, built on the shared EPA and safety panels; it does not reuse fordF250Diesel.ts directly.",
+      "- No parts-content box: the reference prints none, so none is drawn and parts-content data is not shown.",
+      "- Artwork not reproduced: the Lincoln app, Lincoln Protect and Lincoln Automotive Financial Services advertisements, the ramp, rail, order and production codes, the 5-passenger and order-number lines, the residency-restrictions box, the federal-law label statement and the source QR codes. The reference prints amounts without a dollar sign and 'NO CHARGE'; the render prints dollar amounts and INCLUDED.",
+      "- Matching: 2026 Nautilus, SUV, gasoline. The Nautilus hybrid (a hybrid powertrain record) and any other powertrain, model or year are not matched and flag template_configuration_unsupported.",
+    ],
+  },
   maserati: {
     title: "Maserati 2026 GranTurismo Trofeo (gasoline)",
     logo: "Maserati trident and wordmark",
@@ -821,6 +842,7 @@ const packages: PackageSpec[] = [{
   [TOYOTA_4RUNNER_GAS_ID, "toyota-2026-4runner", "toyota4runner", () => [toyota4runnerRenderData()], "off-year layout stress test (2022 4Runner SR5 record), not a production candidate", toyota4runnerReferenceMatchData],
   [ALFA_ROMEO_GIULIA_GAS_ID, "alfa-romeo-2026-giulia", "alfa", () => [alfaRenderData()], "off-year, other-model layout stress test (2020 Stelvio Ti Sport Carbon record), not a production candidate", alfaReferenceMatchData],
   [MASERATI_GRANTURISMO_GAS_ID, "maserati-2026-granturismo", "maserati", () => [maseratiRenderData()], "off-year, other-make layout stress test (2024 Lexus GX record), not a production candidate", maseratiReferenceMatchData],
+  [LINCOLN_NAUTILUS_GAS_ID, "lincoln-2026-nautilus", "lincoln", () => [lincolnRenderData()], "off-year, other-model layout stress test (2008 MKZ Base record), not a production candidate", lincolnReferenceMatchData],
 ] as const).map(([templateId, dirName, key, real, realLabel, reference]): PackageSpec => ({
   templateId,
   dirName,
