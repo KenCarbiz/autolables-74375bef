@@ -22,6 +22,14 @@ import { foresterReferenceMatchData, foresterRenderData } from "../render/__fixt
 import { gv80ReferenceMatchData, gv80RenderData } from "../render/__fixtures__/gv80";
 import { durangoReferenceMatchData, durangoRenderData } from "../render/__fixtures__/durango";
 import { envistaReferenceMatchData, envistaRenderData } from "../render/__fixtures__/envista";
+import { f250ReferenceMatchData, f250RenderData } from "../render/__fixtures__/f250";
+import { ram2500ReferenceMatchData, ram2500RenderData } from "../render/__fixtures__/ram2500";
+import { silveradoReferenceMatchData, silveradoRenderData } from "../render/__fixtures__/silverado2500";
+import { sierraReferenceMatchData, sierraRenderData } from "../render/__fixtures__/sierra3500";
+import { FORD_F250_DIESEL_ID } from "../render/variants/fordF250Diesel";
+import { RAM_2500_DIESEL_ID } from "../render/variants/ramLimitedDiesel";
+import { CHEVROLET_SILVERADO_2500_DIESEL_ID } from "../render/variants/chevroletSilverado2500Diesel";
+import { GMC_SIERRA_3500_DIESEL_ID } from "../render/variants/gmcSierra3500Diesel";
 import { KIA_SORENTO_GAS_ID } from "../render/variants/kiaSorentoGas";
 import { SUBARU_FORESTER_GAS_ID } from "../render/variants/subaruForesterGas";
 import { GENESIS_GV80_GAS_ID } from "../render/variants/genesisGv80Gas";
@@ -418,8 +426,125 @@ const BRAND_DOCS: Record<string, BrandDoc> = {
     sample: ["- sticker-KL47LCEP0TB000001: SYNTHETIC stress fixture (invented values). No Buick row exists in the saved vehicle_listings, so no real record was available; it is not a real vehicle."],
     differences: [
       "- Artwork not reproduced: the adhesive-strip notice, the OnStar advertisement and its QR, the order-information QR, the driving-range bars and the flex-fuel E85 tag (the fuel tag prints the verified EPA fuel type); sales codes and order numbers have no render-data source.",
+      "- Equipment flow: the standard equipment now fills all five of the OEM's columns on the reference's 17px line pitch in upper case with bullets (previously the two rightmost columns stayed empty).",
       "- Standard equipment prints in the reference's column arrangement; the reference's pricing box occupies two columns, this layout gives pricing the right-hand column.",
       "- Matching: 2026 Envista, SUV, gasoline. A non-SUV body or non-gasoline powertrain is not matched.",
+    ],
+  },
+};
+
+interface HdDoc {
+  title: string;
+  logo: string;
+  rows: string[];
+  sample: string[];
+  differences: string[];
+}
+
+const hdMappingFor = (b: HdDoc): string => `# ${b.title} - data source mapping
+
+Every printed value comes from the saved vehicle record the generator already reads (vehicle_listings.mc_attributes from NeoVIN, dealer_profiles.settings). No provider call is made. Reference-sample values appear only in the reference-match fixture used for side-by-side comparison; a test renders an empty record to prove none leaks.
+
+| Printed region | Source field | When missing |
+|---|---|---|
+| Reproduction banner and disclosure | reproduction.ts | Always printed |
+| ${b.logo} | packaged artwork cropped from the reference PDF (logoArtwork.ts) | Always printed |
+${b.rows.join("\n")}
+| Optional equipment / added features (packages, options with price) | build_sheet.packages / options | Nothing listed; a missing price prints N/A, an included item INCLUDED |
+| MSRP, destination, total | build_sheet.pricing base_msrp, destination_charge, total_msrp (stated, else base + options + destination) | NOT AVAILABLE |
+| Standard equipment | build_sheet.standard + key_features through equipmentSelection and catalog hygiene | Unavailable line |
+| Warranty | warranty.* (verified OEM terms only) | "Not available for this vehicle." Not wired in the adapter today |
+| California Air Resources Board panel | Fixed OEM headings. The data model carries no CARB grades, so both scales print "Not Available". The green fuel tag prints only when the record states a fuel type (verified EPA match, else the NeoVIN fuel_type when it states diesel, else engine text naming diesel) | Tag omitted |
+| EPA fuel-economy panel | Not drawn: the reference has none (over 8,500 lb GVWR). Nothing is read from the EPA match | n/a |
+| Government safety ratings | NHTSA rows in the NeoVIN decode (combined frontal and side values, never split into driver/passenger or seat rows) | Heavy-duty pickups are usually not rated: the panel says so, or that no verified record exists |
+| Original delivering dealer (SOLD TO / dealer lines) | dealer block, ONLY when dealerRole is original_delivery | Label printed blank. The current selling rooftop never prints |
+| VIN barcode | barcodePayload (= VIN), Code 128 regenerated per vehicle | Always present |
+| Passport QR (0.90in including quiet zone) | canonicalPassportUrl(listing.slug); placed in the slot the reference uses for its advertisement | Omitted with its caption when no Passport URL |
+`;
+
+const hdDifferencesFor = (b: HdDoc, t: CatalogTemplate): string => `# ${b.title} - differences from the OEM reference
+
+Status: layout ${t.layoutStatus}, approval ${t.approval}. Production routing cannot select this template until the owner approves it.
+
+## Sample data
+- reference-match: the reference sticker's own transcribed values, for side-by-side comparison only. It is never used for another vehicle.
+${b.sample.join("\n")}
+
+## Blockers (stable codes)
+${t.blockers.map((x) => `- ${x}`).join("\n")}
+
+## Unresolved differences
+- Page: the reference PDF is 1224x792pt (17x11in landscape); the render is the same size and exactly one page.
+- Fonts: Helvetica / Helvetica-Bold stand in for the reference faces (font_substitution).
+- Layout compression: vertical positions are compressed to clear the mandatory reproduction banner and disclosure.
+- Powertrain rule: this template matches diesel pickups only. Fuel evidence is the verified EPA fuel type, else the NeoVIN fuel_type when it states diesel. Gasoline heavy-duty pickups are not matched and flag template_configuration_unsupported; no gasoline reference was supplied.
+- CARB panel: native rebuild of the reference's California Air Resources Board panel. The record has no CARB grades, so both scales print "Not Available" with no pointer (carb_panel_pending). The CARB emblem is not reproduced; its name prints as a plain wordmark.
+- No EPA fuel-economy panel is drawn because the reference has none.
+- Artwork not reproduced: agency seals, the source QR codes (replaced by the 0.90in Vehicle Passport QR) and the source barcode (regenerated from the VIN). The federal-law label statement and any Monroney wording are not reproduced; the footnote reads "Original manufacturer's suggested retail prices shown. Excludes taxes, title, license, dealer-installed items and current selling price."
+- Safety: the decode gives one frontal and one side value, so combined rows print where a rated vehicle would show them; heavy-duty pickups are usually not rated and the panel states that.
+- OCR: transcription was spot-checked against the PDF only (ocr_unverified). The reference-match fixture drops trademark and registered marks and normalizes dashes (WinAnsi sanitation).
+- Parts content, warranty: not wired by the orchestrator adapter today; the reference-match render shows the populated state.
+- Equipment: decoder fragments are dropped before selection; when the full list does not fit at 5.5pt the ranked selection prints with the fixed Passport pointer line.
+${b.differences.join("\n")}
+`;
+
+const HD_DOCS: Record<string, HdDoc> = {
+  f250: {
+    title: "Ford 2026 F-250 Super Duty (diesel)",
+    logo: "Ford logo",
+    rows: [
+      "| Vehicle description (model, year, trim, drivetrain, engine, transmission) | identity; mc_attributes.engine / transmission | Row omitted |",
+      "| Exterior / interior colour | build_sheet.colors | Row omitted |",
+      "| Final assembly plant, method of transport | factory.finalAssemblyPoint; transportMethod | Row omitted |",
+    ],
+    sample: ["- sticker-1FTFW3L84RKF67857: off-year, other-model layout stress test (2024 F-150 XLT, used), not a production candidate. Production has no 2026 F-250 record. The saved EPA match on this row is a different vehicle (F-150 Lightning), so its fuel tag reads Electric Vehicle: that is the record's own data."],
+    differences: [
+      "- The reference has a blue frame, no safety panel and a Prop 65 notice; all are reproduced. The Prop 65 text is a fixed OEM boilerplate heading.",
+      "- Matching: 2026 F-250 (Super Duty), pickup body, diesel. F-150, F-350 and gasoline F-250 are not matched.",
+    ],
+  },
+  ram: {
+    title: "Ram 2026 2500 Limited (diesel)",
+    logo: "Ram logo",
+    rows: [
+      "| Model year, title | identity.year and model trim drivetrain | Omitted, never guessed |",
+      "| Spec line, Exterior / Interior colour, Engine, Transmission | identity; build_sheet.colors; mc_attributes | Row omitted |",
+      "| Assembly Point/Port of Entry, SOLD TO | factory.finalAssemblyPoint; original delivering dealer only | Omitted / blank |",
+    ],
+    sample: ["- sticker-3C6UR5CJXNG247030: off-year layout stress test (2022 RAM 2500 Tradesman, 6.4L gasoline, used), not a production candidate. Production has no 2026 Ram 2500."],
+    differences: [
+      "- Shared FCA layout family (fcaCommon.ts); the right-hand panels are the CARB panel, the safety panel and the Passport QR in place of the FlexCare advertisement.",
+      "- Matching: 2026 Ram 2500 pickup, diesel. Ram 1500, 3500 and gasoline 2500 are not matched.",
+    ],
+  },
+  silverado: {
+    title: "Chevrolet 2026 Silverado 2500 HD High Country (diesel)",
+    logo: "Chevrolet logo",
+    rows: [
+      "| Title, EXTERIOR, INTERIOR, ENG, TRANS | identity; build_sheet.colors; mc_attributes.engine / transmission | Row omitted |",
+      "| Options and pricing, totals | build_sheet.pricing, options | NOT AVAILABLE |",
+      "| VIN, dealer to whom delivered, assembly point | listing.vin; original delivering dealer only; factory.finalAssemblyPoint | Label printed blank / omitted |",
+    ],
+    sample: ["- sticker-1GNSKPKD9PR173461: off-year, other-model layout stress test (2023 Tahoe Z71, used), not a production candidate. Production has no 2026 Silverado HD."],
+    differences: [
+      "- Shared General Motors layout family (gmCommon.ts, gmTruckCommon.ts, also used by the Sierra and the Buick Envista). The reference's empty safety and parts frames print an explicit unavailable state when the data is missing.",
+      "- Artwork not reproduced: the OnStar advertisement and its QR, the order-information QR, the adhesive-strip notice, sales codes and order numbers.",
+      "- Matching: 2026 Silverado 2500 HD pickup, diesel. Silverado 1500, 3500 and gasoline 2500 are not matched.",
+    ],
+  },
+  sierra: {
+    title: "GMC 2026 Sierra 3500 HD Denali Ultimate (diesel)",
+    logo: "GMC logo",
+    rows: [
+      "| Title, EXTERIOR, INTERIOR, ENG, TRANS | identity; build_sheet.colors; mc_attributes.engine / transmission | Row omitted |",
+      "| Options and pricing, totals | build_sheet.pricing, options | NOT AVAILABLE |",
+      "| VIN, dealer to whom delivered, assembly point | listing.vin; original delivering dealer only; factory.finalAssemblyPoint | Label printed blank / omitted |",
+    ],
+    sample: ["- sticker-1GKS2DKL7MR290552: off-year, other-model layout stress test (2021 Yukon Denali, used), not a production candidate. Production has no 2026 Sierra HD."],
+    differences: [
+      "- Shared General Motors layout family with the Silverado template; the logo, site line and title are GMC-specific.",
+      "- Artwork not reproduced: the OnStar advertisement and its QR, the order-information QR, the adhesive-strip notice, sales codes and order numbers.",
+      "- Matching: 2026 Sierra 3500 HD pickup, diesel. Sierra 1500, 2500 and gasoline 3500 are not matched.",
     ],
   },
 };
@@ -472,6 +597,17 @@ const packages: PackageSpec[] = [{
   build: () => ({ real: real(), realLabel, reference: reference as (first: FactoryStickerRenderData) => FactoryStickerRenderData }),
   mappingMd: mappingFor(BRAND_DOCS[key]),
   differencesMd: (t) => differencesFor(BRAND_DOCS[key], t),
+})), ...([
+  [FORD_F250_DIESEL_ID, "ford-2026-f250", "f250", f250RenderData, "off-year, other-model layout stress test (2024 F-150 record), not a production candidate", f250ReferenceMatchData],
+  [RAM_2500_DIESEL_ID, "ram-2026-2500", "ram", ram2500RenderData, "off-year layout stress test (2022 RAM 2500 gasoline record), not a production candidate", ram2500ReferenceMatchData],
+  [CHEVROLET_SILVERADO_2500_DIESEL_ID, "chevrolet-2026-silverado-2500", "silverado", silveradoRenderData, "off-year, other-model layout stress test (2023 Tahoe record), not a production candidate", silveradoReferenceMatchData],
+  [GMC_SIERRA_3500_DIESEL_ID, "gmc-2026-sierra-3500", "sierra", sierraRenderData, "off-year, other-model layout stress test (2021 Yukon Denali record), not a production candidate", sierraReferenceMatchData],
+] as const).map(([templateId, dirName, key, real, realLabel, reference]): PackageSpec => ({
+  templateId,
+  dirName,
+  build: () => ({ real: [real()], realLabel, reference: reference as (first: FactoryStickerRenderData) => FactoryStickerRenderData }),
+  mappingMd: hdMappingFor(HD_DOCS[key]),
+  differencesMd: (t) => hdDifferencesFor(HD_DOCS[key], t),
 }))];
 
 const smallestFont = (m: LayoutModel): number =>
