@@ -52,6 +52,7 @@ export function evRangeFacts(r: FactoryStickerData["regulatory"], mode: EvMode):
   };
 }
 
+const kwhText = (n: number): string => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 const miles = (n: number): string => String(Math.round(n));
 const hours = (n: number): string => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
@@ -145,22 +146,26 @@ export function paintEvEpa(p: Painter, d: FactoryStickerData, g: Grid, ox: numbe
   R(p, X(5), Yy(48), W(690), Yy(229) - Yy(48), PAPER);
   T(p, "Fuel Economy", X(12), Yy(52), 10, "bold");
   const unavailable = (x: number, y: number, size = 10): void => T(p, "Not Available", x, y, size, "bold");
+  if (!verified) {
+    wrap("Fuel economy and environment information is not available from verified EPA records for this exact configuration.", "bold", 6.6, W(380))
+      .slice(0, 2).forEach((l, i) => T(p, l, X(120), Yy(50) + i * 7.6, 6.6, "bold", { lh: 7.6 }));
+  }
 
   if (mode === "ev") {
     const mpge = verified ? r.combinedMpg : undefined;
-    if (mpge !== undefined) p.text(String(Math.round(mpge)), X(12), Yy(128), 52, "bold", INK);
-    else unavailable(X(14), Yy(92), 12);
-    T(p, "MPGe", X(mpge !== undefined ? 150 : 14), Yy(mpge !== undefined ? 80 : 112), 16, "bold");
-    T(p, "combined city/hwy", X(12), Yy(134), 8, "body");
+    if (mpge !== undefined) p.text(String(Math.round(mpge)), X(12), Yy(128), 40, "bold", INK);
+    else unavailable(X(14), Yy(84), 12);
+    T(p, "MPGe", X(mpge !== undefined ? 150 : 14), Yy(mpge !== undefined ? 58 : 104), 14, "bold");
+    T(p, "combined city/hwy", X(12), Yy(131), 8, "body");
     const city = verified ? r.cityMpg : undefined;
     const hwy = verified ? r.highwayMpg : undefined;
-    T(p, city !== undefined ? String(Math.round(city)) : "N/A", X(150), Yy(100), 18, "bold");
-    T(p, "city", X(150), Yy(124), 8, "body");
-    T(p, hwy !== undefined ? String(Math.round(hwy)) : "N/A", X(205), Yy(100), 18, "bold");
-    T(p, "highway", X(205), Yy(124), 8, "body");
+    T(p, city !== undefined ? String(Math.round(city)) : "N/A", X(150), Yy(84), 16, "bold");
+    T(p, "city", X(150), Yy(110), 7, "body");
+    T(p, hwy !== undefined ? String(Math.round(hwy)) : "N/A", X(205), Yy(84), 16, "bold");
+    T(p, "highway", X(205), Yy(110), 7, "body");
     const kwh = verified ? r.kwhPer100Miles : undefined;
-    T(p, kwh !== undefined ? kwh.toFixed(1) : "N/A", X(262), Yy(100), 18, "bold");
-    T(p, "kW-hrs per 100 miles", X(262), Yy(124), 8, "body");
+    T(p, kwh !== undefined ? kwhText(kwh) : "N/A", X(270), Yy(84), 16, "bold");
+    T(p, "kW-hrs per 100 miles", X(270), Yy(110), 7, "body");
     paintRangeChart(p, X(12), Yy(146), W(440), range, mode, 0.86);
   } else {
     const box = (title: string, x: number, rows: () => void): void => {
@@ -175,7 +180,7 @@ export function paintEvEpa(p: Painter, d: FactoryStickerData, g: Grid, ox: numbe
       else unavailable(X(34), Yy(100), 10);
       T(p, "MPGe", X(mpge !== undefined ? 122 : 34), Yy(mpge !== undefined ? 84 : 114), 11, "bold");
       const kwh = verified ? r.kwhPer100Miles : undefined;
-      T(p, kwh !== undefined ? kwh.toFixed(1) : "N/A", X(124), Yy(104), 12, "bold");
+      T(p, kwh !== undefined ? kwhText(kwh) : "N/A", X(124), Yy(104), 12, "bold");
       T(p, "kW-hrs per 100 mi", X(124), Yy(120), 6.6, "body");
       T(p, "combined city/highway", X(14), Yy(132), 6.6, "body");
     });

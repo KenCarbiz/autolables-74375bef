@@ -213,7 +213,7 @@ export function paintSafety(p: Painter, d: FactoryStickerData): void {
 export const PARTS_X = 956;
 const PARTS_W = 218;
 
-function paintParts(p: Painter, d: FactoryStickerData): void {
+export function paintParts(p: Painter, d: FactoryStickerData): void {
   const top = Y(442);
   const bottom = Y(641);
   R(p, PARTS_X, top, PARTS_W, bottom - top, null, 2.4);

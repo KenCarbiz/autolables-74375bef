@@ -47,7 +47,8 @@ export type CatalogBlockerCode =
   | "hope_on_wheels_artwork_not_reproduced"
   | "nhtsa_ratings_not_wired"
   | "parts_content_not_wired"
-  | "warranty_terms_not_wired";
+  | "warranty_terms_not_wired"
+  | "ev_figures_not_wired";
 
 export interface CatalogMatchRule {
   modelYears: readonly number[];
@@ -461,8 +462,8 @@ export const TEMPLATE_CATALOG: readonly CatalogTemplate[] = [
     design: { fileKey: "CN6z6UNk9YFEEfe1Nvk9mS", masterNodeId: "1:933" },
     match: { modelYears: [2025], modelPattern: "^500e$", bodyClasses: ["HATCHBACK"], fuelClasses: ["ev"], },
     approval: "pending_owner_approval",
-    layoutStatus: "not_started",
-    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "reference_is_2025", "range_chart_pending", "layout_not_built"],
+    layoutStatus: "sample_ready",
+    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "reference_is_2025", "missing_source_artwork", "ev_figures_not_wired", "parts_content_not_wired", "warranty_terms_not_wired"],
   },
   {
     id: "volvo_2025_xc60_b5_awd_plus",

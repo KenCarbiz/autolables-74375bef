@@ -34,6 +34,10 @@ export interface CatalogSuiteConfig {
   /** Strings a minimal record with the given own values must print. */
   ownExpect: string[];
   /** Heavy-duty reference: a California Air Resources Board panel, no EPA panel, optionally no safety panel. */
+  /** Electric or plug-in reference: the EV fuel-economy panel instead of the gasoline one. */
+  ev?: "ev" | "phev";
+  /** A model year the template must not route (defaults to 2025; the 2025 reference passes 2026). */
+  offYear?: string;
   carb?: { safetyPanel: boolean; plainAmounts?: boolean };
   /** Records the template must match (pending approval) and must not match. */
   supported: Array<{ label: string; patch: (d: FactoryStickerRenderData) => FactoryStickerRenderData }>;
@@ -117,6 +121,14 @@ export function describeCatalogTemplate(c: CatalogSuiteConfig): void {
           expect(s.filter((x) => x === "Not Available").length).toBeGreaterThanOrEqual(2);
           expect(all).not.toMatch(/fueleconomy\.gov|Fuel Economy and Environment|5-year fuel cost/);
           expect(all).not.toMatch(/\$0\b/);
+          return;
+        }
+        if (c.ev && real.epa && real.epa.combined !== null) {
+          expect(s).toContain(String(real.epa.combined));
+          expect(s).toContain(c.ev === "ev" ? "Electric Vehicle" : "Plug-In Hybrid Vehicle");
+          expect(s).not.toContain("Gasoline Vehicle");
+          expect(s.filter((x) => x === "Not Available" || x === "N/A").length).toBeGreaterThanOrEqual(1);
+          expect(s.join(" ")).not.toMatch(/\$0\b/);
           return;
         }
         if (real.epa && real.epa.combined !== null) {
@@ -341,7 +353,7 @@ export function describeCatalogTemplate(c: CatalogSuiteConfig): void {
           const routed = buildRenderLayout(ref, theme);
           expect([routed.width, routed.height]).toEqual([1224, 792]);
           expect(routed.fit.ok && routed.fit.figmaMaster).toBe(true);
-          expect(buildRenderLayout({ ...ref, identity: { ...ref.identity, year: "2025" } }, theme).width).toBe(792);
+          expect(buildRenderLayout({ ...ref, identity: { ...ref.identity, year: c.offYear ?? "2025" } }, theme).width).toBe(792);
         } finally {
           Object.assign(mutable, saved);
         }
