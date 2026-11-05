@@ -219,7 +219,7 @@ export interface FactoryStickerRenderData {
    * NeoVIN decode facts that only catalog templates read (see catalogNeovin.ts).
    * Set only for makes that have catalog templates, so other makes' data is unchanged.
    */
-  neovin?: { ratingMetadata: string[]; madeIn: string | null; /** Present only when the decode states a diesel fuel; the catalog matcher's fuel evidence when there is no EPA match. */ fuelType?: string; /** Set only when the saved EPA match contradicts the decode: "powertrain", "drivetrain" or "engine" (storedEpaConflict). */ epaConflict?: string };
+  neovin?: { ratingMetadata: string[]; madeIn: string | null; /** Present only when the decode states a diesel fuel; the catalog matcher's fuel evidence when there is no EPA match. */ fuelType?: string; /** Set only when the saved EPA match contradicts the decode: "powertrain", "drivetrain" or "engine" (storedEpaConflict). */ epaConflict?: string; /** Set only when the decode states a full hybrid powertrain (HEV); a hybrid saved under a gasoline EPA fuel name is never plain gasoline for catalog matching. */ hybridDecode?: true };
   /** Which dealer the block describes. Only a proven original selling or
    *  delivery dealer may print; the current listing rooftop never does. */
   dealerRole?: "original_delivery" | null;
@@ -764,9 +764,14 @@ export function catalogResolutionFor(data: FactoryStickerRenderData): CatalogRes
     model: data.identity.model,
     trim: data.identity.trim,
     bodyClass: data.bodyClass ?? null,
-    fuelClass: catalogFuelClassOf((data.neovin?.epaConflict ? null : data.epa?.fuelType) ?? data.neovin?.fuelType),
+    fuelClass: catalogFuelClass(data),
     drivetrain: data.mechanical?.drivetrain ?? null,
   });
+}
+
+function catalogFuelClass(data: FactoryStickerRenderData): ReturnType<typeof fuelClassOf> {
+  const base = catalogFuelClassOf((data.neovin?.epaConflict ? null : data.epa?.fuelType) ?? data.neovin?.fuelType);
+  return data.neovin?.hybridDecode && (base === "gasoline" || base === null) ? "hybrid" : base;
 }
 
 /** EPA names a plug-in hybrid "Gasoline and Electricity"; for catalog matching that is never plain gasoline. */

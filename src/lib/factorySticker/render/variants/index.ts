@@ -1,4 +1,6 @@
 import { BUICK_ENVISTA_GAS_ID, buildBuickEnvistaGasLayout } from "./buickEnvistaGas.ts";
+import { LEXUS_RX350_GAS_ID, buildLexusRx350GasLayout } from "./lexusRx350Gas.ts";
+import { TOYOTA_4RUNNER_GAS_ID, buildToyota4runnerGasLayout } from "./toyota4runnerGas.ts";
 import { LAMBORGHINI_URUS_PHEV_ID, buildLamborghiniUrusPhevLayout } from "./lamborghiniUrusPhev.ts";
 import { BENTLEY_CONTINENTAL_GT_PHEV_ID, buildBentleyContinentalGtPhevLayout } from "./bentleyContinentalGtPhev.ts";
 import { ROLLS_ROYCE_SPECTRE_EV_ID, buildRollsRoyceSpectreEvLayout } from "./rollsRoyceSpectreEv.ts";
@@ -58,4 +60,6 @@ export const CATALOG_LAYOUTS: Partial<Record<string, VariantLayoutBuilder>> = {
   [ROLLS_ROYCE_SPECTRE_EV_ID]: buildRollsRoyceSpectreEvLayout,
   [BENTLEY_CONTINENTAL_GT_PHEV_ID]: buildBentleyContinentalGtPhevLayout,
   [LAMBORGHINI_URUS_PHEV_ID]: buildLamborghiniUrusPhevLayout,
+  [LEXUS_RX350_GAS_ID]: buildLexusRx350GasLayout,
+  [TOYOTA_4RUNNER_GAS_ID]: buildToyota4runnerGasLayout,
 };

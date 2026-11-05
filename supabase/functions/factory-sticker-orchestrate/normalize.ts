@@ -228,6 +228,7 @@ export function normalizeForSticker(
               madeIn: str(mc.made_in),
               ...(/diesel/i.test(String(mc.fuel_type ?? "")) ? { fuelType: String(mc.fuel_type) } : {}),
               ...(epaConflict ? { epaConflict } : {}),
+              ...(/^(HEV|FHEV)$/i.test(String(mc.powertrain_type ?? "").trim()) ? { hybridDecode: true as const } : {}),
             },
           }
         : {}),

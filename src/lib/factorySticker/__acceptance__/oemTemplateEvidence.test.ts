@@ -44,6 +44,10 @@ import { fiatReferenceMatchData, fiatRenderData } from "../render/__fixtures__/f
 import { spectreReferenceMatchData, spectreRenderData } from "../render/__fixtures__/spectre";
 import { bentleyReferenceMatchData, bentleyRenderData } from "../render/__fixtures__/bentley";
 import { urusReferenceMatchData, urusRenderData } from "../render/__fixtures__/lamborghini";
+import { lexusReferenceMatchData, lexusRenderData } from "../render/__fixtures__/lexus";
+import { toyota4runnerReferenceMatchData, toyota4runnerRenderData } from "../render/__fixtures__/toyota4runner";
+import { LEXUS_RX350_GAS_ID } from "../render/variants/lexusRx350Gas";
+import { TOYOTA_4RUNNER_GAS_ID } from "../render/variants/toyota4runnerGas";
 import { CADILLAC_ESCALADE_IQL_EV_ID } from "../render/variants/cadillacEscaladeIqEv";
 import { FIAT_500E_EV_ID } from "../render/variants/fiat500eEv";
 import { ROLLS_ROYCE_SPECTRE_EV_ID } from "../render/variants/rollsRoyceSpectreEv";
@@ -361,6 +365,40 @@ ${b.differences.join("\n")}
 `;
 
 const BRAND_DOCS: Record<string, BrandDoc> = {
+  lexus: {
+    title: "Lexus 2026 RX 350 (gasoline)",
+    logo: "Lexus logo and tagline",
+    rows: [
+      "| DESCRIPTION, COLOR, VIN, FINAL ASSEMBLY POINT | identity (year model trim); build_sheet.colors; listing.vin; factory.finalAssemblyPoint | Row omitted |",
+      "| Delivered by Truck to | transportMethod and the original delivering dealer only | Label printed blank |",
+      "| Installed options, base price, MSRP, delivery, total | build_sheet.pricing, packages, options | NOT AVAILABLE |",
+    ],
+    sample: ["- sticker-JTJTBCDX8R5032546: off-year, other-model layout stress test (2024 Lexus GX Premium+, used), not a production candidate. Production has no RX record."],
+    differences: [
+      "- The reference PDF is stored rotated (Page rot 90, 792x1224pt); the render is upright at 1224x792pt (reference_stored_rotated). The reference is a marked online copy (marked_online_copy): its 'Not Original - Copy' watermark and creation stamp are not reproduced.",
+      "- Logo: the Lexus logo and tagline are a raster image inside the reference PDF; its alpha-masked pixels are packaged as-is (logoArtwork.ts). No vector source exists in the PDF.",
+      "- Not printed: the 9412J model code, the dealer-owner support offer panel, the empty frame beside the delivery box, the production strip (742 / L046) and the source barcode (regenerated from the VIN). The parts-content box takes the offer panel's slot.",
+      "- The reference prints its equipment under five OEM headings; the engine regroups equipment under its own category headings.",
+      "- Matching: 2026 RX 350 (or the bare RX model), SUV, gasoline. The RX 350h, RX 450h+ and RX 500h (by model, trim or powertrain) are not matched and flag template_configuration_unsupported. A record that states no drivetrain still matches.",
+    ],
+  },
+  toyota4runner: {
+    title: "Toyota 2026 4Runner (gasoline)",
+    logo: "Toyota logo",
+    rows: [
+      "| DESC., VIN, YR/MDL, CLR, FINAL ASSEMBLY POINT | identity; listing.vin; build_sheet.colors; factory.finalAssemblyPoint | Row omitted |",
+      "| Delivered by Truck to | transportMethod, factoryCodes.dealer and the original delivering dealer only | Label printed blank |",
+      "| Base price, optional equipment, MSRP, delivery, total | build_sheet.pricing, packages, options | NOT AVAILABLE |",
+    ],
+    sample: ["- sticker-JTEMU5JR2N5993023: off-year layout stress test (2022 4Runner SR5, used), not a production candidate. Production has no 2026 4Runner."],
+    differences: [
+      "- The reference PDF is stored rotated (Page rot 90, 792x1224pt); the render is upright at 1224x792pt (reference_stored_rotated). The reference is a marked online copy (marked_online_copy): its watermark and creation stamp are not reproduced.",
+      "- Logo: the Toyota emblem and wordmark are a raster image inside the reference PDF; its alpha-masked pixels are packaged as-is (logoArtwork.ts). No vector source exists in the PDF.",
+      "- Not printed: the 8664S model code, the full-tank statement, the delivery dealer's customer number position, the production strip and the source barcode (regenerated from the VIN). The reference leaves its right quarter blank; the parts-content box and any overflow equipment columns use it.",
+      "- The reference's no-price rows (50 State Emissions, Owner's Portfolio) print INCLUDED in the reference-match render.",
+      "- Matching: 2026 4Runner, SUV, gasoline. The i-FORCE MAX hybrid is not matched when the model, trim (TRD Pro, Trailhunter, Platinum are hybrid-only) or the decode's HEV powertrain says so; a hybrid whose record gives none of these signals cannot be told apart (powertrain_rule_unverified).",
+    ],
+  },
   sorento: {
     title: "Kia 2026 Sorento (gasoline)",
     logo: "Kia logo",
@@ -690,6 +728,8 @@ const packages: PackageSpec[] = [{
   [GENESIS_GV80_GAS_ID, "genesis-2026-gv80", "gv80", () => [gv80RenderData()], "off-year, other-model layout stress test (2024 G70 record), not a production candidate", gv80ReferenceMatchData],
   [DODGE_DURANGO_GAS_ID, "dodge-2026-durango", "durango", () => [durangoRenderData()], "off-year, other-model layout stress test (2008 Grand Caravan record), not a production candidate", durangoReferenceMatchData],
   [BUICK_ENVISTA_GAS_ID, "buick-2026-envista", "envista", () => [envistaRenderData()], "SYNTHETIC stress fixture (no saved Buick record exists), not a real vehicle", envistaReferenceMatchData],
+  [LEXUS_RX350_GAS_ID, "lexus-2026-rx-350", "lexus", () => [lexusRenderData()], "off-year, other-model layout stress test (2024 Lexus GX record), not a production candidate", lexusReferenceMatchData],
+  [TOYOTA_4RUNNER_GAS_ID, "toyota-2026-4runner", "toyota4runner", () => [toyota4runnerRenderData()], "off-year layout stress test (2022 4Runner SR5 record), not a production candidate", toyota4runnerReferenceMatchData],
 ] as const).map(([templateId, dirName, key, real, realLabel, reference]): PackageSpec => ({
   templateId,
   dirName,
@@ -793,7 +833,9 @@ describe.skipIf(!DIR)("OEM template evidence", () => {
     };
     const samplePath = new Map<string, string>();
 
+    const only = process.env.OEM_TEMPLATES_ONLY?.split(",").filter(Boolean);
     for (const spec of packages) {
+      if (only && !only.includes(spec.templateId)) continue;
       const outDir = join(root, "samples", spec.dirName) + "/";
       mkdirSync(outDir, { recursive: true });
       const t = TEMPLATE_CATALOG.find((x) => x.id === spec.templateId)!;
