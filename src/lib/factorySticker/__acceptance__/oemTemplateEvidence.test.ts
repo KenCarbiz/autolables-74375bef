@@ -39,6 +39,16 @@ import { CHRYSLER_VOYAGER_GAS_ID } from "../render/variants/chryslerVoyagerGas";
 import { MITSUBISHI_OUTLANDER_SPORT_ID } from "../render/variants/mitsubishiOutlanderSport";
 import { HYUNDAI_TUCSON_GAS_ID } from "../render/variants/hyundaiTucsonGas";
 import { JEEP_WRANGLER_GAS_ID } from "../render/variants/jeepWranglerGas";
+import { cadillacReferenceMatchData, cadillacRenderData } from "../render/__fixtures__/cadillac";
+import { fiatReferenceMatchData, fiatRenderData } from "../render/__fixtures__/fiat";
+import { spectreReferenceMatchData, spectreRenderData } from "../render/__fixtures__/spectre";
+import { bentleyReferenceMatchData, bentleyRenderData } from "../render/__fixtures__/bentley";
+import { urusReferenceMatchData, urusRenderData } from "../render/__fixtures__/lamborghini";
+import { CADILLAC_ESCALADE_IQL_EV_ID } from "../render/variants/cadillacEscaladeIqEv";
+import { FIAT_500E_EV_ID } from "../render/variants/fiat500eEv";
+import { ROLLS_ROYCE_SPECTRE_EV_ID } from "../render/variants/rollsRoyceSpectreEv";
+import { BENTLEY_CONTINENTAL_GT_PHEV_ID } from "../render/variants/bentleyContinentalGtPhev";
+import { LAMBORGHINI_URUS_PHEV_ID } from "../render/variants/lamborghiniUrusPhev";
 import { TEMPLATE_CATALOG, evaluateCatalogTemplate, type CatalogTemplate } from "../oem/templateCatalog";
 import { CATALOG_LAYOUTS } from "../render/variants";
 
@@ -497,7 +507,7 @@ const HD_DOCS: Record<string, HdDoc> = {
       "| Exterior / interior colour | build_sheet.colors | Row omitted |",
       "| Final assembly plant, method of transport | factory.finalAssemblyPoint; transportMethod | Row omitted |",
     ],
-    sample: ["- sticker-1FTFW3L84RKF67857: off-year, other-model layout stress test (2024 F-150 XLT, used), not a production candidate. Production has no 2026 F-250 record. The saved EPA match on this row is a different vehicle (F-150 Lightning), so its fuel tag reads Electric Vehicle: that is the record's own data."],
+    sample: ["- sticker-1FTFW3L84RKF67857: off-year, other-model layout stress test (2024 F-150 XLT, used), not a production candidate. Production has no 2026 F-250 record. The saved EPA match on this row is an F-150 Lightning record; the shared EPA matcher flags it as contradicting the combustion listing, so the EPA panel prints Not Available and no fuel-type tag (flag epa_match_conflict)."],
     differences: [
       "- The reference has a blue frame, no safety panel and a Prop 65 notice; all are reproduced. The Prop 65 text is a fixed OEM boilerplate heading.",
       "- Matching: 2026 F-250 (Super Duty), pickup body, diesel. F-150, F-350 and gasoline F-250 are not matched.",
@@ -546,6 +556,95 @@ const HD_DOCS: Record<string, HdDoc> = {
       "- Artwork not reproduced: the OnStar advertisement and its QR, the order-information QR, the adhesive-strip notice, sales codes and order numbers.",
       "- Matching: 2026 Sierra 3500 HD pickup, diesel. Sierra 1500, 2500 and gasoline 3500 are not matched.",
     ],
+  },
+};
+
+
+interface EvDoc {
+  title: string;
+  mode: "electric" | "plug-in hybrid";
+  logo: string;
+  page: string;
+  sample: string;
+  extra: string[];
+}
+
+const evMappingFor = (b: EvDoc): string => `# ${b.title} - data source mapping
+
+Every printed value comes from the saved vehicle record the generator already reads (vehicle_listings.mc_attributes from NeoVIN, epa_economy, dealer_profiles.settings). No provider call is made. Reference-sample values appear only in the reference-match fixture used for side-by-side comparison; a test renders an empty record to prove none leaks.
+
+| Printed region | Source field | When missing |
+|---|---|---|
+| Reproduction banner and disclosure | reproduction.ts | Always printed |
+| ${b.logo} | not packaged; a neutral wordmark prints (missing_source_artwork) | Always printed |
+| Title, colours, VIN, engine, transmission | identity; build_sheet.colors; listing.vin; mc_attributes | Row omitted |
+| Options and packages with price | build_sheet.packages / options | Nothing listed; a missing price prints N/A, an included item INCLUDED |
+| MSRP, destination, total | build_sheet.pricing (stated, else base + options + destination) | NOT AVAILABLE |
+| Standard equipment | build_sheet.standard + key_features through equipmentSelection and catalog hygiene | Unavailable line |
+| Warranty | warranty.* (verified OEM terms only) | "Not available for this vehicle." Not wired in the adapter today |
+| ${b.mode} fuel-economy panel: MPGe, city, highway, annual cost, 5-year difference, GHG and smog scores, CO2 | epa_economy of the verified EPA match (matcher epa-match-v2; a contradicted match is treated as unverified) | Not Available, never zero |
+| kWh per 100 miles, charge time, electric and total range${b.mode === "plug-in hybrid" ? ", gasoline-only MPG" : ""} | optional epa_economy fields combinedMpge, kwhPer100Miles, chargeTimeHours, electricRangeMiles, totalRangeMiles, gasCombinedMpg; none are saved on current records (ev_figures_not_wired) | Not Available; the range chart prints its unavailable state and no bar |
+| Government safety ratings | NHTSA rows in the NeoVIN decode (combined frontal and side values, never split) | Panel states not rated / no verified record |
+| Parts content | factory.partsContent (verified rows only) | "Not available for this vehicle." Not wired today |
+| Original delivering dealer (SOLD TO) | dealer block, ONLY when dealerRole is original_delivery | Label printed blank |
+| VIN barcode | barcodePayload (= VIN), Code 128 regenerated per vehicle | Always present |
+| Passport QR (0.90in including quiet zone) | canonicalPassportUrl(listing.slug) | Omitted with its caption when no Passport URL |
+`;
+
+const evDifferencesFor = (b: EvDoc, t: CatalogTemplate): string => `# ${b.title} - differences from the OEM reference
+
+Status: layout ${t.layoutStatus}, approval ${t.approval}. Production routing cannot select this template until the owner approves it.
+
+## Sample data
+- reference-match: the reference sticker's own transcribed values, for side-by-side comparison only. It is never used for another vehicle.
+${b.sample}
+
+## Blockers (stable codes)
+${t.blockers.map((x) => `- ${x}`).join("\n")}
+
+## Unresolved differences
+- Page: ${b.page}
+- Fonts: Helvetica / Helvetica-Bold stand in for the reference faces (font_substitution).
+- Layout compression: vertical positions are compressed to clear the mandatory reproduction banner and disclosure.
+- Matching: model year, model, body and powertrain. This template matches ${b.mode === "electric" ? "electric (fuel class electric)" : "plug-in hybrid (fuel class phev)"} records only; gasoline and the other electrified classes are not matched and flag template_configuration_unsupported.
+- Range graphics are drawn only from record data (an electric vehicle's saved range is its total range; a plug-in hybrid's is its electric range). The reference's printed axis breaks are not reproduced as a continuous scale, and no bar is drawn without a range figure.
+- Artwork not reproduced: logo, agency seals, the source QR (replaced by the 0.90in Vehicle Passport QR) and the source barcode (regenerated from the VIN). The federal-law label statement and any Monroney wording are not reproduced; the footnote reads "Original manufacturer's suggested retail prices shown. Excludes taxes, title, license, dealer-installed items and current selling price."
+- Safety: the decode gives one frontal and one side value, so combined rows print where the reference shows per-seat rows.
+- OCR: transcription was spot-checked against the PDF only (ocr_unverified).
+- Equipment: decoder fragments are dropped before selection; when the full list does not fit at 5.5pt the ranked selection prints with the fixed Passport pointer line.
+${b.extra.map((x) => `- ${x}`).join("\n")}
+`;
+
+const EV_DOCS: Record<string, EvDoc> = {
+  cadillac: {
+    title: "Cadillac 2026 Escalade IQL Premium Sport (electric)", mode: "electric", logo: "Cadillac logo",
+    page: "the reference PDF is 1224x792pt (17x11in landscape); the render is the same size and exactly one page.",
+    sample: "- stress record: a saved 2026 Tesla Model Y (other make), not a production candidate. Production has no Cadillac record. The standard-equipment list is trimmed to about 100 items.",
+    extra: ["Shared General Motors layout family (gmTruckCommon.ts) with a Cadillac wordmark header and the CARB panel (carb_panel_pending)."],
+  },
+  fiat: {
+    title: "Fiat 2025 500e Giorgio Armani (electric)", mode: "electric", logo: "Fiat logo",
+    page: "the reference PDF is 1224x792pt (17x11in landscape); the render is the same size and exactly one page.",
+    sample: "- stress record: a saved 2024 Tesla Model Y Performance (other make, off-year), not a production candidate. Production has no Fiat record. The standard-equipment list is trimmed to about 100 items.",
+    extra: ["The reference is a 2025 example (reference_is_2025); the template matches 2025 only, so a 2026 500e is flagged unsupported.", "Shared FCA layout family (fcaCommon.ts); the FlexCare advertisement slot carries the Passport QR."],
+  },
+  spectre: {
+    title: "Rolls-Royce 2026 Spectre (electric)", mode: "electric", logo: "Rolls-Royce monogram",
+    page: "the reference PDF is stored rotated (reference_stored_rotated) and has no text layer; the render is upright at 1224x792pt and exactly one page.",
+    sample: "- stress record: a saved 2023 Subaru Solterra (off-year, other make), not a production candidate. Production has no Rolls-Royce record. The standard-equipment list is trimmed to about 100 items.\n- the reference's printed total (474,050.00) exceeds the sum of its printed lines (395,000.00 + 38,200.00 options + 2,750.00 destination = 435,950.00) by 38,100.00; the reference sample does not reconcile, and the reference-match fixture keeps the printed total.",
+    extra: ["Values for the reference-match fixture were read from the raster because the reference has no text layer (no_text_layer_in_reference).", "Carrier, port of entry and VPC lines are not reproduced."],
+  },
+  bentley: {
+    title: "Bentley 2026 Continental GT Azure (plug-in hybrid)", mode: "plug-in hybrid", logo: "Bentley winged emblem",
+    page: "the reference PDF is 1159.29x697.01pt (page_size_nonstandard); the render keeps that page size and is exactly one page, with the green frame and the banner and disclosure on white strips inside it.",
+    sample: "- stress record: a saved 2018 Chevrolet Volt (off-year, other make; also used for the Lamborghini), not a production candidate. Production has no Bentley record. The Volt's options may not reconcile to its stated total.",
+    extra: ["The tagline, the winged emblem and the 'affixed pursuant to' statement are not reproduced.", "The parts-content box moves to the lower left so the electric panel keeps its full height (the plug-in panel needs that height to avoid overlapping text).", "The reference's total range is printed only when the record carries it (range_chart_pending)."],
+  },
+  urus: {
+    title: "Lamborghini 2026 Urus SE (plug-in hybrid)", mode: "plug-in hybrid", logo: "Lamborghini shield",
+    page: "the reference PDF is stored rotated (reference_stored_rotated) and has no text layer; the render is upright at 1224x792pt and exactly one page.",
+    sample: "- stress record: a saved 2018 Chevrolet Volt (off-year, other make; also used for the Bentley), not a production candidate. Production has no Lamborghini record. The Volt's options may not reconcile to its stated total.",
+    extra: ["The importer block, stock status and gas guzzler line are not reproduced.", "The reference's sample sticker prints values read from its raster (no text layer)."],
   },
 };
 
@@ -608,6 +707,18 @@ const packages: PackageSpec[] = [{
   build: () => ({ real: [real()], realLabel, reference: reference as (first: FactoryStickerRenderData) => FactoryStickerRenderData }),
   mappingMd: hdMappingFor(HD_DOCS[key]),
   differencesMd: (t) => hdDifferencesFor(HD_DOCS[key], t),
+})), ...([
+  [CADILLAC_ESCALADE_IQL_EV_ID, "cadillac-2026-escalade-iql", "cadillac", cadillacRenderData, "other-make layout stress test (2026 Tesla Model Y record), not a production candidate", cadillacReferenceMatchData],
+  [FIAT_500E_EV_ID, "fiat-2025-500e", "fiat", fiatRenderData, "off-year, other-make layout stress test (2024 Tesla Model Y record), not a production candidate", fiatReferenceMatchData],
+  [ROLLS_ROYCE_SPECTRE_EV_ID, "rolls-royce-2026-spectre", "spectre", spectreRenderData, "off-year, other-make layout stress test (2023 Subaru Solterra record), not a production candidate", spectreReferenceMatchData],
+  [BENTLEY_CONTINENTAL_GT_PHEV_ID, "bentley-2026-continental-gt", "bentley", bentleyRenderData, "off-year, other-make layout stress test (2018 Chevrolet Volt record), not a production candidate", bentleyReferenceMatchData],
+  [LAMBORGHINI_URUS_PHEV_ID, "lamborghini-2026-urus", "urus", urusRenderData, "off-year, other-make layout stress test (2018 Chevrolet Volt record), not a production candidate", urusReferenceMatchData],
+] as const).map(([templateId, dirName, key, real, realLabel, reference]): PackageSpec => ({
+  templateId,
+  dirName,
+  build: () => ({ real: [real()], realLabel, reference: reference as (first: FactoryStickerRenderData) => FactoryStickerRenderData }),
+  mappingMd: evMappingFor(EV_DOCS[key]),
+  differencesMd: (t) => evDifferencesFor(EV_DOCS[key], t),
 }))];
 
 const smallestFont = (m: LayoutModel): number =>
@@ -650,13 +761,15 @@ async function writeSample(
   const calculated = p.baseMsrp !== null ? p.baseMsrp + (p.optionsTotal ?? 0) + (p.destinationCharge ?? 0) : null;
   const refInfo = sh("pdfinfo", [refPdf]);
   const refSize = /Page size:\s+([\d.]+) x ([\d.]+) pts/.exec(refInfo)!;
+  const refRot = Number(/Page rot:\s+(\d+)/.exec(refInfo)?.[1] ?? 0);
+  const refUpright: [number, number] = refRot === 90 || refRot === 270 ? [Number(refSize[2]), Number(refSize[1])] : [Number(refSize[1]), Number(refSize[2])];
   return {
     name, label, referenceOnly, vin: data.vin,
     pages,
     pageSizePt: [Number(size[1]), Number(size[2])],
     pageSizeInches: [Number(size[1]) / 72, Number(size[2]) / 72],
-    referencePageSizePt: [Number(refSize[1]), Number(refSize[2])],
-    pageSizeEqualsReference: Number(size[1]) === Number(refSize[1]) && Number(size[2]) === Number(refSize[2]),
+    referencePageSizePt: refUpright,
+    pageSizeEqualsReference: Math.abs(Number(size[1]) - refUpright[0]) < 0.02 && Math.abs(Number(size[2]) - refUpright[1]) < 0.02,
     smallestFontPt: smallestFont(m),
     equipment: m.fit.ok ? { scope: m.fit.equipmentScope, ...m.fit.equipmentCounts, fontPt: m.fit.equipmentFontPt } : null,
     passportQr: qr ? { sizeInches: qr.size / 72, payload: qr.payload } : null,
@@ -697,7 +810,7 @@ describe.skipIf(!DIR)("OEM template evidence", () => {
       sh("pdftoppm", ["-r", "100", "-png", "-singlefile", refPdf, join(outDir, "_ref100")]);
       if (t.page.widthPt > t.page.heightPt && /Page size:\s+([\d.]+) x ([\d.]+) pts/.test(sh("pdfinfo", [refPdf]))) {
         const rs = /Page size:\s+([\d.]+) x ([\d.]+) pts/.exec(sh("pdfinfo", [refPdf]))!;
-        if (Number(rs[1]) < Number(rs[2])) sh("convert", [join(outDir, "_ref100.png"), "-rotate", "90", join(outDir, "_ref100.png")]);
+        if (Number(rs[1]) < Number(rs[2]) && Number(/Page rot:\s+(\d+)/.exec(sh("pdfinfo", [refPdf]))?.[1] ?? 0) === 0) sh("convert", [join(outDir, "_ref100.png"), "-rotate", "90", join(outDir, "_ref100.png")]);
       }
       sh("pdftoppm", ["-r", "100", "-png", "-singlefile", join(outDir, "reference-match.pdf"), join(outDir, "_match100")]);
       sh("montage", [
