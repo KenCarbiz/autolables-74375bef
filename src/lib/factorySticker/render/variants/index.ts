@@ -27,6 +27,7 @@ import { KIA_SORENTO_GAS_ID, buildKiaSorentoGasLayout } from "./kiaSorentoGas.ts
 import { MITSUBISHI_OUTLANDER_SPORT_ID, buildMitsubishiOutlanderSportLayout } from "./mitsubishiOutlanderSport.ts";
 import { SUBARU_FORESTER_GAS_ID, buildSubaruForesterGasLayout } from "./subaruForesterGas.ts";
 import { ALFA_ROMEO_GIULIA_GAS_ID, buildAlfaRomeoGiuliaGasLayout } from "./alfaRomeoGiuliaGas.ts";
+import { MASERATI_GRANTURISMO_GAS_ID, buildMaseratiGranTurismoGasLayout } from "./maseratiGranTurismoTrofeo.ts";
 import type { VariantLayoutBuilder } from "./shared.ts";
 
 export type { VariantLayoutBuilder, VariantRenderInput } from "./shared.ts";
@@ -68,4 +69,5 @@ export const CATALOG_LAYOUTS: Partial<Record<string, VariantLayoutBuilder>> = {
   [VOLVO_XC60_B5_ID]: buildVolvoXc60B5Layout,
   [HONDA_ODYSSEY_GAS_ID]: buildHondaOdysseyGasLayout,
   [ALFA_ROMEO_GIULIA_GAS_ID]: buildAlfaRomeoGiuliaGasLayout,
+  [MASERATI_GRANTURISMO_GAS_ID]: buildMaseratiGranTurismoGasLayout,
 };

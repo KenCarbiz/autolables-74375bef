@@ -60,6 +60,8 @@ import { BENTLEY_CONTINENTAL_GT_PHEV_ID } from "../render/variants/bentleyContin
 import { LAMBORGHINI_URUS_PHEV_ID } from "../render/variants/lamborghiniUrusPhev";
 import { alfaReferenceMatchData, alfaRenderData } from "../render/__fixtures__/alfa";
 import { ALFA_ROMEO_GIULIA_GAS_ID } from "../render/variants/alfaRomeoGiuliaGas";
+import { maseratiReferenceMatchData, maseratiRenderData } from "../render/__fixtures__/maserati";
+import { MASERATI_GRANTURISMO_GAS_ID } from "../render/variants/maseratiGranTurismoTrofeo";
 import { TEMPLATE_CATALOG, evaluateCatalogTemplate, type CatalogTemplate } from "../oem/templateCatalog";
 import { CATALOG_LAYOUTS } from "../render/variants";
 
@@ -374,6 +376,25 @@ ${b.differences.join("\n")}
 `;
 
 const BRAND_DOCS: Record<string, BrandDoc> = {
+  maserati: {
+    title: "Maserati 2026 GranTurismo Trofeo (gasoline)",
+    logo: "Maserati trident and wordmark",
+    logoNote: "packaged artwork extracted from the reference PDF (logoArtwork.ts): the PDF holds the whole label as a raster scan, so the logo is packaged as an alpha-masked raster crop, not vector paths",
+    rows: [
+      "| Header: model, exterior and interior colour, MSRP line | identity (model); build_sheet.colors; build_sheet.pricing.base_msrp | Row omitted / NOT AVAILABLE |",
+      "| Title box (year model trim) and specification line (engine, transmission, drivetrain) | identity; mc_attributes.engine / transmission / drivetrain | Omitted, never guessed |",
+      "| Exclusive standard equipment | normalized standard equipment, grouped by category, in two columns | \"Standard equipment not available for this vehicle.\" |",
+      "| Additional options | build_sheet.packages / options with price | Nothing listed; a missing price prints N/A |",
+      "| Suggested price box: destination charge, gas guzzler tax, total | build_sheet.pricing (gas guzzler tax only when the record states it) | NOT AVAILABLE / row omitted |",
+      "| V.I.N., importation, ship to | listing.vin; transportMethod; the original delivering dealer only | Label printed blank / omitted |",
+    ],
+    sample: ["- sticker-JTJTBCDX8R5032546: off-year, other-make layout stress test (2024 Lexus GX Premium+, used), not a production candidate. Production has no Maserati record and no Maserati has ever been saved, so a saved record of another make is used through the sample path. The standard-equipment list is trimmed to about 80 items.", "- the reference's printed total (179,345.00) exceeds the sum of its printed lines (166,000.00 base + 10,850.00 options + 2,195.00 destination = 179,045.00) by 300.00, the reference's Preparation and Delivery charge, which has no field in the render data and is not printed. The reference-match fixture keeps the printed total, so it does not reconcile by 300.00."],
+    differences: [
+      "- Layout: a Maserati-specific family (white equipment half, light-blue regulatory half). The FCA family module does not fit although Stellantis owns the brand, so the layout is bespoke, built from the shared EPA, safety and parts panels.",
+      "- Gran Turismo Trofeo gas versus Folgore: the match rule is 2026 GranTurismo, coupe, gasoline. The Folgore is electric, so an electric record (and a plug-in or hybrid one) is not matched and flags template_configuration_unsupported; the Folgore would need its own reference label.",
+      "- Artwork not reproduced: the \"GranTurismo\" script wordmark (the model prints as text), the model description paragraph (marketing copy, not data), the importer address, the preparation-and-delivery line, agency seals, the source QR and the Maserati.com footer advertising style. The reference scan also carries a navy left edge and notch, drawn here as plain shapes.",
+    ],
+  },
   alfa: {
     title: "Alfa Romeo 2026 Giulia Veloce (gasoline)",
     logo: "Alfa Romeo badge",
@@ -799,6 +820,7 @@ const packages: PackageSpec[] = [{
   [LEXUS_RX350_GAS_ID, "lexus-2026-rx-350", "lexus", () => [lexusRenderData()], "off-year, other-model layout stress test (2024 Lexus GX record), not a production candidate", lexusReferenceMatchData],
   [TOYOTA_4RUNNER_GAS_ID, "toyota-2026-4runner", "toyota4runner", () => [toyota4runnerRenderData()], "off-year layout stress test (2022 4Runner SR5 record), not a production candidate", toyota4runnerReferenceMatchData],
   [ALFA_ROMEO_GIULIA_GAS_ID, "alfa-romeo-2026-giulia", "alfa", () => [alfaRenderData()], "off-year, other-model layout stress test (2020 Stelvio Ti Sport Carbon record), not a production candidate", alfaReferenceMatchData],
+  [MASERATI_GRANTURISMO_GAS_ID, "maserati-2026-granturismo", "maserati", () => [maseratiRenderData()], "off-year, other-make layout stress test (2024 Lexus GX record), not a production candidate", maseratiReferenceMatchData],
 ] as const).map(([templateId, dirName, key, real, realLabel, reference]): PackageSpec => ({
   templateId,
   dirName,
