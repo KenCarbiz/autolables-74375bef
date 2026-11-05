@@ -48,6 +48,8 @@ import { lexusReferenceMatchData, lexusRenderData } from "../render/__fixtures__
 import { toyota4runnerReferenceMatchData, toyota4runnerRenderData } from "../render/__fixtures__/toyota4runner";
 import { volvoXc60ReferenceMatchData, volvoXc60RenderData } from "../render/__fixtures__/volvoXc60";
 import { VOLVO_XC60_B5_ID } from "../render/variants/volvoXc60B5";
+import { hondaOdysseyReferenceMatchData, hondaOdysseyRenderData } from "../render/__fixtures__/honda";
+import { HONDA_ODYSSEY_GAS_ID } from "../render/variants/hondaOdysseyGas";
 import { LEXUS_RX350_GAS_ID } from "../render/variants/lexusRx350Gas";
 import { TOYOTA_4RUNNER_GAS_ID } from "../render/variants/toyota4runnerGas";
 import { CADILLAC_ESCALADE_IQL_EV_ID } from "../render/variants/cadillacEscaladeIqEv";
@@ -367,6 +369,24 @@ ${b.differences.join("\n")}
 `;
 
 const BRAND_DOCS: Record<string, BrandDoc> = {
+  honda: {
+    title: "Honda 2026 Odyssey Touring (gasoline)",
+    logo: "Honda wordmark (the logo in the reference scan is damaged)",
+    rows: [
+      "| Honda title block: year, model, trim, EXT and INT colors | identity (year, model, trim); build_sheet.colors | Omitted |",
+      "| Standard equipment at no extra cost | normalized standard equipment, grouped by category | \"Standard equipment not available for this vehicle.\" |",
+      "| Manufacturer's Suggested Retail Price, installed options, Destination and Handling, Total Vehicle Price | build_sheet.pricing, packages, options | NOT AVAILABLE |",
+      "| Delivered to, trans. method, emission, dealer code, VIN, barcode | transportMethod, factory codes and the original delivering dealer only; listing.vin | Label printed blank |",
+      "| Warranty (roadside term) | verified warranty terms only | \"Warranty not available for this vehicle.\" |",
+    ],
+    sample: ["- sticker-5FNRL6H6XSB089137: off-year layout stress test (2025 Odyssey EX-L, used), not a production candidate. Production has no 2026 Odyssey record."],
+    differences: [
+      "- Page: the reference PDF is a 612x792pt portrait page (rotation 0, no text layer) that stores a landscape label sideways (reference_stored_rotated); the render is upright at 792x612pt. The reference scan is a torn, marked copy; the owner should confirm the upright letter-landscape page is acceptable.",
+      "- Artwork not reproduced: the Honda logo (damaged in the scan, so the wordmark prints; missing_source_artwork), the Smartphone QR (the 0.90in Vehicle Passport QR takes its slot), agency seals, the MOB code, the engine number, the full-tank-of-fuel line, the control and reference numbers and the second barcode.",
+      "- The fuel-economy panel is the shared panel drawn at 82% (epa_panel_scaled) so the letter page keeps every line at or above 5.5pt.",
+      "- Matching: 2026 Odyssey, minivan, gasoline. The Odyssey has no hybrid configuration; any plug-in or hybrid powertrain is not matched and flags template_configuration_unsupported.",
+    ],
+  },
   volvo: {
     title: "Volvo 2025 XC60 B5 (mild hybrid gasoline)",
     logo: "Volvo identity line (the reference prints no logo artwork)",
@@ -752,6 +772,7 @@ const packages: PackageSpec[] = [{
   [DODGE_DURANGO_GAS_ID, "dodge-2026-durango", "durango", () => [durangoRenderData()], "off-year, other-model layout stress test (2008 Grand Caravan record), not a production candidate", durangoReferenceMatchData],
   [BUICK_ENVISTA_GAS_ID, "buick-2026-envista", "envista", () => [envistaRenderData()], "SYNTHETIC stress fixture (no saved Buick record exists), not a real vehicle", envistaReferenceMatchData],
   [VOLVO_XC60_B5_ID, "volvo-2025-xc60-b5", "volvo", () => [volvoXc60RenderData()], "off-year layout stress test (2022 XC60 Momentum record), not a production candidate", volvoXc60ReferenceMatchData],
+  [HONDA_ODYSSEY_GAS_ID, "honda-2026-odyssey", "honda", () => [hondaOdysseyRenderData()], "off-year layout stress test (2025 Odyssey EX-L record), not a production candidate", hondaOdysseyReferenceMatchData],
   [LEXUS_RX350_GAS_ID, "lexus-2026-rx-350", "lexus", () => [lexusRenderData()], "off-year, other-model layout stress test (2024 Lexus GX record), not a production candidate", lexusReferenceMatchData],
   [TOYOTA_4RUNNER_GAS_ID, "toyota-2026-4runner", "toyota4runner", () => [toyota4runnerRenderData()], "off-year layout stress test (2022 4Runner SR5 record), not a production candidate", toyota4runnerReferenceMatchData],
 ] as const).map(([templateId, dirName, key, real, realLabel, reference]): PackageSpec => ({
@@ -826,7 +847,8 @@ async function writeSample(
   const refInfo = sh("pdfinfo", [refPdf]);
   const refSize = /Page size:\s+([\d.]+) x ([\d.]+) pts/.exec(refInfo)!;
   const refRot = Number(/Page rot:\s+(\d+)/.exec(refInfo)?.[1] ?? 0);
-  const refUpright: [number, number] = refRot === 90 || refRot === 270 ? [Number(refSize[2]), Number(refSize[1])] : [Number(refSize[1]), Number(refSize[2])];
+  const storedSideways = refRot === 0 && Number(refSize[1]) < Number(refSize[2]) && Number(size[1]) > Number(size[2]);
+  const refUpright: [number, number] = refRot === 90 || refRot === 270 || storedSideways ? [Number(refSize[2]), Number(refSize[1])] : [Number(refSize[1]), Number(refSize[2])];
   return {
     name, label, referenceOnly, vin: data.vin,
     pages,
@@ -876,7 +898,7 @@ describe.skipIf(!DIR)("OEM template evidence", () => {
       sh("pdftoppm", ["-r", "100", "-png", "-singlefile", refPdf, join(outDir, "_ref100")]);
       if (t.page.widthPt > t.page.heightPt && /Page size:\s+([\d.]+) x ([\d.]+) pts/.test(sh("pdfinfo", [refPdf]))) {
         const rs = /Page size:\s+([\d.]+) x ([\d.]+) pts/.exec(sh("pdfinfo", [refPdf]))!;
-        if (Number(rs[1]) < Number(rs[2]) && Number(/Page rot:\s+(\d+)/.exec(sh("pdfinfo", [refPdf]))?.[1] ?? 0) === 0) sh("convert", [join(outDir, "_ref100.png"), "-rotate", "90", join(outDir, "_ref100.png")]);
+        if (Number(rs[1]) < Number(rs[2]) && Number(/Page rot:\s+(\d+)/.exec(sh("pdfinfo", [refPdf]))?.[1] ?? 0) === 0) sh("convert", [join(outDir, "_ref100.png"), "-rotate", t.id === HONDA_ODYSSEY_GAS_ID ? "270" : "90", join(outDir, "_ref100.png")]);
       }
       sh("pdftoppm", ["-r", "100", "-png", "-singlefile", join(outDir, "reference-match.pdf"), join(outDir, "_match100")]);
       sh("montage", [

@@ -43,6 +43,7 @@ export type CatalogBlockerCode =
   | "powertrain_rule_unverified"
   | "page_size_nonstandard"
   | "reference_stored_rotated"
+  | "epa_panel_scaled"
   | "epa_scale_scan_rebuilt"
   | "hope_on_wheels_artwork_not_reproduced"
   | "nhtsa_ratings_not_wired"
@@ -247,13 +248,13 @@ export const TEMPLATE_CATALOG: readonly CatalogTemplate[] = [
     canonicalMake: "HONDA",
     source: { modelYear: 2026, model: "Odyssey", trim: "Touring" },
     referenceStatus: "2026_factory_example",
-    page: { widthPt: 612, heightPt: 792, orientation: "portrait" },
+    page: { widthPt: 792, heightPt: 612, orientation: "landscape" },
     referencePdf: "Honda_2026_Odyssey_Touring.pdf",
     design: { fileKey: "bYlV3mnBv5YlIpZauBSaib", masterNodeId: "2:821" },
     match: { modelYears: [2026], modelPattern: "^odyssey$", bodyClasses: ["MINIVAN"], fuelClasses: ["gasoline"], },
     approval: "pending_owner_approval",
-    layoutStatus: "not_started",
-    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "no_text_layer_in_reference", "page_size_nonstandard", "layout_not_built"],
+    layoutStatus: "sample_ready",
+    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "no_text_layer_in_reference", "reference_stored_rotated", "missing_source_artwork", "epa_panel_scaled", "parts_content_not_wired", "warranty_terms_not_wired"],
   },
   {
     id: "hyundai_2026_tucson_se_awd",

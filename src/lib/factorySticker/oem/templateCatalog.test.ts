@@ -25,7 +25,8 @@ describe("template catalog", () => {
     expect(getCatalogTemplate("hyundai_2026_tucson_se_awd")!.page).toEqual({ widthPt: 1224, heightPt: 792, orientation: "landscape" });
     expect(getCatalogTemplate("mitsubishi_2026_outlander_sport_s")!.page).toEqual({ widthPt: 1224, heightPt: 792, orientation: "landscape" });
     expect(getCatalogTemplate("mitsubishi_2026_outlander_sport_s")!.blockers).toContain("reference_stored_rotated");
-    expect(getCatalogTemplate("honda_2026_odyssey_touring")!.page).toMatchObject({ widthPt: 612, heightPt: 792 });
+    expect(getCatalogTemplate("honda_2026_odyssey_touring")!.page).toEqual({ widthPt: 792, heightPt: 612, orientation: "landscape" });
+    expect(getCatalogTemplate("honda_2026_odyssey_touring")!.blockers).toContain("reference_stored_rotated");
   });
 
   it("flags the 2025 references and marked online copies per template", () => {
