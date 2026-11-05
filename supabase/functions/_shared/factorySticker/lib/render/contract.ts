@@ -732,6 +732,11 @@ function resolveVariantRoute(
 ): VariantRoute | null {
   if (sampleTemplateId) {
     const build = CATALOG_LAYOUTS[sampleTemplateId];
+    const masterKey = getCatalogTemplate(sampleTemplateId)?.existingMasterKey;
+    if (masterKey && build) {
+      const production = resolveVariantRoute(data, theme, input);
+      return { variantKey: masterKey, masterRouted: production?.variantKey === masterKey ? production.masterRouted : true, build };
+    }
     return build && getCatalogTemplate(sampleTemplateId) ? { variantKey: sampleTemplateId, masterRouted: true, build } : null;
   }
   if (String(theme.templateOverrideKey ?? "").trim()) return null;

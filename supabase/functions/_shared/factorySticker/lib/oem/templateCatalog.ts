@@ -38,6 +38,7 @@ export type CatalogBlockerCode =
   | "sample_machine_readable_artwork_not_reproduced"
   | "owner_exact_match_not_approved"
   | "layout_not_built"
+  | "served_by_approved_master"
   | "reference_is_2025"
   | "marked_online_copy"
   | "missing_source_artwork"
@@ -411,8 +412,8 @@ export const TEMPLATE_CATALOG: readonly CatalogTemplate[] = [
     design: { fileKey: "J3SqYGgMhIDclzOxxb7wRO", masterNodeId: "1:822" },
     match: { modelYears: [2026], modelPattern: "^qx60$", bodyClasses: ["SUV"], fuelClasses: ["gasoline"], },
     approval: "pending_owner_approval",
-    layoutStatus: "not_started", existingMasterKey: "infiniti-2026-qx60-sport-awd",
-    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "marked_online_copy", "page_size_nonstandard", "layout_not_built"],
+    layoutStatus: "sample_ready", existingMasterKey: "infiniti-2026-qx60-sport-awd",
+    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "marked_online_copy", "page_size_nonstandard", "served_by_approved_master"],
   },
   {
     id: "lexus_2026_rx_350_awd",
@@ -439,8 +440,8 @@ export const TEMPLATE_CATALOG: readonly CatalogTemplate[] = [
     design: { fileKey: "wqUIPGVY4aHERMX0QmxzFl", masterNodeId: "1:822" },
     match: { modelYears: [2026], modelPattern: "^pathfinder$", bodyClasses: ["SUV"], fuelClasses: ["gasoline"], },
     approval: "pending_owner_approval",
-    layoutStatus: "not_started", existingMasterKey: "nissan-2026-pathfinder-platinum-4wd",
-    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "marked_online_copy", "page_size_nonstandard", "layout_not_built"],
+    layoutStatus: "sample_ready", existingMasterKey: "nissan-2026-pathfinder-platinum-4wd",
+    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "marked_online_copy", "page_size_nonstandard", "served_by_approved_master"],
   },
   {
     id: "toyota_2026_4runner_trd_sport",
@@ -488,7 +489,7 @@ export const TEMPLATE_CATALOG: readonly CatalogTemplate[] = [
 /** True when the catalog holds at least one template with a built layout for this make. */
 export const hasBuiltCatalogTemplates = (make: string | null | undefined): boolean => {
   const m = token(make);
-  return !!m && TEMPLATE_CATALOG.some((t) => t.canonicalMake === m && t.layoutStatus !== "not_started");
+  return !!m && TEMPLATE_CATALOG.some((t) => t.canonicalMake === m && t.layoutStatus !== "not_started" && !t.existingMasterKey);
 };
 
 export const getCatalogTemplate = (id: string): CatalogTemplate | null =>

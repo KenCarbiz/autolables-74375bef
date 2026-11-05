@@ -66,6 +66,11 @@ import { lincolnReferenceMatchData, lincolnRenderData } from "../render/__fixtur
 import { LINCOLN_NAUTILUS_GAS_ID } from "../render/variants/lincolnNautilusGas";
 import { astonReferenceMatchData, astonRenderData } from "../render/__fixtures__/aston";
 import { ASTON_MARTIN_VANTAGE_ROADSTER_GAS_ID } from "../render/variants/astonMartinVantageRoadsterGas";
+import { INFINITI_QX60_SPORT_ID } from "../render/variants/infinitiQx60Sport";
+import { NISSAN_PATHFINDER_PLATINUM_ID } from "../render/variants/nissanPathfinderPlatinum";
+import { pathfinderReferenceMatchData, qx60ReferenceMatchData } from "../render/__fixtures__/letterMasters";
+import { NEW_TITLE, buildListing, loadFixture, passportUrlFor } from "./harness";
+import { normalizeForSticker } from "../../../../supabase/functions/factory-sticker-orchestrate/normalize";
 import { TEMPLATE_CATALOG, evaluateCatalogTemplate, type CatalogTemplate } from "../oem/templateCatalog";
 import { CATALOG_LAYOUTS } from "../render/variants";
 
@@ -377,6 +382,54 @@ ${t.blockers.map((x) => `- ${x}`).join("\n")}
 - Parts content, warranty: not wired by the orchestrator adapter today (blockers parts_content_not_wired, warranty_terms_not_wired); the reference-match render shows the populated state.
 - Equipment: decoder fragments (rating rows, speed thresholds, bare counts and letters, engine and drive labels) are dropped before selection; when the full list does not fit at 5.5pt the ranked selection prints with the fixed Passport pointer line.
 ${b.differences.join("\n")}
+`;
+
+
+interface LetterDoc {
+  title: string;
+  masterKey: string;
+  ownership: string;
+  sample: readonly string[];
+}
+
+const letterMapping = (b: LetterDoc): string => `# ${b.title} - data source mapping
+
+This catalog entry is served by the owner-approved Letter master (${b.masterKey}, render/variants/letterMonroney.ts). The catalog layout delegates to that builder, so every printed value comes from exactly the same fields, in exactly the same regions, as the production sticker. No provider call is made. The reference sample's values are never used as defaults; they appear only in the reference-match fixture used for side-by-side comparison.
+
+| Printed region | Source field | When missing |
+|---|---|---|
+| Reproduction banner and disclosure | reproduction.ts | Always printed |
+| Brand logo | packaged artwork (logoArtwork.ts, owner-approved master asset) | Always printed |
+| Title, VIN, colours, engine, transmission, drivetrain | identity, mechanical, build_sheet.colors, listing.vin | Value omitted |
+| Standard equipment sections | build_sheet.standard + key_features through equipmentSelection | Section omitted |
+| ${b.ownership} | verified warranty terms (warranty.*) | Omitted |
+| Options, packages, MSRP, destination, total | build_sheet.pricing / options / packages | NOT AVAILABLE / N/A |
+| Fuel economy and safety ratings | epa_economy (verified fueleconomy.gov match) and NHTSA rows in the NeoVIN decode | Explicit unavailable states |
+| Original delivering dealer | dealer block, ONLY when dealerRole is original_delivery | Blank |
+| VIN barcode and Passport QR | barcodePayload (= VIN); canonicalPassportUrl(listing.slug) | Always present / omitted with caption when no URL |
+`;
+
+const letterDifferences = (b: LetterDoc, t: CatalogTemplate): string => `# ${b.title} - differences from the OEM reference
+
+Status: layout ${t.layoutStatus}, approval ${t.approval}. Production routing for this make is the approved Letter master, not this catalog entry.
+
+## Served by the approved master
+- The sample render equals the production master render for the same record (verified by letterMasterCatalog.test.ts); nothing about the approved output changed.
+- The make keeps its catalog-only data extras (EPA conflict handling, EV figures) off, because hasBuiltCatalogTemplates excludes entries that carry an existing master.
+
+## Sample data
+- reference-match: synthetic vehicle that satisfies the reference variant (test data from render/__fixtures__/letterMasters.ts), for side-by-side comparison only.
+${b.sample.join("\n")}
+
+## Blockers (stable codes)
+${t.blockers.map((x) => `- ${x}`).join("\n")}
+
+## Unresolved differences
+- Page: the reference PDF is a Letter-class landscape page (792x612pt); the render is the same size and exactly one page.
+- Type size: the approved master prints some footnote and caption lines at 5.2pt, below the 5.5pt floor the new catalog layouts hold. The approved master was not changed.
+- The reference is a marked online copy (marked_online_copy); the approved master reproduces it as the owner approved it.
+- Fonts: Helvetica / Helvetica-Bold stand in for the reference faces (font_substitution). OCR was spot-checked only (ocr_unverified).
+- Artwork not reproduced: agency seals and the source QR (replaced by the Vehicle Passport QR); the barcode is regenerated from the VIN.
 `;
 
 const BRAND_DOCS: Record<string, BrandDoc> = {
@@ -814,6 +867,13 @@ const EV_DOCS: Record<string, EvDoc> = {
   },
 };
 
+
+const saved = (index: number): FactoryStickerRenderData => {
+  const fx = loadFixture();
+  const listing = buildListing(fx, fx.vehicles[index]);
+  return normalizeForSticker(listing, {}, passportUrlFor(listing), NEW_TITLE).data;
+};
+
 const packages: PackageSpec[] = [{
   templateId: HYUNDAI_TUCSON_GAS_ID,
   dirName: "hyundai-2026-tucson-gas",
@@ -870,6 +930,15 @@ const packages: PackageSpec[] = [{
   build: () => ({ real: real(), realLabel, reference: reference as (first: FactoryStickerRenderData) => FactoryStickerRenderData }),
   mappingMd: mappingFor(BRAND_DOCS[key]),
   differencesMd: (t) => differencesFor(BRAND_DOCS[key], t),
+})), ...([
+  [INFINITI_QX60_SPORT_ID, "infiniti-2026-qx60-sport", { title: "INFINITI 2026 QX60 Sport (gasoline), served by the approved master", masterKey: "infiniti-2026-qx60-sport-awd", ownership: "Total Ownership Experience (verified warranty terms)", sample: ["- sticker-5N1AL1FS7TC339685: the saved 2026 INFINITI QX60 LUXE record from the harteNewInventory acceptance fixture (rendered through the sample path, identical to its production render)."] }, () => [saved(0)], "saved production record (2026 INFINITI QX60 LUXE, harteNewInventory fixture)", qx60ReferenceMatchData],
+  [NISSAN_PATHFINDER_PLATINUM_ID, "nissan-2026-pathfinder-platinum", { title: "Nissan 2026 Pathfinder Platinum (gasoline), served by the approved master", masterKey: "nissan-2026-pathfinder-platinum-4wd", ownership: "Nissan Ownership Information (verified warranty terms)", sample: ["- sticker-5N1DR3DK0TC000002: SYNTHETIC reference-variant vehicle (no saved Nissan record exists in the acceptance fixtures), not a real vehicle."] }, () => [pathfinderReferenceMatchData()], "SYNTHETIC reference-variant vehicle (no saved Nissan record), not a real vehicle", pathfinderReferenceMatchData],
+] as const).map(([templateId, dirName, doc, real, realLabel, reference]): PackageSpec => ({
+  templateId,
+  dirName,
+  build: () => ({ real: real(), realLabel, reference: reference as (first: FactoryStickerRenderData) => FactoryStickerRenderData }),
+  mappingMd: letterMapping(doc),
+  differencesMd: (t) => letterDifferences(doc, t),
 })), ...([
   [FORD_F250_DIESEL_ID, "ford-2026-f250", "f250", f250RenderData, "off-year, other-model layout stress test (2024 F-150 record), not a production candidate", f250ReferenceMatchData],
   [RAM_2500_DIESEL_ID, "ram-2026-2500", "ram", ram2500RenderData, "off-year layout stress test (2022 RAM 2500 gasoline record), not a production candidate", ram2500ReferenceMatchData],

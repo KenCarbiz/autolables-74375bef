@@ -34,6 +34,8 @@ import { ALFA_ROMEO_GIULIA_GAS_ID, buildAlfaRomeoGiuliaGasLayout } from "./alfaR
 import { MASERATI_GRANTURISMO_GAS_ID, buildMaseratiGranTurismoGasLayout } from "./maseratiGranTurismoTrofeo.ts";
 import { LINCOLN_NAUTILUS_GAS_ID, buildLincolnNautilusGasLayout } from "./lincolnNautilusGas.ts";
 import { ASTON_MARTIN_VANTAGE_ROADSTER_GAS_ID, buildAstonMartinVantageRoadsterGasLayout } from "./astonMartinVantageRoadsterGas.ts";
+import { INFINITI_QX60_SPORT_ID, buildInfinitiQx60SportLayout } from "./infinitiQx60Sport.ts";
+import { NISSAN_PATHFINDER_PLATINUM_ID, buildNissanPathfinderPlatinumLayout } from "./nissanPathfinderPlatinum.ts";
 import type { VariantLayoutBuilder } from "./shared.ts";
 
 export type { VariantLayoutBuilder, VariantRenderInput } from "./shared.ts";
@@ -78,4 +80,6 @@ export const CATALOG_LAYOUTS: Partial<Record<string, VariantLayoutBuilder>> = {
   [MASERATI_GRANTURISMO_GAS_ID]: buildMaseratiGranTurismoGasLayout,
   [LINCOLN_NAUTILUS_GAS_ID]: buildLincolnNautilusGasLayout,
   [ASTON_MARTIN_VANTAGE_ROADSTER_GAS_ID]: buildAstonMartinVantageRoadsterGasLayout,
+  [INFINITI_QX60_SPORT_ID]: buildInfinitiQx60SportLayout,
+  [NISSAN_PATHFINDER_PLATINUM_ID]: buildNissanPathfinderPlatinumLayout,
 };
