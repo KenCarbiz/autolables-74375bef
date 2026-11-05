@@ -3,6 +3,7 @@
 // bundle the engine (Supabase ships only supabase/functions/). Edit the
 // source file and run `bun run sync:edge-sticker`.
 import { BUICK_ENVISTA_GAS_ID, buildBuickEnvistaGasLayout } from "./buickEnvistaGas.ts";
+import { LAMBORGHINI_URUS_PHEV_ID, buildLamborghiniUrusPhevLayout } from "./lamborghiniUrusPhev.ts";
 import { BENTLEY_CONTINENTAL_GT_PHEV_ID, buildBentleyContinentalGtPhevLayout } from "./bentleyContinentalGtPhev.ts";
 import { ROLLS_ROYCE_SPECTRE_EV_ID, buildRollsRoyceSpectreEvLayout } from "./rollsRoyceSpectreEv.ts";
 import { FIAT_500E_EV_ID, buildFiat500eEvLayout } from "./fiat500eEv.ts";
@@ -60,4 +61,5 @@ export const CATALOG_LAYOUTS: Partial<Record<string, VariantLayoutBuilder>> = {
   [FIAT_500E_EV_ID]: buildFiat500eEvLayout,
   [ROLLS_ROYCE_SPECTRE_EV_ID]: buildRollsRoyceSpectreEvLayout,
   [BENTLEY_CONTINENTAL_GT_PHEV_ID]: buildBentleyContinentalGtPhevLayout,
+  [LAMBORGHINI_URUS_PHEV_ID]: buildLamborghiniUrusPhevLayout,
 };
