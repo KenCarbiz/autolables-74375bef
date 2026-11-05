@@ -38,6 +38,8 @@ export interface CatalogSuiteConfig {
   ev?: "ev" | "phev";
   /** A model year the template must not route (defaults to 2025; the 2025 reference passes 2026). */
   offYear?: string;
+  /** Amount by which the reference sticker's own printed total exceeds its printed lines (the sample does not reconcile). */
+  referenceGap?: number;
   carb?: { safetyPanel: boolean; plainAmounts?: boolean };
   /** Records the template must match (pending approval) and must not match. */
   supported: Array<{ label: string; patch: (d: FactoryStickerRenderData) => FactoryStickerRenderData }>;
@@ -221,7 +223,7 @@ export function describeCatalogTemplate(c: CatalogSuiteConfig): void {
 
       it("reconciles the reference pricing", () => {
         const p = ref.pricing;
-        expect(p.baseMsrp! + p.optionsTotal! + p.destinationCharge!).toBe(p.totalMsrp);
+        expect(p.baseMsrp! + p.optionsTotal! + p.destinationCharge! + (c.referenceGap ?? 0)).toBe(p.totalMsrp);
         expect(ref.options.reduce((a, o) => a + (o.msrp ?? 0), 0) + ref.packages.reduce((a, o) => a + (o.msrp ?? 0), 0)).toBe(p.optionsTotal);
       });
 

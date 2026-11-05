@@ -1,4 +1,5 @@
 import { BUICK_ENVISTA_GAS_ID, buildBuickEnvistaGasLayout } from "./buickEnvistaGas.ts";
+import { ROLLS_ROYCE_SPECTRE_EV_ID, buildRollsRoyceSpectreEvLayout } from "./rollsRoyceSpectreEv.ts";
 import { FIAT_500E_EV_ID, buildFiat500eEvLayout } from "./fiat500eEv.ts";
 import { CADILLAC_ESCALADE_IQL_EV_ID, buildCadillacEscaladeIqEvLayout } from "./cadillacEscaladeIqEv.ts";
 import { buildChryslerPacificaPhevLayout } from "./chryslerPacificaPhev.ts";
@@ -52,4 +53,5 @@ export const CATALOG_LAYOUTS: Partial<Record<string, VariantLayoutBuilder>> = {
   [GMC_SIERRA_3500_DIESEL_ID]: buildGmcSierra3500DieselLayout,
   [CADILLAC_ESCALADE_IQL_EV_ID]: buildCadillacEscaladeIqEvLayout,
   [FIAT_500E_EV_ID]: buildFiat500eEvLayout,
+  [ROLLS_ROYCE_SPECTRE_EV_ID]: buildRollsRoyceSpectreEvLayout,
 };
