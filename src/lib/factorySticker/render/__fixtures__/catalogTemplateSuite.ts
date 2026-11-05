@@ -40,6 +40,8 @@ export interface CatalogSuiteConfig {
   offYear?: string;
   /** Amount by which the reference sticker's own printed total exceeds its printed lines (the sample does not reconcile). */
   referenceGap?: number;
+  /** Page size in points when the reference page is not 17x11. */
+  pageSize?: [number, number];
   carb?: { safetyPanel: boolean; plainAmounts?: boolean };
   /** Records the template must match (pending approval) and must not match. */
   supported: Array<{ label: string; patch: (d: FactoryStickerRenderData) => FactoryStickerRenderData }>;
@@ -353,7 +355,7 @@ export function describeCatalogTemplate(c: CatalogSuiteConfig): void {
           expect(buildRenderLayout(ref, theme).width).toBe(792);
           mutable.layoutStatus = "approved";
           const routed = buildRenderLayout(ref, theme);
-          expect([routed.width, routed.height]).toEqual([1224, 792]);
+          expect([routed.width, routed.height]).toEqual(c.pageSize ?? [1224, 792]);
           expect(routed.fit.ok && routed.fit.figmaMaster).toBe(true);
           expect(buildRenderLayout({ ...ref, identity: { ...ref.identity, year: c.offYear ?? "2025" } }, theme).width).toBe(792);
         } finally {

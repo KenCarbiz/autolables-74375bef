@@ -6,11 +6,11 @@
 // point-based columns and listing priced options.
 
 import type { FactoryStickerData } from "../../types.ts";
-import { Painter, fitOk, validateModel, type LayoutModel } from "../layout.ts";
+import { PAGE_MARGIN, Painter, fitOk, validateModel, type LayoutModel } from "../layout.ts";
 import { REPRODUCTION_BANNER } from "../../reproduction.ts";
-import { INK, type VariantLayoutBuilder, type VariantRenderInput } from "./shared.ts";
+import { INK, PAPER, type VariantLayoutBuilder, type VariantRenderInput } from "./shared.ts";
 import { Q } from "./catalogBlocks.ts";
-import { T, wrap } from "./hyundaiTucsonGas.ts";
+import { R, T, wrap } from "./hyundaiTucsonGas.ts";
 import {
   MAX_EXTRA_COLUMNS, bx, buildSections, disclosureLines, flow, formatMoney, paintPlaced, placedResult, priceRowsWithoutColors, styleLadder, toEntries, totalMsrp, tx, wrapD, withColumns,
   type ColumnSpec, type FirstPageContext, type FirstPageResult, type PriceRow, type TabloidSpec,
@@ -22,6 +22,8 @@ const DISPLAY_PT = 1.224 / 2;
 export interface PageSize {
   widthPt: number;
   heightPt: number;
+  /** Page-wide background; the banner and disclosure then sit on white strips inside it. */
+  frame?: string;
 }
 
 function paintBanner(p: Painter, widthUnits: number): void {
@@ -62,6 +64,12 @@ export function assembleCatalogPage(input: VariantRenderInput, spec: TabloidSpec
       if (probe.rest.length) continue;
       const drawn: string[] = [];
       const p = new Painter(drawn);
+      if (page.frame) {
+        const m = PAGE_MARGIN;
+        R(p, m, m, page.widthPt - 2 * m, page.heightPt - 2 * m, page.frame);
+        R(p, m + 2, m + 2, page.widthPt - 2 * m - 4, 17, PAPER);
+        R(p, m + 2, footerTop * UNIT - 4, page.widthPt - 2 * m - 4, page.heightPt - m - 2 - (footerTop * UNIT - 4), PAPER);
+      }
       paintBanner(p, widthUnits);
       spec.paintFirst(p, ctx);
       paintDisclosure(p, disclosure, footerTop, widthUnits);
@@ -96,14 +104,15 @@ export interface PtColumn {
 
 /** Flows the standard equipment through point-based columns; the ladder may re-split them into more. */
 export function flowEquipmentColumns(
-  p: Painter, ctx: FirstPageContext, cols: PtColumn[], o: { upper?: boolean; bullet?: "dot" | "square"; unavailableAt?: [number, number] } = {},
+  p: Painter, ctx: FirstPageContext, cols: PtColumn[], o: { upper?: boolean; bullet?: "dot" | "square"; unavailableAt?: [number, number]; tail?: PtColumn[] } = {},
 ): FirstPageResult {
   const sections = buildSections(ctx.input);
   if (!sections.length && o.unavailableAt) T(p, "Standard equipment not available for this vehicle.", o.unavailableAt[0], o.unavailableAt[1], 8, "body");
   const entries = toEntries(sections, (s) => (o.upper ? s.toUpperCase() : s), 4, undefined, ctx.input.equipmentNote)
     .map((e) => (o.upper && !e.heading && !e.note ? { ...e, text: e.text.toUpperCase() } : e));
   const base: ColumnSpec[] = cols.map((c) => ({ x: Q(c.x), w: Q(c.w), top: Q(c.top), bottom: Q(c.bottom) }));
-  const { placed, rest } = flow(entries, withColumns(base, ctx.extraColumns), ctx.style);
+  const tail: ColumnSpec[] = (o.tail ?? []).map((c) => ({ x: Q(c.x), w: Q(c.w), top: Q(c.top), bottom: Q(c.bottom) }));
+  const { placed, rest } = flow(entries, [...withColumns(base, ctx.extraColumns), ...tail], ctx.style);
   paintPlaced(p, placed, ctx.style, { headingFont: "bold", ...(o.bullet ? { bullet: o.bullet } : {}) });
   return placedResult(entries, rest);
 }

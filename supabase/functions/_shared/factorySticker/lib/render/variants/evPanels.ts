@@ -72,42 +72,44 @@ function pumpGlyph(p: Painter, x: number, y: number, s: number): void {
 /** Driving-range chart; (x, y, w) in points. Draws only what the record holds. */
 export function paintRangeChart(p: Painter, x: number, y: number, w: number, r: EvRangeFacts, mode: EvMode, scale = 1): void {
   const s = (n: number): number => n * scale;
-  T(p, "Driving Range", x, y, s(10), "bold");
+  const f = (n: number): number => Math.max(5.5, n * scale);
+  T(p, "Driving Range", x, y, f(10), "bold");
   const barY = y + s(14);
   const barH = s(12);
   const trackW = w - s(78);
   const stateY = barY + barH + s(3);
   if (r.electric === undefined) {
     R(p, x, barY, trackW, barH, PAPER, 1);
-    T(p, "Range Not Available", x + trackW / 2, barY + s(1.6), s(8.4), "bold", { align: "center" });
+    T(p, "Range Not Available", x + trackW / 2, barY + s(1.6), f(8.4), "bold", { align: "center" });
   } else if (mode === "ev") {
     R(p, x, barY, trackW, barH, INK);
-    T(p, "Vehicle Range", x + s(4), barY + s(1.8), s(8), "bold", { color: PAPER });
-    T(p, "0", x, stateY, s(7), "body");
-    T(p, miles(r.electric), x + trackW + s(8), barY - s(3), s(17), "bold");
-    T(p, "miles", x + trackW + s(8), barY + s(14), s(8), "body");
+    T(p, "Vehicle Range", x + s(4), barY + s(1.8), f(8), "bold", { color: PAPER });
+    T(p, "0", x, stateY, f(7), "body");
+    T(p, miles(r.electric), x + trackW + s(8), barY - s(3), f(17), "bold");
+    T(p, "miles", x + trackW + s(8), barY + s(14), f(8), "body");
   } else if (r.total !== undefined) {
     const electricW = trackW * (r.electric / r.total);
     R(p, x, barY, trackW, barH, PAPER, 1);
     R(p, x, barY, electricW, barH, INK);
-    R(p, x + electricW, barY, trackW - electricW, barH, "#8f8f8f");
-    T(p, "Electric + Gasoline", x + s(3), barY + s(1.8), s(7), "bold", { color: PAPER });
-    T(p, "Gasoline only", x + electricW + s(4), barY + s(1.8), s(7), "bold", { color: PAPER });
-    T(p, "0", x, stateY, s(7), "body");
-    T(p, miles(r.electric), x + electricW, stateY, s(7), "bold", { align: "center" });
-    T(p, miles(r.total), x + trackW + s(8), barY - s(3), s(17), "bold");
-    T(p, "miles", x + trackW + s(8), barY + s(14), s(8), "body");
+    R(p, x + electricW, barY, trackW - electricW, barH, "#666666");
+    const labelW = measureText("Electric + Gasoline", "bold", f(7));
+    T(p, "Electric + Gasoline", x + s(3), barY + s(1.8), f(7), "bold", { color: PAPER });
+    T(p, "Gasoline only", x + Math.max(electricW + s(4), s(3) + labelW + s(6)), barY + s(1.8), f(7), "bold", { color: PAPER });
+    T(p, "0", x, stateY, f(7), "body");
+    T(p, miles(r.electric), x + electricW, stateY, f(7), "bold", { align: "center" });
+    T(p, miles(r.total), x + trackW + s(8), barY - s(3), f(17), "bold");
+    T(p, "miles", x + trackW + s(8), barY + s(14), f(8), "body");
   } else {
     R(p, x, barY, trackW, barH, INK);
-    T(p, "Electric", x + s(4), barY + s(1.8), s(8), "bold", { color: PAPER });
-    T(p, "0", x, stateY, s(7), "body");
-    T(p, miles(r.electric), x + trackW + s(8), barY - s(3), s(17), "bold");
-    T(p, "miles", x + trackW + s(8), barY + s(14), s(8), "body");
-    T(p, "Total range: Not Available", x + trackW, stateY, s(7), "bold", { align: "right" });
+    T(p, "Electric", x + s(4), barY + s(1.8), f(8), "bold", { color: PAPER });
+    T(p, "0", x, stateY, f(7), "body");
+    T(p, miles(r.electric), x + trackW + s(8), barY - s(3), f(17), "bold");
+    T(p, "miles", x + trackW + s(8), barY + s(14), f(8), "body");
+    T(p, "Total range: Not Available", x + trackW, stateY, f(7), "bold", { align: "right" });
   }
   const charge = mode === "ev" || r.electric !== undefined ? (r.chargeHours !== undefined ? `Charge Time: ${hours(r.chargeHours)} hours (240V)` : "Charge Time: Not Available") : "";
-  if (charge) T(p, charge, x, stateY + s(10), s(8), "bold");
-  if (mode === "phev" && r.electric !== undefined) T(p, `All electric range = 0 to ${miles(r.electric)} miles`, x + w - s(2), stateY + s(10), s(7), "body", { align: "right" });
+  if (charge) T(p, charge, x, stateY + s(10), f(8), "bold");
+  if (mode === "phev" && r.electric !== undefined) T(p, `All electric range = 0 to ${miles(r.electric)} miles`, x + w - s(2), stateY + s(10), f(7), "body", { align: "right" });
 }
 
 export interface EvEpaOptions {
@@ -169,34 +171,34 @@ export function paintEvEpa(p: Painter, d: FactoryStickerData, g: Grid, ox: numbe
     paintRangeChart(p, X(12), Yy(146), W(440), range, mode, 0.86);
   } else {
     const box = (title: string, x: number, rows: () => void): void => {
-      R(p, X(x), Yy(66), W(222), Yy(150) - Yy(66), PAPER, 1.4);
-      T(p, title, X(x + 6), Yy(68), 9, "bold");
+      R(p, X(x), Yy(72), W(222), Yy(154) - Yy(72), PAPER, 1.4);
+      T(p, title, X(x + 6), Yy(74), 8.6, "bold");
       rows();
     };
     box("Electricity + Gasoline", 10, () => {
       const mpge = verified ? r.combinedMpge : undefined;
       plug(p, X(14), Yy(96), 14);
-      if (mpge !== undefined) p.text(String(Math.round(mpge)), X(30), Yy(124), 40, "bold", INK);
+      if (mpge !== undefined) p.text(String(Math.round(mpge)), X(38), Yy(134), 32, "bold", INK);
       else unavailable(X(34), Yy(100), 10);
-      T(p, "MPGe", X(mpge !== undefined ? 122 : 34), Yy(mpge !== undefined ? 84 : 114), 11, "bold");
+      T(p, "MPGe", X(mpge !== undefined ? 130 : 34), Yy(mpge !== undefined ? 92 : 114), 11, "bold");
       const kwh = verified ? r.kwhPer100Miles : undefined;
-      T(p, kwh !== undefined ? kwhText(kwh) : "N/A", X(124), Yy(104), 12, "bold");
-      T(p, "kW-hrs per 100 mi", X(124), Yy(120), 6.6, "body");
-      T(p, "combined city/highway", X(14), Yy(132), 6.6, "body");
+      T(p, kwh !== undefined ? kwhText(kwh) : "N/A", X(134), Yy(108), 12, "bold");
+      T(p, "kW-hrs per 100 mi", X(134), Yy(126), 6.6, "body");
+      T(p, "combined city/highway", X(14), Yy(136), 6.6, "body");
     });
     box("Gasoline Only", 240, () => {
       const mpg = verified ? r.gasolineCombinedMpg ?? r.combinedMpg : undefined;
       pumpGlyph(p, X(244), Yy(92), 14);
-      if (mpg !== undefined) p.text(String(Math.round(mpg)), X(264), Yy(124), 40, "bold", INK);
+      if (mpg !== undefined) p.text(String(Math.round(mpg)), X(274), Yy(134), 32, "bold", INK);
       else unavailable(X(264), Yy(100), 10);
-      T(p, "MPG", X(mpg !== undefined ? 352 : 264), Yy(mpg !== undefined ? 84 : 114), 11, "bold");
+      T(p, "MPG", X(mpg !== undefined ? 360 : 264), Yy(mpg !== undefined ? 92 : 114), 11, "bold");
       if (mpg !== undefined) {
-        T(p, (100 / mpg).toFixed(1), X(354), Yy(104), 12, "bold");
-        T(p, "gallons per 100 mi", X(354), Yy(120), 6.6, "body");
+        T(p, (100 / mpg).toFixed(1), X(362), Yy(108), 12, "bold");
+        T(p, "gallons per 100 mi", X(362), Yy(126), 6.6, "body");
       }
-      T(p, "combined city/highway", X(244), Yy(132), 6.6, "body");
+      T(p, "combined city/highway", X(244), Yy(136), 6.6, "body");
     });
-    paintRangeChart(p, X(10), Yy(152), W(450), range, mode, 0.78);
+    paintRangeChart(p, X(10), Yy(158), W(450), range, mode, 0.78);
   }
 
   const delta = verified ? r.fiveYearCostDifference : undefined;

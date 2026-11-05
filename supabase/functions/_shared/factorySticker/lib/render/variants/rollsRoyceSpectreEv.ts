@@ -82,22 +82,22 @@ const spec: TabloidSpec = {
     const { d, input } = ctx;
     if (!paintLeft(p, d)) return null;
     paintHeader(p, d);
-    T(p, "VIN:", g.x(48), g.y(970), 15, "bold");
-    T(p, d.vehicle.vin, g.x(48) + 38, g.y(970), 15, "bold");
+    T(p, "VIN:", g.x(48), g.y(966), 14, "bold");
+    T(p, d.vehicle.vin, g.x(48) + 38, g.y(966), 14, "bold");
     const colors: Array<[string, string | null]> = [
       ["Exterior Colour:", colorText(d.vehicle.exteriorColor, d.vehicle.exteriorColorCode)],
       ["Interior Colour:", colorText(d.vehicle.interiorColor, d.vehicle.interiorColorCode)],
       ["Motor:", d.vehicle.engine?.toUpperCase() ?? null],
       ["Transmission:", d.vehicle.transmission?.toUpperCase() ?? null],
     ];
-    let cy = 1000;
+    let cy = 992;
     for (const [label, value] of colors) {
       if (!value) continue;
       T(p, label, g.x(48), g.y(cy), 8, "bold");
       T(p, value, g.x(48) + 76, g.y(cy), 8, "body");
-      cy += 11;
+      cy += 14;
     }
-    if (input.layout.barcodePayload) p.barcode(g.x(48), g.y(1044), 400 * PX, g.y(1064) - g.y(1044), input.layout.barcodePayload, INK);
+    if (input.layout.barcodePayload) p.barcode(g.x(280), g.y(990), 170 * PX, g.y(1064) - g.y(990), input.layout.barcodePayload, INK);
     const result = flowEquipmentColumns(p, ctx, [{ x: g.x(465), w: 415 * PX, top: g.y(122), bottom: g.y(1055) }], {
       unavailableAt: [g.x(468), g.y(130)],
     });
