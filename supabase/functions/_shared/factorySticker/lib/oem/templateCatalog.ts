@@ -478,10 +478,10 @@ export const TEMPLATE_CATALOG: readonly CatalogTemplate[] = [
     page: { widthPt: 1224, heightPt: 792, orientation: "landscape" },
     referencePdf: "Volvo_2025_XC60_B5_AWD_Plus.pdf",
     design: { fileKey: "ZSb0xcK1N6bcFnqlM5jevY", masterNodeId: "1:393" },
-    match: { modelYears: [2025], modelPattern: "^xc60$", excludedModelPattern: "^xc60recharge", bodyClasses: ["SUV"], fuelClasses: ["gasoline"], },
+    match: { modelYears: [2025], modelPattern: "^xc60$", excludedModelPattern: "^xc60recharge", excludedTrimPattern: "t8|t6|recharge|b6", bodyClasses: ["SUV"], fuelClasses: ["gasoline"], },
     approval: "pending_owner_approval",
-    layoutStatus: "not_started",
-    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "reference_is_2025", "missing_source_artwork", "powertrain_rule_unverified", "layout_not_built"],
+    layoutStatus: "sample_ready",
+    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "reference_is_2025", "powertrain_rule_unverified", "parts_content_not_wired", "warranty_terms_not_wired"],
   },];
 
 /** True when the catalog holds at least one template with a built layout for this make. */

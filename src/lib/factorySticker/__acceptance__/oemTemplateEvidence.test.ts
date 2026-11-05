@@ -46,6 +46,8 @@ import { bentleyReferenceMatchData, bentleyRenderData } from "../render/__fixtur
 import { urusReferenceMatchData, urusRenderData } from "../render/__fixtures__/lamborghini";
 import { lexusReferenceMatchData, lexusRenderData } from "../render/__fixtures__/lexus";
 import { toyota4runnerReferenceMatchData, toyota4runnerRenderData } from "../render/__fixtures__/toyota4runner";
+import { volvoXc60ReferenceMatchData, volvoXc60RenderData } from "../render/__fixtures__/volvoXc60";
+import { VOLVO_XC60_B5_ID } from "../render/variants/volvoXc60B5";
 import { LEXUS_RX350_GAS_ID } from "../render/variants/lexusRx350Gas";
 import { TOYOTA_4RUNNER_GAS_ID } from "../render/variants/toyota4runnerGas";
 import { CADILLAC_ESCALADE_IQL_EV_ID } from "../render/variants/cadillacEscaladeIqEv";
@@ -365,6 +367,27 @@ ${b.differences.join("\n")}
 `;
 
 const BRAND_DOCS: Record<string, BrandDoc> = {
+  volvo: {
+    title: "Volvo 2025 XC60 B5 (mild hybrid gasoline)",
+    logo: "Volvo identity line (the reference prints no logo artwork)",
+    rows: [
+      "| 2025 VOLVO line, model and trim title | identity (year make, model trim) printed as text | Omitted |",
+      "| Authorized Retailer, Delivery address | original delivering dealer only | Headings print with no dealer text |",
+      "| Pricing block: MSRP, packages and options, destination, total | build_sheet.pricing, packages, options | NOT AVAILABLE |",
+      "| Vehicle identification, delivery | identity; build_sheet.colors; listing.vin; transportMethod | Row omitted |",
+      "| Accessories, Join the Conversation | fixed OEM boilerplate (no vehicle value) | Always printed |",
+      "| Maintenance | no record field | \"Not available for this vehicle.\" |",
+    ],
+    sample: ["- sticker-YV4L12RK0N1034397: off-year layout stress test (2022 XC60 Momentum, B5 mild hybrid, used), not a production candidate. Production has no 2025 XC60."],
+    differences: [
+      "- The reference is a 2025 example (reference_is_2025): the template matches 2025 only, so a 2026 XC60 is flagged unsupported.",
+      "- Artwork not reproduced: the category icons, the accessories QR (the Vehicle Passport QR sits in the fuel-economy panel's QR slot), agency seals and the source barcode (regenerated from the VIN). The reference prints no Volvo logo; its model logotype prints as plain text.",
+      "- The Maintenance programme (3 years / 30,000 miles) and the model-year-specific accessory text are not on any record; the maintenance section prints its unavailable state. The Plus Features list is part of the standard equipment.",
+      "- The reference's EPA panel has no 1-10 tracks (the Figma handoff reconstructed them); the shared panel draws the tracks and pointers from the scores.",
+      "- Free columns of the reference (under Accessories and under Pricing) carry overflow standard equipment.",
+      "- Matching: 2025 XC60, SUV, gasoline (the B5 mild hybrid reports as gasoline). The XC60 Recharge and any T8, T6 or B6 trim, and any plug-in powertrain, are not matched and flag template_configuration_unsupported; the B6 rule is unverified (powertrain_rule_unverified).",
+    ],
+  },
   lexus: {
     title: "Lexus 2026 RX 350 (gasoline)",
     logo: "Lexus logo and tagline",
@@ -728,6 +751,7 @@ const packages: PackageSpec[] = [{
   [GENESIS_GV80_GAS_ID, "genesis-2026-gv80", "gv80", () => [gv80RenderData()], "off-year, other-model layout stress test (2024 G70 record), not a production candidate", gv80ReferenceMatchData],
   [DODGE_DURANGO_GAS_ID, "dodge-2026-durango", "durango", () => [durangoRenderData()], "off-year, other-model layout stress test (2008 Grand Caravan record), not a production candidate", durangoReferenceMatchData],
   [BUICK_ENVISTA_GAS_ID, "buick-2026-envista", "envista", () => [envistaRenderData()], "SYNTHETIC stress fixture (no saved Buick record exists), not a real vehicle", envistaReferenceMatchData],
+  [VOLVO_XC60_B5_ID, "volvo-2025-xc60-b5", "volvo", () => [volvoXc60RenderData()], "off-year layout stress test (2022 XC60 Momentum record), not a production candidate", volvoXc60ReferenceMatchData],
   [LEXUS_RX350_GAS_ID, "lexus-2026-rx-350", "lexus", () => [lexusRenderData()], "off-year, other-model layout stress test (2024 Lexus GX record), not a production candidate", lexusReferenceMatchData],
   [TOYOTA_4RUNNER_GAS_ID, "toyota-2026-4runner", "toyota4runner", () => [toyota4runnerRenderData()], "off-year layout stress test (2022 4Runner SR5 record), not a production candidate", toyota4runnerReferenceMatchData],
 ] as const).map(([templateId, dirName, key, real, realLabel, reference]): PackageSpec => ({
