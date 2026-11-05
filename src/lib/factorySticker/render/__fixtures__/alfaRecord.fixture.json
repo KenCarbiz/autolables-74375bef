@@ -1,0 +1,271 @@
+{
+  "note": "Read-only extract of one saved production vehicle_listings row (SELECT 2026-11-05). 2020 Alfa Romeo Stelvio Ti Sport Carbon, used: an off-year, other-model layout stress record, not a production candidate. The standard list is trimmed to about 100 items.",
+  "vin": "ZASPAKBN5L7C99407",
+  "slug": "2020-alfa-romeo-stelvio-c99407",
+  "ymm": "2020 Alfa Romeo Stelvio",
+  "trim": "Ti Sport Carbon",
+  "condition": "used",
+  "body_type": "SUV",
+  "build_sheet": {
+    "colors": {
+      "exterior": {
+        "code": "PBX",
+        "msrp": 600,
+        "name": "Misano Blue Metallic"
+      },
+      "interior": {
+        "code": "DLXX",
+        "name": "Black Leather"
+      }
+    },
+    "decoded_at": "2026-07-28T03:15:52.542Z",
+    "generic": false,
+    "key_features": {
+      "AL4": [
+        "Advanced Headlight Control Functions",
+        "Blind Spot System",
+        "Anti Collision System",
+        "Adaptive Cruise Control",
+        "Lane Keep Assist",
+        "Autonomous Drive Functions",
+        "Autonomous Drive - Level 2"
+      ],
+      "GWJ": [
+        "Sun/Moonroof"
+      ],
+      "MET": [
+        "Upgrade Paint"
+      ],
+      "RAN": [
+        "Navigation",
+        "Voice Recognition"
+      ],
+      "RCA": [
+        "Premium Speakers"
+      ],
+      "RFX": [
+        "Wireless Charging/Connection"
+      ],
+      "STANDARD": [
+        "Advanced Headlight Control Functions",
+        "Anti Collision System",
+        "Voice Recognition",
+        "Collision/Breakdown Telematics",
+        "Premium Speakers",
+        "Satellite Radio",
+        "Bluetooth",
+        "Steering Wheel Controls",
+        "Leather Seats",
+        "Compact SUV",
+        "Heated Seats",
+        "Memory Seats",
+        "Automatic Transmission",
+        "Rear Parking Device",
+        "Heated Door Mirrors",
+        "Premium Wheels",
+        "Brake Assist",
+        "Keyless Start/Remote Engine Start",
+        "Smart Card / Smart Key",
+        "Power Closing Liftgate",
+        "Parking Assistance System",
+        "Phone Integration",
+        "Apple CarPlay",
+        "Android Auto",
+        "Turbo Boost"
+      ]
+    },
+    "options": [
+      {
+        "code": "AL4",
+        "msrp": 3400,
+        "name": "Active Driver Assist Package TI Sport"
+      },
+      {
+        "code": "RFX",
+        "msrp": 300,
+        "name": "Wireless Charging Pad"
+      },
+      {
+        "code": "MET",
+        "msrp": 600,
+        "name": "Metallic Paint"
+      },
+      {
+        "code": "GWJ",
+        "msrp": 1350,
+        "name": "Dual-pane Sunroof"
+      },
+      {
+        "code": "RCA",
+        "msrp": 900,
+        "name": "Harman Kardon Premium Audio System"
+      },
+      {
+        "code": "XTL",
+        "name": "Calipers, Gloss Yellow w/Black Script"
+      },
+      {
+        "code": "RAN",
+        "msrp": 1200,
+        "name": "AM/FM/HD Bluetooth w/Nav 8.8 Radio"
+      }
+    ],
+    "packages": [],
+    "pricing": {
+      "base_msrp": 52300,
+      "destination_charge": 1345,
+      "total_msrp": 60195
+    },
+    "source": "neovin",
+    "standard": {
+      "AL4": [
+        "Auto High Beam",
+        "Auto-Dimming Door Mirrors",
+        "Blind Spot Monitor",
+        "Adaptive Cruise Control",
+        "Lane Departure Warning",
+        "Lane Keeping Assist",
+        "Highway Assist"
+      ],
+      "GWJ": [
+        "Front Sunroof",
+        "Glass Sunroof",
+        "Electric Sunroof-Front",
+        "Sunshade"
+      ],
+      "RAN": [
+        "Digital Radio",
+        "Navigational Systems",
+        "Navigational Systems Screen Size (8.8 in)"
+      ],
+      "RCA": [
+        "14 Speakers",
+        "Premium Brand Speakers",
+        "Subwoofer",
+        "Surround Sound Speakers"
+      ],
+      "RFX": [
+        "Wireless Charging Pad"
+      ],
+      "STANDARD": [
+        "Dusk Sensor",
+        "Directional Headlights",
+        "Daytime Running Lights",
+        "Automatic Braking",
+        "Pedestrian & Cyclist Avoidance System",
+        "Cruise Control",
+        "Voice Recognition",
+        "Telematics System",
+        "Advanced Auto Collision Notification",
+        "8 Speakers",
+        "ABS Brakes",
+        "Electronic Hand Brake",
+        "Satellite Radio",
+        "Bluetooth Connection",
+        "Projector Beam Headlights",
+        "Bi-Xenon Headlights-Low Beam",
+        "Side Curtain Airbag-Front And Rear",
+        "Driver Airbag",
+        "Passenger Airbag",
+        "Front Side Airbag",
+        "Knee Airbags",
+        "Steering Wheel Mounted Audio Controls",
+        "All Season Tires",
+        "Cargo Area Cover/Rear Parcel Shelf",
+        "Cargo Area Light",
+        "Load Restraint-Hooks",
+        "Card Key Power Locks",
+        "Front Seats Head Restraints",
+        "Rear Seats Head Restraints",
+        "Front Seat belts Pre-Tensioners",
+        "Rear Seat Belts Pre-Tensioners",
+        "Leather Seats",
+        "Driver Sports Seat",
+        "Heated Driver Seat",
+        "Heated Passenger Seat",
+        "Electrically Adjustable",
+        "Driver Seat Memory",
+        "Front Seat Power Lumbar Adjustment",
+        "Rear Seats Bench",
+        "Folding Rear Seats",
+        "Alloy & Leather Steering Wheel",
+        "Height Adjustment Steering Wheel",
+        "Steering Wheel Telescopic Adjustment",
+        "Heated Steering Wheel",
+        "Multi Function Steering Wheel",
+        "Power Steering",
+        "12 Volt Power Outlet",
+        "Wishbone Suspension-Front",
+        "Multi-Link Suspension-Rear",
+        "Coil Suspension-Front",
+        "Coil Suspension-Rear",
+        "Front Stabilizer Bar",
+        "Rear Stabilizer Bar",
+        "Independent Suspension-Front",
+        "Independent Suspension-Rear",
+        "8 Speed Transmission",
+        "Gear Change Paddles",
+        "Dual Zone Air Conditioning",
+        "Automatic Air Conditioning",
+        "Auto Dimming Rear View Mirror/Camera",
+        "Roof Spoiler",
+        "Rear Window Defogger",
+        "Rear Windshield Wipers",
+        "Rain Sensing Windsheild Wipers",
+        "Front Power Windows",
+        "Rear Power Windows",
+        "Front Aluminum/Alloy Wheels",
+        "Front Wheel Diameter (20 in)",
+        "Rear Wheel Diameter (20 in)",
+        "Compass",
+        "Brake Assist",
+        "Garage Door Opener",
+        "Remote Engine Starter",
+        "Low Tire Pressure Monitor",
+        "Door Entry Light",
+        "Smart Card / Smart Key",
+        "Remote Keyless Entry",
+        "Keyless Start",
+        "Power Tailgate/Trunk",
+        "Spare Tire Kit",
+        "Hill Holder Assist",
+        "Engine Start/Stop",
+        "Vehicle Start Button",
+        "AUX Jack Front",
+        "Front USB Connection",
+        "Rear Automated Parking Assistance",
+        "Front Parking Distance System",
+        "Rear Parking Sensor & Camera",
+        "Display Screen-Instrument Cluster 1 (7 in)",
+        "Display Screen-Dashboard Center 1 (8.8 in)",
+        "LED Brake Lights",
+        "Rear LED Lights",
+        "Selectable Driver Modes",
+        "Apple Carplay",
+        "Android Auto",
+        "Ambient Lighting",
+        "AWD",
+        "Descent Control System",
+        "Electronic Traction Control",
+        "Engine Displacement (2.0 Liters)",
+        "4-Cyl",
+        "In-Line",
+        "Turbo",
+        "Premium Unleaded",
+        "Instrument Cluster"
+      ],
+      "XTL": [
+        "Painted Callipers"
+      ]
+    }
+  },
+  "epa_economy": null,
+  "mc_extra": {
+    "drivetrain": "4WD",
+    "engine": "2.0L I4",
+    "fuel_type": "Premium Unleaded",
+    "made_in": "USA",
+    "powertrain_type": "Combustion",
+    "transmission": "Automatic"
+  }
+}

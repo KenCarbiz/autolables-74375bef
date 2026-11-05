@@ -37,6 +37,7 @@ const LATER_TEMPLATES = [
   "cadillac_2026_escalade_iql_premium_sport", "fiat_2025_500e_giorgio_armani", "rolls-royce_2026_spectre", "bentley_2026_continental_gt_azure", "lamborghini_2026_urus_se",
   "ford_2026_f250", "ram_2026_2500_limited", "chevrolet_2026_silverado_2500_high_country", "gmc_2026_sierra_3500_denali_ultimate",
   "lexus_2026_rx_350_awd", "toyota_2026_4runner_trd_sport", "honda_2026_odyssey_touring", "volvo_2025_xc60_b5_awd_plus",
+  "alfa_romeo_2026_giulia_veloce",
 ];
 const FRAGMENT_TEMPLATES = new Set(["mitsubishi_2026_outlander_sport_s", "chrysler_2026_voyager_lx", ...LATER_TEMPLATES]);
 

@@ -58,6 +58,8 @@ import { FIAT_500E_EV_ID } from "../render/variants/fiat500eEv";
 import { ROLLS_ROYCE_SPECTRE_EV_ID } from "../render/variants/rollsRoyceSpectreEv";
 import { BENTLEY_CONTINENTAL_GT_PHEV_ID } from "../render/variants/bentleyContinentalGtPhev";
 import { LAMBORGHINI_URUS_PHEV_ID } from "../render/variants/lamborghiniUrusPhev";
+import { alfaReferenceMatchData, alfaRenderData } from "../render/__fixtures__/alfa";
+import { ALFA_ROMEO_GIULIA_GAS_ID } from "../render/variants/alfaRomeoGiuliaGas";
 import { TEMPLATE_CATALOG, evaluateCatalogTemplate, type CatalogTemplate } from "../oem/templateCatalog";
 import { CATALOG_LAYOUTS } from "../render/variants";
 
@@ -316,6 +318,7 @@ ${t.blockers.map((b) => `- ${b}`).join("\n")}
 interface BrandDoc {
   title: string;
   logo: string;
+  logoNote?: string;
   rows: string[];
   sample: string[];
   differences: string[];
@@ -328,7 +331,7 @@ Every printed value comes from the saved vehicle record the generator already re
 | Printed region | Source field | When missing |
 |---|---|---|
 | Reproduction banner and disclosure | reproduction.ts | Always printed |
-| ${b.logo} | packaged vector-rendered artwork cropped from the reference PDF (logoArtwork.ts) | Always printed |
+| ${b.logo} | ${b.logoNote ?? "packaged vector-rendered artwork cropped from the reference PDF (logoArtwork.ts)"} | Always printed |
 ${b.rows.join("\n")}
 | Optional equipment / added features (packages, options with price) | build_sheet.packages / options | Nothing listed; a missing price prints N/A, an included item INCLUDED; unpriced paint and trim rows already printed as colours are not repeated |
 | MSRP, destination, total | build_sheet.pricing base_msrp, destination_charge, total_msrp (stated, else base + options + destination) | NOT AVAILABLE |
@@ -371,6 +374,24 @@ ${b.differences.join("\n")}
 `;
 
 const BRAND_DOCS: Record<string, BrandDoc> = {
+  alfa: {
+    title: "Alfa Romeo 2026 Giulia Veloce (gasoline)",
+    logo: "Alfa Romeo badge",
+    logoNote: "packaged artwork extracted from the reference PDF (logoArtwork.ts): the reference holds the badge as a 330x330 grayscale raster, so it is packaged as an alpha-masked raster, not vector paths",
+    rows: [
+      "| Header: model, trim, drivetrain title, model-year line, Alfa Romeo contact line | identity (year, model, trim); drivetrain from sourceCorrections.decideDrivetrain; fixed OEM contact text | Missing parts omitted, never guessed |",
+      "| Specification block: make and model, exterior and interior colour, engine, transmission | identity; build_sheet.colors; mc_attributes.engine / transmission | Row omitted |",
+      "| Warranty coverage | verified warranty terms only | \"Not available for this vehicle.\" |",
+      "| Assembly point / port of entry, SOLD TO | factory.finalAssemblyPoint; the original delivering dealer only | Omitted / label printed blank |",
+    ],
+    sample: ["- sticker-ZASPAKBN5L7C99407: off-year, other-model layout stress test (2020 Stelvio Ti Sport Carbon, used; the only saved Alfa Romeo record), not a production candidate. Production has no Giulia record. The standard-equipment list is trimmed to about 100 items and the record has no EPA match, so the EPA panel prints its unavailable states."],
+    differences: [
+      "- Layout family: the reference follows the FCA label family exactly (red frame, specification block, equipment columns, EPA, safety and parts panels), so the layout reuses fcaCommon.ts with an Alfa Romeo header.",
+      "- Giulia Veloce and Quadrifoglio: decided to share this one layout. The Quadrifoglio label differs only in content (trim, engine, option set and a possible gas guzzler tax row, which the FCA family already prints from data), so the match rule is year 2026, model Giulia, sedan, gasoline for every trim. Only the Veloce reference was available; the Quadrifoglio rendering is unreviewed against its own OEM label.",
+      "- Artwork not reproduced: the manufacturer line (FCA US LLC), the SL, ship-to and L4-VON codes, the production strip and the bumper-performance paragraph. The reference's Interior line (seat description) has no data field and is not printed.",
+      "- Matching: 2026 Giulia, sedan, gasoline. Any hybrid or other powertrain, any other model (for example the Stelvio) and any other year is not matched and flags template_configuration_unsupported.",
+    ],
+  },
   honda: {
     title: "Honda 2026 Odyssey Touring (gasoline)",
     logo: "Honda wordmark (the logo in the reference scan is damaged)",
@@ -777,6 +798,7 @@ const packages: PackageSpec[] = [{
   [HONDA_ODYSSEY_GAS_ID, "honda-2026-odyssey", "honda", () => [hondaOdysseyRenderData()], "off-year layout stress test (2025 Odyssey EX-L record), not a production candidate", hondaOdysseyReferenceMatchData],
   [LEXUS_RX350_GAS_ID, "lexus-2026-rx-350", "lexus", () => [lexusRenderData()], "off-year, other-model layout stress test (2024 Lexus GX record), not a production candidate", lexusReferenceMatchData],
   [TOYOTA_4RUNNER_GAS_ID, "toyota-2026-4runner", "toyota4runner", () => [toyota4runnerRenderData()], "off-year layout stress test (2022 4Runner SR5 record), not a production candidate", toyota4runnerReferenceMatchData],
+  [ALFA_ROMEO_GIULIA_GAS_ID, "alfa-romeo-2026-giulia", "alfa", () => [alfaRenderData()], "off-year, other-model layout stress test (2020 Stelvio Ti Sport Carbon record), not a production candidate", alfaReferenceMatchData],
 ] as const).map(([templateId, dirName, key, real, realLabel, reference]): PackageSpec => ({
   templateId,
   dirName,
