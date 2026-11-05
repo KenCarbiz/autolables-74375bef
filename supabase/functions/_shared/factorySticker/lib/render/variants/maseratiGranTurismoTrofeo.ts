@@ -141,7 +141,7 @@ function paintRight(p: Painter, d: FactoryStickerData, input: FirstPageContext["
   T(p, "V.I.N.:", X(937), vy, 6.4, "body");
   T(p, d.vehicle.vin, X(1010), vy - 1, 8.6, "bold");
   if (f.transportMethod) {
-    T(p, "Importation:", X(937), vy + 10, 6.4, "body");
+    T(p, "Transport:", X(937), vy + 10, 6.4, "body");
     T(p, f.transportMethod.toUpperCase(), X(1010), vy + 10, 7.4, "body");
   }
   T(p, "Ship to:", X(937), vy + 20, 6.4, "body");
