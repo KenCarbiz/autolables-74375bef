@@ -15,7 +15,7 @@
 //     is matched. No EPA data is better than another vehicle's EPA data.
 // Pure apart from the injected EPA client, so tests drive it with fixtures.
 
-export const EPA_MATCHER_VERSION = "epa-match-v3";
+export const EPA_MATCHER_VERSION = "epa-match-v4";
 
 export type Powertrain = "ev" | "phev" | "hybrid" | "mild_hybrid" | "gas" | "diesel";
 export type Drive = "4" | "2";
@@ -180,10 +180,14 @@ export async function matchEpa(f: ListingFacts, api: EpaClient, maxFetches = 6):
       if (f.powertrain && named && compatible(f.powertrain, named)) score += 3;
       if (f.drive && drive === f.drive) score += 2;
       if (f.liters && liters === f.liters) score += 2;
-      for (const w of words(m)) {
-        if (target.includes(norm(w)) || driveOf(w)) continue;
-        if (namedPowertrain(w) && f.powertrain && named && compatible(f.powertrain, named)) continue;
-        score += trimWords.has(w) ? 2 : -1;
+      for (const token of m.split(/\s+/)) {
+        const extra = words(token).filter((w) =>
+          !(target.includes(norm(w)) || driveOf(w)) &&
+          !(namedPowertrain(w) && f.powertrain && named && compatible(f.powertrain, named)));
+        if (!extra.length) continue;
+        // "Sport/SE/SEL" lists alternative trims: one of them matching is a match.
+        if (token.includes("/")) score += extra.some((w) => trimWords.has(w)) ? 2 : -1;
+        else for (const w of extra) score += trimWords.has(w) ? 2 : -1;
       }
       candidates.push({ model: m, option: o, score, named });
     }

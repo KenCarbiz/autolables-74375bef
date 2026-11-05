@@ -31,6 +31,7 @@ const MENUS: Record<string, Menu> = {
   },
   "2024 Volkswagen": {
     "Jetta": [{ option: "Auto (S8), 4 cyl, 1.5 L, Turbo", id: "v1", v: gas(29, 40, 33) }, { option: "Man 6-spd, 4 cyl, 1.5 L, Turbo", id: "v2", v: gas(28, 39, 32) }],
+    "Jetta Sport/SE/SEL": [{ option: "Auto (S8), 4 cyl, 1.5 L, Turbo", id: "v3", v: gas(29, 39, 33) }],
   },
   "2023 Jeep": {
     "Wrangler 2dr 4WD": [{ option: "Auto 8-spd, 4 cyl, 2.0 L, Turbo", id: "w1", v: gas(21, 24, 22) }],
@@ -143,6 +144,10 @@ describe("transmission, cylinders and body style narrow the match", () => {
     expect(r.vehicle.id).toBe("v1");
   });
 
+  it("reads a slash list of trims in the model name as alternatives", async () => {
+    const r = await matchEpa(facts({ year: "2024", make: "Volkswagen", model: "Jetta", trim: "SE", liters: "1.5", drive: "2", powertrain: "gas", trans: "auto", cylinders: 4 }), client());
+    expect("refused" in r ? r.refused : r.model).toBe("Jetta Sport/SE/SEL");
+  });
   it("still refuses when the transmission is unknown and the two disagree", async () => {
     expect(await matchEpa(facts({ year: "2024", make: "Volkswagen", model: "Jetta", liters: "1.5", powertrain: "gas" }), client())).toEqual({ refused: "ambiguous_option" });
   });
