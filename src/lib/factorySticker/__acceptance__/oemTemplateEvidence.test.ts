@@ -6,7 +6,8 @@
 
 import { describe, it } from "vitest";
 import * as pdfLibModule from "pdf-lib";
-import { execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildRenderLayout, fuelClassOf, type FactoryStickerRenderData, type FactoryStickerTheme } from "../render/contract";
@@ -66,7 +67,8 @@ const theme: FactoryStickerTheme = {
   templateVersion: "1.0.0", logoAssetId: null, logoAssetVersion: null,
 };
 
-const sh = (cmd: string, args: string[]): string => execFileSync(cmd, args, { encoding: "utf8" });
+const execFileAsync = promisify(execFile);
+const sh = async (cmd: string, args: string[]): Promise<string> => (await execFileAsync(cmd, args, { encoding: "utf8" })).stdout;
 
 interface PackageSpec {
   templateId: string;
@@ -836,15 +838,15 @@ async function writeSample(
   const pdfPath = join(outDir, referenceOnly ? "reference-match.pdf" : `sticker-${data.vin}.pdf`);
   writeFileSync(pdfPath, await realizePdf(m, pdfLibModule as never));
   const pngBase = join(outDir, referenceOnly ? "reference-match-preview" : `preview-${data.vin}`);
-  sh("pdftoppm", ["-r", "150", "-png", "-singlefile", pdfPath, pngBase]);
-  const info = sh("pdfinfo", [pdfPath]);
+  await sh("pdftoppm", ["-r", "150", "-png", "-singlefile", pdfPath, pngBase]);
+  const info = await sh("pdfinfo", [pdfPath]);
   const size = /Page size:\s+([\d.]+) x ([\d.]+) pts/.exec(info)!;
   const pages = Number(/Pages:\s+(\d+)/.exec(info)![1]);
   const qr = m.pages[0].primitives.find((p) => p.kind === "qr") as { size: number; payload: string } | undefined;
   const barcode = m.pages[0].primitives.find((p) => p.kind === "barcode") as { payload: string } | undefined;
   const p = data.pricing;
   const calculated = p.baseMsrp !== null ? p.baseMsrp + (p.optionsTotal ?? 0) + (p.destinationCharge ?? 0) : null;
-  const refInfo = sh("pdfinfo", [refPdf]);
+  const refInfo = await sh("pdfinfo", [refPdf]);
   const refSize = /Page size:\s+([\d.]+) x ([\d.]+) pts/.exec(refInfo)!;
   const refRot = Number(/Page rot:\s+(\d+)/.exec(refInfo)?.[1] ?? 0);
   const storedSideways = refRot === 0 && Number(refSize[1]) < Number(refSize[2]) && Number(size[1]) > Number(size[2]);
@@ -872,16 +874,12 @@ async function writeSample(
 }
 
 describe.skipIf(!DIR)("OEM template evidence", () => {
-  it("writes the sample packages and the coverage matrix", async () => {
-    const root = DIR!;
-    const prod = JSON.parse(readFileSync(join(__dirname, "catalogProdCounts.fixture.json"), "utf8")) as {
-      rows: Array<{ make: string; model: string; year: string; fuel: string; body: string; n: number }>;
-    };
-    const samplePath = new Map<string, string>();
+  const root = DIR!;
+  const samplePath = new Map<string, string>();
+  const only = process.env.OEM_TEMPLATES_ONLY?.split(",").filter(Boolean);
 
-    const only = process.env.OEM_TEMPLATES_ONLY?.split(",").filter(Boolean);
-    for (const spec of packages) {
-      if (only && !only.includes(spec.templateId)) continue;
+  for (const spec of packages) {
+    it.skipIf(Boolean(only) && !only!.includes(spec.templateId))(`writes the sample package for ${spec.templateId}`, async () => {
       const outDir = join(root, "samples", spec.dirName) + "/";
       mkdirSync(outDir, { recursive: true });
       const t = TEMPLATE_CATALOG.find((x) => x.id === spec.templateId)!;
@@ -895,18 +893,18 @@ describe.skipIf(!DIR)("OEM template evidence", () => {
       for (const d of real) results.push(await writeSample(spec, outDir, refPdf, d, built.realLabel, false));
       results.push(await writeSample(spec, outDir, refPdf, matchData, "reference-match (visual comparison only)", true));
 
-      sh("pdftoppm", ["-r", "100", "-png", "-singlefile", refPdf, join(outDir, "_ref100")]);
-      if (t.page.widthPt > t.page.heightPt && /Page size:\s+([\d.]+) x ([\d.]+) pts/.test(sh("pdfinfo", [refPdf]))) {
-        const rs = /Page size:\s+([\d.]+) x ([\d.]+) pts/.exec(sh("pdfinfo", [refPdf]))!;
-        if (Number(rs[1]) < Number(rs[2]) && Number(/Page rot:\s+(\d+)/.exec(sh("pdfinfo", [refPdf]))?.[1] ?? 0) === 0) sh("convert", [join(outDir, "_ref100.png"), "-rotate", t.id === HONDA_ODYSSEY_GAS_ID ? "270" : "90", join(outDir, "_ref100.png")]);
+      await sh("pdftoppm", ["-r", "100", "-png", "-singlefile", refPdf, join(outDir, "_ref100")]);
+      if (t.page.widthPt > t.page.heightPt && /Page size:\s+([\d.]+) x ([\d.]+) pts/.test(await sh("pdfinfo", [refPdf]))) {
+        const rs = /Page size:\s+([\d.]+) x ([\d.]+) pts/.exec(await sh("pdfinfo", [refPdf]))!;
+        if (Number(rs[1]) < Number(rs[2]) && Number(/Page rot:\s+(\d+)/.exec(await sh("pdfinfo", [refPdf]))?.[1] ?? 0) === 0) await sh("convert", [join(outDir, "_ref100.png"), "-rotate", t.id === HONDA_ODYSSEY_GAS_ID ? "270" : "90", join(outDir, "_ref100.png")]);
       }
-      sh("pdftoppm", ["-r", "100", "-png", "-singlefile", join(outDir, "reference-match.pdf"), join(outDir, "_match100")]);
-      sh("montage", [
+      await sh("pdftoppm", ["-r", "100", "-png", "-singlefile", join(outDir, "reference-match.pdf"), join(outDir, "_match100")]);
+      await sh("montage", [
         "-label", "OEM reference (original PDF)", join(outDir, "_ref100.png"),
         "-label", "AutoLabels reference-match render", join(outDir, "_match100.png"),
         "-tile", "2x1", "-geometry", "+12+12", "-pointsize", "26", join(outDir, "side-by-side.png"),
       ]);
-      for (const f of ["_ref100.png", "_match100.png"]) sh("rm", ["-f", join(outDir, f)]);
+      for (const f of ["_ref100.png", "_match100.png"]) await sh("rm", ["-f", join(outDir, f)]);
 
       writeFileSync(join(outDir, "data-source-mapping.md"), spec.mappingMd);
       writeFileSync(join(outDir, "differences.md"), spec.differencesMd(t));
@@ -916,8 +914,13 @@ describe.skipIf(!DIR)("OEM template evidence", () => {
         vehicles: results,
       }, null, 2));
       samplePath.set(t.id, `samples/${spec.dirName}/`);
-    }
+    }, 120000);
+  }
 
+  it("writes the coverage matrix", () => {
+    const prod = JSON.parse(readFileSync(join(__dirname, "catalogProdCounts.fixture.json"), "utf8")) as {
+      rows: Array<{ make: string; model: string; year: string; fuel: string; body: string; n: number }>;
+    };
     const rows = TEMPLATE_CATALOG.map((t) => {
       let prodRecords = 0;
       for (const r of prod.rows) {
