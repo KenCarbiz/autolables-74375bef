@@ -209,6 +209,7 @@ export function normalizeForSticker(
                 ...Object.values(catMap(sheet?.key_features)).flat().filter(isRatingMetadata),
               ],
               madeIn: str(mc.made_in),
+              ...(/diesel/i.test(String(mc.fuel_type ?? "")) ? { fuelType: String(mc.fuel_type) } : {}),
             },
           }
         : {}),

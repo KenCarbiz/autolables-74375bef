@@ -2,7 +2,11 @@ import { BUICK_ENVISTA_GAS_ID, buildBuickEnvistaGasLayout } from "./buickEnvista
 import { buildChryslerPacificaPhevLayout } from "./chryslerPacificaPhev.ts";
 import { CHRYSLER_VOYAGER_GAS_ID, buildChryslerVoyagerGasLayout } from "./chryslerVoyagerGas.ts";
 import { DODGE_DURANGO_GAS_ID, buildDodgeDurangoGasLayout } from "./dodgeDurangoGas.ts";
+import { FORD_F250_DIESEL_ID, buildFordF250DieselLayout } from "./fordF250Diesel.ts";
 import { buildFordTransitCarbLayout } from "./fordTransitCarb.ts";
+import { CHEVROLET_SILVERADO_2500_DIESEL_ID, buildChevroletSilverado2500DieselLayout } from "./chevroletSilverado2500Diesel.ts";
+import { GMC_SIERRA_3500_DIESEL_ID, buildGmcSierra3500DieselLayout } from "./gmcSierra3500Diesel.ts";
+import { RAM_2500_DIESEL_ID, buildRam2500DieselLayout } from "./ramLimitedDiesel.ts";
 import { GENESIS_GV80_GAS_ID, buildGenesisGv80GasLayout } from "./genesisGv80Gas.ts";
 import { buildHyundaiSantaFeHybridLayout } from "./hyundaiSantaFeHybrid.ts";
 import { HYUNDAI_TUCSON_GAS_ID, buildHyundaiTucsonGasLayout } from "./hyundaiTucsonGas.ts";
@@ -40,4 +44,8 @@ export const CATALOG_LAYOUTS: Partial<Record<string, VariantLayoutBuilder>> = {
   [BUICK_ENVISTA_GAS_ID]: buildBuickEnvistaGasLayout,
   [GENESIS_GV80_GAS_ID]: buildGenesisGv80GasLayout,
   [SUBARU_FORESTER_GAS_ID]: buildSubaruForesterGasLayout,
+  [FORD_F250_DIESEL_ID]: buildFordF250DieselLayout,
+  [RAM_2500_DIESEL_ID]: buildRam2500DieselLayout,
+  [CHEVROLET_SILVERADO_2500_DIESEL_ID]: buildChevroletSilverado2500DieselLayout,
+  [GMC_SIERRA_3500_DIESEL_ID]: buildGmcSierra3500DieselLayout,
 };

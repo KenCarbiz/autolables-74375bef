@@ -65,11 +65,20 @@ describe("NeoVIN decode facts for catalog templates", () => {
     const production = buildRenderLayout(d, theme);
     expect(production.width).toBe(792);
     expect(hasBuiltCatalogTemplates("Hyundai")).toBe(true);
-    for (const make of ["Kia", "Subaru", "Genesis", "Dodge", "Buick"]) expect(hasBuiltCatalogTemplates(make), make).toBe(true);
+    for (const make of ["Kia", "Subaru", "Genesis", "Dodge", "Buick", "Ford", "Ram", "Chevrolet", "GMC"]) expect(hasBuiltCatalogTemplates(make), make).toBe(true);
     expect(hasBuiltCatalogTemplates("Infiniti")).toBe(false);
     const listing = { ...tucsonListings()[0], ymm: "2026 Infiniti QX60" };
     const n = normalizeForSticker(listing, {}, canonicalPassportUrl("x"), "t").data;
     expect(n.neovin).toBeUndefined();
     expect("neovin" in n).toBe(false);
+  });
+
+  it("carries the NeoVIN fuel type only when it states diesel, and uses it as the catalog fuel evidence when there is no EPA match", () => {
+    const base = tucsonListings()[0];
+    const withFuel = (fuel: string) => ({ ...base, ymm: "2026 Ford F-250", mc_attributes: { ...(base.mc_attributes as object), fuel_type: fuel } });
+    const diesel = normalizeForSticker(withFuel("Diesel"), {}, canonicalPassportUrl("x"), "t").data;
+    expect(diesel.neovin?.fuelType).toBe("Diesel");
+    const gas = normalizeForSticker(withFuel("Unleaded"), {}, canonicalPassportUrl("x"), "t").data;
+    expect(gas.neovin?.fuelType).toBeUndefined();
   });
 });

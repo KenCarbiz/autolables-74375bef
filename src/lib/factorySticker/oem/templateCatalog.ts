@@ -8,6 +8,12 @@
 // explicit sample-render path may draw it for owner review. Figma is the
 // design reference only; nothing here is read from Figma at runtime.
 //
+// The four heavy-duty pickup templates (F-250, Ram 2500, Silverado 2500,
+// Sierra 3500) are diesel-only: each reference is a diesel truck with the CARB
+// panel and no EPA label (over 8,500 lb GVWR), and a gasoline heavy-duty truck
+// is not matched even though the layout would carry it. Fuel evidence is the
+// verified EPA fuel type, else the NeoVIN fuel_type when it states diesel.
+//
 // A reference label proves nothing about other model years, bodies or
 // powertrains, so a vehicle matches only when model year, model line, body
 // class and fuel/powertrain class all agree. A make that has catalog
@@ -161,8 +167,8 @@ export const TEMPLATE_CATALOG: readonly CatalogTemplate[] = [
     design: { fileKey: "6lFZHEOempaeguzjr0sSOb", masterNodeId: "1:824" },
     match: { modelYears: [2026], modelPattern: "^silverado2500", bodyClasses: ["PICKUP"], fuelClasses: ["diesel"], },
     approval: "pending_owner_approval",
-    layoutStatus: "not_started",
-    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "carb_panel_pending", "layout_not_built"],
+    layoutStatus: "sample_ready",
+    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "carb_panel_pending", "parts_content_not_wired", "warranty_terms_not_wired"],
   },
   {
     id: "chrysler_2026_voyager_lx",
@@ -201,10 +207,10 @@ export const TEMPLATE_CATALOG: readonly CatalogTemplate[] = [
     page: { widthPt: 1224, heightPt: 792, orientation: "landscape" },
     referencePdf: "Ford_2026_F250.pdf",
     design: { fileKey: "2g3UZx8tx8OFgwft6XAssG", masterNodeId: "1:824" },
-    match: { modelYears: [2026], modelPattern: "^f250$|^f250superduty$", bodyClasses: ["PICKUP"], fuelClasses: ["diesel"], },
+    match: { modelYears: [2026], modelPattern: "^f250(superduty)?(pickup)?$", bodyClasses: ["PICKUP"], fuelClasses: ["diesel"], },
     approval: "pending_owner_approval",
-    layoutStatus: "not_started",
-    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "carb_panel_pending", "layout_not_built"],
+    layoutStatus: "sample_ready",
+    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "carb_panel_pending", "warranty_terms_not_wired"],
   },
   {
     id: "gmc_2026_sierra_3500_denali_ultimate",
@@ -217,8 +223,8 @@ export const TEMPLATE_CATALOG: readonly CatalogTemplate[] = [
     design: { fileKey: "1KkxbDPYNy2r10UcZTBPlB", masterNodeId: "1:824" },
     match: { modelYears: [2026], modelPattern: "^sierra3500", bodyClasses: ["PICKUP"], fuelClasses: ["diesel"], },
     approval: "pending_owner_approval",
-    layoutStatus: "not_started",
-    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "carb_panel_pending", "layout_not_built"],
+    layoutStatus: "sample_ready",
+    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "carb_panel_pending", "parts_content_not_wired", "warranty_terms_not_wired"],
   },
   {
     id: "genesis_2026_gv80_3.5t_prestige",
@@ -355,10 +361,10 @@ export const TEMPLATE_CATALOG: readonly CatalogTemplate[] = [
     page: { widthPt: 1224, heightPt: 792, orientation: "landscape" },
     referencePdf: "Ram_2026_2500_Limited.pdf",
     design: { fileKey: "KQDfedj4ysiDgipy9fYPjs", masterNodeId: "1:824" },
-    match: { modelYears: [2026], modelPattern: "^2500$|^ram2500$", bodyClasses: ["PICKUP"], fuelClasses: ["diesel"], },
+    match: { modelYears: [2026], modelPattern: "^(ram)?2500(pickup)?$", bodyClasses: ["PICKUP"], fuelClasses: ["diesel"], },
     approval: "pending_owner_approval",
-    layoutStatus: "not_started",
-    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "carb_panel_pending", "layout_not_built"],
+    layoutStatus: "sample_ready",
+    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "carb_panel_pending", "warranty_terms_not_wired"],
   },
   {
     id: "rolls-royce_2026_spectre",

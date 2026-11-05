@@ -214,7 +214,7 @@ export interface FactoryStickerRenderData {
    * NeoVIN decode facts that only catalog templates read (see catalogNeovin.ts).
    * Set only for makes that have catalog templates, so other makes' data is unchanged.
    */
-  neovin?: { ratingMetadata: string[]; madeIn: string | null };
+  neovin?: { ratingMetadata: string[]; madeIn: string | null; /** Present only when the decode states a diesel fuel; the catalog matcher's fuel evidence when there is no EPA match. */ fuelType?: string };
   /** Which dealer the block describes. Only a proven original selling or
    *  delivery dealer may print; the current listing rooftop never does. */
   dealerRole?: "original_delivery" | null;
@@ -376,7 +376,7 @@ export function adaptRenderData(d: FactoryStickerRenderData): StickerLayoutInput
       ...opt("exteriorColorCode", d.colors.exterior.code),
       ...opt("interiorColor", d.colors.interior.name),
       ...opt("interiorColorCode", d.colors.interior.code),
-      ...opt("fuelType", d.epa?.fuelType ?? null),
+      ...opt("fuelType", d.epa?.fuelType ?? d.neovin?.fuelType ?? null),
       ...opt("engine", d.mechanical?.engine ?? null),
       ...opt("transmission", d.mechanical?.transmission ?? null),
       ...opt("drivetrain", d.mechanical?.drivetrain ?? null),
@@ -754,7 +754,7 @@ export function catalogResolutionFor(data: FactoryStickerRenderData): CatalogRes
     model: data.identity.model,
     trim: data.identity.trim,
     bodyClass: data.bodyClass ?? null,
-    fuelClass: catalogFuelClassOf(data.epa?.fuelType),
+    fuelClass: catalogFuelClassOf(data.epa?.fuelType ?? data.neovin?.fuelType),
     drivetrain: data.mechanical?.drivetrain ?? null,
   });
 }

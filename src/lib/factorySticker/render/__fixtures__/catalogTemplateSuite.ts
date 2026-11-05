@@ -31,6 +31,8 @@ export interface CatalogSuiteConfig {
   referenceExpect: string[];
   /** Strings a minimal record with the given own values must print. */
   ownExpect: string[];
+  /** Heavy-duty reference: a California Air Resources Board panel, no EPA panel, optionally no safety panel. */
+  carb?: { safetyPanel: boolean; plainAmounts?: boolean };
   /** Records the template must match (pending approval) and must not match. */
   supported: Array<{ label: string; patch: (d: FactoryStickerRenderData) => FactoryStickerRenderData }>;
   unsupported: Array<{ label: string; patch: (d: FactoryStickerRenderData) => FactoryStickerRenderData }>;
@@ -46,6 +48,7 @@ export function describeCatalogTemplate(c: CatalogSuiteConfig): void {
   };
   const sample = (d: FactoryStickerRenderData): LayoutModel => buildRenderLayout(d, theme, undefined, { sampleTemplateId: c.templateId });
   const texts = (m: LayoutModel): TextPrimitive[] => m.pages[0].primitives.filter((p): p is TextPrimitive => p.kind === "text");
+  const dollar = (v: string): string => (c.carb?.plainAmounts ? v.replace(/[$]/g, "") : v);
   const listing = c.listing();
   const real = c.renderData(listing);
   const ref = c.referenceMatch(real);
@@ -72,9 +75,9 @@ export function describeCatalogTemplate(c: CatalogSuiteConfig): void {
 
       it("prints the priced options and the record's own pricing", () => {
         const printed = norm(m.drawnStrings.join(" "));
-        for (const o of real.options.filter((x) => x.msrp)) expect(printed).toContain(`$${o.msrp!.toLocaleString("en-US")}.00`);
+        for (const o of real.options.filter((x) => x.msrp)) expect(printed).toContain(dollar(`$${o.msrp!.toLocaleString("en-US")}.00`));
         for (const v of [real.pricing.baseMsrp, real.pricing.destinationCharge, real.pricing.totalMsrp]) {
-          if (v !== null) expect(printed).toContain(`$${v.toLocaleString("en-US")}.00`);
+          if (v !== null) expect(printed).toContain(dollar(`$${v.toLocaleString("en-US")}.00`));
         }
       });
 
@@ -98,6 +101,15 @@ export function describeCatalogTemplate(c: CatalogSuiteConfig): void {
 
       it("prints EPA values from the record and explicit unavailable states for the rest", () => {
         const s = m.drawnStrings;
+        if (c.carb) {
+          const all = s.join(" ");
+          expect(all).toContain("California Air Resources Board");
+          expect(all).toContain("Environmental Performance");
+          expect(s.filter((x) => x === "Not Available").length).toBeGreaterThanOrEqual(2);
+          expect(all).not.toMatch(/fueleconomy\.gov|Fuel Economy and Environment|5-year fuel cost/);
+          expect(all).not.toMatch(/\$0\b/);
+          return;
+        }
         if (real.epa && real.epa.combined !== null) {
           expect(s).toContain(String(real.epa.combined));
           expect(s).toContain("Gasoline Vehicle");
@@ -113,6 +125,7 @@ export function describeCatalogTemplate(c: CatalogSuiteConfig): void {
 
       it("never splits combined NHTSA decode values into driver/passenger or seat rows", () => {
         const s = m.drawnStrings;
+        if (c.carb && !c.carb.safetyPanel) return;
         if (s.includes("Overall Vehicle Score")) {
           expect(s).not.toContain("Driver");
           expect(s).not.toContain("Passenger");
@@ -179,7 +192,7 @@ export function describeCatalogTemplate(c: CatalogSuiteConfig): void {
         expect(m.pages).toHaveLength(1);
         expectNoTextOverlap(m, 0);
         const s = norm(m.drawnStrings.join(" | "));
-        for (const v of c.referenceExpect) expect(s, v).toContain(v);
+        for (const v of c.referenceExpect) expect(s, v).toContain(dollar(v));
         const equipment = Object.values(ref.standardEquipment).flat();
         expect(m.fit.ok && m.fit.equipmentCounts).toMatchObject({ printed: equipment.length, total: equipment.length });
         expect(Math.min(...texts(m).map((t) => t.size))).toBeGreaterThanOrEqual(5.5);
@@ -191,7 +204,7 @@ export function describeCatalogTemplate(c: CatalogSuiteConfig): void {
         expect(ref.options.reduce((a, o) => a + (o.msrp ?? 0), 0) + ref.packages.reduce((a, o) => a + (o.msrp ?? 0), 0)).toBe(p.optionsTotal);
       });
 
-      it("draws star ratings per row, and Not Rated / Not Available states, from the data", () => {
+      it.skipIf(Boolean(c.carb))("draws star ratings per row, and Not Rated / Not Available states, from the data", () => {
         const stars = (d: FactoryStickerRenderData): number =>
           sample(d).pages[0].primitives.filter((p) => p.kind === "path" && p.w < 14 && p.h < 14 && p.fill === "#000000" && p.d.includes("L")).length;
         const full = { ...ref, safety: { overall: 5, frontalDriver: 5, frontalPassenger: 4, sideFront: 5, sideRear: 4, rollover: 4 }, nhtsaNotRated: false };
@@ -203,6 +216,16 @@ export function describeCatalogTemplate(c: CatalogSuiteConfig): void {
         expect(sample({ ...ref, safety: null, nhtsaNotRated: false }).drawnStrings.join(" ")).toContain("not available from a verified NHTSA record");
       });
 
+      it("prints the CARB panel with unavailable scales whatever the EPA match holds", () => {
+        if (!c.carb) return;
+        const model = sample({ ...ref, epa: null, safety: null, nhtsaNotRated: false });
+        const all = model.drawnStrings.join(" ");
+        expect(all).toContain("California Air Resources Board");
+        expect(model.drawnStrings.filter((x) => x === "Not Available").length).toBeGreaterThanOrEqual(2);
+        expect(all).not.toContain("Overall Vehicle Score");
+        expectNoTextOverlap(model, 0);
+      });
+
       it("never prints a zero for unknown EPA and pricing values", () => {
         const sparse = sample({
           ...ref, pricing: { baseMsrp: null, destinationCharge: null, optionsTotal: null, totalMsrp: null }, epa: null, safety: null, nhtsaNotRated: false,
@@ -210,12 +233,12 @@ export function describeCatalogTemplate(c: CatalogSuiteConfig): void {
         expect(sparse.fit.ok).toBe(true);
         const all = sparse.drawnStrings.join(" ");
         expect(all).not.toMatch(/(^|[^\d.,])\$?0\.00\b/);
-        expect(all).toContain("not available from verified EPA records");
-        expect(sparse.drawnStrings.filter((x) => x === "Not Available").length).toBeGreaterThanOrEqual(3);
+        if (!c.carb) expect(all).toContain("not available from verified EPA records");
+        expect(sparse.drawnStrings.filter((x) => x === "Not Available").length).toBeGreaterThanOrEqual(c.carb ? 2 : 3);
         expect(all).toContain("NOT AVAILABLE");
       });
 
-      it("moves the greenhouse-gas pointer with the score and shows an unavailable state for bad scores", () => {
+      it.skipIf(Boolean(c.carb))("moves the greenhouse-gas pointer with the score and shows an unavailable state for bad scores", () => {
         const xs: number[] = [];
         for (const score of [1, 5, 10]) {
           const model = sample({ ...ref, epa: { ...ref.epa!, ghgScore: score, smogScore: null } });
@@ -254,6 +277,7 @@ export function describeCatalogTemplate(c: CatalogSuiteConfig): void {
         expect(all).toContain("STANDARD EQUIPMENT NOT AVAILABLE FOR THIS VEHICLE");
         expect(all).toContain("NOT AVAILABLE FOR THIS VEHICLE");
         expect(all).not.toContain("GASOLINE VEHICLE");
+        expect(all).not.toContain("DIESEL VEHICLE");
       });
 
       it("prints a record's own values and none of the reference's", () => {
@@ -266,7 +290,7 @@ export function describeCatalogTemplate(c: CatalogSuiteConfig): void {
         };
         const m = sample(other);
         const all = norm(m.drawnStrings.join(" ")).toUpperCase();
-        for (const want of ["ZETA", "BRIGHT TEST COLOR (XYZ)", "$43,000.00", "$44,995.00", ...c.ownExpect]) expect(all, want).toContain(want);
+        for (const want of ["ZETA", "BRIGHT TEST COLOR (XYZ)", "$43,000.00", "$44,995.00", ...c.ownExpect]) expect(all, want).toContain(dollar(want));
         for (const bad of [c.referenceVin, ...c.referenceStrings.filter((b) => b !== "1,995")]) expect(all, bad).not.toContain(bad.toUpperCase());
       });
     });
