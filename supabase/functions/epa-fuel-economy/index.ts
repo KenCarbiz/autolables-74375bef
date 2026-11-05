@@ -11,7 +11,7 @@
 // ──────────────────────────────────────────────────────────────────────
 import { json, preflight } from "../_shared/http.ts";
 import { adminClient, isServiceOrCron } from "../_shared/supabase.ts";
-import { matchEpa, listingPowertrain, litersOf, driveOf, EPA_MATCHER_VERSION, type EpaClient, type MatchResult } from "../_shared/epaMatch.ts";
+import { matchEpa, listingPowertrain, litersOf, driveOf, transOf, cylindersOf, EPA_MATCHER_VERSION, type EpaClient, type MatchResult } from "../_shared/epaMatch.ts";
 
 const FE_BASE = "https://www.fueleconomy.gov/ws/rest";
 const JSON_HDR = { Accept: "application/json" };
@@ -74,6 +74,8 @@ async function lookupEpa(l: { ymm: string | null; trim: string | null; mc: Recor
     year, make, model, trim,
     liters: litersOf(String(l.mc.engine ?? l.mc.engine_size ?? "")),
     drive: driveOf(String(l.mc.drivetrain ?? "")),
+    trans: transOf(String(l.mc.transmission ?? "")),
+    cylinders: cylindersOf(String(l.mc.engine ?? "")),
     powertrain: listingPowertrain({ powertrainType: l.mc.powertrain_type, fuelType: l.mc.fuel_type, trim, model }),
   };
   try {

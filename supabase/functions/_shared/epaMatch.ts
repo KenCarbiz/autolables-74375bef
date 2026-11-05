@@ -15,7 +15,7 @@
 //     is matched. No EPA data is better than another vehicle's EPA data.
 // Pure apart from the injected EPA client, so tests drive it with fixtures.
 
-export const EPA_MATCHER_VERSION = "epa-match-v2";
+export const EPA_MATCHER_VERSION = "epa-match-v3";
 
 export type Powertrain = "ev" | "phev" | "hybrid" | "mild_hybrid" | "gas" | "diesel";
 export type Drive = "4" | "2";
@@ -28,7 +28,12 @@ export interface ListingFacts {
   liters: string | null;
   drive: Drive | null;
   powertrain: Powertrain | null;
+  /** "manual" or "auto" from the decode; the EPA menu often lists both for one engine. */
+  trans?: Trans | null;
+  cylinders?: number | null;
 }
+
+export type Trans = "manual" | "auto";
 
 export interface MenuItem { text: string; value: string }
 
@@ -71,13 +76,29 @@ export interface MatchResult {
   };
 }
 
-const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+const norm = (s: string) => s.toLowerCase().replace(/\b([24])[- ]?door\b/g, "$1dr").replace(/[^a-z0-9]/g, "");
 
 const words = (s: string) => s.toLowerCase().split(/[^a-z0-9.]+/).filter(Boolean);
 
 export function litersOf(s: string | null | undefined): string | null {
   const m = String(s ?? "").match(/(\d\.\d)\s*-?\s*l(?![a-z])/i);
   return m ? m[1] : null;
+}
+
+export function transOf(s: string | null | undefined): Trans | null {
+  const t = String(s ?? "").trim().toLowerCase();
+  if (!t) return null;
+  if (/^man\b|\bmanual\b/.test(t) && !/automatic|auto\b|manual mode|auto-?manual|am-s/.test(t)) return "manual";
+  if (/\bauto|automatic|cvt|variable gear|\bav\b|dct|dual.?clutch/.test(t)) return "auto";
+  return null;
+}
+
+/** Cylinder count from "2.7L V6", "1.5L I4" or EPA's "6 cyl". */
+export function cylindersOf(s: string | null | undefined): number | null {
+  const t = String(s ?? "");
+  const m = t.match(/(\d{1,2})\s*cyl/i) ?? t.match(/\b[VIHW](\d{1,2})\b/) ?? t.match(/\bflat[- ]?(\d)\b/i);
+  const n = m ? Number(m[1]) : NaN;
+  return Number.isInteger(n) && n >= 2 && n <= 16 ? n : null;
 }
 
 export function driveOf(s: string | null | undefined): Drive | null {
@@ -151,6 +172,10 @@ export async function matchEpa(f: ListingFacts, api: EpaClient, maxFetches = 6):
       if (f.powertrain && named && !compatible(f.powertrain, named)) continue;
       if (f.drive && drive && drive !== f.drive) continue;
       if (f.liters && liters && liters !== f.liters) continue;
+      const trans = transOf(o.text);
+      if (f.trans && trans && trans !== f.trans) continue;
+      const cyl = cylindersOf(o.text);
+      if (f.cylinders && cyl && cyl !== f.cylinders) continue;
       let score = 0;
       if (f.powertrain && named && compatible(f.powertrain, named)) score += 3;
       if (f.drive && drive === f.drive) score += 2;

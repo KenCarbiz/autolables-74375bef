@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { matchEpa, storedEpaConflict, listingPowertrain, litersOf, driveOf, type EpaClient, type EpaVehicle, type ListingFacts } from "./epaMatch.ts";
+import { matchEpa, storedEpaConflict, listingPowertrain, litersOf, driveOf, transOf, cylindersOf, type EpaClient, type EpaVehicle, type ListingFacts } from "./epaMatch.ts";
 
 type Menu = Record<string, { option: string; id: string; v: Partial<EpaVehicle> }[]>;
 
@@ -28,6 +28,13 @@ const MENUS: Record<string, Menu> = {
   "2026 INFINITI": {
     "QX80 2WD": [{ option: "Auto (S9), 6 cyl, 3.5 L, Turbo", id: "q1", v: gas(16, 21, 18) }],
     "QX80 4WD": [{ option: "Auto (S9), 6 cyl, 3.5 L, Turbo", id: "q2", v: gas(16, 20, 17) }],
+  },
+  "2024 Volkswagen": {
+    "Jetta": [{ option: "Auto (S8), 4 cyl, 1.5 L, Turbo", id: "v1", v: gas(29, 40, 33) }, { option: "Man 6-spd, 4 cyl, 1.5 L, Turbo", id: "v2", v: gas(28, 39, 32) }],
+  },
+  "2023 Jeep": {
+    "Wrangler 2dr 4WD": [{ option: "Auto 8-spd, 4 cyl, 2.0 L, Turbo", id: "w1", v: gas(21, 24, 22) }],
+    "Wrangler 4dr 4WD": [{ option: "Auto 8-spd, 4 cyl, 2.0 L, Turbo", id: "w2", v: gas(20, 24, 22) }, { option: "Auto 8-spd, 6 cyl, 3.6 L", id: "w3", v: gas(17, 23, 19) }],
   },
   "2025 Honda": {
     "Accord": [{ option: "Auto (variable gear ratios), 4 cyl, 1.5 L, Turbo", id: "a1", v: gas(29, 37, 32) }],
@@ -126,6 +133,36 @@ describe("EPA matching is powertrain-aware", () => {
       const b = await matchEpa(c, client(MENUS, true));
       expect(b).toEqual(a);
     }
+  });
+});
+
+describe("transmission, cylinders and body style narrow the match", () => {
+  it("picks the automatic Jetta when the decode says automatic", async () => {
+    const r = await matchEpa(facts({ year: "2024", make: "Volkswagen", model: "Jetta", liters: "1.5", drive: "2", powertrain: "gas", trans: "auto", cylinders: 4 }), client());
+    if ("refused" in r) throw new Error(r.refused);
+    expect(r.vehicle.id).toBe("v1");
+  });
+
+  it("still refuses when the transmission is unknown and the two disagree", async () => {
+    expect(await matchEpa(facts({ year: "2024", make: "Volkswagen", model: "Jetta", liters: "1.5", powertrain: "gas" }), client())).toEqual({ refused: "ambiguous_option" });
+  });
+
+  it("matches a 4-Door Wrangler to the 4dr record", async () => {
+    const r = await matchEpa(facts({ year: "2023", make: "Jeep", model: "Wrangler 4-Door", liters: "2.0", drive: "4", powertrain: "gas", trans: "auto", cylinders: 4 }), client());
+    if ("refused" in r) throw new Error(r.refused);
+    expect(r.model).toBe("Wrangler 4dr 4WD");
+  });
+
+  it("reads transmission and cylinders", () => {
+    expect(transOf("Automatic")).toBe("auto");
+    expect(transOf("Automatic With Manual Mode Trans")).toBe("auto");
+    expect(transOf("Manual")).toBe("manual");
+    expect(transOf("Man 6-spd, 4 cyl, 1.5 L, Turbo")).toBe("manual");
+    expect(transOf("Auto (AV-S7), 4 cyl, 1.5 L, Turbo")).toBe("auto");
+    expect(transOf("")).toBeNull();
+    expect(cylindersOf("2.7L V6")).toBe(6);
+    expect(cylindersOf("Auto 8-spd, 4 cyl, 2.0 L, Turbo")).toBe(4);
+    expect(cylindersOf("Electric")).toBeNull();
   });
 });
 
