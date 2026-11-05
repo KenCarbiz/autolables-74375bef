@@ -77,8 +77,17 @@ describe("Mitsubishi Outlander Sport gasoline template", () => {
       for (const bad of ["2", "AWD", "4-Cyl", "Unleaded", "In-Line"]) expect(m.printedEquipment, bad).not.toContain(bad);
     });
 
-    it("prints EPA values from the record and explicit unavailable states for the rest", () => {
+    it("treats the saved EPA row as unverified because it contradicts the decode's drivetrain", () => {
+      expect(real.neovin?.epaConflict).toBe("drivetrain");
       const s = m.drawnStrings;
+      expect(s).not.toContain("26");
+      expect(s).not.toContain("Gasoline Vehicle");
+      expect(s.join(" ")).toContain("not available from verified EPA records");
+      expect(s.join(" ")).not.toMatch(/\$0\b/);
+    });
+
+    it("prints EPA values from the record and explicit unavailable states for the rest when the match is not contradicted", () => {
+      const s = sample({ ...real, neovin: { ratingMetadata: real.neovin?.ratingMetadata ?? [], madeIn: real.neovin?.madeIn ?? null } }).drawnStrings;
       expect(s).toContain("26");
       expect(s).toContain("Gasoline Vehicle");
       expect(s.join(" ")).toContain("339 grams CO2");
@@ -286,7 +295,7 @@ describe("Mitsubishi Outlander Sport gasoline template", () => {
   describe("recorded routing flags", () => {
     it("matches 2026 gasoline SUV Outlander Sports as pending approval and flags other configurations unsupported", () => {
       expect(templateRoutingFacts(ref)).toMatchObject({ status: "pending_match", flags: ["template_pending_owner_approval"] });
-      expect(templateRoutingFacts(real).flags).toEqual(["template_configuration_unsupported"]);
+      expect(templateRoutingFacts(real).flags).toEqual(["template_configuration_unsupported", "epa_match_conflict"]);
       expect(templateRoutingFacts({ ...ref, bodyClass: "Sedan" }).flags).toEqual(["template_configuration_unsupported"]);
     });
 

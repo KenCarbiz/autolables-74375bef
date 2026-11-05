@@ -552,7 +552,7 @@ export function evaluateCatalogTemplate(t: CatalogTemplate, v: CatalogVehicleInp
   return { matched: reasons.length === 0, reasons };
 }
 
-export type CatalogFlag = "template_configuration_unsupported" | "template_pending_owner_approval" | "epa_match_fuel_class_conflict";
+export type CatalogFlag = "template_configuration_unsupported" | "template_pending_owner_approval" | "epa_match_conflict";
 
 export interface CatalogResolution {
   status: "approved_match" | "pending_match" | "configuration_unsupported" | "no_catalog_for_make";

@@ -214,7 +214,7 @@ export interface FactoryStickerRenderData {
    * NeoVIN decode facts that only catalog templates read (see catalogNeovin.ts).
    * Set only for makes that have catalog templates, so other makes' data is unchanged.
    */
-  neovin?: { ratingMetadata: string[]; madeIn: string | null; /** Present only when the decode states a diesel fuel; the catalog matcher's fuel evidence when there is no EPA match. */ fuelType?: string; /** Set only when the saved EPA match names a fuel class the decode contradicts. */ epaFuelConflict?: true };
+  neovin?: { ratingMetadata: string[]; madeIn: string | null; /** Present only when the decode states a diesel fuel; the catalog matcher's fuel evidence when there is no EPA match. */ fuelType?: string; /** Set only when the saved EPA match contradicts the decode: "powertrain", "drivetrain" or "engine" (storedEpaConflict). */ epaConflict?: string };
   /** Which dealer the block describes. Only a proven original selling or
    *  delivery dealer may print; the current listing rooftop never does. */
   dealerRole?: "original_delivery" | null;
@@ -754,7 +754,7 @@ export function catalogResolutionFor(data: FactoryStickerRenderData): CatalogRes
     model: data.identity.model,
     trim: data.identity.trim,
     bodyClass: data.bodyClass ?? null,
-    fuelClass: catalogFuelClassOf((data.neovin?.epaFuelConflict ? null : data.epa?.fuelType) ?? data.neovin?.fuelType),
+    fuelClass: catalogFuelClassOf((data.neovin?.epaConflict ? null : data.epa?.fuelType) ?? data.neovin?.fuelType),
     drivetrain: data.mechanical?.drivetrain ?? null,
   });
 }
@@ -783,8 +783,8 @@ export function templateRoutingFacts(data: FactoryStickerRenderData): CatalogRes
       MASTER_APPROVAL[exact.variant.key] === "approved") || masterFor(data) !== null
   );
   if (servedByApprovedMaster) return { ...catalog, flags: [], servedByApprovedMaster };
-  const conflict = data.neovin?.epaFuelConflict && catalog.status !== "no_catalog_for_make";
-  return { ...catalog, flags: conflict ? [...catalog.flags, "epa_match_fuel_class_conflict"] : catalog.flags, servedByApprovedMaster };
+  const conflict = data.neovin?.epaConflict && catalog.status !== "no_catalog_for_make";
+  return { ...catalog, flags: conflict ? [...catalog.flags, "epa_match_conflict"] : catalog.flags, servedByApprovedMaster };
 }
 
 export type { CatalogTemplate };

@@ -406,6 +406,7 @@
   "transmission": "Automatic",
   "drivetrain": "4WD",
   "made_in": "USA",
-  "fuel_type": "Unleaded"
+  "fuel_type": "Unleaded",
+  "powertrain_type": "Combustion"
  }
 }

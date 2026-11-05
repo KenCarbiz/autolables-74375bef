@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildRenderLayout, templateRoutingFacts, type FactoryStickerRenderData, type FactoryStickerTheme } from "./contract";
-import { epaFuelClassConflict, nhtsaFromRatingMetadata, withCatalogEpaGuard, withCatalogNeovin } from "./catalogNeovin";
+import { nhtsaFromRatingMetadata, withCatalogEpaGuard, withCatalogNeovin } from "./catalogNeovin";
 import { hasBuiltCatalogTemplates } from "../oem/templateCatalog";
 import { tucsonListings, tucsonRenderData } from "./__fixtures__/tucson";
 import { wranglerRenderData } from "./__fixtures__/wrangler";
@@ -83,40 +83,47 @@ describe("NeoVIN decode facts for catalog templates", () => {
   });
 });
 
-describe("EPA match fuel-class guard for catalog templates", () => {
-  const cases: Array<[string, string, string, string | null, boolean]> = [
-    ["2024 F-150 XLT with an Electricity EPA row", "Electricity", "Unleaded", null, true],
-    ["Grand Cherokee Electric / Premium Unleaded matched as Regular", "Regular", "Electric / Premium Unleaded", null, true],
-    ["Fusion Electric / Unleaded matched as Regular", "Regular", "Electric / Unleaded", null, true],
-    ["consistent gasoline", "Regular Gasoline", "Unleaded", null, false],
-    ["consistent plug-in", "Gasoline and Electricity", "Electric / Premium Unleaded", null, false],
-    ["no decode fuel", "Electricity", "", null, false],
+describe("EPA match conflict guard for catalog templates", () => {
+  const base = tucsonListings()[0];
+  const make = (ymm: string, trim: string, mc: Record<string, unknown>, epa: Record<string, unknown>) =>
+    normalizeForSticker(
+      { ...base, ymm, trim, mc_attributes: { ...(base.mc_attributes as object), ...mc }, epa_economy: { combined: 76, city: 78, highway: 72, annualFuelCost: 700, ghgScore: 10, ...epa } },
+      {}, canonicalPassportUrl("x"), "t",
+    ).data;
+
+  const cases: Array<[string, ReturnType<typeof make>, string | null]> = [
+    ["2024 F-150 XLT 3.5L V6 matched to the Lightning", make("2024 Ford F-150", "XLT", { fuel_type: "Unleaded", powertrain_type: "Combustion", engine: "3.5L V6", drivetrain: "4WD" }, { fuelType: "Electricity", matchedOption: "2024 Ford F-150 Lightning 4WD — Auto (A1)" }), "powertrain"],
+    ["Grand Cherokee 4xe matched to a gasoline engine", make("2024 Jeep Grand Cherokee", "4xe", { fuel_type: "Electric / Premium Unleaded", powertrain_type: "PHEV", engine: "2.0L I4", drivetrain: "4WD" }, { fuelType: "Regular", matchedOption: "2024 Jeep Grand Cherokee 2WD — Auto 8-spd, 6 cyl, 3.6 L" }), "powertrain"],
+    ["Fusion hybrid matched to another engine", make("2010 Ford Fusion", "Hybrid", { fuel_type: "Electric / Unleaded", powertrain_type: "HEV", engine: "2.5L I4", drivetrain: "FWD" }, { fuelType: "Regular", matchedOption: "2010 Ford Fusion FWD — Auto, 6 cyl, 3.0 L" }), "engine"],
+    ["consistent gasoline", make("2026 Ford F-250", "XL", { fuel_type: "Unleaded", powertrain_type: "Combustion", engine: "6.8L V8", drivetrain: "4WD" }, { fuelType: "Regular", matchedOption: "2026 Ford F250 Pickup 4WD — Auto, 8 cyl, 6.8 L" }), null],
   ];
-  for (const [label, epaFuel, decodeFuel, powertrain, expected] of cases) {
-    it(`${expected ? "flags" : "accepts"} ${label}`, () => {
-      expect(epaFuelClassConflict(epaFuel, decodeFuel, powertrain)).toBe(expected);
+
+  for (const [label, data, expected] of cases) {
+    it(`${expected ? "marks the EPA match unverified for" : "keeps the EPA match for"} ${label}`, () => {
+      expect(data.neovin?.epaConflict).toBe(expected ?? undefined);
+      expect(withCatalogEpaGuard(data).epa === null).toBe(expected !== null);
     });
   }
 
-  it("normalizes the conflict only for catalog makes and prints every EPA value as unavailable", () => {
-    const base = tucsonListings()[0];
-    const make = (ymm: string, decodeFuel: string, epaFuel: string) => ({
-      ...base, ymm,
-      mc_attributes: { ...(base.mc_attributes as object), fuel_type: decodeFuel },
-      epa_economy: { combined: 76, city: 78, highway: 72, annualFuelCost: 700, ghgScore: 10, fuelType: epaFuel },
-    });
-    const conflicted = normalizeForSticker(make("2026 Ford F-250", "Unleaded", "Electricity"), {}, canonicalPassportUrl("x"), "t").data;
-    expect(conflicted.neovin?.epaFuelConflict).toBe(true);
-    expect(withCatalogEpaGuard(conflicted).epa).toBeNull();
-    expect(templateRoutingFacts(conflicted).flags).toContain("epa_match_fuel_class_conflict");
-    const consistent = normalizeForSticker(make("2026 Ford F-250", "Unleaded", "Regular Gasoline"), {}, canonicalPassportUrl("x"), "t").data;
-    expect(consistent.neovin?.epaFuelConflict).toBeUndefined();
-    expect(withCatalogEpaGuard(consistent).epa).not.toBeNull();
-    const master = normalizeForSticker(make("2026 Infiniti QX60", "Unleaded", "Electricity"), {}, canonicalPassportUrl("x"), "t").data;
+  it("carries the verdict only for catalog makes and records the routing flag", () => {
+    const conflicted = cases[0][1];
+    expect(templateRoutingFacts(conflicted).flags).toContain("epa_match_conflict");
+    expect(templateRoutingFacts(cases[3][1]).flags).not.toContain("epa_match_conflict");
+    const master = make("2026 Infiniti QX60", "Sport", { fuel_type: "Unleaded", powertrain_type: "Combustion" }, { fuelType: "Electricity", matchedOption: "2026 Lightning" });
     expect(master.neovin).toBeUndefined();
-    const layout = buildRenderLayout(conflicted, theme, undefined, { sampleTemplateId: "ford_2026_f250" });
+    expect(master.epa).not.toBeNull();
+  });
+
+  it("prints every EPA value as unavailable and no fuel-type tag when the verdict is set", () => {
+    const layout = buildRenderLayout(cases[0][1], theme, undefined, { sampleTemplateId: "ford_2026_f250" });
     const all = layout.drawnStrings.join(" ");
-    expect(all).not.toContain("Electric Vehicle");
-    expect(all).not.toContain("Diesel Vehicle");
+    expect(all).not.toMatch(/Electric Vehicle|Gasoline Vehicle|Diesel Vehicle/);
+    expect(layout.drawnStrings.filter((x) => x === "Not Available").length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("treats the EPA match as unavailable when render data carries the verdict, and leaves it alone otherwise", () => {
+    const d = cases[3][1];
+    expect(withCatalogEpaGuard({ ...d, neovin: { ratingMetadata: [], madeIn: null, epaConflict: "engine" } }).epa).toBeNull();
+    expect(withCatalogEpaGuard({ ...d, neovin: { ratingMetadata: [], madeIn: null } }).epa).not.toBeNull();
   });
 });

@@ -7,7 +7,7 @@
 import { parseYmm } from "../_shared/factorySticker/lib/ymm.ts";
 import { decideDrivetrain, isRatingMetadata, splitRatingMetadata, type DrivetrainEvidence } from "../_shared/factorySticker/lib/oem/sourceCorrections.ts";
 
-import { epaFuelClassConflict } from "../_shared/factorySticker/lib/render/catalogNeovin.ts";
+import { driveOf, listingPowertrain, litersOf, storedEpaConflict } from "../_shared/epaMatch.ts";
 import { hasBuiltCatalogTemplates } from "../_shared/factorySticker/lib/oem/templateCatalog.ts";
 import type { FactoryStickerRenderData } from "../_shared/factorySticker/lib/render/contract.ts";
 
@@ -142,6 +142,15 @@ export function normalizeForSticker(
     co2TailpipeGpm: num(epaRow.co2TailpipeGpm),
   } : null;
   if (!epa) missing.push("epa_economy");
+  // The shared matcher's verdict on the saved EPA row against this car's own decode (catalog makes only).
+  const epaConflict = epa && hasBuiltCatalogTemplates(identity.make)
+    ? storedEpaConflict(epaRow, {
+      powertrain: listingPowertrain({ powertrainType: mc.powertrain_type, fuelType: mc.fuel_type, trim: listing.trim, model: identity.model }),
+      drive: driveOf(str(mc.drivetrain) ?? str(sheet?.mechanical?.drivetrain)),
+      liters: litersOf(str(mc.engine) ?? str(sheet?.mechanical?.engine)),
+      text: `${identity.model ?? ""} ${listing.trim ?? ""}`,
+    })
+    : null;
 
   const drive = decideDrivetrain({ ...identity, source: str(mc.drivetrain) ?? str(sheet?.mechanical?.drivetrain) });
   const mechanical = {
@@ -211,7 +220,7 @@ export function normalizeForSticker(
               ],
               madeIn: str(mc.made_in),
               ...(/diesel/i.test(String(mc.fuel_type ?? "")) ? { fuelType: String(mc.fuel_type) } : {}),
-              ...(epaFuelClassConflict(epa?.fuelType, str(mc.fuel_type), str(mc.powertrain_type)) ? { epaFuelConflict: true as const } : {}),
+              ...(epaConflict ? { epaConflict } : {}),
             },
           }
         : {}),
