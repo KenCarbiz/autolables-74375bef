@@ -28,7 +28,9 @@ import { paintCarbPanel } from "./carbPanel.ts";
 import { GM_EQ_STYLE, flowGmEquipment, gmGrid, paintGmEquipmentFrame, paintGmSpecColumns, paintGmVinDealer } from "./gmCommon.ts";
 
 export interface GmTruckBrand {
-  logo: "chevrolet" | "gmc";
+  logo: "chevrolet" | "gmc" | null;
+  /** Neutral wordmark printed when no logo artwork is packaged. */
+  wordmark?: string;
   logoX: number;
   logoW: number;
   site: string;
@@ -140,10 +142,14 @@ function paintPrices(p: Painter, d: FactoryStickerData): boolean {
 }
 
 function paintHeader(p: Painter, d: FactoryStickerData, brand: GmTruckBrand): void {
-  const logo = VARIANT_LOGOS[brand.logo];
-  const w = brand.logoW * PX;
-  const h = (w * logo.slot.h) / logo.slot.w;
-  p.image(logo.png, logo.assetId, g.x(brand.logoX), g.y(91) - h / 2, w, h);
+  if (brand.logo) {
+    const logo = VARIANT_LOGOS[brand.logo];
+    const w = brand.logoW * PX;
+    const h = (w * logo.slot.h) / logo.slot.w;
+    p.image(logo.png, logo.assetId, g.x(brand.logoX), g.y(91) - h / 2, w, h);
+  } else if (brand.wordmark) {
+    T(p, brand.wordmark.toUpperCase(), g.x(brand.logoX), g.y(70), 34, "bold");
+  }
   const title = yearModelTrim(d, ["year", "model", "trim", "drivetrain"], d.vehicle.make);
   wrap(title, "bold", 19, 450 * PX).slice(0, 2).forEach((l, i) => T(p, l, g.x(722), g.y(60 + i * 31), 19, "bold", { align: "center" }));
   paintGmSpecColumns(p, d, g, { leftX: 961, rightX: 1236, leftW: 270, rightW: 400, engineLabel: "ENG", transmissionLabel: "TRANS" });

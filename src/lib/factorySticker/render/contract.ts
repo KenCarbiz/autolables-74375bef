@@ -187,6 +187,11 @@ export interface FactoryStickerRenderData {
     fuelType: string | null;
     smogScore?: number | null;
     gasCombinedMpg?: number | null;
+    combinedMpge?: number | null;
+    kwhPer100Miles?: number | null;
+    chargeTimeHours?: number | null;
+    electricRangeMiles?: number | null;
+    totalRangeMiles?: number | null;
     gallonsPer100Miles?: number | null;
     co2TailpipeGpm?: number | null;
     /** Positive = saves vs average new vehicle over 5 years; negative = spends more. */
@@ -411,6 +416,11 @@ export function adaptRenderData(d: FactoryStickerRenderData): StickerLayoutInput
             ...opt("smogRating", d.epa.smogScore ?? null),
             ...opt("evRangeMiles", d.epa.rangeMiles),
             ...opt("gasolineCombinedMpg", d.epa.gasCombinedMpg ?? null),
+            ...opt("combinedMpge", d.epa.combinedMpge ?? null),
+            ...opt("kwhPer100Miles", d.epa.kwhPer100Miles ?? null),
+            ...opt("chargeTimeHours", d.epa.chargeTimeHours ?? null),
+            ...opt("electricRangeMiles", d.epa.electricRangeMiles ?? null),
+            ...opt("totalRangeMiles", d.epa.totalRangeMiles ?? null),
             ...opt("gallonsPer100Miles", d.epa.gallonsPer100Miles ?? null),
             ...opt("co2TailpipeGpm", d.epa.co2TailpipeGpm ?? null),
             ...opt("fiveYearCostDifference", d.epa.fiveYearCostDifference ?? null),
@@ -761,8 +771,9 @@ export function catalogResolutionFor(data: FactoryStickerRenderData): CatalogRes
 
 /** EPA names a plug-in hybrid "Gasoline and Electricity"; for catalog matching that is never plain gasoline. */
 function catalogFuelClassOf(fuelType: string | null | undefined): ReturnType<typeof fuelClassOf> {
-  const cls = fuelClassOf(fuelType);
-  return cls === "gasoline" && /electric/i.test(String(fuelType ?? "")) ? "phev" : cls;
+  const text = String(fuelType ?? "");
+  if (/electric/i.test(text) && /gas|premium|regular|unleaded|e85|petrol|diesel/i.test(text) && !/hybrid/i.test(text)) return "phev";
+  return fuelClassOf(fuelType);
 }
 
 /**

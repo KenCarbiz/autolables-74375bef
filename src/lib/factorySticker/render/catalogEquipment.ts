@@ -34,6 +34,7 @@ const SIZE_AND_ENGINE_FRAGMENTS = /^(mid|upper|lower|medium|upper medium|lower m
 
 const LATER_TEMPLATES = [
   "kia_2026_sorento_lx", "subaru_2026_forester_wilderness", "genesis_2026_gv80_3.5t_prestige", "dodge_2026_durango_gt_blacktop", "buick_2026_envista_avenir",
+  "cadillac_2026_escalade_iql_premium_sport", "fiat_2025_500e_giorgio_armani", "rolls-royce_2026_spectre", "bentley_2026_continental_gt_azure", "lamborghini_2026_urus_se",
   "ford_2026_f250", "ram_2026_2500_limited", "chevrolet_2026_silverado_2500_high_country", "gmc_2026_sierra_3500_denali_ultimate",
 ];
 const FRAGMENT_TEMPLATES = new Set(["mitsubishi_2026_outlander_sport_s", "chrysler_2026_voyager_lx", ...LATER_TEMPLATES]);

@@ -140,6 +140,13 @@ export function normalizeForSticker(
     fuelType: str(epaRow.fuelType),
     gallonsPer100Miles: epaCombined ? Math.round((100 / epaCombined) * 10) / 10 : null,
     co2TailpipeGpm: num(epaRow.co2TailpipeGpm),
+    // Plug-in and electric figures only when the saved row carries them; read for catalog makes only.
+    ...(hasBuiltCatalogTemplates(identity.make)
+      ? Object.fromEntries(
+        (["combinedMpge", "kwhPer100Miles", "chargeTimeHours", "electricRangeMiles", "totalRangeMiles", "smogScore", "fiveYearCostDifference"] as const)
+          .flatMap((k) => (num(epaRow[k]) !== null ? [[k, num(epaRow[k])]] : [])),
+      ) as { combinedMpge?: number; kwhPer100Miles?: number; chargeTimeHours?: number; electricRangeMiles?: number; totalRangeMiles?: number; smogScore?: number; fiveYearCostDifference?: number }
+      : {}),
   } : null;
   if (!epa) missing.push("epa_economy");
   // The shared matcher's verdict on the saved EPA row against this car's own decode (catalog makes only).

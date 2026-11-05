@@ -104,6 +104,15 @@ export interface StickerRegulatory {
   smogRating?: number;
   evRangeMiles?: number;
   gasolineCombinedMpg?: number;
+  /** Electricity + gasoline combined MPGe of a plug-in hybrid, exactly as saved from the EPA row. */
+  combinedMpge?: number;
+  kwhPer100Miles?: number;
+  /** Hours on a 240V charger, exactly as saved from the EPA row. */
+  chargeTimeHours?: number;
+  /** Plug-in hybrid all-electric range; evRangeMiles carries the single range of the EPA row. */
+  electricRangeMiles?: number;
+  /** Total (electricity + gasoline) range of a plug-in hybrid. */
+  totalRangeMiles?: number;
   epaClassNote?: string;
   epaSourceReference?: string;
   nhtsaStatus: NhtsaStatus;
