@@ -28,6 +28,7 @@ import {
 } from "../_shared/description-core.ts";
 import { repairContent, hasRepairableFindings } from "../_shared/description-repair.ts";
 import { fitNarrativeExact, disclosureDecision, type ApprovedDisclosure } from "../_shared/description-exact-fit.ts";
+import { applyStoreOverrides, loadStoreSettings, renderVehicleSettings } from "../_shared/description-store-settings.ts";
 import { preflight, preflightSummary } from "../_shared/description-preflight.ts";
 import {
   evaluateBudget, coerceBudgetConfig, parseSpendUsage, withUsageFloor, budgetUnavailable,
@@ -564,6 +565,18 @@ async function loadSettings(admin: any, tenantId: string) {
   return { settings: merged, configVersion };
 }
 
+// The vehicle's effective settings: its rooftop's overrides over the
+// dealership row, with the disclosure rendered for this vehicle's fee. A
+// store override changes the configuration version, so its descriptions are
+// regenerated rather than silently reused from another store's settings.
+// deno-lint-ignore no-explicit-any
+async function loadVehicleSettings(admin: any, tenantId: string, listing: Record<string, any> | null) {
+  const base = await loadSettings(admin, tenantId);
+  const store = await loadStoreSettings(admin, tenantId, listing?.owning_store_id ?? null);
+  const settings = renderVehicleSettings(applyStoreOverrides(base.settings, store), listing);
+  return { settings, configVersion: store ? `${base.configVersion}:store:${store.store_id}:${store.version}` : base.configVersion };
+}
+
 // ── V3 configuration loaders ─────────────────────────────────────────
 
 /**
@@ -870,7 +883,7 @@ async function orchestrateVehicle(
   });
   if (!caseId) return { vehicle_id: vehicleId, skipped: "case_not_initialized" };
 
-  const { settings, configVersion } = await loadSettings(admin, tenantId);
+  const { settings, configVersion } = await loadVehicleSettings(admin, tenantId, listing);
   const sdv = await computeSourceDataVersion(listing, configVersion, !!settings.price_in_description);
 
   const { data: existing } = await admin.from("description_cases").select("*").eq("id", caseId).maybeSingle();
@@ -1767,7 +1780,7 @@ serve(async (req) => {
       const { data: ver } = await admin.from("description_versions").select("*").eq("id", versionId).maybeSingle();
       if (!ver || ver.tenant_id !== tenantId) return json({ error: "version_not_found" }, 404);
       const { data: listing } = await admin.from("vehicle_listings").select("*").eq("id", ver.vehicle_id).maybeSingle();
-      const { settings } = await loadSettings(admin, tenantId);
+      const { settings } = await loadVehicleSettings(admin, tenantId, listing);
       const { data: dealer } = await admin.from("dealer_profiles").select("*").eq("tenant_id", tenantId).maybeSingle();
       const { data: ovRows } = await admin.from("description_fact_overrides")
         .select("field_key, decision, value").eq("description_case_id", ver.description_case_id);
