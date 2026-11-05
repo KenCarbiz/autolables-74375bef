@@ -204,9 +204,18 @@ export function describeCatalogTemplate(c: CatalogSuiteConfig): void {
         expect(ref.options.reduce((a, o) => a + (o.msrp ?? 0), 0) + ref.packages.reduce((a, o) => a + (o.msrp ?? 0), 0)).toBe(p.optionsTotal);
       });
 
-      it.skipIf(Boolean(c.carb))("draws star ratings per row, and Not Rated / Not Available states, from the data", () => {
+      it("draws star ratings per row, and Not Rated / Not Available states, from the data, or no safety panel at all", () => {
         const stars = (d: FactoryStickerRenderData): number =>
           sample(d).pages[0].primitives.filter((p) => p.kind === "path" && p.w < 14 && p.h < 14 && p.fill === "#000000" && p.d.includes("L")).length;
+        if (c.carb && !c.carb.safetyPanel) {
+          const full = { ...ref, safety: { overall: 5, frontalDriver: 5, frontalPassenger: 4, sideFront: 5, sideRear: 4, rollover: 4 }, nhtsaNotRated: false };
+          for (const d of [full, { ...ref, safety: null, nhtsaNotRated: true }, { ...ref, safety: null, nhtsaNotRated: false }]) {
+            const model = sample(d);
+            expect(stars(d)).toBe(0);
+            expect(model.drawnStrings.join(" ")).not.toMatch(/5-STAR SAFETY|Overall Vehicle Score|Not Rated|not been rated by the government|verified NHTSA record/i);
+          }
+          return;
+        }
         const full = { ...ref, safety: { overall: 5, frontalDriver: 5, frontalPassenger: 4, sideFront: 5, sideRear: 4, rollover: 4 }, nhtsaNotRated: false };
         expect(stars(full) - stars({ ...ref, safety: null, nhtsaNotRated: true })).toBe(5 + 5 + 4 + 5 + 4 + 4);
         const partial = sample({ ...full, safety: { overall: null, frontalDriver: 4, frontalPassenger: null, sideFront: 5, sideRear: 0, rollover: 3 } });
@@ -238,7 +247,15 @@ export function describeCatalogTemplate(c: CatalogSuiteConfig): void {
         expect(all).toContain("NOT AVAILABLE");
       });
 
-      it.skipIf(Boolean(c.carb))("moves the greenhouse-gas pointer with the score and shows an unavailable state for bad scores", () => {
+      it("moves the greenhouse-gas pointer with the score and shows an unavailable state for bad scores, or keeps the CARB scales unavailable", () => {
+        if (c.carb) {
+          for (const score of [1, 5, 10]) {
+            const model = sample({ ...ref, epa: { ...(ref.epa ?? { city: null, highway: null, combined: null, annualFuelCost: null, rangeMiles: null, fuelType: null }), ghgScore: score, smogScore: score } as typeof ref.epa });
+            expect(model.drawnStrings.filter((x) => x === "Not Available").length).toBeGreaterThanOrEqual(2);
+            expect(texts(model).filter((t) => t.str === String(score) && t.color === "#ffffff" && t.align === "center")).toHaveLength(0);
+          }
+          return;
+        }
         const xs: number[] = [];
         for (const score of [1, 5, 10]) {
           const model = sample({ ...ref, epa: { ...ref.epa!, ghgScore: score, smogScore: null } });
