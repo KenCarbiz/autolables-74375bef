@@ -16,6 +16,9 @@
 // Pure apart from the injected EPA client, so tests drive it with fixtures.
 
 export const EPA_MATCHER_VERSION = "epa-match-v4";
+// Matchers whose stored records were checked against the car (powertrain,
+// drive, engine, transmission); the sweep does not redo or clear them.
+export const VERIFIED_MATCHERS: readonly string[] = ["epa-match-v3", "epa-match-v4"];
 
 export type Powertrain = "ev" | "phev" | "hybrid" | "mild_hybrid" | "gas" | "diesel";
 export type Drive = "4" | "2";

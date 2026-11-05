@@ -11,7 +11,7 @@
 // ──────────────────────────────────────────────────────────────────────
 import { json, preflight } from "../_shared/http.ts";
 import { adminClient, isServiceOrCron } from "../_shared/supabase.ts";
-import { matchEpa, listingPowertrain, litersOf, driveOf, transOf, cylindersOf, EPA_MATCHER_VERSION, type EpaClient, type MatchResult } from "../_shared/epaMatch.ts";
+import { matchEpa, listingPowertrain, litersOf, driveOf, transOf, cylindersOf, EPA_MATCHER_VERSION, VERIFIED_MATCHERS, type EpaClient, type MatchResult } from "../_shared/epaMatch.ts";
 
 const FE_BASE = "https://www.fueleconomy.gov/ws/rest";
 const JSON_HDR = { Accept: "application/json" };
@@ -104,6 +104,9 @@ async function lookupEpa(l: { ymm: string | null; trim: string | null; mc: Recor
   }
 }
 
+const verifiedRecord = (r: Record<string, unknown> | null | undefined) =>
+  VERIFIED_MATCHERS.includes(String(r?.matcherVersion ?? ""));
+
 Deno.serve(async (req) => {
   const pf = preflight(req); if (pf) return pf;
   const admin = adminClient();
@@ -137,10 +140,12 @@ Deno.serve(async (req) => {
   // definite refusal also clears a stored match: the earlier matcher's record
   // for a car the new one will not match is not this car's data. A network
   // failure leaves what is stored.
-  const refuse = async (id: string, reason: string) =>
+  // A record a verified matcher (v3 on) wrote is kept: a later refusal is a
+  // tie or a gap in the service, not evidence that the stored figure is wrong.
+  const refuse = async (id: string, reason: string, stored?: Record<string, unknown> | null) =>
     // deno-lint-ignore no-explicit-any
     await (admin as any).from("vehicle_listings")
-      .update(reason === "timeout_or_network"
+      .update(reason === "timeout_or_network" || verifiedRecord(stored)
         ? { epa_checked_at: new Date().toISOString() }
         : { epa_economy: null, epa_checked_at: new Date().toISOString() })
       .eq("id", id);
@@ -159,14 +164,14 @@ Deno.serve(async (req) => {
     let checked = 0, matched = 0, skipped = 0, errors = 0;
     for (const v of (vehicles || []) as { id: string; vin: string | null; ymm: string | null; trim: string | null; mc_attributes: Record<string, unknown> | null; epa_economy: Record<string, unknown> | null; epa_checked_at: string | null }[]) {
       if (!v.ymm) { skipped++; continue; }
-      // A record written by an earlier matcher is re-checked whatever its age.
-      const current = v.epa_economy?.matcherVersion === EPA_MATCHER_VERSION || !v.epa_economy;
+      // A record written by a pre-v3 matcher is re-checked whatever its age.
+      const current = verifiedRecord(v.epa_economy) || !v.epa_economy;
       if (!force && current && v.epa_checked_at && new Date(v.epa_checked_at).getTime() > cutoff) { skipped++; continue; }
       const r = await lookupEpa({ ymm: v.ymm, trim: v.trim, mc: v.mc_attributes || {} });
       checked++;
       if ("error" in r) {
         errors++;
-        await refuse(v.id, r.error);
+        await refuse(v.id, r.error, v.epa_economy);
       } else { await persist(v.id, r); matched++; }
       await new Promise((res) => setTimeout(res, 150));
     }
@@ -175,13 +180,13 @@ Deno.serve(async (req) => {
 
   const vin = String(body.vin || "").toUpperCase().trim();
   if (!validVin(vin)) return json(400, { error: "invalid_vin" });
-  let lq = admin.from("vehicle_listings").select("id, ymm, trim, mc_attributes").eq("vin", vin);
+  let lq = admin.from("vehicle_listings").select("id, ymm, trim, mc_attributes, epa_economy").eq("vin", vin);
   if (tenantId) lq = lq.eq("tenant_id", tenantId);
   const { data: listing } = await lq.maybeSingle();
   if (!listing) return json(404, { error: "listing_not_found" });
 
   const r = await lookupEpa({ ymm: listing.ymm as string | null, trim: (listing.trim as string | null) ?? null, mc: (listing.mc_attributes as Record<string, unknown>) || {} });
-  if ("error" in r) { await refuse(listing.id as string, r.error); return json(200, { vin, available: false, error: r.error }); }
+  if ("error" in r) { await refuse(listing.id as string, r.error, listing.epa_economy as Record<string, unknown> | null); return json(200, { vin, available: false, error: r.error }); }
   await persist(listing.id as string, r);
   return json(200, { vin, available: true, ...r });
 });
