@@ -343,7 +343,7 @@ const InventoryCommandCenterV2 = () => {
   );
 
   const gridCols = combinedView
-    ? "lg:grid-cols-[minmax(0,2fr)_minmax(0,1.1fr)_112px_minmax(0,1.5fr)_120px_168px]"
+    ? "lg:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_96px_minmax(0,1.5fr)_104px_152px]"
     : "lg:grid-cols-[minmax(0,2fr)_112px_minmax(0,1.6fr)_120px_168px]";
   const selectCls = "h-10 px-3 rounded-lg border border-border text-sm bg-card focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary";
   const accessNote = groupAccessNote(group.access, group.stores.length);
@@ -513,7 +513,7 @@ const InventoryCommandCenterV2 = () => {
                         <DealershipChip name={r.gv.storeName} className="lg:hidden max-w-full" />
                       </div>
                     </div>
-                    <div className="hidden lg:block min-w-0"><DealershipChip name={r.gv.storeName} /></div>
+                    <div className="hidden lg:block min-w-0 overflow-hidden"><DealershipChip name={r.gv.storeName} className="max-w-full" /></div>
                     <div className="hidden lg:block"><DealershipStatusBadge status={r.gv.status} /></div>
                     <div className="col-span-2 lg:col-span-1 text-[12px] text-muted-foreground">Source data from the dealership feed. Read-only.</div>
                     <div className="hidden lg:block text-[13px] leading-tight">
@@ -548,7 +548,7 @@ const InventoryCommandCenterV2 = () => {
                       {r.gv && <DealershipChip name={r.gv.storeName} className="lg:hidden max-w-full" />}
                     </div>
                   </div>
-                  {r.gv && <div className="hidden lg:block min-w-0"><DealershipChip name={r.gv.storeName} /></div>}
+                  {r.gv && <div className="hidden lg:block min-w-0 overflow-hidden"><DealershipChip name={r.gv.storeName} className="max-w-full" /></div>}
                   <div className="hidden lg:block">{r.gv?.status === "review" ? <DealershipStatusBadge status="review" /> : <Status tone={ready.tone}>{ready.label}</Status>}</div>
                   <div className="col-span-2 lg:col-span-1 flex flex-wrap gap-x-3 gap-y-1">
                     {!s.decoded && <Status tone="critical">VIN issue</Status>}
