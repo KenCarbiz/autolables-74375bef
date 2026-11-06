@@ -53,4 +53,35 @@ describe("buildMappingRows", () => {
     expect(r.production[0].state).toBe("approved_paused");
     expect(r.production[0].nextAction).toMatch(/Ingestion is paused/);
   });
+
+  const importRun = (path: string, id: string, status: string, at: string, sha = "sha-1", reason: string | null = null): FeedRun => ({
+    id: `imp-${at}`, path, kind: "import", status, failure_reason: reason, started_at: at, finished_at: at, affected_store_ids: [], job_id: null, content_sha256: sha, remote_mtime: null,
+    report: { partitions: [{ sourceDealerId: id, status: status === "applied" ? "applied" : "rejected", reason }] },
+  });
+  const approvedInput = (runs: FeedRun[], fileSha = "sha-1", dryRunSha = "sha-0") => input({
+    files: [file("a.csv", fileSha)], runs: [run("a.csv", ["MP15395_inventory"], dryRunSha), ...runs],
+    mappings: [mapping({ status: "approved", approved_at: "2026-10-30T02:00:00Z" })],
+    bindings: [{ id: "b1", path: "a.csv", tenant_id: "t1", status: "approved", approved_at: "" }],
+  });
+
+  it("does not call an imported file stale when the imported version is the current file", () => {
+    const r = buildMappingRows(approvedInput([importRun("a.csv", "MP15395_inventory", "applied", "2026-11-06T18:56:00Z", "sha-1")])).production[0];
+    expect(r.state).toBe("imported");
+    expect(r.stale).toBe(false);
+    expect(r.nextAction).toBe("None");
+    expect(r.fileApproved).toBe(true);
+  });
+
+  it("separates an import failure from a paused store and from validation", () => {
+    const failed = buildMappingRows(approvedInput([importRun("a.csv", "MP15395_inventory", "rejected", "2026-11-06T18:55:00Z", "sha-1", "store_feed_not_enabled")], "sha-1", "sha-1")).production[0];
+    expect(failed.state).toBe("import_failed");
+    expect(failed.validated).toBe(true);
+    expect(failed.nextAction).toMatch(/store feed not enabled/);
+    const recovered = buildMappingRows(approvedInput([
+      importRun("a.csv", "MP15395_inventory", "rejected", "2026-11-06T18:55:00Z", "sha-1", "store_feed_not_enabled"),
+      importRun("a.csv", "MP15395_inventory", "applied", "2026-11-06T20:22:00Z", "sha-1"),
+    ], "sha-1", "sha-1")).production[0];
+    expect(recovered.state).toBe("imported");
+    expect(recovered.lastImportFailure).toBeNull();
+  });
 });

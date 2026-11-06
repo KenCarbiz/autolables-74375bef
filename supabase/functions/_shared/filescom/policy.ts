@@ -202,6 +202,25 @@ export function intakeStatus(binding: BindingStatus): { status: "pending" | "qua
   return { status: "quarantined", reason: `binding_${binding}` };
 }
 
+// The scheduled worker authenticates with a key that authorises this one
+// function and nothing else. pg_cron reads it from Vault at run time
+// (files_inventory_worker_tick), so no credential is stored in a cron job.
+// The service-role key is still accepted for a manual operator call.
+export const WORKER_KEY_HEADER = "x-files-inventory-worker-key";
+export const WORKER_KEY_ENV_NAME = "FILES_INVENTORY_WORKER_KEY";
+
+export async function authorizeWorker(
+  presentedWorkerKey: string | null,
+  configuredWorkerKey: string | null | undefined,
+  serviceRoleMatches: () => Promise<boolean>,
+  constantTimeEquals: (a: string, b: string) => Promise<boolean>,
+): Promise<"worker_key" | "service_role" | null> {
+  const configured = (configuredWorkerKey ?? "").trim();
+  if (configured && presentedWorkerKey && await constantTimeEquals(presentedWorkerKey, configured)) return "worker_key";
+  if (await serviceRoleMatches()) return "service_role";
+  return null;
+}
+
 // A tenant-level admin role is not platform authority. Only the global
 // has_role(uid,'admin') answer, read server-side, admits the caller.
 export function authorizePlatformAdmin(input: { userId: string | null; hasPlatformRole: boolean | null }): { ok: true } | { ok: false; status: 401 | 403 } {

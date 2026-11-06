@@ -42,10 +42,15 @@ an explicit platform-admin action.
 5. **Dry run all six feeds** with `Dry run` in the console.
 6. **Map and approve** each DealerId to its store; approve each file binding.
 7. **Resume ingestion** in the console and run `Import now` per approved feed.
-8. **Schedule the worker** once imports look right: first run `supabase/manual/files_inventory_worker_schedule.sql` in the Supabase SQL editor (it reads Vault, so the Lovable migration tool will not apply it), then
-   `select schedule_files_inventory_worker('*/10 * * * *');` (needs the Vault
-   entries `supabase_url` and `service_role_key`, same as the MarketCheck sync).
-   Then turn on Reconciliation in the console. To stop: `select unschedule_files_inventory_worker();`
+8. **Schedule the worker** once imports look right. Run
+   `supabase/manual/files_inventory_worker_schedule.sql` in the Supabase SQL
+   editor (it reads Vault, so the Lovable migration tool will not apply it).
+   The cron job's command is only `SELECT public.files_inventory_worker_tick();`;
+   the tick reads a dedicated worker key from Vault at run time, so no
+   credential is stored in cron. Needs the Vault entries `supabase_url` and
+   `files_inventory_worker_key`, and the same key as the edge secret
+   `FILES_INVENTORY_WORKER_KEY`. Then `select schedule_files_inventory_worker('*/10 * * * *');`.
+   To stop: `select unschedule_files_inventory_worker();`
 9. Sharing, the customer browser and MarketCheck enrichment stay off until
    configured per store.
 

@@ -257,6 +257,24 @@ describe("import pipeline", () => {
     globalFetch.mockRestore();
   });
 
+  it("keeps a file valid and retryable when its only store is paused", async () => {
+    const t = seed();
+    t.dealer_stores[0].feed_import_paused = true;
+    const files = fakeFiles(csvOf([row("MP15397"), row("MP15397")]));
+    const f = fakeDb(t, {
+      inventory_feed_claim_version: () => ({ claimed: true, version_id: "v1" }),
+      inventory_apply_store_snapshot: () => { throw new Error("must not apply while paused"); },
+      inventory_feed_finish_job: (a) => `${a.p_status}:${a.p_retryable}`,
+    });
+    f.tables.inventory_feed_versions = [{ id: "v1" }];
+    const out = await processImportJob({ db: f.db, key: "k", fetchFn: files.fetchFn }, job);
+    expect(out.status).toBe("skipped:false");
+    expect((out.result as { partitions: Array<{ status: string; reason: string | null }> }).partitions).toEqual([expect.objectContaining({ status: "rejected", reason: "store_feed_not_enabled" })]);
+    expect(f.tables.inventory_feed_versions?.[0]).toMatchObject({ status: "failed" });
+    expect(f.tables.inventory_feed_files?.[0]).toMatchObject({ status: "validated" });
+    expect((f.tables.inventory_feed_runs ?? []).at(-1)).toMatchObject({ status: "skipped" });
+  });
+
   it("does not process a file version that was already claimed or applied", async () => {
     const files = fakeFiles(csvOf([row("MP15397")]));
     const f = fakeDb(seed(), {
