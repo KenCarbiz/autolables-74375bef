@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { buildRegistry, inPrimaryView, type ScopeListing } from "@/lib/inventoryScope/storeScope";
+import { listTenantStores } from "@/lib/inventoryScope/api";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
@@ -122,6 +124,7 @@ const InventoryCommandCenterV2 = () => {
       const isSchemaErr = (e: { message?: string; code?: string } | null) =>
         !!e && (/column|does not exist|schema cache/i.test(e.message || "") || ["42703", "PGRST204", "42P01"].includes(e.code || ""));
       const colSets = [
+        `${baseCols},hero_image_url,recall_status,open_recall_count,recall_payload,recall_check,recall_checked_at,market_position,market_value,owning_store_id,mc_dealer_id:mc_raw->dealer->>id`,
         `${baseCols},hero_image_url,recall_status,open_recall_count,recall_payload,recall_check,recall_checked_at,market_position,market_value`,
         `${baseCols},hero_image_url,recall_status,open_recall_count,recall_payload,recall_check,recall_checked_at`,
         `${baseCols},hero_image_url,recall_status,open_recall_count`,
@@ -148,6 +151,12 @@ const InventoryCommandCenterV2 = () => {
       if (!on) return;
       if (failed && !list.length) { setLoadError(true); setLoading(false); toast.error("Couldn't load inventory"); return; }
       setTruncated(list.length >= MAX_ROWS);
+      if (list.length && "owning_store_id" in list[0]) {
+        try {
+          const reg = buildRegistry(await listTenantStores(tenant.id));
+          if (reg.primary) list = list.filter((r) => inPrimaryView(r as ScopeListing, reg));
+        } catch { /* store registry unreadable: unscoped list */ }
+      }
 
       const vins = Array.from(new Set(list.map((r) => r.vin).filter(Boolean)));
       const ad = new Set<string>();

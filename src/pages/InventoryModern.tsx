@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { deriveRecallView, recallScopeOfSource, type RecallRowInput } from "@/lib/vehicleTruth/recallView";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useSectionLinks } from "@/components/layout/SectionTabs";
 import { useQueryClient } from "@tanstack/react-query";
 import { useViewTransitionNavigate } from "@/lib/navigation";
@@ -30,6 +30,9 @@ import { MARKET_BATCH_NOTICE } from "@/lib/market/batchTransition";
 import { AdvertisedPriceBand } from "@/components/inventory/AdvertisedPriceBand";
 import { PageBody, PageHeader, MetricStrip, LocalTabs, WorkTable, Th, Td, Button, FilterSelect, StatusText, type LocalTab, type Tone } from "@/components/product";
 import { summarizeReadiness } from "@/lib/inventory/readinessSummary";
+import { buildRegistry, inPrimaryView, summarizeScopes } from "@/lib/inventoryScope/storeScope";
+import { listTenantStores } from "@/lib/inventoryScope/api";
+import { STORE_INVENTORY_PATH } from "@/lib/inventoryScope/paths";
 
 // ──────────────────────────────────────────────────────────────
 // Inventory — dealer's primary workspace, as an Inventory Command
@@ -64,7 +67,13 @@ interface VehicleRow {
   recall_checked_at?: string | null;
   market_position?: string | null;
   market_value?: number | null;
+  owning_store_id?: string | null;
+  mc_dealer_id?: string | null;
 }
+
+interface ScopeNotice { primaryName: string; children: number; childVehicles: number; review: number }
+
+const SCOPE_COLS = "owning_store_id,mc_dealer_id:mc_raw->dealer->>id";
 
 interface ActivityRow { id: string; action: string; created_at: string; details: Record<string, unknown> | null; }
 
@@ -120,6 +129,7 @@ const InventoryModern = () => {
     else toast.error("Could not add to Get-Ready (it may already be in the pipeline).");
   };
   const [rows, setRows] = useState<VehicleRow[]>([]);
+  const [scopeNotice, setScopeNotice] = useState<ScopeNotice | null>(null);
   const [addendumVins, setAddendumVins] = useState<Set<string>>(new Set());
   const [activity, setActivity] = useState<ActivityRow[]>([]);
   const [lastSync, setLastSync] = useState<{ at: string | null; status: Record<string, unknown> | null }>({ at: null, status: null });
@@ -275,6 +285,7 @@ const InventoryModern = () => {
     let error: { message?: string; code?: string } | null = null;
     try {
       for (const cols of [
+        `${baseCols},hero_image_url,recall_status,open_recall_count,recall_payload,recall_check,recall_checked_at,market_position,market_value,${SCOPE_COLS}`,
         `${baseCols},hero_image_url,recall_status,open_recall_count,recall_payload,recall_check,recall_checked_at,market_position,market_value`,
         `${baseCols},hero_image_url,recall_status,open_recall_count,recall_payload,recall_check,recall_checked_at`,
         `${baseCols},hero_image_url,recall_status,open_recall_count`,
@@ -297,6 +308,23 @@ const InventoryModern = () => {
     }
     {
       let rows = (data || []) as VehicleRow[];
+      // Primary dealership by default: child-store vehicles and listings whose
+      // provider rooftop is not mapped to a store are counted on the Inventory
+      // by store screen, never in this list or its totals.
+      let nextScope: ScopeNotice | null = null;
+      if (rows.length && "owning_store_id" in rows[0]) {
+        try {
+          const stores = await listTenantStores(tenant.id);
+          const reg = buildRegistry(stores);
+          if (reg.primary) {
+            const all = rows;
+            rows = all.filter((r) => inPrimaryView(r, reg));
+            const sum = summarizeScopes(all, reg);
+            nextScope = { primaryName: reg.primary.display_name, children: reg.children.length, childVehicles: [...sum.byChild.values()].reduce((n, c) => n + c.total, 0), review: sum.review.total };
+          }
+        } catch { /* store registry unreadable: show the list as before */ }
+      }
+      setScopeNotice(nextScope);
       const vins = rows.map((r) => r.vin).filter(Boolean);
       const adVins = new Set<string>();
       if (vins.length) {
@@ -563,6 +591,15 @@ const InventoryModern = () => {
 
       <section className="flex flex-col gap-3" aria-label="Vehicles">
         <LocalTabs tabs={conditionTabs} label="Condition" />
+
+        {scopeNotice && (
+          <p className="text-[13px] leading-[18px] text-adm-muted" data-testid="inventory-scope">
+            Showing the primary dealership, {scopeNotice.primaryName}.{" "}
+            {scopeNotice.children > 0 && <>{scopeNotice.children} child {scopeNotice.children === 1 ? "store is" : "stores are"} kept separate{scopeNotice.childVehicles ? ` (${scopeNotice.childVehicles} vehicles)` : ""}. </>}
+            {scopeNotice.review > 0 && <>{scopeNotice.review} {scopeNotice.review === 1 ? "listing needs" : "listings need"} rooftop review. </>}
+            <Link to={STORE_INVENTORY_PATH} className="font-semibold text-adm-primary hover:underline">Inventory by store</Link>
+          </p>
+        )}
 
         <MetricStrip
           label="Inventory summary"

@@ -185,6 +185,7 @@ export const ADMIN_CHILD_ROUTES = {
   paymentEstimator: "/admin/brand/payment-estimator",
   paymentAssumptions: "/admin/brand/payment-assumptions",
   storeIdentity: "/admin/brand/store-identity",
+  storeInventory: "/admin/integrations/store-inventory",
   syncRun: (runId: string) => `/admin/integrations/runs/${encodeURIComponent(runId)}`,
   providerDetail: (providerId: string) => `/admin/integrations/providers/${encodeURIComponent(providerId)}`,
   jobDetail: (jobId: string) => `/admin/integrations/jobs/${encodeURIComponent(jobId)}`,
