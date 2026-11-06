@@ -32,6 +32,10 @@ import { PageBody, PageHeader, MetricStrip, LocalTabs, WorkTable, Th, Td, Button
 import { summarizeReadiness } from "@/lib/inventory/readinessSummary";
 import { chunk, loadScopedInventory, scopeFailureOf, type ScopedInventory } from "@/lib/inventoryScope/primaryInventory";
 import { STORE_INVENTORY_PATH } from "@/lib/inventoryScope/paths";
+import { useGroupInventory } from "@/hooks/useGroupInventory";
+import { DISPLAY_STATUS_LABEL, countByStore, feedTitle, groupFailureOf, mergeGroupRows, verifyAccessStores, type DisplayRow, type DisplayStatus } from "@/lib/inventoryScope/groupInventory";
+import { DealershipChip, DealershipSelector, DealershipStatusBadge, DealershipSummaryLine, groupAccessNote } from "@/components/inventory/DealershipSelector";
+import { FeedVehicleSheet } from "@/components/inventory/FeedVehicleSheet";
 
 // ──────────────────────────────────────────────────────────────
 // Inventory — dealer's primary workspace, as an Inventory Command
@@ -42,7 +46,10 @@ import { STORE_INVENTORY_PATH } from "@/lib/inventoryScope/paths";
 // the numbers are honest, not decorative.
 // ──────────────────────────────────────────────────────────────
 
+interface GroupMeta { storeId: string; storeName: string; status: DisplayStatus; feedOnly: boolean; display: DisplayRow }
+
 interface VehicleRow {
+  gv?: GroupMeta;
   id: string;
   vin: string;
   ymm: string | null;
@@ -71,11 +78,22 @@ interface VehicleRow {
   mc_dealer_id?: string | null;
 }
 
+const toPageRow = (d: DisplayRow<VehicleRow>): VehicleRow => {
+  const gv: GroupMeta = { storeId: d.storeId, storeName: d.storeName, status: d.status, feedOnly: d.source === "feed", display: d as DisplayRow };
+  if (d.listing) return { ...d.listing, gv };
+  const seen = d.feed?.last_seen_at ?? "1970-01-01T00:00:00.000Z";
+  return {
+    id: d.key, vin: d.vin, ymm: d.feed ? feedTitle(d.feed) : null, trim: d.trim, mileage: d.mileage, condition: d.condition, price: d.price,
+    status: "draft", slug: "", published_at: null, view_count: 0, created_at: seen, updated_at: seen, stock_number: d.stock,
+    hero_image_url: d.thumbnail, gv,
+  };
+};
+
 interface ScopeNotice { primaryName: string; children: number; childVehicles: number; review: number }
 
 interface ActivityRow { id: string; action: string; created_at: string; details: Record<string, unknown> | null; }
 
-type StatusFilter = "all" | "draft" | "published" | "archived";
+type StatusFilter = "all" | "draft" | "published" | "archived" | "feed_only" | "missing_from_feed" | "review";
 type ConditionFilter = "all" | "new" | "used" | "cpo";
 type DerivedFilter = "all" | "needs-sticker" | "missing-addendum" | "price-verify" | "open-recalls" | "needs-attention";
 type SortKey = "updated" | "created" | "price_desc" | "price_asc" | "year_desc" | "mileage_asc" | "readiness_desc";
@@ -126,7 +144,10 @@ const InventoryModern = () => {
     if (rec) toast.success(`${r.ymm || r.vin || "Vehicle"} sent to Get-Ready`);
     else toast.error("Could not add to Get-Ready (it may already be in the pipeline).");
   };
-  const [rows, setRows] = useState<VehicleRow[]>([]);
+  const [listingRows, setRows] = useState<VehicleRow[]>([]);
+  const group = useGroupInventory(tenant?.id, user?.id);
+  const [registry, setRegistry] = useState<{ ids: string[]; primaryId: string | null } | null>(null);
+  const [detailRow, setDetailRow] = useState<DisplayRow | null>(null);
   const [scopeNotice, setScopeNotice] = useState<ScopeNotice | null>(null);
   const [scopeError, setScopeError] = useState<{ code: string; title: string; detail: string } | null>(null);
   const [primaryStoreId, setPrimaryStoreId] = useState<string | null>(null);
@@ -243,7 +264,7 @@ const InventoryModern = () => {
 
   const deleteVehicle = async (r: VehicleRow) => {
     if (!window.confirm(`Remove ${r.ymm || r.vin} from inventory? This deletes the vehicle file.`)) return;
-    if (!tenant?.id || !rows.some((x) => x.id === r.id)) { toast.error("This vehicle is not in this dealership's inventory."); return; }
+    if (!tenant?.id || !listingRows.some((x) => x.id === r.id)) { toast.error("This vehicle is not in this dealership's inventory."); return; }
     const { error } = await (supabase as any).from("vehicle_listings").delete().eq("id", r.id).eq("tenant_id", tenant.id);
     if (error) { toast.error(`Delete failed: ${error.message}`); return; }
     toast.success("Vehicle removed");
@@ -285,6 +306,7 @@ const InventoryModern = () => {
     } catch (e) {
       // Fail closed: drop whatever was on screen, never keep or show a mixed list.
       setRows([]);
+      setRegistry(null);
       setScopeNotice(null);
       setPrimaryStoreId(null);
       setScopeError(scopeFailureOf(e));
@@ -298,6 +320,7 @@ const InventoryModern = () => {
       let rows = [...scoped.primaryRows].sort((x, y) => (y.updated_at || "").localeCompare(x.updated_at || "") || x.id.localeCompare(y.id));
       const reg = scoped.registry;
       setPrimaryStoreId(scoped.mode === "multi_rooftop" ? reg.primary?.id ?? null : null);
+      setRegistry({ ids: scoped.stores.map((st) => st.id), primaryId: reg.primary?.id ?? null });
       setScopeNotice(scoped.mode === "multi_rooftop" && reg.primary ? {
         primaryName: reg.primary.display_name,
         children: reg.children.length,
@@ -354,6 +377,27 @@ const InventoryModern = () => {
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [tenant?.id]);
   useEffect(() => { setPage(1); }, [q, status, condition, derived, perPage]);
 
+  const merged = useMemo((): { rows: VehicleRow[] | null; error: unknown } => {
+    if (!group.combined || group.access.status !== "allowed" || !registry) return { rows: null, error: null };
+    if (group.feedError) return { rows: null, error: group.feedError };
+    if (group.feed.status !== "ready") return { rows: null, error: null };
+    try {
+      verifyAccessStores(group.access, registry.ids, registry.primaryId);
+      const display = mergeGroupRows<VehicleRow>({
+        stores: group.stores, selectedStoreIds: group.selectedIds, primaryStoreId: registry.primaryId, listings: listingRows, feed: group.feedRows,
+      });
+      return { rows: display.map(toPageRow), error: null };
+    } catch (e) {
+      return { rows: null, error: e };
+    }
+  }, [group.combined, group.access, group.feed, group.feedError, group.feedRows, group.stores, group.selectedIds, registry, listingRows]);
+  const combinedView = group.combined && !!registry;
+  const groupError = combinedView ? merged.error : null;
+  const groupLoading = combinedView && !groupError && merged.rows === null;
+  const rows = useMemo(() => (combinedView ? merged.rows ?? [] : listingRows), [combinedView, merged.rows, listingRows]);
+  const busy = loading || groupLoading;
+  const feedOnlyShown = rows.some((r) => r.gv?.feedOnly);
+
   const signalFor = (r: VehicleRow) => {
     const v = (r.vin || "").toUpperCase();
     const stickerDone = r.status === "published";
@@ -380,9 +424,13 @@ const InventoryModern = () => {
   const filtered = useMemo(() => {
     const lc = q.trim().toLowerCase();
     const list = rows.filter((r) => {
-      if (status !== "all" && r.status !== status) return false;
+      if (status !== "all") {
+        if (status === "feed_only" || status === "missing_from_feed" || status === "review") { if (r.gv?.status !== status) return false; }
+        else if (r.gv?.feedOnly || r.status !== status) return false;
+      }
       if (condition !== "all" && r.condition !== condition) return false;
       if (derived !== "all") {
+        if (r.gv?.feedOnly) return false;
         const s = signalFor(r);
         if (derived === "needs-sticker" && s.stickerDone) return false;
         if (derived === "missing-addendum" && s.hasAddendum) return false;
@@ -395,7 +443,8 @@ const InventoryModern = () => {
         r.vin.toLowerCase().includes(lc) ||
         (r.ymm || "").toLowerCase().includes(lc) ||
         (r.trim || "").toLowerCase().includes(lc) ||
-        (r.stock_number || "").toLowerCase().includes(lc)
+        (r.stock_number || "").toLowerCase().includes(lc) ||
+        (r.gv?.storeName || "").toLowerCase().includes(lc)
       );
     });
     const yearOf = (r: VehicleRow) => parseInt((r.ymm || "").match(/\b(19|20)\d{2}\b/)?.[0] || "0", 10);
@@ -407,14 +456,14 @@ const InventoryModern = () => {
     const sorted = [...list];
     sorted.sort((a, b) => {
       switch (sortKey) {
-        case "created": return (new Date(b.created_at).getTime()) - (new Date(a.created_at).getTime());
+        case "created": return (new Date(b.created_at).getTime() || 0) - (new Date(a.created_at).getTime() || 0);
         case "price_desc": return (b.price || 0) - (a.price || 0);
         case "price_asc": return (a.price || Number.MAX_SAFE_INTEGER) - (b.price || Number.MAX_SAFE_INTEGER);
         case "year_desc": return yearOf(b) - yearOf(a);
         case "mileage_asc": return (a.mileage || Number.MAX_SAFE_INTEGER) - (b.mileage || Number.MAX_SAFE_INTEGER);
         case "readiness_desc": return readinessOf(b) - readinessOf(a);
         case "updated":
-        default: return (new Date(b.updated_at).getTime()) - (new Date(a.updated_at).getTime());
+        default: return (new Date(b.updated_at).getTime() || 0) - (new Date(a.updated_at).getTime() || 0);
       }
     });
     return sorted;
@@ -422,18 +471,19 @@ const InventoryModern = () => {
 
   const counts = useMemo(() => {
     const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const publishedRows = rows.filter((r) => r.status === "published");
+    const publishedRows = rows.filter((r) => r.status === "published" && !r.gv?.feedOnly);
     const publishedRecent = publishedRows.filter(
       (r) => r.published_at && new Date(r.published_at).getTime() >= sevenDaysAgo,
     );
-    const totalViews = rows.reduce((sum, r) => sum + (r.view_count || 0), 0);
+    const tracked = rows.filter((r) => !r.gv?.feedOnly);
+    const totalViews = tracked.reduce((sum, r) => sum + (r.view_count || 0), 0);
     const newCount = rows.filter((r) => r.condition === "new").length;
     const usedCount = rows.filter((r) => r.condition === "used").length;
     const cpoCount = rows.filter((r) => r.condition === "cpo").length;
     let needsSticker = 0, missingAddendum = 0, priceVerify = 0, clean = 0;
     let vinDecoded = 0, openRecallsTotal = 0, openRecallVehicles = 0, readinessSum = 0;
     let needsAttention = 0, marketSum = 0, marketCount = 0;
-    for (const r of rows) {
+    for (const r of tracked) {
       const s = signalFor(r);
       if (!s.stickerDone) needsSticker++;
       if (!s.hasAddendum) missingAddendum++;
@@ -451,12 +501,12 @@ const InventoryModern = () => {
       readinessSum += rowReadiness(r);
     }
     const total = rows.length;
-    const readiness = summarizeReadiness(rows.map(rowReadiness));
-    const archived = rows.filter((r) => r.status === "archived").length;
-    const health = total ? Math.round((clean / total) * 100) : 100;
+    const readiness = summarizeReadiness(tracked.map(rowReadiness));
+    const archived = tracked.filter((r) => r.status === "archived").length;
+    const health = tracked.length ? Math.round((clean / tracked.length) * 100) : 100;
     return {
       total,
-      draft: rows.filter((r) => r.status === "draft").length,
+      draft: tracked.filter((r) => r.status === "draft").length,
       published: publishedRows.length,
       archived,
       publishedRecent: publishedRecent.length,
@@ -468,7 +518,8 @@ const InventoryModern = () => {
       checklistRatePct: readiness.completeRatePct,
       meanCompletenessPct: readiness.meanCompletenessPct,
       vinDecoded, openRecallsTotal, openRecallVehicles, needsAttention,
-      avgReadiness: total ? Math.round(readinessSum / total) : 0,
+      feedOnly: total - tracked.length,
+      avgReadiness: tracked.length ? Math.round(readinessSum / tracked.length) : 0,
       avgBelowMarket: marketCount ? Math.round(marketSum / marketCount) : 0,
       health,
     };
@@ -479,7 +530,7 @@ const InventoryModern = () => {
   const pageRows = filtered.slice((safePage - 1) * perPage, safePage * perPage);
   const readinessSpark = pageRows.map(rowReadiness);
 
-  const rowActions = (r: VehicleRow): KebabItem[] => [
+  const rowActions = (r: VehicleRow): KebabItem[] => r.gv?.feedOnly ? [] : [
     { label: "Open Vehicle", icon: ExternalLink, onClick: () => navigate(`/vehicle-file/${r.id}`) },
     // §6 gives VIN Command Center no nav row because it is reached per vehicle,
     // and the vehicle row is where that happens. Its two siblings DO have nav
@@ -517,22 +568,25 @@ const InventoryModern = () => {
   const dealerLoc = [settings.dealer_city, settings.dealer_state].filter(Boolean).join(", ");
 
   const conditionTabs: LocalTab[] = [
-    { key: "all", label: "All", to: "/inventory", count: loading ? null : counts.total, active: condition === "all" },
-    { key: "new", label: "New", to: "/inventory?condition=new", count: loading ? null : counts.newCount, active: condition === "new" },
-    { key: "used", label: "Used", to: "/inventory?condition=used", count: loading ? null : counts.usedCount, active: condition === "used" },
-    { key: "cpo", label: "CPO", to: "/inventory?condition=cpo", count: loading ? null : counts.cpoCount, active: condition === "cpo" },
+    { key: "all", label: "All", to: "/inventory", count: busy || groupError ? null : counts.total, active: condition === "all" },
+    { key: "new", label: "New", to: "/inventory?condition=new", count: busy || groupError ? null : counts.newCount, active: condition === "new" },
+    { key: "used", label: "Used", to: "/inventory?condition=used", count: busy || groupError ? null : counts.usedCount, active: condition === "used" },
+    { key: "cpo", label: "CPO", to: "/inventory?condition=cpo", count: busy || groupError ? null : counts.cpoCount, active: condition === "cpo" },
   ];
 
   const sectionLinks = useSectionLinks();
+  const primaryName = group.stores.find((st) => st.primary)?.name ?? null;
+  const accessNote = groupAccessNote(group.access, group.stores.length);
+  const listingOnly = feedOnlyShown ? { disabled: true, title: "Applies to the primary dealership's listings only. Feed-only vehicles are read-only." } : {};
   const moreActions: KebabItem[] = [
     { label: showFilters ? "Hide filters and sort" : "Filter and sort", icon: Search, onClick: () => setShowFilters((v) => !v) },
     { label: "Scan VIN", icon: ScanLine, onClick: openScan },
     { label: "OEM Window Sticker", icon: Printer, onClick: () => navigate("/window-sticker-studio") },
     { label: "New Addendum", icon: FileSignature, onClick: () => navigate("/addendum") },
-    { label: "Check Recalls", icon: ShieldCheck, onClick: runRecallBatch },
+    { label: "Check Recalls", icon: ShieldCheck, onClick: runRecallBatch, ...listingOnly },
     { label: "Check Market Prices", icon: CircleDollarSign, onClick: runMarketBatch, disabled: true, title: MARKET_BATCH_NOTICE },
-    ...(settings.feature_price_verification ? [{ label: scraping ? "Verifying…" : "Verify Prices", icon: RefreshCw, onClick: runPriceScrape }] : []),
-    { label: "CSV Import", icon: Upload, onClick: () => setShowImport(true) },
+    ...(settings.feature_price_verification ? [{ label: scraping ? "Verifying…" : "Verify Prices", icon: RefreshCw, onClick: runPriceScrape, ...listingOnly }] : []),
+    { label: "CSV Import", icon: Upload, onClick: () => setShowImport(true), ...listingOnly },
     ...sectionLinks.map((l) => ({ label: l.count ? `${l.label} (${l.count})` : l.label, icon: ChevronRight, onClick: () => navigate(l.path) })),
   ];
 
@@ -542,8 +596,8 @@ const InventoryModern = () => {
     const chosen = rows.filter((r) => picked.has(r.id));
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const csv = [
-      ["Stock", "VIN", "Vehicle", "Condition", "Status", "Price"].join(","),
-      ...chosen.map((r) => [r.stock_number, r.vin, r.ymm, r.condition, r.status, r.price].map(esc).join(",")),
+      [...(combinedView ? ["Dealership"] : []), "Stock", "VIN", "Vehicle", "Condition", "Status", "Price"].join(","),
+      ...chosen.map((r) => [...(combinedView ? [r.gv?.storeName] : []), r.stock_number, r.vin, r.ymm, r.condition, r.gv ? DISPLAY_STATUS_LABEL[r.gv.status] : r.status, r.price].map(esc).join(",")),
     ].join("\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
     const a = document.createElement("a");
@@ -577,8 +631,13 @@ const InventoryModern = () => {
         description="All vehicles in your inventory with status, pricing and next steps."
         actions={
           <>
+            <DealershipSelector
+              access={group.access} stores={group.stores} selectedIds={group.selectedIds} primaryOnly={group.primaryOnly}
+              liveCounts={combinedView && !busy && !groupError ? countByStore(rows.map((r) => r.gv!.display)) : undefined}
+              loading={groupLoading} onSelect={group.select} onSelectAll={group.selectAll} onPrimaryOnly={group.selectPrimaryOnly}
+            />
             <ActionsMenu items={moreActions} />
-            <Button variant="primary" onClick={() => setShowAdd(true)}><Plus className="w-4 h-4" /> Add vehicle</Button>
+            <Button variant="primary" onClick={() => setShowAdd(true)} title={primaryName ? `Adds to ${primaryName}` : undefined}><Plus className="w-4 h-4" /> Add vehicle</Button>
           </>
         }
       />
@@ -587,7 +646,14 @@ const InventoryModern = () => {
       <section className="flex flex-col gap-3" aria-label="Vehicles">
         <LocalTabs tabs={conditionTabs} label="Condition" />
 
-        {scopeNotice && (
+        {combinedView && !groupError && !groupLoading && (
+          <DealershipSummaryLine stores={group.stores} selectedIds={group.selectedIds} total={rows.length} />
+        )}
+        {!combinedView && accessNote && (
+          <p className="text-[13px] leading-[18px] text-adm-muted" data-testid="dealership-note">{accessNote}</p>
+        )}
+
+        {scopeNotice && !combinedView && (
           <p className="text-[13px] leading-[18px] text-adm-muted" data-testid="inventory-scope">
             Showing the primary dealership, {scopeNotice.primaryName}.{" "}
             {scopeNotice.children > 0 && <>{scopeNotice.children} child {scopeNotice.children === 1 ? "store is" : "stores are"} kept separate{scopeNotice.childVehicles ? ` (${scopeNotice.childVehicles} vehicles)` : ""}. </>}
@@ -600,10 +666,10 @@ const InventoryModern = () => {
           label="Inventory summary"
           allBars
           metrics={[
-            { label: "Active", value: loading ? null : counts.total, loading, tone: "info" },
-            { label: "Checklist complete", value: loading ? null : counts.checklistComplete, loading, tone: counts.checklistComplete > 0 ? "success" : "neutral" },
-            { label: "Needs attention", value: loading ? null : counts.needsAttention, loading, tone: counts.needsAttention > 0 ? "warning" : "neutral" },
-            { label: "Published", value: loading ? null : counts.published, loading, tone: "info" },
+            { label: "Active", value: busy || groupError ? null : counts.total, loading: busy, tone: "info" },
+            { label: "Checklist complete", value: busy || groupError ? null : counts.checklistComplete, loading: busy, tone: counts.checklistComplete > 0 ? "success" : "neutral" },
+            { label: "Needs attention", value: busy || groupError ? null : counts.needsAttention, loading: busy, tone: counts.needsAttention > 0 ? "warning" : "neutral" },
+            { label: "Published", value: busy || groupError ? null : counts.published, loading: busy, tone: "info" },
           ]}
         />
 
@@ -620,7 +686,10 @@ const InventoryModern = () => {
                 <input value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search inventory" placeholder="Search VIN, stock #, year, make, model, trim" className="w-full min-h-[36px] pl-9 pr-3 rounded-md border border-adm-border bg-adm-surface text-[14px]" />
               </div>
               <FilterSelect label="Filter by status" value={status} onChange={(v) => setStatus(v as StatusFilter)}
-                options={[{ value: "all", label: "All statuses" }, { value: "draft", label: `Draft (${counts.draft})` }, { value: "published", label: `Published (${counts.published})` }, { value: "archived", label: "Archived" }]} />
+                options={[
+                  { value: "all", label: "All statuses" }, { value: "draft", label: `Draft (${counts.draft})` }, { value: "published", label: `Published (${counts.published})` }, { value: "archived", label: "Archived" },
+                  ...(combinedView ? [{ value: "feed_only", label: `Feed only (${counts.feedOnly})` }, { value: "missing_from_feed", label: "Missing from feed" }, { value: "review", label: "Needs review" }] : []),
+                ]} />
               <FilterSelect label="Filter by attention" value={derived} onChange={(v) => setDerived(v as DerivedFilter)}
                 options={[
                   { value: "all", label: "All vehicles" },
@@ -652,22 +721,35 @@ const InventoryModern = () => {
         )}
 
         {picked.size > 0 && (
-          <div className="flex items-center gap-3 rounded-[6px] border border-adm-border bg-adm-surface px-4 py-2 text-[14px]">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[6px] border border-adm-border bg-adm-surface px-4 py-2 text-[14px]">
             <span className="font-semibold text-adm-ink">{picked.size} selected</span>
             <button type="button" className="font-semibold text-adm-primary hover:underline" onClick={exportPicked}>Export CSV</button>
             <button type="button" className="text-adm-muted hover:underline" onClick={() => setPicked(new Set())}>Clear selection</button>
+            {rows.some((r) => picked.has(r.id) && r.gv?.feedOnly) && (
+              <span className="text-[13px] text-adm-muted">Includes feed-only vehicles: they can be exported, not published or edited.</span>
+            )}
           </div>
         )}
 
         {/* List */}
-        {loading ? (
+        {groupError ? (
+          <div data-testid="dealership-view-error">
+            <InlineNote tone="danger" title={groupFailureOf(groupError).title}>
+              <p>{groupFailureOf(groupError).detail} No vehicle has been moved, changed or removed.</p>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <Button variant="primary" onClick={() => { group.retry(); load(); }}>Retry</Button>
+                <Button onClick={group.selectPrimaryOnly}>Show primary dealership only</Button>
+              </div>
+            </InlineNote>
+          </div>
+        ) : busy ? (
           <InventorySkeleton />
         ) : filtered.length === 0 ? (
           <EmptyState onAdd={() => setShowAdd(true)} total={rows.length} />
         ) : (
           <>
             <div className={`${viewMode === "list" ? "hidden md:block" : "hidden"} rounded-[4px] border border-adm-border bg-adm-surface`}>
-              <WorkTable caption="Inventory vehicles" minWidth={900}>
+              <WorkTable caption="Inventory vehicles" minWidth={combinedView ? 1060 : 900}>
                 <thead>
                   <tr>
                     <Th className="w-10">
@@ -676,6 +758,7 @@ const InventoryModern = () => {
                         onChange={(e) => setPicked((prev) => { const n = new Set(prev); pageRows.forEach((x) => (e.target.checked ? n.add(x.id) : n.delete(x.id))); return n; })} />
                     </Th>
                     <Th>Vehicle</Th>
+                    {combinedView && <Th>Dealership</Th>}
                     <Th>Stock / VIN</Th>
                     <Th>Condition</Th>
                     <Th>State</Th>
@@ -686,15 +769,17 @@ const InventoryModern = () => {
                 </thead>
                 <tbody>
                   {pageRows.map((r) => {
+                    const feedOnly = !!r.gv?.feedOnly;
                     const sg = signalFor(r);
-                    const next = deriveRecallView(r).riskSignalled ? "Resolve recall"
+                    const next = feedOnly ? "View feed details"
+                      : deriveRecallView(r).riskSignalled ? "Resolve recall"
                       : r.status === "draft" ? "Publish listing"
                       : !sg.hasAddendum ? "Create addendum"
                       : sg.needsPriceVerify ? "Review price"
                       : !sg.stickerDone ? "Generate sticker"
                       : "Open vehicle";
                     return (
-                      <tr key={r.id} className="h-14 group hover:bg-adm-workspace cursor-pointer" onClick={() => navigate(`/vehicle-file/${r.id}`)}>
+                      <tr key={r.id} className="h-14 group hover:bg-adm-workspace cursor-pointer" onClick={() => (feedOnly ? setDetailRow(r.gv!.display) : navigate(`/vehicle-file/${r.id}`))}>
                         <Td className="w-10">
                           <input type="checkbox" onClick={(e) => e.stopPropagation()} aria-label={`Select ${r.ymm || r.vin}`} className="h-4 w-4 accent-[#2457D6]" checked={picked.has(r.id)}
                             onChange={(e) => setPicked((prev) => { const n = new Set(prev); if (e.target.checked) n.add(r.id); else n.delete(r.id); return n; })} />
@@ -704,19 +789,22 @@ const InventoryModern = () => {
                             <div className="h-10 w-14 shrink-0 overflow-hidden rounded-[4px] bg-adm-workspace">
                               {r.hero_image_url ? <img src={r.hero_image_url} alt="" loading="lazy" className="h-full w-full object-cover" /> : null}
                             </div>
-                            <span className="min-w-0 truncate font-semibold text-adm-ink">{r.ymm || "Needs VIN decode"}</span>
+                            <span className="min-w-0 truncate font-semibold text-adm-ink">{r.ymm || (feedOnly ? "Not decoded in feed" : "Needs VIN decode")}</span>
                           </div>
                         </Td>
+                        {combinedView && <Td className="max-w-[200px]"><DealershipChip name={r.gv!.storeName} /></Td>}
                         <Td className="font-mono text-[13px] text-adm-muted whitespace-nowrap">
                           {r.stock_number || "Unknown"} / ...{(r.vin || "").slice(-6)}
                         </Td>
                         <Td className="capitalize">{r.condition ? (r.condition === "cpo" ? "CPO" : r.condition) : "Unknown"}</Td>
-                        <Td><SimpleStatusPill status={r.status} /></Td>
+                        <Td>{r.gv && (feedOnly || r.gv.status === "review") ? <DealershipStatusBadge status={r.gv.status} /> : <SimpleStatusPill status={r.status} />}</Td>
                         <Td align="right" className="tabular-nums">{r.price != null ? `$${Number(r.price).toLocaleString("en-US")}` : <span className="text-adm-muted">Unknown</span>}</Td>
                         <Td className="whitespace-nowrap"><span className="font-semibold text-adm-primary">{next}</span></Td>
                         <Td align="right" className="py-2">
                           <div className="flex justify-end items-center" onClick={(e) => e.stopPropagation()}>
-                            <KebabMenu items={rowActions(r)} />
+                            {feedOnly
+                              ? <Button size="sm" onClick={() => setDetailRow(r.gv!.display)} aria-label={`Feed details for ${r.ymm || r.vin}`}>Details</Button>
+                              : <KebabMenu items={rowActions(r)} />}
                           </div>
                         </Td>
                       </tr>
@@ -732,6 +820,8 @@ const InventoryModern = () => {
                 <VehicleCard
                   key={r.id}
                   r={r}
+                  storeLine={combinedView ? r.gv?.storeName : undefined}
+                  onDetails={r.gv?.feedOnly ? () => setDetailRow(r.gv!.display) : undefined}
                   signal={signalFor(r)}
                   readiness={rowReadiness(r)}
                   onOpen={() => navigate(`/vehicle-file/${r.id}`)}
@@ -746,6 +836,8 @@ const InventoryModern = () => {
           </>
         )}
       </section>
+
+      <FeedVehicleSheet row={detailRow} onClose={() => setDetailRow(null)} />
 
       {/* Modals */}
       {showAdd && (
@@ -880,19 +972,20 @@ const Sparkline = ({ values }: { values: number[] }) => {
 // ── Mobile vehicle card ────────────────────────────────────────
 interface RowSignal { stickerDone: boolean; hasAddendum: boolean; priceVerified: boolean; needsPriceVerify: boolean; }
 
-const VehicleCard = ({ r, signal, readiness, onOpen, onSticker, onView, items }: { r: VehicleRow; signal: RowSignal; readiness: number; onOpen: () => void; onSticker: () => void; onView: () => void; items: KebabItem[] }) => {
+const VehicleCard = ({ r, signal, readiness, onOpen, onSticker, onView, items, storeLine, onDetails }: { r: VehicleRow; signal: RowSignal; readiness: number; onOpen: () => void; onSticker: () => void; onView: () => void; items: KebabItem[]; storeLine?: string; onDetails?: () => void }) => {
   const thumbTint = r.condition === "new" ? "from-blue-500/15 to-blue-600/5 text-blue-600" : r.condition === "cpo" ? "from-violet-500/15 to-violet-600/5 text-violet-600" : "from-slate-400/15 to-slate-500/5 text-muted-foreground";
   return (
-    <div onClick={onOpen} className="group rounded-2xl border border-border bg-card shadow-sm hover:shadow-md transition-all cursor-pointer p-3">
+    <div onClick={onDetails ?? onOpen} className="group rounded-2xl border border-border bg-card shadow-sm hover:shadow-md transition-all cursor-pointer p-3">
       <div className="flex items-start gap-3">
         <div className={`w-[110px] h-[74px] rounded-xl bg-gradient-to-br ${thumbTint} flex items-center justify-center shrink-0 overflow-hidden`}>
           {r.hero_image_url ? <img src={r.hero_image_url} alt={r.ymm || "vehicle"} loading="lazy" className="w-full h-full object-cover" /> : <Car className="w-7 h-7" strokeWidth={1.5} />}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <h3 className="font-display font-semibold text-foreground truncate">{r.ymm || "(needs decode)"}</h3>
+            <h3 className="font-display font-semibold text-foreground truncate">{r.ymm || (onDetails ? "Not decoded in feed" : "(needs decode)")}</h3>
             {r.condition && <CondBadge condition={r.condition} />}
           </div>
+          {storeLine && <DealershipChip name={storeLine} className="mt-0.5 max-w-full" />}
           {r.trim && <p className="text-xs text-muted-foreground truncate">{r.trim}</p>}
           <div className="flex items-center gap-x-3 gap-y-0.5 flex-wrap text-[11px] text-muted-foreground mt-1">
             <span className="font-mono">{r.stock_number || "—"}</span>
@@ -901,21 +994,25 @@ const VehicleCard = ({ r, signal, readiness, onOpen, onSticker, onView, items }:
             <span className="font-semibold text-foreground">{r.price ? `$${r.price.toLocaleString()}` : "—"}</span>
           </div>
         </div>
-        <div className="flex flex-col items-center gap-0.5 shrink-0">
-          <MiniRing pct={readiness} size={60} />
-        </div>
+        {!onDetails && (
+          <div className="flex flex-col items-center gap-0.5 shrink-0">
+            <MiniRing pct={readiness} size={60} />
+          </div>
+        )}
       </div>
       <div className="flex items-center gap-1.5 mt-2.5 flex-wrap" onClick={(e) => e.stopPropagation()}>
-        <StatusPill status={r.status} signal={signal} />
-        <RecallChip row={r} />
-        {!signal.hasAddendum && <span className="text-[11px] font-semibold px-2 py-1 rounded-lg bg-red-100 text-red-700">Addendum Missing</span>}
+        {r.gv && (onDetails || r.gv.status === "review") ? <DealershipStatusBadge status={r.gv.status} /> : <StatusPill status={r.status} signal={signal} />}
+        {!onDetails && <RecallChip row={r} />}
+        {!onDetails && !signal.hasAddendum && <span className="text-[11px] font-semibold px-2 py-1 rounded-lg bg-red-100 text-red-700">Addendum Missing</span>}
         <div className="ml-auto flex items-center gap-1.5">
-          {r.status === "published" ? (
+          {onDetails ? (
+            <button onClick={onDetails} className="h-9 px-3 rounded-xl border border-border bg-card text-xs font-bold hover:bg-muted">Details</button>
+          ) : r.status === "published" ? (
             <button onClick={onView} className="h-9 px-3 rounded-xl bg-emerald-500 text-white text-xs font-bold inline-flex items-center gap-1.5"><Eye className="w-3.5 h-3.5" /> View</button>
           ) : (
             <button onClick={onSticker} className="h-9 px-3 rounded-xl bg-blue-600 text-white text-xs font-bold inline-flex items-center gap-1.5"><Printer className="w-3.5 h-3.5" /> Sticker</button>
           )}
-          <KebabMenu items={items} />
+          {!onDetails && <KebabMenu items={items} />}
         </div>
       </div>
     </div>

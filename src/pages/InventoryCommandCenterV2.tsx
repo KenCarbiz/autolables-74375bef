@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { loadScopedInventory, scopeFailureOf } from "@/lib/inventoryScope/primaryInventory";
 import { STORE_INVENTORY_PATH } from "@/lib/inventoryScope/paths";
+import { useGroupInventory } from "@/hooks/useGroupInventory";
+import { feedTitle, groupFailureOf, mergeGroupRows, verifyAccessStores, type DisplayRow, type DisplayStatus } from "@/lib/inventoryScope/groupInventory";
+import { countByStore } from "@/lib/inventoryScope/groupInventory";
+import { DealershipChip, DealershipSelector, DealershipStatusBadge, DealershipSummaryLine, groupAccessNote } from "@/components/inventory/DealershipSelector";
+import { FeedVehicleSheet } from "@/components/inventory/FeedVehicleSheet";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
@@ -38,7 +43,20 @@ const rowMarketDelta = (row: unknown): number | null => {
   return view.difference != null ? -view.difference : null;
 };
 
+interface GroupMeta { storeId: string; storeName: string; status: DisplayStatus; feedOnly: boolean; display: DisplayRow }
+
+const toPageRow = (d: DisplayRow<VRow>): VRow => {
+  const gv: GroupMeta = { storeId: d.storeId, storeName: d.storeName, status: d.status, feedOnly: d.source === "feed", display: d as DisplayRow };
+  if (d.listing) return { ...d.listing, gv };
+  const seen = d.feed?.last_seen_at ?? "1970-01-01T00:00:00.000Z";
+  return {
+    id: d.key, vin: d.vin, ymm: d.feed ? feedTitle(d.feed) : null, trim: d.trim, mileage: d.mileage, condition: d.condition, price: d.price,
+    status: "draft", slug: "", published_at: null, updated_at: seen, stock_number: d.stock, hero_image_url: d.thumbnail, gv,
+  };
+};
+
 interface VRow {
+  gv?: GroupMeta;
   id: string; vin: string; ymm: string | null; trim: string | null;
   mileage: number | null; condition: "new" | "used" | "cpo" | null;
   price: number | null; status: "draft" | "published" | "archived";
@@ -87,14 +105,17 @@ const Kpi = ({ label, value, sub, tone = "muted", onClick, cta }: { label: strin
 
 const InventoryCommandCenterV2 = () => {
   const { tenant } = useTenant();
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const { member } = useEntitlements();
   const { settings, updateSettings } = useDealerSettings();
   const navigate = useNavigate();
   const canEditLayout = hasDealerCapability(member?.role, "can_manage_settings", isAdmin);
   const quickActionsOn = settings.inventory_show_quick_actions === true;
 
-  const [rows, setRows] = useState<VRow[]>([]);
+  const [listingRows, setRows] = useState<VRow[]>([]);
+  const group = useGroupInventory(tenant?.id, user?.id);
+  const [registry, setRegistry] = useState<{ ids: string[]; primaryId: string | null } | null>(null);
+  const [detailRow, setDetailRow] = useState<DisplayRow | null>(null);
   const [scopeInfo, setScopeInfo] = useState<{ primaryName: string; children: number; review: number } | null>(null);
   const [addVins, setAddVins] = useState<Set<string>>(new Set());
   const [stickerDocs, setStickerDocs] = useState<Map<string, StickerDoc[]>>(new Map());
@@ -134,13 +155,14 @@ const InventoryCommandCenterV2 = () => {
         list = [...scoped.primaryRows].sort((x, y) => (y.updated_at || "").localeCompare(x.updated_at || "") || x.id.localeCompare(y.id));
         if (!on) return;
         const reg = scoped.registry;
+        setRegistry({ ids: scoped.stores.map((st) => st.id), primaryId: reg.primary?.id ?? null });
         setScopeInfo(scoped.mode === "multi_rooftop" && reg.primary
           ? { primaryName: reg.primary.display_name, children: reg.children.length, review: scoped.summary.review.total }
           : null);
       } catch (e) {
         if (!on) return;
         // Fail closed: never keep or show an unscoped list.
-        setRows([]); setScopeInfo(null); setLoadError(scopeFailureOf(e)); setLoading(false);
+        setRows([]); setRegistry(null); setScopeInfo(null); setLoadError(scopeFailureOf(e)); setLoading(false);
         return;
       }
 
@@ -187,20 +209,45 @@ const InventoryCommandCenterV2 = () => {
     return () => { on = false; };
   }, [tenant?.id, reload]);
 
+  const merged = useMemo((): { rows: VRow[] | null; error: unknown } => {
+    if (!group.combined || group.access.status !== "allowed" || !registry) return { rows: null, error: null };
+    if (group.feedError) return { rows: null, error: group.feedError };
+    if (group.feed.status !== "ready") return { rows: null, error: null };
+    try {
+      verifyAccessStores(group.access, registry.ids, registry.primaryId);
+      const display = mergeGroupRows<VRow>({
+        stores: group.stores, selectedStoreIds: group.selectedIds, primaryStoreId: registry.primaryId, listings: listingRows, feed: group.feedRows,
+      });
+      return { rows: display.map(toPageRow), error: null };
+    } catch (e) {
+      return { rows: null, error: e };
+    }
+  }, [group.combined, group.access, group.feed, group.feedError, group.feedRows, group.stores, group.selectedIds, registry, listingRows]);
+  const combinedView = group.combined && !!registry;
+  const groupError = combinedView ? merged.error : null;
+  const groupLoading = combinedView && !groupError && merged.rows === null;
+  const rows = useMemo(() => (combinedView ? merged.rows ?? [] : listingRows), [combinedView, merged.rows, listingRows]);
+
   const signals = useMemo(() => {
     const m = new Map<string, VehicleSignal>();
     for (const r of rows) {
+      if (r.gv?.feedOnly) continue;
       m.set(r.id, signalOf(r, addVins.has((r.vin || "").toUpperCase()), stickerStateOf(r.condition, docsLoaded, stickerDocs.get(r.id))));
     }
     return m;
   }, [rows, addVins, stickerDocs, docsLoaded]);
 
-  const count = (id: QueueId) => rows.reduce((n, r) => n + (queueMatches(id, r, signals.get(r.id)!, needsPriceReview(r)) ? 1 : 0), 0);
+  const FEED_QUEUES: QueueId[] = ["all", "new", "used", "cpo"];
+  const matches = (id: QueueId, r: VRow): boolean => {
+    if (r.gv?.feedOnly) return FEED_QUEUES.includes(id) && (id === "all" || r.condition === id);
+    return queueMatches(id, r, signals.get(r.id)!, needsPriceReview(r));
+  };
+  const count = (id: QueueId) => rows.reduce((n, r) => n + (matches(id, r) ? 1 : 0), 0);
 
   const stats = useMemo(() => {
     const c = (id: QueueId) => count(id);
-    const all = rows.map((r) => signals.get(r.id)!);
-    const deltas = rows.map(rowMarketDelta).filter((x): x is number => x != null);
+    const all = rows.filter((r) => !r.gv?.feedOnly).map((r) => signals.get(r.id)!);
+    const deltas = rows.filter((r) => !r.gv?.feedOnly).map(rowMarketDelta).filter((x): x is number => x != null);
     return {
       total: rows.length,
       newN: c("new"), usedN: c("used"), cpoN: c("cpo"),
@@ -217,16 +264,19 @@ const InventoryCommandCenterV2 = () => {
     const needle = q.trim().toLowerCase();
     const out = rows.filter((r) => {
       if (condFilter !== "all" && r.condition !== condFilter) return false;
-      if (statusFilter !== "all" && r.status !== statusFilter) return false;
-      if (!queueMatches(tab, r, signals.get(r.id)!, needsPriceReview(r))) return false;
-      if (needle && !`${r.vin} ${r.stock_number || ""} ${r.ymm || ""} ${r.trim || ""}`.toLowerCase().includes(needle)) return false;
+      if (statusFilter !== "all") {
+        if (statusFilter === "feed_only" || statusFilter === "missing_from_feed" || statusFilter === "review") { if (r.gv?.status !== statusFilter) return false; }
+        else if (r.gv?.feedOnly || r.status !== statusFilter) return false;
+      }
+      if (!matches(tab, r)) return false;
+      if (needle && !`${r.vin} ${r.stock_number || ""} ${r.ymm || ""} ${r.trim || ""} ${r.gv?.storeName || ""}`.toLowerCase().includes(needle)) return false;
       return true;
     });
     return out.sort((a, b) =>
       sort === "price" ? (b.price ?? -1) - (a.price ?? -1)
       : sort === "ymm" ? (a.ymm || "").localeCompare(b.ymm || "")
       : (b.updated_at || "").localeCompare(a.updated_at || ""));
-  }, [rows, signals, q, statusFilter, condFilter, tab, sort]);
+  }, [rows, signals, q, statusFilter, condFilter, tab, sort]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const go = (id: QueueId) => { setTab(id); setStatusFilter("all"); setCondFilter("all"); document.getElementById("inv-v2-list")?.scrollIntoView({ behavior: "smooth", block: "start" }); };
   const stickerCount: number | null = docsLoaded ? stats.sticker : null;
@@ -292,15 +342,23 @@ const InventoryCommandCenterV2 = () => {
     </div>
   );
 
+  const gridCols = combinedView
+    ? "lg:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_96px_minmax(0,1.5fr)_104px_152px]"
+    : "lg:grid-cols-[minmax(0,2fr)_112px_minmax(0,1.6fr)_120px_168px]";
   const selectCls = "h-10 px-3 rounded-lg border border-border text-sm bg-card focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary";
-
-  return (
-    <div className="p-4 lg:px-6 lg:py-5 max-w-[1600px] mx-auto">
+  const accessNote = groupAccessNote(group.access, group.stores.length);
+  const header = (
       <PageHeader
         className="mb-6"
         title="Inventory Command Center"
-        description={<>{syncedLabel}{scopeInfo ? <> · Showing {scopeInfo.primaryName} only{scopeInfo.review ? `, ${scopeInfo.review} awaiting rooftop review` : ""}. <Link to={STORE_INVENTORY_PATH} className="font-semibold text-primary hover:underline">Inventory by store</Link></> : null}</>}
+        description={<>{syncedLabel}{scopeInfo && !combinedView ? <> · Showing {scopeInfo.primaryName} only{scopeInfo.review ? `, ${scopeInfo.review} awaiting rooftop review` : ""}. <Link to={STORE_INVENTORY_PATH} className="font-semibold text-primary hover:underline">Inventory by store</Link></> : null}</>}
         actions={
+          <>
+          <DealershipSelector
+            access={group.access} stores={group.stores} selectedIds={group.selectedIds} primaryOnly={group.primaryOnly}
+            liveCounts={combinedView && !groupLoading && !groupError ? countByStore(rows.map((r) => r.gv!.display)) : undefined}
+            loading={groupLoading} variant="plain" onSelect={group.select} onSelectAll={group.selectAll} onPrimaryOnly={group.selectPrimaryOnly}
+          />
           <div className="relative">
             <button onClick={() => setShowSettings((v) => !v)} aria-expanded={showSettings} className="inline-flex items-center gap-2 px-3 h-10 rounded-lg bg-card border border-border text-sm font-semibold hover:bg-muted">
               <Settings className="w-5 h-5 text-muted-foreground" aria-hidden="true" /> <span className="hidden sm:inline">Layout</span>
@@ -328,8 +386,42 @@ const InventoryCommandCenterV2 = () => {
               </>
             )}
           </div>
+          </>
         }
       />
+  );
+  const notes = (
+    <>
+      {combinedView && !groupError && !groupLoading && <DealershipSummaryLine className="-mt-4 mb-4" stores={group.stores} selectedIds={group.selectedIds} total={rows.length} />}
+      {!combinedView && accessNote && <p className="-mt-4 mb-4 text-[13px] leading-[18px] text-muted-foreground" data-testid="dealership-note">{accessNote}</p>}
+    </>
+  );
+
+  if (groupError) return (
+    <div className="p-4 lg:px-6 lg:py-5 max-w-[1600px] mx-auto">
+      {header}
+      <div className="p-6 max-w-xl mx-auto text-center" role="alert" data-testid="dealership-view-error">
+        <p className="text-[15px] font-semibold">{groupFailureOf(groupError).title}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{groupFailureOf(groupError).detail} No vehicle has been moved, changed or removed.</p>
+        <div className="mt-3 flex items-center justify-center gap-3">
+          <button onClick={() => { group.retry(); setReload((n) => n + 1); }} className="h-10 px-4 rounded-lg border border-border text-sm font-semibold hover:bg-muted">Retry</button>
+          <button onClick={group.selectPrimaryOnly} className="text-sm font-semibold text-primary hover:underline">Show primary dealership only</button>
+        </div>
+      </div>
+    </div>
+  );
+  if (groupLoading) return (
+    <div className="p-4 lg:px-6 lg:py-5 max-w-[1600px] mx-auto">
+      {header}
+      <div className="min-h-[40vh] flex items-center justify-center" role="status" aria-label="Loading selected dealerships"><div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>
+    </div>
+  );
+
+
+  return (
+    <div className="p-4 lg:px-6 lg:py-5 max-w-[1600px] mx-auto">
+      {header}
+      {notes}
 
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
         <Kpi label="Ready to publish" value={<>{stats.ready}<span className="text-sm font-semibold text-muted-foreground"> / {stats.draft}</span></>} sub={`Drafts passing every check · avg ${stats.avgScore}%`} onClick={() => go("ready")} cta="View ready" />
@@ -373,6 +465,7 @@ const InventoryCommandCenterV2 = () => {
               </label>
               <select aria-label="Status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={selectCls}>
                 <option value="all">All statuses</option><option value="published">Published</option><option value="draft">Draft</option><option value="archived">Archived</option>
+                {combinedView && <><option value="feed_only">Feed only</option><option value="missing_from_feed">Missing from feed</option><option value="review">Needs review</option></>}
               </select>
               <select aria-label="Condition" value={condFilter} onChange={(e) => setCondFilter(e.target.value)} className={selectCls}>
                 <option value="all">New &amp; used</option><option value="new">New</option><option value="used">Used</option><option value="cpo">CPO</option>
@@ -398,14 +491,41 @@ const InventoryCommandCenterV2 = () => {
           </div>
 
           <div className="rounded-xl border border-border bg-card">
-            <div className="hidden lg:grid grid-cols-[minmax(0,2fr)_112px_minmax(0,1.6fr)_120px_168px] gap-3 px-4 h-10 items-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground border-b border-border sticky top-0 z-10 bg-card rounded-t-xl">
-              <span>Vehicle</span><span>Readiness</span><span>Compliance</span><span>Price</span><span className="text-right">Actions</span>
+            <div className={`hidden lg:grid ${gridCols} gap-3 px-4 h-10 items-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground border-b border-border sticky top-0 z-10 bg-card rounded-t-xl`}>
+              <span>Vehicle</span>{combinedView && <span>Dealership</span>}<span>Readiness</span><span>Compliance</span><span>Price</span><span className="text-right">Actions</span>
             </div>
             {pageRows.length === 0 ? (
               <div className="py-16 text-center text-sm text-muted-foreground">
                 {rows.length === 0 ? "No vehicles in inventory yet." : "No vehicles match these filters."}
               </div>
             ) : pageRows.map((r) => {
+              if (r.gv?.feedOnly) {
+                const fname = r.ymm || "Vehicle (not decoded in feed)";
+                return (
+                  <div key={r.id} className={`grid grid-cols-[1fr_auto] ${gridCols} gap-x-3 gap-y-1.5 px-4 py-2 lg:min-h-[56px] items-center border-b border-border last:border-0 hover:bg-muted/50`}>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-[56px] h-[40px] rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
+                        {r.hero_image_url ? <img src={r.hero_image_url} alt="" loading="lazy" className="w-full h-full object-cover" /> : <Car className="w-5 h-5 text-muted-foreground/50" aria-hidden="true" />}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-[13px] truncate">{fname}</p>
+                        <p className="text-[12px] text-muted-foreground truncate">{[r.condition?.toUpperCase(), r.stock_number ? `#${r.stock_number}` : null, r.vin ? `…${r.vin.slice(-6)}` : null].filter(Boolean).join(" · ") || "—"}</p>
+                        <DealershipChip name={r.gv.storeName} className="lg:hidden max-w-full" />
+                      </div>
+                    </div>
+                    <div className="hidden lg:block min-w-0 overflow-hidden"><DealershipChip name={r.gv.storeName} className="max-w-full" /></div>
+                    <div className="hidden lg:block"><DealershipStatusBadge status={r.gv.status} /></div>
+                    <div className="col-span-2 lg:col-span-1 text-[12px] text-muted-foreground">Source data from the dealership feed. Read-only.</div>
+                    <div className="hidden lg:block text-[13px] leading-tight">
+                      {r.price != null ? <p className="font-semibold tabular-nums">{fmt$(r.price)}</p> : <p className="text-[12px] text-muted-foreground">Price not in feed</p>}
+                    </div>
+                    <div className="row-start-1 col-start-2 lg:row-auto lg:col-auto flex items-center justify-end gap-1">
+                      <button onClick={() => setDetailRow(r.gv!.display)} aria-label={`Feed details for ${fname}`}
+                        className="h-10 px-3 rounded-lg border border-border text-[13px] font-semibold hover:bg-muted">Details</button>
+                    </div>
+                  </div>
+                );
+              }
               const s = signals.get(r.id)!;
               const pct = Math.round(s.score * 100);
               const ready: { tone: Tone; label: string } = s.published ? { tone: "ok", label: "Live" }
@@ -417,7 +537,7 @@ const InventoryCommandCenterV2 = () => {
               const canPrint = s.sticker === "present" && r.condition === "new";
               const delta = rowMarketDelta(r);
               return (
-                <div key={r.id} className="grid grid-cols-[1fr_auto] lg:grid-cols-[minmax(0,2fr)_112px_minmax(0,1.6fr)_120px_168px] gap-x-3 gap-y-1.5 px-4 py-2 lg:min-h-[56px] items-center border-b border-border last:border-0 hover:bg-muted/50">
+                <div key={r.id} className={`grid grid-cols-[1fr_auto] ${gridCols} gap-x-3 gap-y-1.5 px-4 py-2 lg:min-h-[56px] items-center border-b border-border last:border-0 hover:bg-muted/50`}>
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-[56px] h-[40px] rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
                       {r.hero_image_url ? <img src={r.hero_image_url} alt="" loading="lazy" className="w-full h-full object-cover" /> : <Car className="w-5 h-5 text-muted-foreground/50" aria-hidden="true" />}
@@ -425,9 +545,11 @@ const InventoryCommandCenterV2 = () => {
                     <div className="min-w-0">
                       <p className="font-semibold text-[13px] truncate">{name}</p>
                       <p className="text-[12px] text-muted-foreground truncate">{[r.condition?.toUpperCase(), r.stock_number ? `#${r.stock_number}` : null, r.vin ? `…${r.vin.slice(-6)}` : null].filter(Boolean).join(" · ") || "—"}</p>
+                      {r.gv && <DealershipChip name={r.gv.storeName} className="lg:hidden max-w-full" />}
                     </div>
                   </div>
-                  <div className="hidden lg:block"><Status tone={ready.tone}>{ready.label}</Status></div>
+                  {r.gv && <div className="hidden lg:block min-w-0 overflow-hidden"><DealershipChip name={r.gv.storeName} className="max-w-full" /></div>}
+                  <div className="hidden lg:block">{r.gv?.status === "review" ? <DealershipStatusBadge status="review" /> : <Status tone={ready.tone}>{ready.label}</Status>}</div>
                   <div className="col-span-2 lg:col-span-1 flex flex-wrap gap-x-3 gap-y-1">
                     {!s.decoded && <Status tone="critical">VIN issue</Status>}
                     {s.recall === "open" ? <Status tone="critical">Open recall</Status> : s.recall === "clear" ? <Status tone="ok">Recall clear (VIN)</Status> : <Status tone="muted">Recall not verified</Status>}
@@ -516,6 +638,7 @@ const InventoryCommandCenterV2 = () => {
           )}
         </aside>
       </div>
+      <FeedVehicleSheet row={detailRow} onClose={() => setDetailRow(null)} />
     </div>
   );
 };

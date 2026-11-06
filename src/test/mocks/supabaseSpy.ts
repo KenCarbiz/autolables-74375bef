@@ -48,7 +48,7 @@ export const isSingleRead = (ops: SpyOp[]): boolean => ops.some((o) => o.op === 
 const WRITE_OPS = new Set(["insert", "update", "upsert", "delete"]);
 
 /** RPCs declared STABLE (read-only) in their migration. */
-export const READ_ONLY_RPCS = new Set(["inventory_scope_report"]);
+export const READ_ONLY_RPCS = new Set(["inventory_scope_report", "inventory_group_view_access", "inventory_group_view_rows"]);
 
 /** Table writes and every RPC that can write: the set that must stay empty after a mount. */
 export const writeCalls = (): SpyCall[] =>
