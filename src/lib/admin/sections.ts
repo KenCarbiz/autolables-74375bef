@@ -171,6 +171,7 @@ export const ADMIN_CHILD_ROUTES = {
   feeReview: "/admin/pricing/fee-review",
   pricingIntegrity: "/admin/pricing/integrity",
   vehicleFiles: "/admin/integrations/vehicle-files",
+  vehicleRecords: "/admin/integrations/vehicle-records",
   jobs: "/admin/integrations/jobs",
   accessActivity: "/admin/access/activity",
   permissionVerification: "/admin/access/permission-verification",

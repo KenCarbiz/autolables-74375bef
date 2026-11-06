@@ -217,8 +217,10 @@ describe("the contract AutoFilm probes against", () => {
   it("accepts either header name for the same secret", () => {
     // A 401 over which of two names carried the identical value is a wasted
     // round trip, not a security boundary.
-    expect(feed).toMatch(/req\.headers\.get\("x-lookup-secret"\)/);
-    expect(feed).toMatch(/req\.headers\.get\("x-autofilm-key"\)/);
+    // The legacy check moved into the shared feed auth module with the signed mode.
+    const auth = readFileSync(join(fnDir, "_shared/legacyFeeds/auth.ts"), "utf8");
+    expect(auth).toMatch(/headers\.get\("x-lookup-secret"\) \?\? input\.headers\.get\("x-autofilm-key"\)/);
+    expect(feed).toMatch(/authenticateLegacyFeed\(/);
     // CORS has to allow it too, or a browser preflight strips it.
     expect(feed).toMatch(/x-lookup-secret, x-autofilm-key/);
   });

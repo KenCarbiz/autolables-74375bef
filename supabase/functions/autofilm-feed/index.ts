@@ -5,6 +5,8 @@ import {
   type LotFeedFile, type DetailVersionSnapshot,
 } from "../_shared/lotFeedRow.ts";
 import { factAuthority } from "../_shared/factorySticker/lib/vehicleTruth/precedence.ts";
+import { authenticateLegacyFeed, canonicalGetTarget, DEPRECATION_HEADER } from "../_shared/legacyFeeds/auth.ts";
+import { supabaseLegacyFeedStore } from "../_shared/legacyFeeds/supabaseStore.ts";
 
 // ──────────────────────────────────────────────────────────────
 // autofilm-feed
@@ -29,6 +31,10 @@ import { factAuthority } from "../_shared/factorySticker/lib/vehicleTruth/preced
 //          the live listing row.
 //   Headers: x-lookup-secret: <AUTOLABELS_LOOKUP_SECRET>
 //            (x-autofilm-key is accepted as an alias for the same value)
+//   Signed (preferred): X-Rooftop-Key-Id / X-Rooftop-Timestamp / X-Rooftop-Signature over
+//            "GET <path after the function name>?<query sorted by key>". The tenant is the
+//            key's connection; tenant_id, when sent, must match it. See
+//            docs/vehicle-history/04-legacy-feed-transition.md.
 //
 // Returns: {
 //   total: number,           // live vehicles for the tenant
@@ -61,22 +67,17 @@ import { factAuthority } from "../_shared/factorySticker/lib/vehicleTruth/preced
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-lookup-secret, x-autofilm-key",
+    "authorization, x-client-info, apikey, content-type, x-lookup-secret, x-autofilm-key, x-rooftop-key-id, x-rooftop-timestamp, x-rooftop-signature",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
 };
 
-const json = (status: number, body: unknown) =>
+const json = (status: number, body: unknown, extra: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders, "Content-Type": "application/json", ...extra },
   });
 
-const timingSafeEqual = (a: string, b: string) => {
-  if (a.length !== b.length) return false;
-  let mismatch = 0;
-  for (let i = 0; i < a.length; i++) mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return mismatch === 0;
-};
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const MAX_LIMIT = 1000;
 const DEFAULT_LIMIT = 500;
@@ -96,27 +97,35 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const feedSecret = Deno.env.get("AUTOLABELS_LOOKUP_SECRET");
     if (!supabaseUrl || !serviceKey) return json(500, { error: "server misconfigured" });
-    if (!feedSecret) return json(503, { error: "feed not enabled" });
 
-    // x-autofilm-key is accepted as an alias for x-lookup-secret. Same value,
+    const admin = createClient(supabaseUrl, serviceKey);
+    const url = new URL(req.url);
+    const askedTenant = url.searchParams.get("tenant_id") ?? "";
+    // x-autofilm-key is accepted as an alias for x-lookup-secret on the legacy path. Same value,
     // same credential — AutoFilm's config named the header after itself and a
     // 401 over which of two names carried the identical secret is a wasted
     // round trip, not a security boundary.
-    const key = req.headers.get("x-lookup-secret")
-      ?? req.headers.get("x-autofilm-key")
-      ?? "";
-    if (!timingSafeEqual(key, feedSecret)) return json(401, { error: "unauthorized" });
+    const auth = await authenticateLegacyFeed({
+      feed: "autofilm_feed",
+      method: "GET",
+      pathAndQuery: canonicalGetTarget(url.pathname, url.search, "autofilm-feed"),
+      rawBody: "",
+      headers: req.headers,
+      nowSeconds: Math.floor(Date.now() / 1000),
+      claimedTenant: askedTenant ? { kind: "tenant_id", value: askedTenant } : null,
+    }, supabaseLegacyFeedStore(admin));
+    if (!auth.ok) return json(auth.status, { error: auth.error });
+    const extraHeaders: Record<string, string> = auth.mode === "legacy" ? { ...DEPRECATION_HEADER } : {};
+    const reply = (status: number, body: unknown) => json(status, body, extraHeaders);
 
-    const url = new URL(req.url);
-    const tenantId = url.searchParams.get("tenant_id") ?? "";
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenantId)) {
-      return json(400, { error: "tenant_id must be a uuid" });
+    if ((auth.mode === "legacy" || askedTenant) && !UUID_RE.test(askedTenant)) {
+      return reply(400, { error: "tenant_id must be a uuid" });
     }
+    const tenantId = auth.mode === "signed" ? auth.tenantId : askedTenant;
     const cursor = (url.searchParams.get("cursor") ?? "").toUpperCase();
     if (cursor && !/^[A-HJ-NPR-Z0-9]{17}$/.test(cursor)) {
-      return json(400, { error: "cursor must be a 17-character VIN" });
+      return reply(400, { error: "cursor must be a 17-character VIN" });
     }
     // AutoFilm addresses this as {base}/vehicle/{vin}. Supabase routes on the
     // function name and hands the remaining path through, so the segment form
@@ -125,21 +134,19 @@ serve(async (req) => {
     const pathVin = (/\/vehicle\/([^/?#]+)/i.exec(url.pathname)?.[1] ?? "").toUpperCase();
     const detailVin = (pathVin || url.searchParams.get("vin") || "").toUpperCase();
     if (detailVin && !/^[A-HJ-NPR-Z0-9]{17}$/.test(detailVin)) {
-      return json(400, { error: "vin must be a 17-character VIN" });
+      return reply(400, { error: "vin must be a 17-character VIN" });
     }
     const updatedSinceRaw = url.searchParams.get("updated_since") ?? "";
     let updatedSince: string | null = null;
     if (updatedSinceRaw) {
       const t = Date.parse(updatedSinceRaw);
-      if (Number.isNaN(t)) return json(400, { error: "updated_since must be ISO-8601" });
+      if (Number.isNaN(t)) return reply(400, { error: "updated_since must be ISO-8601" });
       updatedSince = new Date(t).toISOString();
     }
     const limitParam = Number(url.searchParams.get("limit") ?? DEFAULT_LIMIT);
     const limit = Number.isInteger(limitParam) && limitParam > 0
       ? Math.min(limitParam, MAX_LIMIT)
       : DEFAULT_LIMIT;
-
-    const admin = createClient(supabaseUrl, serviceKey);
 
     // ── Detail: one vehicle, everything we hold ───────────────────────
     //
@@ -159,11 +166,13 @@ serve(async (req) => {
         .select("*")
         .eq("tenant_id", tenantId)
         .eq("vin", detailVin)
-        .is("archived_at", null)
         .maybeSingle();
-      if (rowErr) return json(500, { error: rowErr.message });
-      if (!rowData) return json(404, { error: "not_found", vin: detailVin });
+      if (rowErr) return reply(500, { error: rowErr.message });
+      if (!rowData) return reply(404, { error: "not_found", vin: detailVin });
       const row = rowData as Record<string, unknown>;
+      if (row.archived_at || ["archived", "sold", "expired"].includes(String(row.status ?? "").toLowerCase())) {
+        return reply(404, { error: "not_current_inventory", vin: detailVin });
+      }
 
       const [fileRes, docRes, factRes, snapRes] = await Promise.all([
         admin.from("vehicle_files")
@@ -214,7 +223,7 @@ serve(async (req) => {
       // Same value the list carried, computed from the same inputs, so a caller
       // can confirm what it just stored matches what it was told to expect.
       vehicle.detail_version = await detailVersion(row, snap as DetailVersionSnapshot | null);
-      return json(200, {
+      return reply(200, {
         vin: detailVin,
         detail_version: vehicle.detail_version,
         vehicle,
@@ -264,12 +273,12 @@ serve(async (req) => {
         .is("archived_at", null)
         .in("status", ["published", "active"]),
     );
-    if (countErr) return json(500, { error: countErr.message });
+    if (countErr) return reply(500, { error: countErr.message });
 
     let pageQuery = base().order("vin", { ascending: true }).limit(limit + 1);
     if (cursor) pageQuery = pageQuery.gt("vin", cursor);
     const { data, error } = await pageQuery;
-    if (error) return json(500, { error: error.message });
+    if (error) return reply(500, { error: error.message });
 
     const rows = (data ?? []) as Record<string, unknown>[];
     const hasMore = rows.length > limit;
@@ -351,7 +360,7 @@ serve(async (req) => {
       identityIncomplete(r, filesByVin.get(String(r.vin)) ?? null)
     ).length;
 
-    return json(200, {
+    return reply(200, {
       total: count ?? 0,
       limit,
       // Both, so a caller can stop on whichever it already reads. next_cursor

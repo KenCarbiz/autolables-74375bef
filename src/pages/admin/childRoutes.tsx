@@ -18,6 +18,7 @@ export const ADMIN_CHILD_ROUTE_ELEMENTS: AdminChildRoute[] = [
   { path: ADMIN_CHILD_ROUTES.feeReview, element: lazyElement(() => import("./children/FeeReviewPage")) },
   { path: ADMIN_CHILD_ROUTES.pricingIntegrity, element: lazyElement(() => import("./children/PricingIntegrityPage")) },
   { path: ADMIN_CHILD_ROUTES.vehicleFiles, element: lazyElement(() => import("./children/VehicleFilesPage")) },
+  { path: ADMIN_CHILD_ROUTES.vehicleRecords, element: lazyElement(() => import("./children/VehicleRecordsPage")) },
   { path: ADMIN_CHILD_ROUTES.jobs, element: lazyElement(() => import("./children/JobsPipelinesPage")) },
   { path: ADMIN_CHILD_ROUTES.accessActivity, element: lazyElement(() => import("./children/AccessActivityPage")) },
   { path: ADMIN_CHILD_ROUTES.permissionVerification, element: lazyElement(() => import("./children/PermissionVerificationPage")) },

@@ -2,6 +2,10 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { artifactPostsIdle, autoPreload } from "../_shared/intake-autoprovision.ts";
 import { classifyCondition } from "../_shared/vehicleCondition.ts";
+import { authenticateLegacyFeed, hasSignedHeaders } from "../_shared/legacyFeeds/auth.ts";
+import { planListingWrite, type HeldVehicle } from "../_shared/legacyFeeds/archivedGuard.ts";
+import { runFeedWrite } from "../_shared/legacyFeeds/idempotency.ts";
+import { supabaseLegacyFeedStore } from "../_shared/legacyFeeds/supabaseStore.ts";
 
 // Artifact posts are queued and paced, so they can still be in flight when the
 // handler returns. Without this the isolate is torn down mid-queue and the
@@ -26,10 +30,16 @@ function drainArtifactPosts(): void {
 //   Headers:
 //     X-Dms-Signature: sha256=<hmac>      (HMAC-SHA-256 over raw body)
 //     X-Dms-Tenant: <tenant-uuid>          (which AutoLabels tenant to write into)
+//   Signed (preferred): X-Rooftop-Key-Id / X-Rooftop-Timestamp / X-Rooftop-Signature over the
+//   raw body, plus Idempotency-Key, instead of X-Dms-Signature. The tenant is the key's
+//   connection; X-Dms-Tenant, when sent, must match it. See
+//   docs/vehicle-history/04-legacy-feed-transition.md.
 //   Body: provider-specific JSON. We normalize to a shared
 //   InboundVehicle shape before upserting.
 //
-// Returns: { provider, upserted, errors: [...] }
+// Returns: { provider, upserted, errors: [...], held: [{ vin, reason, review_id }] }
+// held: VINs whose existing listing is archived (or otherwise retired). They are not
+// updated; a vehicle reappearance review is opened instead.
 //
 // Per-provider HMAC secret env keys:
 //   DMS_SECRET_VAUTO
@@ -47,36 +57,15 @@ function drainArtifactPosts(): void {
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-dms-signature, x-dms-tenant",
+    "authorization, x-client-info, apikey, content-type, x-dms-signature, x-dms-tenant, x-rooftop-key-id, x-rooftop-timestamp, x-rooftop-signature, idempotency-key",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const json = (status: number, body: unknown) =>
+const json = (status: number, body: unknown, extra: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders, "Content-Type": "application/json", ...extra },
   });
-
-const hmacSha256Hex = async (secret: string, body: string) => {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(body));
-  return Array.from(new Uint8Array(sig))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-};
-
-const timingSafeEqual = (a: string, b: string) => {
-  if (a.length !== b.length) return false;
-  let mismatch = 0;
-  for (let i = 0; i < a.length; i++) mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return mismatch === 0;
-};
 
 const makeSlug = (vin: string, ymm: string | undefined) => {
   const seed = `${(ymm || "veh").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${vin
@@ -100,8 +89,6 @@ interface InboundVehicle {
 
 const PROVIDERS = ["vauto", "vinsolutions", "cdk", "reynolds", "generic"] as const;
 type Provider = (typeof PROVIDERS)[number];
-
-const secretEnvKey = (p: Provider) => `DMS_SECRET_${p.toUpperCase()}`;
 
 // ── Per-provider mappers ─────────────────────────────────────────
 const mapVauto = (raw: any): InboundVehicle[] => {
@@ -191,38 +178,45 @@ serve(async (req) => {
     if (!PROVIDERS.includes(provider)) {
       return json(400, { error: `unknown provider; expected one of ${PROVIDERS.join(", ")}` });
     }
-    const sharedSecret = Deno.env.get(secretEnvKey(provider));
-    if (!sharedSecret) {
-      return json(500, { error: `${secretEnvKey(provider)} not configured` });
-    }
 
-    const tenantId = req.headers.get("x-dms-tenant") || "";
-    if (!tenantId) return json(400, { error: "X-Dms-Tenant header required" });
+    const namedTenant = req.headers.get("x-dms-tenant") || "";
+    if (!namedTenant && !hasSignedHeaders(req.headers)) return json(400, { error: "X-Dms-Tenant header required" });
 
     const raw = await req.text();
-    const sigHeader = req.headers.get("x-dms-signature") || "";
-    const expected = "sha256=" + (await hmacSha256Hex(sharedSecret, raw));
-    if (!timingSafeEqual(sigHeader, expected)) {
-      return json(401, { error: "invalid signature" });
-    }
+    const admin = createClient(supabaseUrl, serviceKey);
+    const feedStore = supabaseLegacyFeedStore(admin);
+    const auth = await authenticateLegacyFeed({
+      feed: "dms_webhook",
+      provider,
+      method: "POST",
+      pathAndQuery: "",
+      rawBody: raw,
+      headers: req.headers,
+      nowSeconds: Math.floor(Date.now() / 1000),
+      claimedTenant: namedTenant ? { kind: "tenant_id", value: namedTenant } : null,
+    }, feedStore);
+    if (!auth.ok) return json(auth.status, { error: auth.error });
+    const reply = (status: number, body: unknown) =>
+      json(status, body, auth.mode === "legacy" ? { "X-AutoLabels-Auth-Deprecated": "legacy-shared-secret" } : {});
+    const tenantId = auth.mode === "signed" ? auth.tenantId : namedTenant;
 
     let parsed: unknown;
     try { parsed = JSON.parse(raw); }
     catch { return json(400, { error: "invalid JSON body" }); }
 
     const vehicles = MAPPERS[provider](parsed as Record<string, unknown>);
-    if (vehicles.length === 0) return json(200, { provider, upserted: 0, errors: [] });
-    if (vehicles.length > 500) return json(413, { error: "max 500 vehicles per request" });
-
-    const admin = createClient(supabaseUrl, serviceKey);
+    if (vehicles.length === 0) return reply(200, { provider, upserted: 0, errors: [], held: [] });
+    if (vehicles.length > 500) return reply(413, { error: "max 500 vehicles per request" });
 
     const { data: tenant } = await admin
       .from("tenants")
       .select("id,name,is_active")
       .eq("id", tenantId)
       .maybeSingle();
-    if (!tenant) return json(404, { error: "tenant not found" });
-    if (!tenant.is_active) return json(403, { error: "tenant disabled" });
+    if (!tenant) return reply(404, { error: "tenant not found" });
+    if (!tenant.is_active) return reply(403, { error: "tenant disabled" });
+
+    const outcome = await runFeedWrite(feedStore, auth, "dms_webhook", async () => {
 
     const { data: profile } = await admin
       .from("onboarding_profiles")
@@ -247,6 +241,7 @@ serve(async (req) => {
       String((dprof?.settings as Record<string, unknown> | null)?.title_email_on_intake) !== "false";
 
     const errors: Array<{ vin: string; error: string }> = [];
+    const held: HeldVehicle[] = [];
     const updatedIds: string[] = [];
     let upserted = 0;
 
@@ -258,10 +253,17 @@ serve(async (req) => {
 
       const { data: existing } = await admin
         .from("vehicle_listings")
-        .select("id,status")
+        .select("id,status,archived_at,archive_reason")
         .eq("tenant_id", tenant.id)
         .eq("vin", v.vin)
         .maybeSingle();
+
+      if (planListingWrite(existing) === "hold_archived") {
+        held.push(await feedStore.holdArchived(
+          tenant.id, v.vin, existing, "dms_webhook", `${provider}:${auth.mode === "signed" ? auth.connectionId : "legacy"}`,
+        ));
+        continue;
+      }
 
       const insertPatch = {
         tenant_id: tenant.id,
@@ -338,11 +340,13 @@ serve(async (req) => {
       entity_type: "tenant",
       entity_id: tenant.id,
       store_id: tenant.id,
-      details: { provider, received: vehicles.length, upserted, errors: errors.length },
+      details: { provider, received: vehicles.length, upserted, held: held.length, errors: errors.length },
     });
 
     drainArtifactPosts();
-    return json(200, { provider, upserted, errors });
+    return { status: 200, body: { provider, upserted, errors, held } };
+    });
+    return json(outcome.status, outcome.body, outcome.headers);
   } catch (err) {
     return json(500, { error: err instanceof Error ? err.message : "unknown error" });
   }

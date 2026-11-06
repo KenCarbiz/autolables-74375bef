@@ -1,0 +1,18 @@
+{
+  "source": "AutoFilm 381ce9cd, api/index.ts:13784,13862 (publish), 4861 (decisions), 8849 (message); api/integrations.ts:199-204 (envelope)",
+  "rooftop_id": "7b0e2a6c-5f0d-4a0e-9a53-1f0c3f1a9d11",
+  "events": {
+    "mpi.report.published": {
+      "event_id": "pub-3f2c1d9e-0a11-4c55-8f6e-2b7d5a9c0e01-1761678000123",
+      "data": { "ro_id": "3f2c1d9e-0a11-4c55-8f6e-2b7d5a9c0e01", "ro_number": "RO-10442" }
+    },
+    "mpi.customer.decisions.submitted": {
+      "event_id": "dec-3f2c1d9e-0a11-4c55-8f6e-2b7d5a9c0e01-auth-77",
+      "data": { "ro_id": "3f2c1d9e-0a11-4c55-8f6e-2b7d5a9c0e01", "external_ro_id": "DMS-5521", "approved": 2, "declined": 1, "total": 1180.5, "authorization_id": "auth-77" }
+    },
+    "mpi.customer.message.created": {
+      "event_id": "msg-9a3b7c10-2d4e-4f60-8a1b-3c5d7e9f1a22",
+      "data": { "video_id": "5d6e7f80-1a2b-4c3d-8e4f-5a6b7c8d9e00", "message_id": "9a3b7c10-2d4e-4f60-8a1b-3c5d7e9f1a22", "length": 42 }
+    }
+  }
+}
