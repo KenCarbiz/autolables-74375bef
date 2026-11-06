@@ -548,7 +548,7 @@ describe("Acura profile (acura-us-2026-v1)", () => {
     expect(page1.some((s) => s.includes("PARTS CONTENT INFORMATION"))).toBe(true);
     expect(page1.some((s) => s.includes("EAST LIBERTY, OHIO, USA"))).toBe(true);
     expect(page1.some((s) => s === "VEHICLE PASSPORT")).toBe(true);
-    expect(page1.some((s) => s.includes("Scan for verified vehicle details"))).toBe(true);
+    expect(page1).toContain("Scan for Vehicle Passport");
     expect(page1.some((s) => s === "auto")).toBe(true);
     expect(page1.some((s) => s === "(LABELS)")).toBe(true);
     expect(page1).toContain("TOTAL VEHICLE PRICE");
@@ -814,11 +814,13 @@ describe("Mercedes-Benz profile (mercedes-benz-us-2026-v1)", () => {
     expect(resolveThemeProfile("Mercedes-Benz", 2021).profile.status).toBe("fallback");
   });
 
-  it("GLE 450 benchmark reconciles coded packages on one page with the full panel set", () => {
+  // The mandatory reproduction banner costs the left column one equipment
+  // line, which moves the GLE's last standard item onto a continuation page.
+  it("GLE 450 benchmark reconciles coded packages with the full panel set", () => {
     const data = mercedesGleFixture();
     const model = buildRenderLayout(data, themeFor(null));
     const page1 = pageStrings(model, 0);
-    expect(model.pages.length).toBe(1);
+    expect(model.pages.length).toBe(2);
     expect(page1).toContain("$79,050.00");
     expect(model.drawnStrings).toContain("4JGFB5KB8TB123456");
     expect(page1).toContain("TOTAL MSRP");
@@ -1127,7 +1129,8 @@ describe("Audi profile (audi-us-2026-v2, german-factory-technical)", () => {
     const model = buildRenderLayout(audiQ5Fixture(), themeFor(null));
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
-    expect(model.pages.length).toBe(1);
+    // Two equipment lines continue on page 2 since the reproduction banner.
+    expect(model.pages.length).toBe(2);
     expect(page1).toContain("$61,640.00");
     expect(page1).toContain("$52,800.00");
     expect(page1).toContain("1,295.00");
