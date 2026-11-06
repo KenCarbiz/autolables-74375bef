@@ -150,6 +150,7 @@ export const infinitiBenchmark = (): FactoryStickerRenderData => ({
     sideRear: null,
     rollover: 5,
   },
+  dealerRole: "original_delivery",
   dealer: {
     name: "Harte INFINITI",
     address: "1 Weston Park Ave",
@@ -184,8 +185,8 @@ export const noEpaFixture = (): FactoryStickerRenderData => ({
   barcodePayload: "2T3P1RFV8MW123456",
 });
 
-// Enough standard equipment to overflow page 1 and force a continuation
-// page; pricing, banner, VIN, and disclosures must remain on page 1.
+// Enough standard equipment that no readable one-page layout exists; the
+// sticker must flag REVIEW_REQUIRED rather than spill onto a second page.
 export const longEquipmentFixture = (): FactoryStickerRenderData => {
   const base = infinitiBenchmark();
   const categories = ["exterior", "interior", "safety_features", "mechanical", "technology", "comfort"];
@@ -198,6 +199,21 @@ export const longEquipmentFixture = (): FactoryStickerRenderData => {
     });
   }
   return { ...base, standardEquipment, keyFeatures: {} };
+};
+
+// QX55-class build: about 60 standard items and three options, the size of
+// the owner's one-page INFINITI reference sticker. Must fit one page at or
+// above the equipment floor.
+export const qx55ClassFixture = (): FactoryStickerRenderData => {
+  const base = infinitiBenchmark();
+  const groups: Record<string, string[]> = {
+    mechanical: ["2.0L VC-Turbo 4-cylinder engine", "9-speed automatic transmission", "Intelligent all-wheel drive", "Paddle shifters", "Drive mode selector", "Hill start assist", "Electric power steering", "Four-wheel independent suspension", "Engine start/stop system", "Active trace control", "Vehicle dynamic control", "Anti-lock braking system"],
+    exterior: ["LED headlights with auto-leveling", "LED daytime running lights", "LED taillights", "Power moonroof", "Roof rails", "Heated power mirrors", "Rain-sensing wipers", "Rear spoiler", "19-inch aluminum-alloy wheels", "Intelligent auto high beams", "Chrome exhaust finishers", "Power liftgate"],
+    interior: ["Leather-appointed seats", "Heated front seats", "Power driver seat with memory", "Dual-zone automatic climate control", "Push-button start", "Leather-wrapped steering wheel", "Heated steering wheel", "Ambient interior lighting", "Rear seat 60/40 split fold", "Remote engine start", "Rear privacy glass", "Wireless phone charging"],
+    audio: ["8-inch touch-screen display", "Wireless Apple CarPlay", "Android Auto", "Bose premium audio system", "SiriusXM satellite radio", "Bluetooth hands-free phone", "USB-A and USB-C ports", "Voice recognition", "InTouch connected services", "Navigation system"],
+    safety: ["Forward emergency braking", "Blind spot warning", "Rear cross traffic alert", "Lane departure warning", "Intelligent cruise control", "Driver attention alert", "Around view monitor", "Advanced air bag system", "Tire pressure monitoring", "Rear door child safety locks", "Immobilizer anti-theft system", "Front and rear parking sensors", "Traffic sign recognition"],
+  };
+  return { ...base, standardEquipment: groups, keyFeatures: {} };
 };
 
 // Second OEM profile proof: same engine and arithmetic, visibly different
@@ -1262,6 +1278,7 @@ export const mazdaCx90Fixture = (): FactoryStickerRenderData => ({
     { label: "Country of origin - engine", value: "Japan" },
     { label: "Country of origin - transmission", value: "Japan" },
   ],
+  dealerRole: "original_delivery",
   dealer: { name: "Mazda North American Operations", address: null, city: "Irvine", state: "CA", zip: "92618-2922", phone: null },
   passportUrl: "https://autolabels.io/v/demo-cx90",
   barcodePayload: "JM3KKEHC7T1234567",
@@ -1490,6 +1507,7 @@ export const subaruOutbackFixture = (): FactoryStickerRenderData => ({
     { label: "Country of origin - engine", value: "USA" },
     { label: "Country of origin - transmission", value: "Japan" },
   ],
+  dealerRole: "original_delivery",
   dealer: { name: "Subaru Distributors Corp.", address: null, city: "Orangeburg", state: "NY", zip: "10962", phone: null },
   passportUrl: "https://autolabels.io/v/demo-outback",
   barcodePayload: "4S4BTGPD0T3456789",
@@ -1691,6 +1709,7 @@ export const hondaCrvHybridFixture = (): FactoryStickerRenderData => ({
     { label: "Country of origin - engine", value: "USA" },
     { label: "Country of origin - transmission", value: "USA" },
   ],
+  dealerRole: "original_delivery",
   dealer: { name: "ABC Honda", address: "123 Main Street", city: "Alpharetta", state: "GA", zip: "30009", phone: null },
   passportUrl: "https://autolabels.io/v/demo-crv-hybrid",
   barcodePayload: "7FARS6H93TE123456",
@@ -1953,6 +1972,7 @@ export const acuraRdxFixture = (): FactoryStickerRenderData => ({
     { label: "Country of origin - engine", value: "USA" },
     { label: "Country of origin - transmission", value: "USA" },
   ],
+  dealerRole: "original_delivery",
   dealer: { name: "Miami Acura", address: "16601 S. Dixie Highway", city: "Miami", state: "FL", zip: "33157", phone: null },
   passportUrl: "https://autolabels.io/v/demo-rdx",
   barcodePayload: "5J8TC2H86SL007905",
@@ -2144,6 +2164,7 @@ export const infinitiQx80NewFixture = (): FactoryStickerRenderData => ({
     { label: "Country of origin - engine", value: "Japan" },
     { label: "Country of origin - transmission", value: "Japan" },
   ],
+  dealerRole: "original_delivery",
   dealer: { name: "INFINITI of Coral Gables", address: "4152 Ponce de Leon Blvd", city: "Coral Gables", state: "FL", zip: "33146", phone: null },
   passportUrl: "https://autolabels.io/v/demo-qx80-new",
   barcodePayload: "JN8AZ3DC0T9500123",
@@ -2245,6 +2266,7 @@ export const hyundaiPalisadeFixture = (): FactoryStickerRenderData => ({
     { label: "Country of origin - engine", value: "Korea" },
     { label: "Country of origin - transmission", value: "Korea" },
   ],
+  dealerRole: "original_delivery",
   dealer: { name: "Hyundai of North Miami", address: "16600 NW 2nd Ave", city: "Miami", state: "FL", zip: "33169", phone: null },
   passportUrl: "https://autolabels.io/v/demo-palisade",
   barcodePayload: "KM8R7DGE8TU612345",
@@ -2497,6 +2519,7 @@ export const lincolnNautilusFixture = (): FactoryStickerRenderData => ({
     { label: "Country of origin - engine", value: "China" },
     { label: "Country of origin - transmission", value: "China" },
   ],
+  dealerRole: "original_delivery",
   dealer: { name: "Lincoln of South Miami", address: "10001 S Dixie Hwy", city: "Miami", state: "FL", zip: "33156", phone: null },
   passportUrl: "https://autolabels.io/v/demo-nautilus",
   barcodePayload: "5LMPJ8K85TJ801234",
@@ -2748,6 +2771,7 @@ export const mercedesGleFixture = (): FactoryStickerRenderData => ({
     { label: "Country of origin - engine", value: "Germany" },
     { label: "Country of origin - transmission", value: "Germany" },
   ],
+  dealerRole: "original_delivery",
   dealer: { name: "Mercedes-Benz of Coral Gables", address: "300 Almeria Ave", city: "Coral Gables", state: "FL", zip: "33134", phone: null },
   passportUrl: "https://autolabels.io/v/demo-gle450",
   barcodePayload: "4JGFB5KB8TB123456",
@@ -2997,6 +3021,7 @@ export const gmcSierraFixture = (): FactoryStickerRenderData => ({
     { label: "Country of origin - engine", value: "USA" },
     { label: "Country of origin - transmission", value: "USA" },
   ],
+  dealerRole: "original_delivery",
   dealer: { name: "GMC of Doral", address: "8447 NW 12th St", city: "Doral", state: "FL", zip: "33126", phone: null },
   passportUrl: "https://autolabels.io/v/demo-sierra",
   barcodePayload: "3GTUUGEL8TG412345",
@@ -3179,6 +3204,7 @@ export const cadillacEscaladeFixture = (): FactoryStickerRenderData => ({
     { label: "Country of origin - engine", value: "United States" },
     { label: "Country of origin - transmission", value: "United States" },
   ],
+  dealerRole: "original_delivery",
   dealer: { name: "Harte Cadillac", address: "One Weston Park Rd", city: "Hartford", state: "CT", zip: "06120", phone: null },
   passportUrl: "https://autolabels.io/v/demo-escalade",
   barcodePayload: "1GYS4BKL6TR100001",
@@ -3391,6 +3417,7 @@ export const ramFixture = (): FactoryStickerRenderData => ({
     { label: "Country of origin - engine", value: "United States" },
     { label: "Country of origin - transmission", value: "United States" },
   ],
+  dealerRole: "original_delivery",
   dealer: { name: "Ram of Sampleville", address: "123 Main Street", city: "Sampleville", state: "ST", zip: "54321", phone: null },
   passportUrl: "https://autolabels.io/v/demo-ram1500",
   barcodePayload: "1C6SRFJT7TN123456",
@@ -3547,6 +3574,7 @@ export const vwAtlasFixture = (): FactoryStickerRenderData => ({
     emissions: "2-Year/20,000-Mile Carefree Scheduled Maintenance",
   },
   partsContent: null,
+  dealerRole: "original_delivery",
   dealer: { name: "Volkswagen of South Miami", address: "16600 S Dixie Hwy", city: "Miami", state: "FL", zip: "33157", phone: null },
   passportUrl: "https://autolabels.io/v/demo-atlas",
   barcodePayload: "1V2FR2CA8TC512345",
@@ -3750,6 +3778,7 @@ export const audiQ5Fixture = (): FactoryStickerRenderData => ({
     { label: "Country of origin - engine", value: "Hungary" },
     { label: "Country of origin - transmission", value: "Germany" },
   ],
+  dealerRole: "original_delivery",
   dealer: { name: "Audi Beverly Hills", address: "8823 Wilshire Blvd.", city: "Beverly Hills", state: "CA", zip: "90211", phone: null },
   passportUrl: "https://autolabels.io/v/demo-q5",
   barcodePayload: "WA1E2AFP4TA123456",
@@ -3987,6 +4016,7 @@ export const volvoXc90Fixture = (): FactoryStickerRenderData => ({
     { label: "Country of origin - engine", value: "Sweden" },
     { label: "Country of origin - transmission", value: "Japan" },
   ],
+  dealerRole: "original_delivery",
   dealer: { name: "Volvo Cars Palo Alto", address: "4190 El Camino Real", city: "Palo Alto", state: "CA", zip: "94306", phone: null },
   passportUrl: "https://autolabels.io/v/demo-xc90",
   barcodePayload: "YV4L12PE9T1234567",
@@ -4237,6 +4267,7 @@ export const teslaModelYFixture = (): FactoryStickerRenderData => ({
     { label: "Country of origin - motor assembly", value: "United States" },
     { label: "Country of origin - battery cells", value: "United States" },
   ],
+  dealerRole: "original_delivery",
   dealer: { name: "Tesla Motors, Inc.", address: "1234 Tesla Road", city: "Fremont", state: "CA", zip: "94538", phone: null },
   passportUrl: "https://autolabels.io/v/demo-modely",
   barcodePayload: "7SAYGDEE6TF123456",
@@ -4419,6 +4450,7 @@ export const porsche911Fixture = (): FactoryStickerRenderData => ({
     { label: "Country of origin - engine", value: "Germany" },
     { label: "Country of origin - transmission", value: "Germany" },
   ],
+  dealerRole: "original_delivery",
   dealer: { name: "Porsche Cars North America", address: "980 Hammond Dr", city: "Atlanta", state: "GA", zip: "30328", phone: null },
   passportUrl: "https://autolabels.io/v/demo-911gts",
   barcodePayload: "WP0AB2A99TS223847",
@@ -4663,6 +4695,7 @@ export const landRoverSportFixture = (): FactoryStickerRenderData => ({
     { label: "Final assembly point", value: "Solihull, United Kingdom" },
     { label: "Country of origin - engine / transmission", value: "United Kingdom / Germany" },
   ],
+  dealerRole: "original_delivery",
   dealer: { name: "Harte Land Rover", address: "67 Weston Street", city: "Hartford", state: "CT", zip: "06120", phone: null },
   passportUrl: "https://autolabels.io/v/demo-rrsport",
   barcodePayload: "SAL1L9FUXSA123456",
@@ -4929,6 +4962,7 @@ export const chryslerPacificaFixture = (): FactoryStickerRenderData => ({
     { label: "Country of origin - engine", value: "United States" },
     { label: "Country of origin - transmission", value: "United States" },
   ],
+  dealerRole: "original_delivery",
   dealer: { name: "Chrysler of Example", address: "123 Main Street", city: "Anytown", state: "MI", zip: "48183", phone: null },
   passportUrl: "https://autolabels.io/v/demo-pacifica",
   barcodePayload: "2C4RC3GG6TR188133",
@@ -5173,6 +5207,7 @@ export const dodgeDurangoFixture = (): FactoryStickerRenderData => ({
     { label: "Final assembly point", value: "Detroit, Michigan, USA" },
     { label: "Country of origin - engine / transmission", value: "United States / United States" },
   ],
+  dealerRole: "original_delivery",
   dealer: { name: "Lakeview Dodge", address: "1234 Performance Way", city: "Detroit", state: "MI", zip: "48201", phone: null },
   passportUrl: "https://autolabels.io/v/demo-durango",
   barcodePayload: "1C4SDJCT5SC123456",
@@ -5439,6 +5474,7 @@ export const buickEnvisionFixture = (): FactoryStickerRenderData => ({
     { label: "Final assembly point", value: "San Luis Potosi, Mexico" },
     { label: "Country of origin - engine / transmission", value: "United States / Japan" },
   ],
+  dealerRole: "original_delivery",
   dealer: { name: "Example Buick of Anytown", address: "1200 Avenir Drive", city: "Anytown", state: "MI", zip: "48009", phone: null },
   passportUrl: "https://autolabels.io/v/demo-envision",
   barcodePayload: "LRBFZSE41SD012345",

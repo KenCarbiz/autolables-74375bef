@@ -7,6 +7,7 @@ import {
   genericDecodeFixture,
   infinitiBenchmark,
   longEquipmentFixture,
+  qx55ClassFixture,
   newConditionBenchmark,
   noEpaFixture,
   themeFor,
@@ -15,8 +16,8 @@ import {
 const sha256 = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
 
 describe("renderFactorySticker (orchestrator contract)", () => {
-  it("exports renderer version 1.0.0", () => {
-    expect(FACTORY_STICKER_RENDERER_VERSION).toBe("1.0.0");
+  it("exports renderer version 1.5.0", () => {
+    expect(FACTORY_STICKER_RENDERER_VERSION).toBe("1.5.0");
   });
 
   it("satisfies the orchestrator QA invariants", async () => {
@@ -25,8 +26,8 @@ describe("renderFactorySticker (orchestrator contract)", () => {
     expect(result.layout.drawnStrings).toContain(data.vin);
     expect(data.barcodePayload).toBe(data.vin);
     expect(data.passportUrl).toBe("https://autolabels.io/v/demo-qx80");
-    expect(result.layout.pages).toBeGreaterThanOrEqual(1);
-    expect(result.layout.pages).toBeLessThanOrEqual(2);
+    expect(result.layout.pages).toBe(1);
+    expect(result.layout.fit.ok).toBe(true);
     expect(new TextDecoder().decode(result.pdfBytes.slice(0, 5))).toBe("%PDF-");
     expect(result.previewSvg.startsWith("<svg")).toBe(true);
   });
@@ -39,15 +40,25 @@ describe("renderFactorySticker (orchestrator contract)", () => {
     expect(a.layout).toEqual(b.layout);
   });
 
-  it("reports two pages for the long-equipment fixture", async () => {
-    const result = await renderFactorySticker(longEquipmentFixture(), themeFor("infiniti"));
-    expect(result.layout.pages).toBe(2);
+  it("flags review instead of adding a page when mandatory content cannot fit one readable page", async () => {
+    const long = longEquipmentFixture();
+    const options = Array.from({ length: 400 }, (_, i) => ({ ...long.options[0], name: `Verified Priced Option ${i} with a long descriptive name`, code: `X${i}` }));
+    const result = await renderFactorySticker({ ...long, options }, themeFor("infiniti"));
+    expect(result.layout.pages).toBe(1);
+    expect(result.layout.fit.ok).toBe(false);
+    if (!result.layout.fit.ok) {
+      expect(result.layout.fit.reason).toBe("one_page_fit_failed");
+      expect(result.layout.fit.overflowPt).toBeGreaterThan(0);
+      expect(result.layout.fit.equipmentFontPt).toBe(5.5);
+    }
+    expect(result.pdfBytes.byteLength).toBe(0);
+    expect(result.previewSvg).toBe("");
   });
 
   it("labels generic decodes instead of asserting them", async () => {
     const result = await renderFactorySticker(genericDecodeFixture(), themeFor("infiniti"));
     expect(result.layout.drawnStrings.some((s) => s.includes("TYPICAL FACTORY CONFIGURATION"))).toBe(true);
-    expect(result.layout.drawnStrings.some((s) => s.includes("saved VIN-specific factory-build data"))).toBe(false);
+    expect(result.layout.drawnStrings.some((s) => s.includes("saved VIN-specific vehicle data"))).toBe(false);
     expect(result.layout.drawnStrings.some((s) => s.includes("typical factory-configuration data"))).toBe(true);
   });
 
@@ -56,6 +67,7 @@ describe("renderFactorySticker (orchestrator contract)", () => {
     const result = await renderFactorySticker(data, themeFor(null));
     expect(result.layout.drawnStrings.some((s) => s.includes("AUTOLABELS"))).toBe(true);
     expect(result.layout.pages).toBe(1);
+    expect(result.layout.fit.ok).toBe(true);
   });
 });
 
@@ -95,7 +107,7 @@ describe.runIf(WRITE_SAMPLES)("sample sticker PDFs (WRITE_SAMPLES=1)", () => {
           themeFor("tesla"),
         ],
       ],
-      ["long-equipment-continuation", [longEquipmentFixture(), themeFor("infiniti")]],
+      ["qx55-class", [qx55ClassFixture(), themeFor("infiniti")]],
       [
         "fallback-unknown-make",
         [

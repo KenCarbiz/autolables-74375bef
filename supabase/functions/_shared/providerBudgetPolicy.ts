@@ -10,12 +10,20 @@
 
 export type AdmissionReason =
   | "ungated" | "admitted" | "monthly_cap" | "reserve_for_essential" | "tenant_budget"
-  | "unconfigured" | "disabled" | "lane_cap" | "lane_usd_cap" | "unpriced" | "store_policy" | "account_quota";
+  | "unconfigured" | "disabled" | "lane_cap" | "lane_usd_cap" | "unpriced" | "store_policy" | "account_quota"
+  | "launch_gate";
 
 const KNOWN_REASONS: readonly AdmissionReason[] = [
   "ungated", "admitted", "monthly_cap", "reserve_for_essential", "tenant_budget",
   "unconfigured", "disabled", "lane_cap", "lane_usd_cap", "unpriced", "store_policy", "account_quota",
 ];
+
+// Refusals by the MarketCheck launch gate (migration 0018). They are read as
+// one reason, "launch_gate", with the database's wording kept alongside.
+export function isLaunchGateReason(reason: unknown): reason is string {
+  return typeof reason === "string" && (/^launch_[a-z_]{3,60}$/.test(reason) || reason === "emergency_stop"
+    || reason === "gate_upgrade_required" || reason === "gate_version_missing");
+}
 
 // How a provider answer settles an account reservation (migration 0007). No
 // answer at all, or a server error, may still have been billed: it settles as
@@ -156,6 +164,8 @@ export interface AdmitResult {
   accountRequestId?: string | null;
   /** Why the account coordinator refused, when it did. */
   accountReason?: string | null;
+  /** The launch gate's own reason, when reason is "launch_gate". */
+  launchReason?: string | null;
 }
 
 // The RPC answers one row; a missing or malformed answer is an unavailable
@@ -165,6 +175,9 @@ export function parseAdmitRow(row: unknown): AdmitResult | null {
   if (!r || typeof r !== "object" || typeof r.admitted !== "boolean") return null;
   const n = (v: unknown): number | null => (v == null ? null : Number.isFinite(Number(v)) ? Number(v) : null);
   const reason = String(r.reason || "");
+  if (r.admitted === false && isLaunchGateReason(reason)) {
+    return { admitted: false, eventId: n(r.event_id), monthCalls: n(r.month_calls), cap: n(r.monthly_call_cap), reserve: n(r.reserve_for_essential), reason: "launch_gate", launchReason: reason };
+  }
   return {
     admitted: r.admitted,
     eventId: n(r.event_id),

@@ -8,8 +8,8 @@
     "path": 66,
     "qr": 2,
     "rect": 31,
-    "rule": 11,
-    "text": 214
+    "rule": 13,
+    "text": 238
   },
   "fills": [
     "#0d0d0d",
@@ -66,18 +66,21 @@
   ],
   "regions": {
     "barcode": "21,517.5 227.15x23",
-    "qr": "755.5,198.4 17",
-    "qr2": "596.05,376.9 91.9",
+    "qr": "755.5,202.9 17",
+    "qr2": "594,381.8 96",
     "totalMsrp": "481,585 @18"
   },
   "headings": [
     "2026 MERCEDES-BENZ GLE 450",
     "4MATIC SUV",
     "STANDARD EQUIPMENT",
+    "PERFORMANCE &",
+    "MECHANICAL",
+    "SAFETY & DRIVER",
+    "ASSISTANCE",
     "EXTERIOR",
-    "INTERIOR & COMFORT",
-    "PERFORMANCE & MECHANICAL",
-    "SAFETY & DRIVER ASSISTANCE",
+    "INTERIOR &",
+    "COMFORT",
     "MSRP INCLUDES",
     "FACTORY OPTIONS",
     "DESTINATION & HANDLING",
@@ -91,13 +94,10 @@
     "MPG",
     "19",
     "26",
-    "4.5",
-    "spend",
-    "$2,000",
-    "cost"
+    "4.5"
   ],
   "totalBand": "$79,050.00",
   "svgDigest": [
-    "40f031c6"
+    "10dca013"
   ]
 }

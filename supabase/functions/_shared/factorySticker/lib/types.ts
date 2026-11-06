@@ -101,6 +101,8 @@ export interface StickerRegulatory {
   combinedMpg?: number;
   annualFuelCost?: number;
   gallonsPer100Miles?: number;
+  /** Tailpipe CO2 grams per mile exactly as saved from the EPA row. */
+  co2TailpipeGpm?: number;
   fiveYearCostDifference?: number;
   greenhouseGasRating?: number;
   smogRating?: number;

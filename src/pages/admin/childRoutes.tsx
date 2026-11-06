@@ -38,6 +38,7 @@ export const ADMIN_CHILD_ROUTE_ELEMENTS: AdminChildRoute[] = [
   { path: "/admin/integrations/jobs/:jobId", element: lazyElement(() => import("./children/JobDetailPage")) },
   { path: "/admin/integrations/files-com", element: lazyElement(() => import("./children/FilesComFeedPage")) },
   { path: "/admin/integrations/inventory-network", element: lazyElement(() => import("./children/InventoryNetworkPage")) },
+  { path: "/admin/integrations/marketcheck/launch-control", element: lazyElement(() => import("./children/MarketCheckLaunchControlPage")) },
 ];
 
 export { lazyElement };

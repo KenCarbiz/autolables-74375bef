@@ -7,9 +7,9 @@
     "barcode": 1,
     "path": 38,
     "qr": 2,
-    "rect": 31,
+    "rect": 32,
     "rule": 12,
-    "text": 179
+    "text": 183
   },
   "fills": [
     "#0d0d0d",
@@ -67,19 +67,19 @@
   ],
   "regions": {
     "barcode": "21,560 227.15x23",
-    "qr": "755.5,192 17",
-    "qr2": "592,360.5 100",
-    "totalMsrp": "493,465.4 @11.5"
+    "qr": "755.5,196.5 17",
+    "qr2": "592,365 100",
+    "totalMsrp": "493,346.8 @11.5"
   },
   "headings": [
     "ORIGINAL FACTORY BUILD & MSRP RECORD",
     "2025 NISSAN ARIYA",
     "EVOLVE+ E-4ORCE",
     "STANDARD EQUIPMENT",
+    "UTILITY & TOWING",
+    "SAFETY & DRIVER ASSISTANCE",
     "EXTERIOR",
     "INTERIOR & COMFORT",
-    "PERFORMANCE & MECHANICAL",
-    "SAFETY & DRIVER ASSISTANCE",
     "FACTORY OPTIONS",
     "DESTINATION & HANDLING",
     "1,390.00",
@@ -99,6 +99,6 @@
   ],
   "totalBand": "$49,615.00",
   "svgDigest": [
-    "aafda89c"
+    "ccddfd83"
   ]
 }

@@ -349,7 +349,7 @@ describe("MarketCheck store policy in the shared provider gate", () => {
     const admin = gate({ admitted: false, reason: "feed_only" });
     const r = await admitProviderCall(admin, { url: URL, caller: "vehicle-enrich", tenantId: "t1", vin: "1N4AZ1CP0LC000001" });
     expect(r).toMatchObject({ admitted: false, reason: "store_policy" });
-    expect(admin.rpc).not.toHaveBeenCalledWith("provider_call_admit", expect.anything());
+    expect(admin.rpc).not.toHaveBeenCalledWith("provider_call_admit_v2", expect.anything());
   });
   it("an approved store product proceeds to the platform budget", async () => {
     const admin = gate({ admitted: true, scope: "store" });

@@ -7,9 +7,9 @@
     "barcode": 1,
     "path": 72,
     "qr": 2,
-    "rect": 29,
-    "rule": 10,
-    "text": 249
+    "rect": 30,
+    "rule": 11,
+    "text": 265
   },
   "fills": [
     "#0d0d0d",
@@ -64,18 +64,19 @@
   ],
   "regions": {
     "barcode": "21,517.5 227.15x23",
-    "qr": "755.5,204.8 17",
-    "qr2": "594,390.05 96",
+    "qr": "755.5,209.3 17",
+    "qr2": "596.8,387.8 90.4",
     "totalMsrp": "481,585 @18"
   },
   "headings": [
     "2025 INFINITI QX80",
     "SENSORY AWD",
     "STANDARD EQUIPMENT",
+    "UTILITY & TOWING",
+    "SAFETY & DRIVER",
+    "ASSISTANCE",
     "EXTERIOR",
     "INTERIOR & COMFORT",
-    "PERFORMANCE & MECHANICAL",
-    "SAFETY & DRIVER ASSISTANCE",
     "INCLUDED FACTORY PACKAGES",
     "EQUIPMENT GROUP SENSORY",
     "3,400.00",
@@ -91,11 +92,10 @@
     "MPG",
     "15",
     "20",
-    "5.9",
-    "spend"
+    "5.9"
   ],
   "totalBand": "$95,695.00",
   "svgDigest": [
-    "6e1d162b"
+    "42272789"
   ]
 }

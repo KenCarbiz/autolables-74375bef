@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildRenderLayout } from "./contract";
+import { adaptRenderData, buildRenderLayout, resolveRenderTheme } from "./contract";
+import { buildStickerLayout } from "./layout";
 import { resolveThemeProfile } from "../oem/profiles";
 import {
   acuraLongFixture,
@@ -79,6 +80,9 @@ import {
 } from "./__fixtures__/renderData";
 import { expectMinFontRespected, expectWithinBounds, pageStrings } from "./__fixtures__/layoutAsserts";
 
+const buildGenericLayout = (data: Parameters<typeof adaptRenderData>[0], theme: Parameters<typeof resolveRenderTheme>[1]) =>
+  buildStickerLayout(adaptRenderData(data), resolveRenderTheme(data, theme));
+
 // Five-OEM design system: one engine, versioned profiles, distinct output.
 const CASES = [
   { name: "JEEP", fixture: jeepFixture, vin: "1C4HJXFG5SW551234", total: "$56,205.00", version: "jeep-us-2025-v1" },
@@ -93,7 +97,7 @@ describe("five-OEM design system", () => {
   for (const c of CASES) {
     it(`${c.name} (${c.vin}) renders with reconciled total and identity`, () => {
       const data = c.fixture();
-      const model = buildRenderLayout(data, themeFor(null));
+      const model = buildGenericLayout(data, themeFor(null));
       const page1 = pageStrings(model, 0);
       expect(model.pages.length).toBe(1);
       expect(model.drawnStrings).toContain(c.vin);
@@ -110,7 +114,7 @@ describe("five-OEM design system", () => {
   }
 
   it("Jeep 4xe uses the PHEV regulatory module, never gasoline or EV-only language", () => {
-    const model = buildRenderLayout(jeep4xeFixture(), themeFor(null));
+    const model = buildGenericLayout(jeep4xeFixture(), themeFor(null));
     const page1 = pageStrings(model, 0);
     expect(page1).toContain("MPGe");
     expect(page1.some((s) => s.includes("miles electric range"))).toBe(true);
@@ -180,14 +184,11 @@ describe("Genesis profile (genesis-us-2025-v1)", () => {
     expect(page1.some((s) => s.includes("grams CO2"))).toBe(false);
   });
 
-  it("G90 long-equipment produces a deliberate continuation page", () => {
+  it("G90 long-equipment stays on one physical page", () => {
     const model = buildRenderLayout(genesisG90LongFixture(), themeFor(null));
-    expect(model.pages.length).toBe(2);
-    const page1 = pageStrings(model, 0);
-    expect(page1).toContain("$97,545.00");
-    const page2 = pageStrings(model, 1);
-    expect(page2).toContain("FACTORY EQUIPMENT CONTINUATION");
-    expect(page2).toContain("PAGE 2 OF 2");
+    expect(model.pages.length).toBe(1);
+    expect(model.fit.ok).toBe(model.mode !== "REVIEW_REQUIRED");
+    expect(pageStrings(model, 0).join(" ")).not.toMatch(/CONTINUATION|PAGE 2 OF/);
     expectMinFontRespected(model);
   });
 });
@@ -263,13 +264,11 @@ describe("Kia profile (kia-us-2026-v1)", () => {
     expect(page1.some((s) => s.includes("grams CO2"))).toBe(false);
   });
 
-  it("Telluride X-Pro long-equipment produces a deliberate continuation page", () => {
+  it("Telluride X-Pro long-equipment stays on one physical page", () => {
     const model = buildRenderLayout(kiaTellurideLongFixture(), themeFor(null));
-    expect(model.pages.length).toBe(2);
-    expect(pageStrings(model, 0)).toContain("$57,180.00");
-    const page2 = pageStrings(model, 1);
-    expect(page2).toContain("FACTORY EQUIPMENT CONTINUATION");
-    expect(page2).toContain("PAGE 2 OF 2");
+    expect(model.pages.length).toBe(1);
+    expect(model.fit.ok).toBe(model.mode !== "REVIEW_REQUIRED");
+    expect(pageStrings(model, 0).join(" ")).not.toMatch(/CONTINUATION|PAGE 2 OF/);
     expectMinFontRespected(model);
   });
 
@@ -356,13 +355,11 @@ describe("Mazda profile (mazda-us-2026-v1)", () => {
     expectMinFontRespected(model);
   });
 
-  it("long-equipment CX-90 produces a deliberate continuation page", () => {
+  it("long-equipment CX-90 stays on one physical page", () => {
     const model = buildRenderLayout(mazdaLongFixture(), themeFor(null));
-    expect(model.pages.length).toBe(2);
-    expect(pageStrings(model, 0)).toContain("$67,520.00");
-    const page2 = pageStrings(model, 1);
-    expect(page2).toContain("FACTORY EQUIPMENT CONTINUATION");
-    expect(page2).toContain("PAGE 2 OF 2");
+    expect(model.pages.length).toBe(1);
+    expect(model.fit.ok).toBe(model.mode !== "REVIEW_REQUIRED");
+    expect(pageStrings(model, 0).join(" ")).not.toMatch(/CONTINUATION|PAGE 2 OF/);
     expectMinFontRespected(model);
   });
 });
@@ -407,11 +404,11 @@ describe("Subaru profile (subaru-us-2026-v1)", () => {
     expect(page1.some((s) => s.includes("8-YEAR/100,000-MILE HIGH-VOLTAGE BATTERY LIMITED WARRANTY"))).toBe(true);
   });
 
-  it("Ascent long-equipment produces a deliberate continuation page", () => {
+  it("Ascent long-equipment stays on one physical page", () => {
     const model = buildRenderLayout(subaruAscentLongFixture(), themeFor(null));
-    expect(model.pages.length).toBe(2);
-    expect(pageStrings(model, 0)).toContain("$52,655.00");
-    expect(pageStrings(model, 1)).toContain("PAGE 2 OF 2");
+    expect(model.pages.length).toBe(1);
+    expect(model.fit.ok).toBe(model.mode !== "REVIEW_REQUIRED");
+    expect(pageStrings(model, 0).join(" ")).not.toMatch(/CONTINUATION|PAGE 2 OF/);
     expectMinFontRespected(model);
   });
 
@@ -505,11 +502,11 @@ describe("Honda profile (honda-us-2026-v1)", () => {
     expect(page1.some((s) => s.includes("grams CO2"))).toBe(false);
   });
 
-  it("long-equipment Pilot produces a deliberate continuation page", () => {
+  it("long-equipment Pilot stays on one physical page", () => {
     const model = buildRenderLayout(hondaLongFixture(), themeFor(null));
-    expect(model.pages.length).toBe(2);
-    expect(pageStrings(model, 0)).toContain("$58,670.00");
-    expect(pageStrings(model, 1)).toContain("PAGE 2 OF 2");
+    expect(model.pages.length).toBe(1);
+    expect(model.fit.ok).toBe(model.mode !== "REVIEW_REQUIRED");
+    expect(pageStrings(model, 0).join(" ")).not.toMatch(/CONTINUATION|PAGE 2 OF/);
     expectMinFontRespected(model);
   });
 });
@@ -548,7 +545,7 @@ describe("Acura profile (acura-us-2026-v1)", () => {
     expect(page1.some((s) => s.includes("PARTS CONTENT INFORMATION"))).toBe(true);
     expect(page1.some((s) => s.includes("EAST LIBERTY, OHIO, USA"))).toBe(true);
     expect(page1.some((s) => s === "VEHICLE PASSPORT")).toBe(true);
-    expect(page1.some((s) => s.includes("Scan for verified vehicle details"))).toBe(true);
+    expect(page1).toContain("Scan for Vehicle Passport");
     expect(page1.some((s) => s === "auto")).toBe(true);
     expect(page1.some((s) => s === "(LABELS)")).toBe(true);
     expect(page1).toContain("TOTAL VEHICLE PRICE");
@@ -579,11 +576,11 @@ describe("Acura profile (acura-us-2026-v1)", () => {
     expect(page1.some((s) => s.includes("grams CO2"))).toBe(false);
   });
 
-  it("long-equipment MDX produces a deliberate continuation page", () => {
+  it("long-equipment MDX stays on one physical page", () => {
     const model = buildRenderLayout(acuraLongFixture(), themeFor(null));
-    expect(model.pages.length).toBe(2);
-    expect(pageStrings(model, 0)).toContain("$79,345.00");
-    expect(pageStrings(model, 1)).toContain("PAGE 2 OF 2");
+    expect(model.pages.length).toBe(1);
+    expect(model.fit.ok).toBe(model.mode !== "REVIEW_REQUIRED");
+    expect(pageStrings(model, 0).join(" ")).not.toMatch(/CONTINUATION|PAGE 2 OF/);
     expectMinFontRespected(model);
   });
 });
@@ -601,7 +598,7 @@ describe("INFINITI profile (infiniti-us-2026-v2)", () => {
 
   it("new QX80 reconciles 109,900 + 1,150 + 1,995 with the full panel set", () => {
     const data = infinitiQx80NewFixture();
-    const model = buildRenderLayout(data, themeFor(null));
+    const model = buildGenericLayout(data, themeFor(null));
     const page1 = pageStrings(model, 0);
     expect(model.pages.length).toBe(1);
     expect(page1).toContain("$113,045.00");
@@ -624,7 +621,7 @@ describe("INFINITI profile (infiniti-us-2026-v2)", () => {
   });
 
   it("carries a paper masthead, burgundy keyline and governed emblem paths", () => {
-    const model = buildRenderLayout(infinitiQx80NewFixture(), themeFor(null));
+    const model = buildGenericLayout(infinitiQx80NewFixture(), themeFor(null));
     const prims = model.pages[0].primitives;
     const fills = new Set(prims.filter((p) => p.kind === "rect" && p.fill !== null).map((p) => (p.kind === "rect" ? String(p.fill) : "")));
     const rules = new Set(prims.filter((p) => p.kind === "rule").map((p) => (p.kind === "rule" ? String(p.color) : "")));
@@ -709,18 +706,18 @@ describe("Hyundai profile (hyundai-us-2026-v2)", () => {
   });
 
   it("Tucson Hybrid keeps the gasoline regulatory shape under the Hybrid Vehicle tag", () => {
-    const model = buildRenderLayout(hyundaiTucsonHybridFixture(), themeFor(null));
+    const model = buildGenericLayout(hyundaiTucsonHybridFixture(), themeFor(null));
     const page1 = pageStrings(model, 0);
     expect(page1.some((s) => s.includes("Hybrid Vehicle"))).toBe(true);
     expect(page1.some((s) => s.includes("MPGe"))).toBe(false);
     expect(page1.some((s) => s.includes("gallons per 100 miles"))).toBe(true);
   });
 
-  it("long-equipment Palisade produces a deliberate continuation page", () => {
+  it("long-equipment Palisade stays on one physical page", () => {
     const model = buildRenderLayout(hyundaiLongFixture(), themeFor(null));
-    expect(model.pages.length).toBe(2);
-    expect(pageStrings(model, 0)).toContain("$57,205.00");
-    expect(pageStrings(model, 1)).toContain("PAGE 2 OF 2");
+    expect(model.pages.length).toBe(1);
+    expect(model.fit.ok).toBe(model.mode !== "REVIEW_REQUIRED");
+    expect(pageStrings(model, 0).join(" ")).not.toMatch(/CONTINUATION|PAGE 2 OF/);
     expectMinFontRespected(model);
   });
 });
@@ -794,11 +791,11 @@ describe("Lincoln profile (lincoln-us-2026-v1)", () => {
     expect(page1.some((s) => s.includes("LOUISVILLE, KENTUCKY, USA"))).toBe(true);
   });
 
-  it("long-equipment Navigator produces a deliberate continuation page", () => {
+  it("long-equipment Navigator stays on one physical page", () => {
     const model = buildRenderLayout(lincolnLongFixture(), themeFor(null));
-    expect(model.pages.length).toBe(2);
-    expect(pageStrings(model, 0)).toContain("$108,135.00");
-    expect(pageStrings(model, 1)).toContain("PAGE 2 OF 2");
+    expect(model.pages.length).toBe(1);
+    expect(model.fit.ok).toBe(model.mode !== "REVIEW_REQUIRED");
+    expect(pageStrings(model, 0).join(" ")).not.toMatch(/CONTINUATION|PAGE 2 OF/);
     expectMinFontRespected(model);
   });
 });
@@ -814,7 +811,7 @@ describe("Mercedes-Benz profile (mercedes-benz-us-2026-v1)", () => {
     expect(resolveThemeProfile("Mercedes-Benz", 2021).profile.status).toBe("fallback");
   });
 
-  it("GLE 450 benchmark reconciles coded packages on one page with the full panel set", () => {
+  it("GLE 450 benchmark reconciles coded packages with the full panel set", () => {
     const data = mercedesGleFixture();
     const model = buildRenderLayout(data, themeFor(null));
     const page1 = pageStrings(model, 0);
@@ -878,11 +875,11 @@ describe("Mercedes-Benz profile (mercedes-benz-us-2026-v1)", () => {
     expect(page1.join(" ")).toContain("10-YEAR/155,000-MILE HIGH-VOLTAGE BATTERY CERTIFICATE");
   });
 
-  it("AMG GLE 63 S long-equipment produces a deliberate continuation page", () => {
+  it("AMG GLE 63 S long-equipment stays on one physical page", () => {
     const model = buildRenderLayout(mercedesAmgLongFixture(), themeFor(null));
-    expect(model.pages.length).toBe(2);
-    expect(pageStrings(model, 0)).toContain("$133,400.00");
-    expect(pageStrings(model, 1)).toContain("PAGE 2 OF 2");
+    expect(model.pages.length).toBe(1);
+    expect(model.fit.ok).toBe(model.mode !== "REVIEW_REQUIRED");
+    expect(pageStrings(model, 0).join(" ")).not.toMatch(/CONTINUATION|PAGE 2 OF/);
     expectMinFontRespected(model);
   });
 });
@@ -941,10 +938,7 @@ describe("GM truck and luxury profiles (gmc-us-2026-v1, cadillac-us-2026-v2)", (
     const model = buildRenderLayout(data, themeFor(null));
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
-    // Every member of this build's packages now prints. The page can no
-    // longer hold all of it, so the template's approved continuation page
-    // carries the overflow rather than paid equipment being hidden.
-    expect(model.pages.length).toBeLessThanOrEqual(2);
+    expect(model.pages.length).toBe(1);
     expect(page1).toContain("$109,335.00");
     expect(page1).toContain("$93,795.00");
     expect(page1).toContain("TOTAL VEHICLE PRICE");
@@ -1010,10 +1004,7 @@ describe("Ram profile (ram-us-2026-v2, commercial-factory-technical)", () => {
     const model = buildRenderLayout(ramFixture(), themeFor(null));
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
-    // Every member of this build's packages now prints. The page can no
-    // longer hold all of it, so the template's approved continuation page
-    // carries the overflow rather than paid equipment being hidden.
-    expect(model.pages.length).toBeLessThanOrEqual(2);
+    expect(model.pages.length).toBe(1);
     expect(page1).toContain("$72,845.00");
     expect(page1).toContain("$61,645.00");
     expect(page1).toContain("TOTAL PRICE");

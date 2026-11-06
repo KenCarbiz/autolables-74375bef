@@ -7,9 +7,9 @@
     "barcode": 1,
     "path": 33,
     "qr": 2,
-    "rect": 29,
+    "rect": 30,
     "rule": 10,
-    "text": 171
+    "text": 175
   },
   "fills": [
     "#0d0d0d",
@@ -62,8 +62,8 @@
   ],
   "regions": {
     "barcode": "21,517.5 227.15x23",
-    "qr": "755.5,198.4 17",
-    "qr2": "594,351.2 96",
+    "qr": "755.5,202.9 17",
+    "qr2": "594,355.7 96",
     "totalMsrp": "481,585 @18"
   },
   "headings": [
@@ -71,10 +71,10 @@
     "2025 BMW 530I XDRIVE",
     "SEDAN (G60)",
     "STANDARD EQUIPMENT",
-    "EXTERIOR",
-    "INTERIOR & COMFORT",
     "PERFORMANCE & MECHANICAL",
     "SAFETY & DRIVER ASSISTANCE",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
     "FACTORY OPTIONS",
     "DESTINATION & HANDLING",
     "1,175.00",
@@ -94,6 +94,6 @@
   ],
   "totalBand": "$67,725.00",
   "svgDigest": [
-    "004259cb"
+    "fb2cad6d"
   ]
 }

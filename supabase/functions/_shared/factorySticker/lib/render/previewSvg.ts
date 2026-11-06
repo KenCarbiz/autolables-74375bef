@@ -3,14 +3,12 @@
 // bundle the engine (Supabase ships only supabase/functions/). Edit the
 // source file and run `bun run sync:edge-sticker`.
 // LayoutModel -> standalone SVG string for the stored preview and admin UI.
-// Pages stack vertically; barcode and QR are realized as vector rects from
+// A sticker is one page; barcode and QR are realized as vector rects from
 // the same encoders the PDF path uses, so preview and PDF stay in lockstep.
 
 import { encodeCode128 } from "./code128.ts";
 import { encodeQrMatrix } from "./qrMatrix.ts";
 import type { LayoutFont, LayoutModel } from "./layout.ts";
-
-const PAGE_GAP = 12;
 
 const esc = (s: string): string =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -18,7 +16,8 @@ const esc = (s: string): string =>
 const num = (n: number): string => String(Math.round(n * 100) / 100);
 
 export function layoutToSvg(model: LayoutModel): string {
-  const totalH = model.pages.length * model.height + (model.pages.length - 1) * PAGE_GAP;
+  if (model.pages.length !== 1) throw new Error(`one_page_only: layout has ${model.pages.length} pages`);
+  const totalH = model.height;
   const family = (font: LayoutFont): string =>
     font === "numeric" ? model.fontFamilies.numeric : font === "body" ? model.fontFamilies.body : model.fontFamilies.heading;
   const weight = (font: LayoutFont): string => (font === "bold" || font === "heading" ? "700" : "400");
@@ -29,7 +28,7 @@ export function layoutToSvg(model: LayoutModel): string {
   );
 
   model.pages.forEach((page, pi) => {
-    const oy = pi * (model.height + PAGE_GAP);
+    const oy = 0;
     parts.push(`<g data-page="${pi + 1}">`);
     parts.push(
       `<rect x="0" y="${num(oy)}" width="${model.width}" height="${model.height}" fill="#ffffff" stroke="#d0d3d8" stroke-width="0.5"/>`,
@@ -62,6 +61,10 @@ export function layoutToSvg(model: LayoutModel): string {
           : "";
         parts.push(
           `<path transform="translate(${num(prim.x)} ${num(oy + prim.y)})" d="${esc(prim.d)}" fill="${fill}"${stroke}/>`,
+        );
+      } else if (prim.kind === "image") {
+        parts.push(
+          `<image x="${num(prim.x)}" y="${num(oy + prim.y)}" width="${num(prim.w)}" height="${num(prim.h)}" preserveAspectRatio="none" href="data:image/png;base64,${prim.png}"/>`,
         );
       } else if (prim.kind === "barcode") {
         const encoding = encodeCode128(prim.payload);

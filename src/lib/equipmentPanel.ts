@@ -7,7 +7,9 @@
 // ──────────────────────────────────────────────────────────────────────
 
 import type { VehicleListing } from "@/hooks/useVehicleListing";
-import { listingEquipment, type PassportData } from "@/lib/passportV2Data";
+import { listingEquipment, UPHOLSTERY_RE, COLOR_WORDS, type PassportData } from "@/lib/passportV2Data";
+import { classifyStandardItem } from "@/lib/factorySticker/equipment";
+import type { EquipmentCategory as StickerCategory } from "@/lib/factorySticker/types";
 import { readBuildSheet } from "@/lib/buildSheet";
 import { getEquipmentIcon, EQUIPMENT_ICON_REGISTRY, type EquipmentIconDef } from "@/lib/equipmentIcons";
 
@@ -37,6 +39,13 @@ export interface EquipmentCategory {
 
 export interface CustomerLoveReason { id: string; title: string; description: string }
 
+export interface CompleteFactoryEquipment {
+  groups: { category: string; items: string[] }[];
+  total: number;
+  generic: boolean;
+  available: boolean;
+}
+
 export interface EquipmentPanelData {
   optionValue: number | null;
   factoryFeatureCount: number;
@@ -48,7 +57,7 @@ export interface EquipmentPanelData {
   factoryOptionsSummary: FactoryOption[];
   categories: EquipmentCategory[];
   customerLoveReasons: CustomerLoveReason[];
-  completeFactoryEquipment: [string, string[]][];
+  completeFactoryEquipment: CompleteFactoryEquipment;
   accessories: string[];
 }
 
@@ -147,6 +156,75 @@ export function curatePrintEquipment(items: string[], max = 24): { shown: string
   return { shown: shown.map((x) => x.name), remainder: clean.length - shown.length };
 }
 
+const COMPLETE_CATEGORY_LABELS: [StickerCategory, string][] = [
+  ["POWERTRAIN", "Mechanical & Performance"],
+  ["SAFETY_SECURITY", "Safety & Security"],
+  ["TECHNOLOGY", "Technology"],
+  ["COMFORT_CONVENIENCE", "Comfort & Convenience"],
+  ["INTERIOR", "Interior"],
+  ["EXTERIOR", "Exterior"],
+  ["FUNCTIONAL", "Functional"],
+  ["OTHER", "Other"],
+];
+
+const TEST_RATING_RE = /^(frontal crash rating|rollover rating|side impact|overall|headlights|latch|seat belt reminder|moderate overlap front test|small overlap front\b.*)\s*-\s*(good|acceptable|marginal|poor|[1-5])$/i;
+const DECODER_META_RE = /^(top safety pick status|standard|test revision)\s*-/i;
+const BODY_CLASS_RE = /^(sub-?compact|compact|(lower |upper )?(medium|mid-?size)|full[- ]size|large|executive|small|mini)( [a-z]+)? (suv|sedan|coupe|crossover|truck|pickup|van|minivan|wagon|hatchback)$/i;
+const PAINT_FLAG_RE = /^paint\s*-\s*(gloss|metallic|pearl|matte|solid|flat)$/i;
+
+export const isNonEquipmentRow = (item: string): boolean =>
+  item.length < 2 || TEST_RATING_RE.test(item) || DECODER_META_RE.test(item) || BODY_CLASS_RE.test(item)
+  || PAINT_FLAG_RE.test(item) || /\bwarranty\b/i.test(item);
+
+const SPELLING_VARIANTS: [RegExp, string][] = [
+  [/centre/g, "center"], [/colour/g, "color"], [/litre/g, "liter"], [/levelling/g, "leveling"],
+  [/\btyres?\b/g, "tire"], [/aluminium/g, "aluminum"], [/grey/g, "gray"],
+];
+const BRITISH_RE = /centre|colour|litre|levelling|\btyre|aluminium|grey/i;
+const spellingKey = (item: string): string => {
+  let k = item.toLowerCase();
+  for (const [re, to] of SPELLING_VARIANTS) k = k.replace(re, to);
+  return k.replace(/[^a-z0-9]+/g, "");
+};
+
+const mismatchedUpholstery = (item: string, interiorColor: string): boolean => {
+  if (!interiorColor || !UPHOLSTERY_RE.test(item)) return false;
+  const lc = item.toLowerCase();
+  const named = COLOR_WORDS.filter((c) => new RegExp(`\\b${c}\\b`).test(lc));
+  return named.length > 0 && !named.some((c) => interiorColor.includes(c));
+};
+
+export function buildCompleteFactoryEquipment(listing: VehicleListing): CompleteFactoryEquipment {
+  const sheet = readBuildSheet(listing);
+  if (!sheet || !sheet.completeEquipment.length) return { groups: [], total: 0, generic: false, available: false };
+  const ks = (listing.key_specs || {}) as Record<string, unknown>;
+  const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
+  const interiorColor = String(ks.interior_color ?? mc.interior_color ?? "").toLowerCase();
+
+  const order: string[] = [];
+  const byKey = new Map<string, string>();
+  for (const raw of sheet.completeEquipment) {
+    const item = raw.replace(/\s+/g, " ").trim();
+    if (isNonEquipmentRow(item) || mismatchedUpholstery(item, interiorColor)) continue;
+    const key = spellingKey(item);
+    const seen = byKey.get(key);
+    if (seen === undefined) { byKey.set(key, item); order.push(key); continue; }
+    if (BRITISH_RE.test(seen) && !BRITISH_RE.test(item)) byKey.set(key, item);
+  }
+
+  const buckets = new Map<StickerCategory, string[]>();
+  for (const key of order) {
+    const item = byKey.get(key) as string;
+    const cat = classifyStandardItem(item);
+    buckets.set(cat, [...(buckets.get(cat) ?? []), item]);
+  }
+  const groups = COMPLETE_CATEGORY_LABELS
+    .map(([cat, category]) => ({ category, items: buckets.get(cat) ?? [] }))
+    .filter((g) => g.items.length > 0);
+  const total = groups.reduce((n, g) => n + g.items.length, 0);
+  return { groups, total, generic: sheet.generic, available: total > 0 };
+}
+
 export function buildEquipmentPanelData(listing: VehicleListing, d: PassportData): EquipmentPanelData {
   const sheet = readBuildSheet(listing);
   const allEquipment = listingEquipment(listing);
@@ -211,7 +289,7 @@ export function buildEquipmentPanelData(listing: VehicleListing, d: PassportData
     factoryOptionsSummary,
     categories,
     customerLoveReasons,
-    completeFactoryEquipment: sheet?.standard ?? [],
+    completeFactoryEquipment: buildCompleteFactoryEquipment(listing),
     accessories,
   };
 }

@@ -138,7 +138,7 @@ describe("OEM template selection engine", () => {
 describe("page geometry validation", () => {
   const format = {
     widthInches: 11, heightInches: 8.5, orientation: "landscape" as const,
-    expectedPageCount: 1, continuationAllowed: true,
+    expectedPageCount: 1,
   };
 
   it("passes the engine's native landscape page", () => {
@@ -158,12 +158,20 @@ describe("page geometry validation", () => {
     expect(r.code).toBe("LAYOUT_OVERFLOW");
   });
 
-  it("rejects a continuation page when the template forbids one", () => {
-    const strict = { ...format, continuationAllowed: false };
-    expect(validatePageGeometry(strict, { widthPt: 792, heightPt: 612, pageCount: 2 }).code)
-      .toBe("LAYOUT_OVERFLOW");
-    expect(validatePageGeometry(format, { widthPt: 792, heightPt: 612, pageCount: 2 }).pass)
-      .toBe(true);
+  it("requires exactly one page: a second page or no page both fail", () => {
+    for (const pageCount of [0, 2]) {
+      const r = validatePageGeometry(format, { widthPt: 792, heightPt: 612, pageCount });
+      expect(r.pass).toBe(false);
+      expect(r.code).toBe("LAYOUT_OVERFLOW");
+      expect(r.reasons.join(" ")).toContain("exactly 1");
+    }
+  });
+
+  it("declares exactly one page and no continuation field on every template", () => {
+    for (const d of listTemplateDefinitions()) {
+      expect(d.pageFormat.expectedPageCount, d.displayName).toBe(1);
+      expect("continuationAllowed" in d.pageFormat, d.displayName).toBe(false);
+    }
   });
 });
 

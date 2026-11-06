@@ -26,7 +26,7 @@ import type { SelectionDowngrade, SelectionStatus } from "./oem/selection.ts";
 // Part of the generation fingerprint. Bumping it re-decides every record on
 // its next orchestration instead of letting a stale REVIEW_REQUIRED sit
 // behind a fingerprint that no longer reflects the policy that produced it.
-export const AUTO_PUBLISH_POLICY_VERSION = "2026-07-29.1";
+export const AUTO_PUBLISH_POLICY_VERSION = "2026-11-03.1";
 
 // ── Money ────────────────────────────────────────────────────────────
 // Every comparison below is integer cents. Dollar figures arrive as JSON
@@ -166,6 +166,7 @@ export type AutoPublishBlockerCode =
   | "passport_url_missing"
   | "layout_incomplete"
   | "page_geometry_failed"
+  | "one_page_review_required"
   | "qa_failed"
   | "low_confidence";
 
@@ -197,6 +198,8 @@ export interface AutoPublishInput {
     miscounted: Array<{ label: string; actualCount: number }>;
   };
   geometry: { pass: boolean; code: string; reasons: string[] };
+  /** The sticker is one physical page; a failed fit is a hold, never a second page. */
+  onePageFit?: { ok: boolean; detail: string };
 }
 
 export interface AutoPublishDecision {
@@ -280,10 +283,17 @@ export function evaluateAutoPublish(input: AutoPublishInput): AutoPublishDecisio
       `${input.geometry.code.toLowerCase()}: ${list(input.geometry.reasons)}`);
   }
 
+  if (input.onePageFit && !input.onePageFit.ok) {
+    block("one_page_review_required",
+      `${input.onePageFit.detail || "verified content does not fit one readable page"}. `
+      + "An approved one-page layout adjustment is needed before this sticker can publish; "
+      + "the remaining detail stays in the Vehicle Passport");
+  }
+
   const failedQa = Object.entries(input.qaChecks).filter(([, ok]) => !ok).map(([name]) => name);
   // content_complete and page_count_ok already have their own, more specific
   // blockers above; naming them twice would only make the reason harder to read.
-  const otherQa = failedQa.filter((n) => n !== "content_complete" && n !== "page_count_ok");
+  const otherQa = failedQa.filter((n) => n !== "content_complete" && n !== "page_count_ok" && n !== "one_page_fit_ok");
   if (otherQa.length) {
     block("qa_failed", `identity check failed: ${list(otherQa)}`);
   }

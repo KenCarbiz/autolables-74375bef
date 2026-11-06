@@ -13,7 +13,7 @@ import {
   kiaTellurideFixture, landRoverSportFixture, lexusFixture, lincolnNautilusFixture,
   mazdaCx90Fixture, mercedesGleFixture, nissanBenchmark, porsche911Fixture, ramFixture,
   subaruOutbackFixture, teslaModelYFixture, toyotaFixture, volvoXc90Fixture,
-  vwAtlasFixture, longEquipmentFixture, evFixture, noEpaFixture,
+  vwAtlasFixture, qx55ClassFixture, evFixture, noEpaFixture,
 } from "./__fixtures__/renderData";
 import type { FactoryStickerRenderData } from "./contract";
 
@@ -148,7 +148,7 @@ const BRAND_FIXTURES: Array<[string, () => FactoryStickerRenderData]> = [
   ["vw-atlas", vwAtlasFixture],
   // Shape cases: maximum content, an EV with no gasoline panel, and a
   // vehicle with no EPA record at all.
-  ["shape-max-equipment", longEquipmentFixture],
+  ["shape-max-equipment", qx55ClassFixture],
   ["shape-ev", evFixture],
   ["shape-no-epa", noEpaFixture],
 ];

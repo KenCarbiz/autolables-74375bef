@@ -17,7 +17,7 @@ import { resolveEffectiveWarranty } from "@/lib/warranty/passportWarranty";
 import { resolveWarrantyState, type WarrantyStateView } from "@/lib/warranty/state";
 import { readBuildSheet, PACKAGE_KIND_ORDER } from "@/lib/buildSheet";
 import { getEquipmentIcon } from "@/lib/equipmentIcons";
-import { buildEquipmentPanelData, type EquipmentCategory } from "@/lib/equipmentPanel";
+import { buildEquipmentPanelData, type EquipmentCategory, type CompleteFactoryEquipment } from "@/lib/equipmentPanel";
 import { buildVehiclePassportDataContract } from "@/lib/vehicleData/dataContract";
 import { readDealerAlternatives, type DealerAlternative } from "@/lib/dealerAlternatives";
 import { rememberPassportOrigin } from "@/lib/passportOrigin";
@@ -2149,18 +2149,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                 </Section>
               )}
 
-              {eq.completeFactoryEquipment.length > 0 && (
-                <details className={`${CARD} overflow-hidden group`}>
-                  <summary className="cursor-pointer list-none flex items-center justify-between gap-3 px-4 py-3.5">
-                    <span className="min-w-0">
-                      <span className="block text-[13px] font-bold text-[#0F172A] leading-tight">Complete Factory Equipment</span>
-                      <span className="block text-[11px] text-[#94A3B8] leading-tight mt-0.5">Full VIN-decoded standard equipment for reference</span>
-                    </span>
-                    <ChevronDown className="w-4 h-4 text-[#94A3B8] group-open:rotate-180 transition-transform shrink-0" />
-                  </summary>
-                  <div className="px-3 pb-3 space-y-2">{eq.completeFactoryEquipment.map(([name, items]) => <Group key={name} title={name} items={items} iconic />)}</div>
-                </details>
-              )}
+              <CompleteFactoryEquipmentCard data={eq.completeFactoryEquipment} />
             </>
           ) : <Empty>Equipment details appear here as the vehicle's build data is decoded.</Empty>}
           <Disclaimer />
@@ -3216,6 +3205,36 @@ function EquipmentExplorer({ categories, totalCount }: { categories: EquipmentCa
         <div className="space-y-2">{categories.map((c) => <EquipmentCategoryRow key={c.id} cat={c} forceOpen={expandAll} />)}</div>
       </Section>
     </div>
+  );
+}
+
+function CompleteFactoryEquipmentCard({ data }: { data: CompleteFactoryEquipment }) {
+  const [expandAll, setExpandAll] = useState(false);
+  return (
+    <details id="complete-factory-equipment" className={`${CARD} overflow-hidden group scroll-mt-4`}>
+      <summary className="cursor-pointer list-none flex items-center justify-between gap-3 px-4 py-3.5">
+        <span className="min-w-0">
+          <span className="block text-[13px] font-bold text-[#0F172A] leading-tight">Complete Factory Equipment</span>
+          <span className="block text-[11px] text-[#94A3B8] leading-tight mt-0.5">{data.available ? `${data.total} standard items, organized by category` : "Full standard equipment for reference"}</span>
+        </span>
+        <ChevronDown className="w-4 h-4 text-[#94A3B8] group-open:rotate-180 transition-transform shrink-0" />
+      </summary>
+      {data.available ? (
+        <div className="px-3 pb-3 space-y-2">
+          <div className="flex items-start justify-between gap-3 px-1">
+            <p className="text-[11px] text-[#94A3B8] leading-snug min-w-0">
+              {data.generic
+                ? "Typical standard equipment for this trim, not specific to this VIN."
+                : "Source: factory build data decoded from this VIN."}
+            </p>
+            <button type="button" onClick={() => setExpandAll((e) => !e)} className="shrink-0 text-[12px] font-semibold text-[#0B6FEA] inline-flex items-center gap-1">{expandAll ? "Collapse all" : "Expand all"} <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform ${expandAll ? "rotate-180" : ""}`} /></button>
+          </div>
+          {data.groups.map((g) => <Group key={`${g.category}-${expandAll}`} title={g.category} items={g.items} defaultOpen={expandAll} iconic />)}
+        </div>
+      ) : (
+        <p className="px-4 pb-4 text-[12px] text-[#94A3B8]">The complete factory equipment list isn't available for this vehicle yet.</p>
+      )}
+    </details>
   );
 }
 

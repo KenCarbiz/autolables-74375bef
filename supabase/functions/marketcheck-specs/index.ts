@@ -10,6 +10,7 @@
 // ──────────────────────────────────────────────────────────────────────
 import { json, preflight } from "../_shared/http.ts";
 import { adminClient, SERVICE_KEY } from "../_shared/supabase.ts";
+import { schedulerSecretValid } from "../_shared/schedulerAuth.ts";
 import { admitProviderCall, recordProviderCall } from "../_shared/providerBudget.ts";
 import { flat, structuredSheet } from "../_shared/neovinSheet.ts";
 import { describeShape, detectDrift, shapeHash } from "../_shared/payloadShape.ts";
@@ -102,10 +103,11 @@ Deno.serve(async (req) => {
   const vehicleId: string | null = body.vehicle_id || null;
   if (!validVin(vin)) return json(400, { ok: false, error: "invalid_vin" });
 
-  // ── Auth gate: service-role bypasses; otherwise require a signed-in
-  // tenant member or platform admin for the requested tenant.
+  // ── Auth gate: service-role or the scheduler secret (launch dispatcher)
+  // bypasses; otherwise require a signed-in tenant member or platform admin
+  // for the requested tenant.
   const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-  if (auth !== SERVICE_KEY) {
+  if (auth !== SERVICE_KEY && !(await schedulerSecretValid(req, admin))) {
     const { data: ures, error: uerr } = await admin.auth.getUser(auth);
     const userId = ures?.user?.id;
     if (uerr || !userId) return json(401, { ok: false, error: "authentication required" });
