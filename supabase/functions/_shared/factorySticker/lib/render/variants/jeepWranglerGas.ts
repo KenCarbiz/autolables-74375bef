@@ -31,7 +31,9 @@ function paintHeader(p: Painter, d: FactoryStickerData): void {
   p.image(logo.png, logo.assetId, 54, Y(61), 97, (97 * logo.slot.h) / logo.slot.w);
   const v = d.vehicle;
   if (v.year > 0) T(p, `${v.year} MODEL YEAR (${String(v.year).slice(-2)}MY)`, 165.4, Y(38.3), 14.8, "bold");
-  const title = [v.model, v.trim ?? "", v.drivetrain ?? ""].filter(Boolean).join(" ").toUpperCase();
+  // Jeep's header names four-wheel drive "4X4"; the spec line keeps the decoded "(4WD)".
+  const drive = v.drivetrain && /^(4WD|4X4|AWD-4WD)$/i.test(v.drivetrain.trim()) ? "4X4" : v.drivetrain ?? "";
+  const title = [v.model, v.trim ?? "", drive].filter(Boolean).join(" ").toUpperCase();
   T(p, title, 165.2, Y(72.7), fitSize(title, "bold", 25, 590, 14), "bold");
   T(p, "For more information visit: www.jeep.com", 869, Y(55.9), 12, "body", { align: "center" });
   T(p, "or call 1-877-IAM-JEEP", 869, Y(68.9), 12, "body", { align: "center" });

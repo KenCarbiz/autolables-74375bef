@@ -45,6 +45,12 @@ describe("Jeep Wrangler gasoline template", () => {
       expectNoTextOverlap(m, 0);
     });
 
+    it("names four-wheel drive 4X4 in the header, as the Jeep reference does", () => {
+      const header = pageStrings(m, 0).find((s) => s.startsWith("WRANGLER"));
+      expect(header).toBeDefined();
+      expect(header!).not.toMatch(/\b4WD\b/);
+    });
+
     it("prints every priced option, the destination charge and the stated total", () => {
       const printed = norm(m.drawnStrings.join(" "));
       for (const o of real.options) expect(printed).toContain(o.name);
