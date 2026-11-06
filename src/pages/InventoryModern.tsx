@@ -28,10 +28,9 @@ import { legacyMarketView, type LegacyListingFields } from "@/lib/market/surface
 import { presentLegacyPosition } from "@/lib/market/presentation";
 import { MARKET_BATCH_NOTICE } from "@/lib/market/batchTransition";
 import { AdvertisedPriceBand } from "@/components/inventory/AdvertisedPriceBand";
-import { PageBody, PageHeader, MetricStrip, LocalTabs, WorkTable, Th, Td, Button, FilterSelect, StatusText, type LocalTab, type Tone } from "@/components/product";
+import { PageBody, PageHeader, MetricStrip, LocalTabs, WorkTable, Th, Td, Button, FilterSelect, StatusText, InlineNote, type LocalTab, type Tone } from "@/components/product";
 import { summarizeReadiness } from "@/lib/inventory/readinessSummary";
-import { buildRegistry, inPrimaryView, summarizeScopes } from "@/lib/inventoryScope/storeScope";
-import { listTenantStores } from "@/lib/inventoryScope/api";
+import { chunk, loadScopedInventory, scopeFailureOf, type ScopedInventory } from "@/lib/inventoryScope/primaryInventory";
 import { STORE_INVENTORY_PATH } from "@/lib/inventoryScope/paths";
 
 // ──────────────────────────────────────────────────────────────
@@ -67,13 +66,12 @@ interface VehicleRow {
   recall_checked_at?: string | null;
   market_position?: string | null;
   market_value?: number | null;
+  tenant_id?: string | null;
   owning_store_id?: string | null;
   mc_dealer_id?: string | null;
 }
 
 interface ScopeNotice { primaryName: string; children: number; childVehicles: number; review: number }
-
-const SCOPE_COLS = "owning_store_id,mc_dealer_id:mc_raw->dealer->>id";
 
 interface ActivityRow { id: string; action: string; created_at: string; details: Record<string, unknown> | null; }
 
@@ -130,6 +128,8 @@ const InventoryModern = () => {
   };
   const [rows, setRows] = useState<VehicleRow[]>([]);
   const [scopeNotice, setScopeNotice] = useState<ScopeNotice | null>(null);
+  const [scopeError, setScopeError] = useState<{ code: string; title: string; detail: string } | null>(null);
+  const [primaryStoreId, setPrimaryStoreId] = useState<string | null>(null);
   const [addendumVins, setAddendumVins] = useState<Set<string>>(new Set());
   const [activity, setActivity] = useState<ActivityRow[]>([]);
   const [lastSync, setLastSync] = useState<{ at: string | null; status: Record<string, unknown> | null }>({ at: null, status: null });
@@ -243,7 +243,8 @@ const InventoryModern = () => {
 
   const deleteVehicle = async (r: VehicleRow) => {
     if (!window.confirm(`Remove ${r.ymm || r.vin} from inventory? This deletes the vehicle file.`)) return;
-    const { error } = await (supabase as any).from("vehicle_listings").delete().eq("id", r.id);
+    if (!tenant?.id || !rows.some((x) => x.id === r.id)) { toast.error("This vehicle is not in this dealership's inventory."); return; }
+    const { error } = await (supabase as any).from("vehicle_listings").delete().eq("id", r.id).eq("tenant_id", tenant.id);
     if (error) { toast.error(`Delete failed: ${error.message}`); return; }
     toast.success("Vehicle removed");
     setRows((prev) => prev.filter((x) => x.id !== r.id));
@@ -264,87 +265,64 @@ const InventoryModern = () => {
   const load = async () => {
     if (!tenant?.id) return;
     setLoading(true);
+    setScopeError(null);
     const baseCols = "id,vin,ymm,trim,mileage,condition,price,status,slug,source_url,published_at,view_count,created_at,updated_at";
-    const runSelect = (cols: string) => (supabase as any)
-      .from("vehicle_listings")
-      .select(cols)
-      .or(`tenant_id.eq.${tenant.id},tenant_id.is.null`)
-      // A car that left the feed is retired, not deleted, so active inventory
-      // has to exclude it explicitly now.
-      .neq("status", "archived")
-      .order("updated_at", { ascending: false })
-      .limit(500);
-    // Resilient cascade: drop only the columns that aren't migrated yet, so a
-    // missing newest column never knocks out the older enrichment (e.g. photos).
-    // Resilient cascade: any schema/column error (e.g. a not-yet-migrated column
-    // or a stale PostgREST schema cache right after a deploy) drops the newest
-    // columns and retries, so it never blanks the page over a missing column.
-    const isSchemaErr = (e: { message?: string; code?: string } | null) =>
-      !!e && (/column|does not exist|schema cache/i.test(e.message || "") || ["42703", "PGRST204", "42P01"].includes(e.code || ""));
-    let data: unknown = null;
-    let error: { message?: string; code?: string } | null = null;
+    // Display columns, richest first: a not-yet-migrated display column drops
+    // to the next set. The store-scope columns are part of every set, so a
+    // missing scope column fails the load instead of silently unscoping it.
+    let scoped: ScopedInventory<VehicleRow>;
     try {
-      for (const cols of [
-        `${baseCols},hero_image_url,recall_status,open_recall_count,recall_payload,recall_check,recall_checked_at,market_position,market_value,${SCOPE_COLS}`,
-        `${baseCols},hero_image_url,recall_status,open_recall_count,recall_payload,recall_check,recall_checked_at,market_position,market_value`,
-        `${baseCols},hero_image_url,recall_status,open_recall_count,recall_payload,recall_check,recall_checked_at`,
-        `${baseCols},hero_image_url,recall_status,open_recall_count`,
-        baseCols,
-      ]) {
-        const res = await runSelect(cols);
-        if (!res.error) { data = res.data; error = null; break; }
-        error = res.error;
-        if (!isSchemaErr(res.error)) break; // genuine error → stop retrying
-      }
+      scoped = await loadScopedInventory<VehicleRow>({
+        tenantId: tenant.id,
+        includeArchived: false,
+        columnSets: [
+          `${baseCols},hero_image_url,recall_status,open_recall_count,recall_payload,recall_check,recall_checked_at,market_position,market_value`,
+          `${baseCols},hero_image_url,recall_status,open_recall_count,recall_payload,recall_check,recall_checked_at`,
+          `${baseCols},hero_image_url,recall_status,open_recall_count`,
+          baseCols,
+        ],
+      });
     } catch (e) {
-      error = { message: e instanceof Error ? e.message : "network error" };
-    }
-    if (error) {
-      // Preserve the last good rows on a transient re-load failure; only blank
-      // + toast on the very first load when there is nothing to show.
-      setRows((prev) => { if (prev.length === 0) toast.error("Couldn't refresh inventory — retrying shortly."); return prev; });
+      // Fail closed: drop whatever was on screen, never keep or show a mixed list.
+      setRows([]);
+      setScopeNotice(null);
+      setPrimaryStoreId(null);
+      setScopeError(scopeFailureOf(e));
       setLoading(false);
       return;
     }
     {
-      let rows = (data || []) as VehicleRow[];
-      // Primary dealership by default: child-store vehicles and listings whose
-      // provider rooftop is not mapped to a store are counted on the Inventory
-      // by store screen, never in this list or its totals.
-      let nextScope: ScopeNotice | null = null;
-      if (rows.length && "owning_store_id" in rows[0]) {
-        try {
-          const stores = await listTenantStores(tenant.id);
-          const reg = buildRegistry(stores);
-          if (reg.primary) {
-            const all = rows;
-            rows = all.filter((r) => inPrimaryView(r, reg));
-            const sum = summarizeScopes(all, reg);
-            nextScope = { primaryName: reg.primary.display_name, children: reg.children.length, childVehicles: [...sum.byChild.values()].reduce((n, c) => n + c.total, 0), review: sum.review.total };
-          }
-        } catch { /* store registry unreadable: show the list as before */ }
-      }
-      setScopeNotice(nextScope);
+      // Primary dealership only: child-store vehicles and listings without
+      // verified rooftop evidence are counted on Inventory by store, never in
+      // this list or its totals.
+      let rows = [...scoped.primaryRows].sort((x, y) => (y.updated_at || "").localeCompare(x.updated_at || "") || x.id.localeCompare(y.id));
+      const reg = scoped.registry;
+      setPrimaryStoreId(scoped.mode === "multi_rooftop" ? reg.primary?.id ?? null : null);
+      setScopeNotice(scoped.mode === "multi_rooftop" && reg.primary ? {
+        primaryName: reg.primary.display_name,
+        children: reg.children.length,
+        childVehicles: [...scoped.summary.byChild.values()].reduce((n, c) => n + c.total, 0),
+        review: scoped.summary.review.total,
+      } : null);
       const vins = rows.map((r) => r.vin).filter(Boolean);
       const adVins = new Set<string>();
       if (vins.length) {
         try {
-          const [{ data: delAdd }, { data: vfiles }, { data: allAdd }] = await Promise.all([
-            (supabase as any).from("addendums").select("vehicle_vin").not("delivered_at", "is", null).in("vehicle_vin", vins),
-            (supabase as any).from("vehicle_files").select("vin, stock_number, deal_status").in("vin", vins),
-            (supabase as any).from("addendums").select("vehicle_vin").in("vehicle_vin", vins),
-          ]);
           const stockByVin = new Map<string, string>();
-          const delivered = new Set<string>(
-            (delAdd || []).map((r: { vehicle_vin: string }) => (r.vehicle_vin || "").toUpperCase())
-          );
-          for (const a of (allAdd || []) as Array<{ vehicle_vin: string }>) {
-            adVins.add((a.vehicle_vin || "").toUpperCase());
-          }
-          for (const f of (vfiles || []) as Array<{ vin: string; stock_number: string | null; deal_status: string }>) {
-            const v = (f.vin || "").toUpperCase();
-            if (f.stock_number) stockByVin.set(v, f.stock_number);
-            if (f.deal_status === "delivered") delivered.add(v);
+          const delivered = new Set<string>();
+          for (const part of chunk(vins)) {
+            const [{ data: delAdd }, { data: vfiles }, { data: allAdd }] = await Promise.all([
+              (supabase as any).from("addendums").select("vehicle_vin").not("delivered_at", "is", null).in("vehicle_vin", part),
+              (supabase as any).from("vehicle_files").select("vin, stock_number, deal_status").in("vin", part),
+              (supabase as any).from("addendums").select("vehicle_vin").in("vehicle_vin", part),
+            ]);
+            for (const r of (delAdd || []) as Array<{ vehicle_vin: string }>) delivered.add((r.vehicle_vin || "").toUpperCase());
+            for (const a of (allAdd || []) as Array<{ vehicle_vin: string }>) adVins.add((a.vehicle_vin || "").toUpperCase());
+            for (const f of (vfiles || []) as Array<{ vin: string; stock_number: string | null; deal_status: string }>) {
+              const v = (f.vin || "").toUpperCase();
+              if (f.stock_number) stockByVin.set(v, f.stock_number);
+              if (f.deal_status === "delivered") delivered.add(v);
+            }
           }
           rows = rows
             .filter((r) => !delivered.has((r.vin || "").toUpperCase()))
@@ -575,6 +553,23 @@ const InventoryModern = () => {
     URL.revokeObjectURL(url);
   };
 
+  if (scopeError) {
+    return (
+      <PageBody width="wide">
+        <PageHeader title="Inventory" description="All vehicles in your inventory with status, pricing and next steps." />
+        <div data-testid="inventory-scope-error">
+          <InlineNote tone="danger" title={scopeError.title}>
+            <p>{scopeError.detail} No vehicle has been moved, changed or removed.</p>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <Button variant="primary" onClick={() => load()} disabled={loading}>{loading ? "Retrying" : "Retry"}</Button>
+              <Link to={STORE_INVENTORY_PATH} className="text-[14px] font-semibold text-adm-primary hover:underline">Inventory by store</Link>
+            </div>
+          </InlineNote>
+        </div>
+      </PageBody>
+    );
+  }
+
   return (
     <PageBody width="wide">
       <PageHeader
@@ -754,10 +749,10 @@ const InventoryModern = () => {
 
       {/* Modals */}
       {showAdd && (
-        <AddVehicleModal tenantId={tenant?.id || null} userId={user?.id || null} onClose={() => setShowAdd(false)} onCreated={(id) => { setShowAdd(false); navigate(`/vehicle-file/${id}`); }} />
+        <AddVehicleModal tenantId={tenant?.id || null} userId={user?.id || null} owningStoreId={primaryStoreId} onClose={() => setShowAdd(false)} onCreated={(id) => { setShowAdd(false); navigate(`/vehicle-file/${id}`); }} />
       )}
       {showImport && (
-        <CsvImportModal tenantId={tenant?.id || null} userId={user?.id || null} onClose={() => setShowImport(false)} onImported={() => { setShowImport(false); load(); }} />
+        <CsvImportModal tenantId={tenant?.id || null} userId={user?.id || null} owningStoreId={primaryStoreId} onClose={() => setShowImport(false)} onImported={() => { setShowImport(false); load(); }} />
       )}
     </PageBody>
   );
@@ -1191,7 +1186,7 @@ const EmptyState = ({ onAdd, total }: { onAdd: () => void; total: number }) => (
   />
 );
 
-interface AddProps { tenantId: string | null; userId: string | null; onClose: () => void; onCreated: (id: string) => void }
+interface AddProps { tenantId: string | null; userId: string | null; owningStoreId: string | null; onClose: () => void; onCreated: (id: string) => void }
 
 const makeSlug = (seed: string) => {
   const clean = seed.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 24);
@@ -1199,7 +1194,7 @@ const makeSlug = (seed: string) => {
   return `${clean || "veh"}-${rand}`;
 };
 
-const AddVehicleModal = ({ tenantId, userId, onClose, onCreated }: AddProps) => {
+const AddVehicleModal = ({ tenantId, userId, owningStoreId, onClose, onCreated }: AddProps) => {
   const { decode, decoding } = useVinDecode();
   const [vin, setVin] = useState("");
   const [stock, setStock] = useState("");
@@ -1233,6 +1228,8 @@ const AddVehicleModal = ({ tenantId, userId, onClose, onCreated }: AddProps) => 
       .from("vehicle_listings")
       .insert({
         store_id: tenantId, tenant_id: tenantId, vin: vin.trim().toUpperCase(), slug, ymm,
+        // Added from the primary dealership's inventory: the dealer attests the rooftop.
+        ...(owningStoreId ? { owning_store_id: owningStoreId } : {}),
         trim: decoded?.trim || null,
         mileage: mileage ? parseInt(mileage.replace(/[^0-9]/g, ""), 10) : null,
         condition, price: price ? parseFloat(price.replace(/[^0-9.]/g, "")) : null,
@@ -1296,9 +1293,9 @@ const AddVehicleModal = ({ tenantId, userId, onClose, onCreated }: AddProps) => 
   );
 };
 
-interface ImportProps { tenantId: string | null; userId: string | null; onClose: () => void; onImported: () => void }
+interface ImportProps { tenantId: string | null; userId: string | null; owningStoreId: string | null; onClose: () => void; onImported: () => void }
 
-const CsvImportModal = ({ tenantId, userId, onClose, onImported }: ImportProps) => {
+const CsvImportModal = ({ tenantId, userId, owningStoreId, onClose, onImported }: ImportProps) => {
   const [text, setText] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -1326,6 +1323,7 @@ const CsvImportModal = ({ tenantId, userId, onClose, onImported }: ImportProps) 
       const ymm = [year, make, model].filter(Boolean).join(" ");
       return {
         store_id: tenantId, tenant_id: tenantId, vin, slug: vin, ymm: ymm || null,
+        ...(owningStoreId ? { owning_store_id: owningStoreId } : {}),
         trim: idx.trim >= 0 ? cells[idx.trim] : null,
         mileage: idx.mileage >= 0 && cells[idx.mileage] ? parseInt(cells[idx.mileage].replace(/[^0-9]/g, ""), 10) : null,
         price: idx.price >= 0 && cells[idx.price] ? parseFloat(cells[idx.price].replace(/[^0-9.]/g, "")) : null,

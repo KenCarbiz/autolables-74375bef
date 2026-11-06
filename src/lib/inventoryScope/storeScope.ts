@@ -9,8 +9,10 @@
 //
 // A listing that carries a provider dealer id nobody has mapped is held in a
 // review bucket instead of being counted as primary inventory, because it may
-// be a sister store's car. A listing with no provider identity at all (manual
-// entry, legacy row) is the tenant's own, so it stays in the primary view.
+// be a sister store's car. A listing with no rooftop evidence at all (manual
+// entry, legacy row) is the tenant's own when the tenant has one rooftop; when
+// the tenant has child stores it could be any of them, so it is held for review
+// too. Nothing is ever assumed to be the primary store's.
 
 export type Condition = "new" | "used" | "cpo";
 
@@ -24,13 +26,14 @@ export interface ScopeStore {
 
 export interface ScopeListing {
   id: string;
+  tenant_id?: string | null;
   owning_store_id?: string | null;
   mc_dealer_id?: string | number | null;
   condition?: string | null;
 }
 
 export type ScopeKind = "primary" | "child" | "rooftop_review";
-export type ScopeBasis = "owning_store" | "marketcheck_dealer_id" | "no_provider_identity" | "unmapped_provider_dealer" | "unknown_store";
+export type ScopeBasis = "owning_store" | "marketcheck_dealer_id" | "single_rooftop" | "no_verified_rooftop" | "unmapped_provider_dealer" | "ambiguous_provider_dealer" | "unknown_store";
 
 export interface ListingScope { kind: ScopeKind; storeId: string | null; basis: ScopeBasis }
 
@@ -41,6 +44,8 @@ export interface StoreRegistry {
   byMcDealer: Map<string, ScopeStore>;
   /** Dealer ids mapped to more than one store. They resolve to review, never to a guess. */
   ambiguousMcDealers: Set<string>;
+  /** Stores the tenant has according to the server, not how many this client can see. */
+  verifiedStoreCount: number;
 }
 
 export const MC_DEALER_KEY = "marketcheck_dealer_id";
@@ -51,7 +56,7 @@ const norm = (v: unknown): string | null => {
   return s ? s : null;
 };
 
-export function buildRegistry(stores: ScopeStore[]): StoreRegistry {
+export function buildRegistry(stores: ScopeStore[], verifiedStoreCount = stores.length): StoreRegistry {
   const byId = new Map<string, ScopeStore>();
   const byMcDealer = new Map<string, ScopeStore>();
   const ambiguous = new Set<string>();
@@ -72,14 +77,26 @@ export function buildRegistry(stores: ScopeStore[]): StoreRegistry {
     .filter((s) => !primary || s.id !== primary.id)
     .filter((s) => !s.is_primary_inventory_store)
     .sort((a, b) => a.display_name.localeCompare(b.display_name));
-  return { primary, children, byId, byMcDealer, ambiguousMcDealers: ambiguous };
+  return { primary, children, byId, byMcDealer, ambiguousMcDealers: ambiguous, verifiedStoreCount: Math.max(verifiedStoreCount, byId.size) };
 }
+
+/**
+ * One rooftop (or none registered): every listing of the tenant is that rooftop's.
+ * Decided by the server's store count, so a client that can see only one of
+ * several stores is never treated as single-rooftop.
+ */
+export const isSingleRooftop = (reg: StoreRegistry): boolean => reg.verifiedStoreCount <= 1;
 
 const kindOf = (reg: StoreRegistry, store: ScopeStore): ScopeKind =>
   reg.primary && store.id === reg.primary.id ? "primary" : "child";
 
 export function resolveListingScope(listing: ScopeListing, reg: StoreRegistry): ListingScope {
   const owner = norm(listing.owning_store_id);
+  if (isSingleRooftop(reg)) {
+    const only = [...reg.byId.values()][0] ?? null;
+    if (owner && owner !== only?.id) return { kind: "rooftop_review", storeId: owner, basis: "unknown_store" };
+    return { kind: "primary", storeId: only?.id ?? null, basis: owner ? "owning_store" : "single_rooftop" };
+  }
   if (owner) {
     const s = reg.byId.get(owner);
     if (!s) return { kind: "rooftop_review", storeId: owner, basis: "unknown_store" };
@@ -89,9 +106,10 @@ export function resolveListingScope(listing: ScopeListing, reg: StoreRegistry): 
   if (dealer) {
     const s = reg.byMcDealer.get(dealer);
     if (s) return { kind: kindOf(reg, s), storeId: s.id, basis: "marketcheck_dealer_id" };
+    if (reg.ambiguousMcDealers.has(dealer)) return { kind: "rooftop_review", storeId: null, basis: "ambiguous_provider_dealer" };
     return { kind: "rooftop_review", storeId: null, basis: "unmapped_provider_dealer" };
   }
-  return { kind: "primary", storeId: reg.primary?.id ?? null, basis: "no_provider_identity" };
+  return { kind: "rooftop_review", storeId: null, basis: "no_verified_rooftop" };
 }
 
 /** True when a row belongs in the default (primary dealership) list. */
