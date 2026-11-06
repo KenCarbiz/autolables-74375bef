@@ -101,8 +101,8 @@ describe("marketcheck-specs — capture first, extract second (F3)", () => {
     expect(src).toContain("destination_charge");
     expect(src).toContain("total_msrp");
     // per-item factory option codes on both packages and options
-    expect(src).toMatch(/packages: \{ name: string; code\?: string; msrp\?: number; contents: string\[\] \}\[\]/);
-    expect(src).toMatch(/options: \{ name: string; code\?: string; msrp\?: number \}\[\]/);
+    expect(src).toMatch(/packages: \{ name: string; code\?: string; msrp\?: number; contents: string\[\];[^}]*\}\[\]/);
+    expect(src).toMatch(/options: \{ name: string; code\?: string; msrp\?: number[;}][^\]]*\[\]/);
     expect(src).toContain("exterior_color");
     expect(src).toContain("interior_color");
     expect(src).toContain("made_in");

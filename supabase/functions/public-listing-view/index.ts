@@ -889,9 +889,11 @@ serve(async (req) => {
       }
       if (row.blackbook && typeof row.blackbook === "object") {
         const bb = row.blackbook as Record<string, unknown>;
-        // tradein ships as an independent-guide value row; wholesale (and the
-        // raw provider payload) stays stripped from the anonymous view.
-        row.blackbook = { available: bb.available === true, retail: bb.retail ?? null, tradein: bb.tradein ?? null, checked_at: bb.checked_at ?? null };
+        // Retail only. Trade-in and wholesale are dealer acquisition values
+        // and need explicit owner authorization before they reach a shopper
+        // (Passport data-integration audit, Nov 2026); the raw provider
+        // payload stays stripped too.
+        row.blackbook = { available: bb.available === true, retail: bb.retail ?? null, checked_at: bb.checked_at ?? null };
       }
       if (row.history_payload && typeof row.history_payload === "object") {
         const hp = row.history_payload as Record<string, unknown>;

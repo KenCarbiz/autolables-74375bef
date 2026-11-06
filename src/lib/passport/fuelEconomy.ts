@@ -23,13 +23,15 @@ export interface FuelEconomyView {
   /** EPA-sourced annual fuel cost, or null when the source didn't provide one. */
   annualFuelCost: number | null;
   annualFuelCostLabel: string | null;  // "EPA estimated annual fuel cost" when present
+  /** "MPGe" for a battery-electric EPA record, otherwise "MPG". */
+  unit: "MPG" | "MPGe";
   note: string;
   source: string | null;               // "EPA · fueleconomy.gov" when data exists
 }
 
 const UNAVAILABLE: FuelEconomyView = {
   available: false, fuelType: null, cityMpg: null, highwayMpg: null, combinedMpg: null,
-  rangeMiles: null, annualFuelCost: null, annualFuelCostLabel: null,
+  rangeMiles: null, annualFuelCost: null, annualFuelCostLabel: null, unit: "MPG",
   note: "Fuel-economy information is currently unavailable for this vehicle.", source: null,
 };
 
@@ -39,7 +41,9 @@ export function resolveFuelEconomy(epa: PassportData["epa"]): FuelEconomyView {
   const hasCost = epa.annualFuelCost != null && Number.isFinite(epa.annualFuelCost);
   const note = hasCost
     ? FUEL_MODULE_DISCLAIMER
-    : "Miles-per-gallon shown from EPA estimates. Annual fuel-cost information is unavailable for this vehicle.";
+    : epa.unit === "MPGe"
+      ? "MPGe (miles-per-gallon equivalent) shown from EPA estimates. Annual fuel-cost information is unavailable for this vehicle."
+      : "Miles-per-gallon shown from EPA estimates. Annual fuel-cost information is unavailable for this vehicle.";
 
   return {
     available: true,
@@ -50,6 +54,7 @@ export function resolveFuelEconomy(epa: PassportData["epa"]): FuelEconomyView {
     rangeMiles: epa.rangeMiles ?? null,
     annualFuelCost: hasCost ? epa.annualFuelCost : null,
     annualFuelCostLabel: hasCost ? "EPA estimated annual fuel cost" : null,
+    unit: epa.unit ?? "MPG",
     note,
     source: "EPA · fueleconomy.gov",
   };

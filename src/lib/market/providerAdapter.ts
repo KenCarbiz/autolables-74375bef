@@ -266,6 +266,11 @@ export function parsePredictionResponse(args: {
     ? args.body
     : {}) as Record<string, unknown>;
 
+  if (Array.isArray(body.generic_prices)) {
+    parseErrors.push("generic_fallback");
+    return { valuation: null, parseErrors };
+  }
+
   let selectedField: ProviderResponseField | null = null;
   let predictedValue: number | null = null;
   for (const candidate of PREDICTION_FIELDS) {

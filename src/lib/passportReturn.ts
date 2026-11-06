@@ -13,7 +13,7 @@
 // protocol-relative URL — so the param can never drive an open redirect.
 // ──────────────────────────────────────────────────────────────────────
 
-const PASSPORT_PATH_RE = /^\/v3?\/[A-Za-z0-9._-]+$/; // /v/<slug> or /v3/<slug>
+const PASSPORT_PATH_RE = /^\/(?:v3?|v-next)\/[A-Za-z0-9._-]+$/; // /v/<slug>, /v3/<slug> or the /v-next/<slug> draft
 
 // A returnTo is safe only when it is a root-relative path to a known passport
 // surface. Reject anything with a scheme, host, protocol-relative prefix, or
