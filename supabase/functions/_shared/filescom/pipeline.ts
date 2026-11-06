@@ -307,6 +307,7 @@ export async function processImportJob(deps: Deps, job: Job): Promise<JobOutcome
   const partitions: PartitionReport[] = [];
   const affected: string[] = [];
   let applied = 0;
+  let paused = 0;
   let transientFailure = false;
   for (const p of parts.partitions) {
     const m = maps.get(p.sourceDealerId) ?? null;
@@ -322,6 +323,7 @@ export async function processImportJob(deps: Deps, job: Job): Promise<JobOutcome
     if (!m.store || m.store.status !== "active" || !m.store.inventory_feed_enabled || m.store.feed_import_paused) {
       rep.snapshotId = await recordUnstaged(db, p, m, runId, job.id, job.path, loaded, "rejected", "store_feed_not_enabled", rep);
       rep.status = "rejected"; rep.reason = "store_feed_not_enabled";
+      paused++;
       partitions.push(rep);
       continue;
     }
@@ -348,12 +350,16 @@ export async function processImportJob(deps: Deps, job: Job): Promise<JobOutcome
 
   const total = partitions.length;
   const missingPartitions = await missingPartitionsFor(db, job.path, parts.partitions.map((p) => p.sourceDealerId));
-  const runStatus = applied === total && missingPartitions.length === 0 ? "applied" : applied > 0 ? "partial" : transientFailure ? "failed" : "rejected";
+  // A file held only because its store is paused is still a valid file. It is
+  // recorded as skipped and its version stays retryable, so resuming the store
+  // and importing again works instead of the file reading as rejected for good.
+  const heldByPause = applied === 0 && !transientFailure && total > 0 && paused === total;
+  const runStatus = applied === total && missingPartitions.length === 0 ? "applied" : applied > 0 ? "partial" : transientFailure ? "failed" : heldByPause ? "skipped" : "rejected";
   const report = { kind: "import", outcome: runStatus, headers: parts.headers, rowsWithoutDealer: parts.rowsWithoutDealer, identities: total, partitions, missingPartitions, inventoryWrites: applied, providerCalls: 0 };
   await finishRun(db, runId, file?.id ?? null, runStatus, { ...version, failure_reason: runStatus === "applied" ? null : [...partitions.filter((x) => x.status !== "applied").map((x) => `${x.sourceDealerId}:${x.reason}`), ...missingPartitions.map((d) => `${d}:partition_missing`)].join(",").slice(0, 300), report, affected_store_ids: affected });
-  await setVersion(db, c.version_id, runStatus === "applied" ? "applied" : runStatus === "partial" ? "partial" : runStatus === "failed" ? "failed" : "rejected", { run_id: runId, content_sha256: loaded.sha });
+  await setVersion(db, c.version_id, runStatus === "applied" ? "applied" : runStatus === "partial" ? "partial" : runStatus === "failed" || runStatus === "skipped" ? "failed" : "rejected", { run_id: runId, content_sha256: loaded.sha });
   const result = { runId, partitions: partitions.map((x) => ({ sourceDealerId: x.sourceDealerId, storeId: x.mapping?.storeId ?? null, snapshotId: x.snapshotId ?? null, status: x.status, reason: x.reason ?? null, apply: x.apply ?? null })) };
-  const jobStatus = runStatus === "applied" ? "succeeded" : runStatus === "partial" ? "partial" : "failed";
+  const jobStatus = runStatus === "applied" ? "succeeded" : runStatus === "partial" ? "partial" : runStatus === "skipped" ? "skipped" : "failed";
   const st = await finishJob(db, job, jobStatus, { error: jobStatus === "succeeded" ? undefined : report.partitions.find((x) => x.status !== "applied")?.reason ?? runStatus, retryable: runStatus === "failed", result, runId, versionKey: vkey });
   return { status: st, result };
 }

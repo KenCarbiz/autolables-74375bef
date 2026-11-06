@@ -4,7 +4,7 @@ import {
 } from "./api";
 
 export type MappingState =
-  | "source_unread" | "stale" | "validation_failed" | "unmapped" | "proposed" | "identity_conflict" | "ready_for_approval" | "approved_paused" | "approved" | "imported";
+  | "source_unread" | "stale" | "validation_failed" | "unmapped" | "proposed" | "identity_conflict" | "ready_for_approval" | "approved_paused" | "approved" | "import_failed" | "imported";
 
 export const STATE_LABEL: Record<MappingState, string> = {
   source_unread: "Source unread",
@@ -14,8 +14,9 @@ export const STATE_LABEL: Record<MappingState, string> = {
   proposed: "Proposed",
   identity_conflict: "Identity conflict",
   ready_for_approval: "Ready for approval",
-  approved_paused: "Approved, import paused",
-  approved: "Approved",
+  approved_paused: "Import paused",
+  approved: "Ready to import",
+  import_failed: "Import failed",
   imported: "Imported",
 };
 
@@ -36,6 +37,9 @@ export interface MappingRow {
   nextAction: string;
   lastArrival: string | null;
   lastImport: string | null;
+  lastImportFailure: { at: string; reason: string | null } | null;
+  fileApproved: boolean;
+  validated: boolean;
   pausedReason: string | null;
 }
 
@@ -52,12 +56,21 @@ export interface MappingBoardInput {
 const latestPartitionRun = (runs: FeedRun[], path: string) =>
   runs.filter((r) => r.path === path && r.kind === "dry_run" && isPartitionReport(r.report)).sort((a, b) => b.started_at.localeCompare(a.started_at))[0] ?? null;
 
-function lastImportFor(runs: FeedRun[], path: string, dealerId: string, since: string | null): string | null {
-  for (const r of runs.filter((x) => x.path === path && x.kind === "import").sort((a, b) => b.started_at.localeCompare(a.started_at))) {
-    const parts = (r.report as { partitions?: Array<{ sourceDealerId?: string; status?: string }> } | null)?.partitions ?? [];
-    if (parts.some((p) => p.sourceDealerId === dealerId && p.status === "applied") && (!since || r.started_at >= since)) return r.finished_at ?? r.started_at;
+interface ImportHistory { success: { at: string; sha: string | null } | null; failure: { at: string; reason: string | null } | null }
+
+// Walks this DealerId's import runs newest first. The failure is reported only
+// when it is newer than the last success, so an old paused attempt never hides
+// a later good import.
+function importHistory(runs: FeedRun[], path: string, dealerId: string, since: string | null): ImportHistory {
+  let failure: ImportHistory["failure"] = null;
+  for (const r of runs.filter((x) => x.path === path && x.kind === "import" && (!since || x.started_at >= since)).sort((a, b) => b.started_at.localeCompare(a.started_at))) {
+    const parts = (r.report as { partitions?: Array<{ sourceDealerId?: string; status?: string; reason?: string | null }> } | null)?.partitions ?? [];
+    const p = parts.find((x) => x.sourceDealerId === dealerId);
+    if (!p) continue;
+    if (p.status === "applied") return { success: { at: r.finished_at ?? r.started_at, sha: r.content_sha256 ?? null }, failure };
+    if (!failure && p.status !== "superseded") failure = { at: r.finished_at ?? r.started_at, reason: p.reason ?? r.failure_reason ?? null };
   }
-  return null;
+  return { success: null, failure };
 }
 
 function pauseReason(controls: InventoryFeedControls | null, store: DealerStore | null): string | null {
@@ -84,7 +97,8 @@ export function buildMappingRows(input: MappingBoardInput): { production: Mappin
     if (!report || report.partitions.length === 0) {
       const failed = !!report && run?.status !== "passed";
       production.push({
-        ...base, key: file.path, partition: null, dealerId: null, observed: null, mapping: null, store: null, group: null, lastImport: null, pausedReason: null,
+        ...base, key: file.path, partition: null, dealerId: null, observed: null, mapping: null, store: null, group: null, lastImport: null, lastImportFailure: null, pausedReason: null,
+        fileApproved: !!binding, validated: false,
         state: failed ? "validation_failed" : "source_unread",
         nextAction: failed ? `Fix the feed: ${(report?.rejectReasons ?? []).join(", ").replace(/_/g, " ") || "the file was rejected"}` : "Run a dry run",
       });
@@ -94,14 +108,19 @@ export function buildMappingRows(input: MappingBoardInput): { production: Mappin
       const mapping = input.mappings.find((m) => m.source_dealer_id === p.sourceDealerId && (m.status === "pending" || m.status === "approved")) ?? null;
       const store = mapping ? storeById.get(mapping.store_id) ?? null : null;
       const group = store ? groupById.get(store.group_id) ?? null : null;
-      const lastImport = lastImportFor(input.runs, file.path, p.sourceDealerId, mapping?.approved_at ?? null);
+      const hist = importHistory(input.runs, file.path, p.sourceDealerId, mapping?.approved_at ?? null);
+      const lastImport = hist.success?.at ?? null;
+      const lastImportFailure = hist.failure;
       const pausedReason = pauseReason(input.controls, store);
+      const newerFile = hist.success ? !!hist.success.sha && !!file.last_content_sha256 && hist.success.sha !== file.last_content_sha256 : stale;
+      const validated = run!.status === "passed" && p.outcome !== "rejected" && !stale;
       let state: MappingState;
       let nextAction: string;
       const ev = mapping?.evidence ?? null;
       if (mapping?.status === "approved") {
-        if (lastImport) { state = "imported"; nextAction = stale ? "Newer file waiting; import when ready" : "None"; }
-        else if (pausedReason) { state = "approved_paused"; nextAction = `${pausedReason}. Resume it to import.`; }
+        if (pausedReason) { state = "approved_paused"; nextAction = `${pausedReason}. Resume it to import.`; }
+        else if (lastImportFailure) { state = "import_failed"; nextAction = `Last import failed: ${(lastImportFailure.reason ?? "unknown").replace(/^[^:]*:/, "").replace(/_/g, " ")}. Import again.`; }
+        else if (lastImport) { state = "imported"; nextAction = newerFile ? "Newer file waiting; import when ready" : "None"; }
         else { state = "approved"; nextAction = "Import now"; }
       } else if (stale) {
         state = "stale"; nextAction = "Run a new dry run; the file changed";
@@ -118,7 +137,7 @@ export function buildMappingRows(input: MappingBoardInput): { production: Mappin
       } else {
         state = "ready_for_approval"; nextAction = ev.verdict === "name_review" ? "Approve with name acknowledgement" : "Approve";
       }
-      production.push({ ...base, key: `${file.path}::${p.sourceDealerId}`, partition: p, dealerId: p.sourceDealerId, observed: p.identity, mapping, store, group, lastImport, pausedReason, state, nextAction });
+      production.push({ ...base, key: `${file.path}::${p.sourceDealerId}`, partition: p, dealerId: p.sourceDealerId, observed: p.identity, mapping, store, group, lastImport, lastImportFailure, fileApproved: !!binding, validated, pausedReason, state, nextAction, stale: lastImport ? newerFile : stale });
     }
   }
   return { production, tests };
