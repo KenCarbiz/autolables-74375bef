@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { buildRegistry, inPrimaryView, type ScopeListing } from "@/lib/inventoryScope/storeScope";
-import { listTenantStores } from "@/lib/inventoryScope/api";
-import { useNavigate } from "react-router-dom";
+import { loadScopedInventory, scopeFailureOf } from "@/lib/inventoryScope/primaryInventory";
+import { STORE_INVENTORY_PATH } from "@/lib/inventoryScope/paths";
+import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -53,8 +53,6 @@ interface VRow {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sb = () => supabase as any;
 
-const PAGE_SIZE = 1000;
-const MAX_ROWS = 5000;
 const CHUNK = 200;
 
 type Tone = "critical" | "warn" | "ok" | "muted";
@@ -97,13 +95,13 @@ const InventoryCommandCenterV2 = () => {
   const quickActionsOn = settings.inventory_show_quick_actions === true;
 
   const [rows, setRows] = useState<VRow[]>([]);
-  const [truncated, setTruncated] = useState(false);
+  const [scopeInfo, setScopeInfo] = useState<{ primaryName: string; children: number; review: number } | null>(null);
   const [addVins, setAddVins] = useState<Set<string>>(new Set());
   const [stickerDocs, setStickerDocs] = useState<Map<string, StickerDoc[]>>(new Map());
   const [docsLoaded, setDocsLoaded] = useState(false);
   const [lastSync, setLastSync] = useState<{ at: string | null }>({ at: null });
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
+  const [loadError, setLoadError] = useState<{ title: string; detail: string } | null>(null);
   const [reload, setReload] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
   const [q, setQ] = useState("");
@@ -119,43 +117,31 @@ const InventoryCommandCenterV2 = () => {
     if (!tenant?.id) return;
     let on = true;
     (async () => {
-      setLoading(true); setLoadError(false);
+      setLoading(true); setLoadError(null);
       const baseCols = "id,vin,ymm,trim,mileage,condition,price,status,slug,published_at,updated_at";
-      const isSchemaErr = (e: { message?: string; code?: string } | null) =>
-        !!e && (/column|does not exist|schema cache/i.test(e.message || "") || ["42703", "PGRST204", "42P01"].includes(e.code || ""));
-      const colSets = [
-        `${baseCols},hero_image_url,recall_status,open_recall_count,recall_payload,recall_check,recall_checked_at,market_position,market_value,owning_store_id,mc_dealer_id:mc_raw->dealer->>id`,
-        `${baseCols},hero_image_url,recall_status,open_recall_count,recall_payload,recall_check,recall_checked_at,market_position,market_value`,
-        `${baseCols},hero_image_url,recall_status,open_recall_count,recall_payload,recall_check,recall_checked_at`,
-        `${baseCols},hero_image_url,recall_status,open_recall_count`,
-        baseCols,
-      ];
-      let cols: string | null = null;
-      let list: VRow[] = [];
-      let failed = false;
-      for (let from = 0; from < MAX_ROWS; from += PAGE_SIZE) {
-        const tryCols: string[] = cols ? [cols] : colSets;
-        let pageData: VRow[] | null = null;
-        for (const c of tryCols) {
-          const res = await sb().from("vehicle_listings").select(c)
-            .or(`tenant_id.eq.${tenant.id},tenant_id.is.null`)
-            .order("updated_at", { ascending: false }).order("id", { ascending: true })
-            .range(from, from + PAGE_SIZE - 1);
-          if (!res.error) { pageData = res.data as VRow[]; cols = c; break; }
-          if (!isSchemaErr(res.error)) break;
-        }
-        if (!pageData) { failed = true; break; }
-        list = list.concat(pageData);
-        if (pageData.length < PAGE_SIZE) break;
-      }
-      if (!on) return;
-      if (failed && !list.length) { setLoadError(true); setLoading(false); toast.error("Couldn't load inventory"); return; }
-      setTruncated(list.length >= MAX_ROWS);
-      if (list.length && "owning_store_id" in list[0]) {
-        try {
-          const reg = buildRegistry(await listTenantStores(tenant.id));
-          if (reg.primary) list = list.filter((r) => inPrimaryView(r as ScopeListing, reg));
-        } catch { /* store registry unreadable: unscoped list */ }
+      let list: VRow[];
+      try {
+        const scoped = await loadScopedInventory<VRow>({
+          tenantId: tenant.id,
+          includeArchived: true,
+          columnSets: [
+            `${baseCols},hero_image_url,recall_status,open_recall_count,recall_payload,recall_check,recall_checked_at,market_position,market_value`,
+            `${baseCols},hero_image_url,recall_status,open_recall_count,recall_payload,recall_check,recall_checked_at`,
+            `${baseCols},hero_image_url,recall_status,open_recall_count`,
+            baseCols,
+          ],
+        });
+        list = [...scoped.primaryRows].sort((x, y) => (y.updated_at || "").localeCompare(x.updated_at || "") || x.id.localeCompare(y.id));
+        if (!on) return;
+        const reg = scoped.registry;
+        setScopeInfo(scoped.mode === "multi_rooftop" && reg.primary
+          ? { primaryName: reg.primary.display_name, children: reg.children.length, review: scoped.summary.review.total }
+          : null);
+      } catch (e) {
+        if (!on) return;
+        // Fail closed: never keep or show an unscoped list.
+        setRows([]); setScopeInfo(null); setLoadError(scopeFailureOf(e)); setLoading(false);
+        return;
       }
 
       const vins = Array.from(new Set(list.map((r) => r.vin).filter(Boolean)));
@@ -296,9 +282,13 @@ const InventoryCommandCenterV2 = () => {
     <div className="min-h-[60vh] flex items-center justify-center" role="status" aria-label="Loading inventory"><div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>
   );
   if (loadError) return (
-    <div className="p-6 max-w-xl mx-auto text-center">
-      <p className="text-[15px] font-semibold">Inventory couldn't be loaded.</p>
-      <button onClick={() => setReload((n) => n + 1)} className="mt-3 h-10 px-4 rounded-lg border border-border text-sm font-semibold hover:bg-muted">Try again</button>
+    <div className="p-6 max-w-xl mx-auto text-center" role="alert" data-testid="inventory-scope-error">
+      <p className="text-[15px] font-semibold">{loadError.title}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{loadError.detail} No vehicle has been moved, changed or removed.</p>
+      <div className="mt-3 flex items-center justify-center gap-3">
+        <button onClick={() => setReload((n) => n + 1)} className="h-10 px-4 rounded-lg border border-border text-sm font-semibold hover:bg-muted">Retry</button>
+        <Link to={STORE_INVENTORY_PATH} className="text-sm font-semibold text-primary hover:underline">Inventory by store</Link>
+      </div>
     </div>
   );
 
@@ -309,7 +299,7 @@ const InventoryCommandCenterV2 = () => {
       <PageHeader
         className="mb-6"
         title="Inventory Command Center"
-        description={<>{syncedLabel}{truncated ? ` · Showing the ${MAX_ROWS.toLocaleString()} most recently updated vehicles` : ""}</>}
+        description={<>{syncedLabel}{scopeInfo ? <> · Showing {scopeInfo.primaryName} only{scopeInfo.review ? `, ${scopeInfo.review} awaiting rooftop review` : ""}. <Link to={STORE_INVENTORY_PATH} className="font-semibold text-primary hover:underline">Inventory by store</Link></> : null}</>}
         actions={
           <div className="relative">
             <button onClick={() => setShowSettings((v) => !v)} aria-expanded={showSettings} className="inline-flex items-center gap-2 px-3 h-10 rounded-lg bg-card border border-border text-sm font-semibold hover:bg-muted">

@@ -34,8 +34,16 @@ describe("store scope", () => {
     expect(inPrimaryView({ id: "l3", mc_dealer_id: "1028492" }, reg)).toBe(false);
   });
 
-  it("keeps manual/legacy rows with no provider identity in the primary view", () => {
-    expect(resolveListingScope({ id: "l4" }, reg)).toEqual({ kind: "primary", storeId: "45cd", basis: "no_provider_identity" });
+  it("holds a manual/legacy row with no rooftop evidence for review when the tenant has child stores", () => {
+    expect(resolveListingScope({ id: "l4" }, reg)).toEqual({ kind: "rooftop_review", storeId: null, basis: "no_verified_rooftop" });
+    expect(inPrimaryView({ id: "l4" }, reg)).toBe(false);
+  });
+
+  it("a single-rooftop tenant keeps every listing in its one inventory", () => {
+    const one = buildRegistry([store("only", "Only Motors", true)]);
+    expect(resolveListingScope({ id: "m" }, one)).toEqual({ kind: "primary", storeId: "only", basis: "single_rooftop" });
+    expect(resolveListingScope({ id: "n", mc_dealer_id: "555" }, one).kind).toBe("primary");
+    expect(resolveListingScope({ id: "m" }, buildRegistry([])).kind).toBe("primary");
   });
 
   it("owning store wins over a conflicting provider dealer id", () => {
@@ -49,7 +57,7 @@ describe("store scope", () => {
   it("a dealer id mapped to two stores is ambiguous and resolves to review", () => {
     const r = buildRegistry([store("a", "A", true, "9"), store("b", "B", false, "9")]);
     expect(r.ambiguousMcDealers.has("9")).toBe(true);
-    expect(resolveListingScope({ id: "x", mc_dealer_id: "9" }, r).kind).toBe("rooftop_review");
+    expect(resolveListingScope({ id: "x", mc_dealer_id: "9" }, r)).toEqual({ kind: "rooftop_review", storeId: null, basis: "ambiguous_provider_dealer" });
   });
 
   it("no designated primary means no store is treated as primary", () => {
@@ -68,8 +76,8 @@ describe("store scope", () => {
       { id: "6", condition: "weird" },
     ];
     const sum = summarizeScopes(rows, reg);
-    expect(sum.primary).toEqual({ total: 4, new: 1, used: 1, cpo: 1, unknown: 1 });
-    expect(sum.review.total).toBe(1);
+    expect(sum.primary).toEqual({ total: 3, new: 1, used: 1, cpo: 1, unknown: 0 });
+    expect(sum.review.total).toBe(2);
     expect(sum.byChild.get("02b4")?.new).toBe(1);
   });
 });
