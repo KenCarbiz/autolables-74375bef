@@ -164,6 +164,9 @@ export const LEGACY_TAB_REDIRECTS: Readonly<Record<string, string>> = {
   funnel: "/dashboard/reports?tab=signings",
   leads: "/leads",
   queue: "/queue",
+  // Installer invoices are Get Ready operational work, not subscription
+  // billing (Admin V3 handoff). /invoices keeps its own capability gate.
+  invoices: "/invoices",
 };
 
 export const ADMIN_CHILD_ROUTES = {
