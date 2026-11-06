@@ -37,5 +37,6 @@ $P -d "$DB" -f supabase/proposed/20261110000000_store_scope_primary_precedence.r
 $P -d "$DB" -f supabase/proposed/20261110000000_store_scope_primary_precedence.sql
 $P -d "$DB" -f supabase/proposed/20261111000000_provider_dealer_mapping.sql
 $P -d "$DB" -f supabase/tests/inventory_network/91_provider_dealer_mapping.sql
+bash supabase/tests/inventory_network/92_mapping_concurrency.sh "$DB"
 $P -d "$DB" -f supabase/proposed/20261111000000_provider_dealer_mapping.rollback.sql
 $P -d "$DB" -f supabase/proposed/20261111000000_provider_dealer_mapping.sql

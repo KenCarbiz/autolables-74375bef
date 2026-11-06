@@ -44,6 +44,8 @@ export interface StoreRegistry {
   byMcDealer: Map<string, ScopeStore>;
   /** Dealer ids mapped to more than one store. They resolve to review, never to a guess. */
   ambiguousMcDealers: Set<string>;
+  /** Stores the tenant has according to the server, not how many this client can see. */
+  verifiedStoreCount: number;
 }
 
 export const MC_DEALER_KEY = "marketcheck_dealer_id";
@@ -54,7 +56,7 @@ const norm = (v: unknown): string | null => {
   return s ? s : null;
 };
 
-export function buildRegistry(stores: ScopeStore[]): StoreRegistry {
+export function buildRegistry(stores: ScopeStore[], verifiedStoreCount = stores.length): StoreRegistry {
   const byId = new Map<string, ScopeStore>();
   const byMcDealer = new Map<string, ScopeStore>();
   const ambiguous = new Set<string>();
@@ -75,11 +77,15 @@ export function buildRegistry(stores: ScopeStore[]): StoreRegistry {
     .filter((s) => !primary || s.id !== primary.id)
     .filter((s) => !s.is_primary_inventory_store)
     .sort((a, b) => a.display_name.localeCompare(b.display_name));
-  return { primary, children, byId, byMcDealer, ambiguousMcDealers: ambiguous };
+  return { primary, children, byId, byMcDealer, ambiguousMcDealers: ambiguous, verifiedStoreCount: Math.max(verifiedStoreCount, byId.size) };
 }
 
-/** One rooftop (or none registered): every listing of the tenant is that rooftop's. */
-export const isSingleRooftop = (reg: StoreRegistry): boolean => reg.byId.size <= 1;
+/**
+ * One rooftop (or none registered): every listing of the tenant is that rooftop's.
+ * Decided by the server's store count, so a client that can see only one of
+ * several stores is never treated as single-rooftop.
+ */
+export const isSingleRooftop = (reg: StoreRegistry): boolean => reg.verifiedStoreCount <= 1;
 
 const kindOf = (reg: StoreRegistry, store: ScopeStore): ScopeKind =>
   reg.primary && store.id === reg.primary.id ? "primary" : "child";

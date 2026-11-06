@@ -29,6 +29,10 @@ beforeEach(() => {
   resetSupabaseSpy();
   platformAdmin = false;
   spyResponses.tables.dealer_stores = { data: [store(HYUNDAI, "Harte Hyundai of Old Saybrook"), store(PRIMARY, "Harte INFINITI", true, "1013372"), store(NISSAN, "Harte Nissan")] };
+  spyResponses.rpcs.inventory_scope_report = () => {
+    const visible = (spyResponses.tables.dealer_stores as { data: Array<{ id: string; is_primary_inventory_store: boolean }> }).data ?? [];
+    return { data: { tenant_id: "t1", stores: visible.map((s) => ({ store_id: s.id, primary: s.is_primary_inventory_store })) }, error: null };
+  };
   spyResponses.tables.store_enrichment_policies = { data: [] };
   spyResponses.tables.store_provider_usage = { data: [{ id: 1, outcome: "denied", deny_reason: "feed_only", estimated_cost_usd: 0.08, product: "neovin" }], count: 1 };
   const listings = [

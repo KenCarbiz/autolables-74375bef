@@ -12,8 +12,8 @@
 --    listings that moved. Platform admins read all; tenant members read their
 --    own (canonical RLS shape).
 -- 3. inv_admin_map_provider_dealer(...): the only path the Inventory by store
---    screen uses. Platform admin only (server-checked), optimistic concurrency
---    on dealer_stores.updated_at, reason and evidence required, the evidence
+--    screen uses. Platform admin only (server-checked), mandatory optimistic
+--    concurrency on dealer_stores.updated_at (null is refused), reason and evidence required, the evidence
 --    must name the destination store (explicit confirmation). "unmap" is the
 --    rollback of a mapping and is recorded the same way.
 -- 4. inventory_scope_report: a listing with no feed owner and no provider
@@ -106,9 +106,13 @@ BEGIN
     RAISE EXCEPTION 'destination_not_confirmed' USING ERRCODE = '22023';
   END IF;
 
+  IF p_expected_updated_at IS NULL THEN RAISE EXCEPTION 'expected_updated_at_required' USING ERRCODE = '22023'; END IF;
+
+  -- The row lock serialises concurrent requests; the loser re-reads the row the
+  -- winner committed, whose updated_at no longer matches, and is refused.
   SELECT * INTO v_store FROM dealer_stores WHERE id = p_store_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'store_not_found' USING ERRCODE = 'P0002'; END IF;
-  IF p_expected_updated_at IS NOT NULL AND p_expected_updated_at IS DISTINCT FROM v_store.updated_at THEN
+  IF p_expected_updated_at IS DISTINCT FROM v_store.updated_at THEN
     RAISE EXCEPTION 'store_changed_since_loaded' USING ERRCODE = '40001';
   END IF;
   IF p_action = 'map' AND v_store.status <> 'active' THEN RAISE EXCEPTION 'store_inactive' USING ERRCODE = '22023'; END IF;

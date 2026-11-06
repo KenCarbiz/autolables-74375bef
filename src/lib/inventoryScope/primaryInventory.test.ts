@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { resetSupabaseSpy, spyResponses, type SpyOp } from "@/test/mocks/supabaseSpy";
-import { InventoryScopeError, loadScopedInventory, scopeInventory } from "./primaryInventory";
+import { resetSupabaseSpy, spyResponses, writeCalls, type SpyOp } from "@/test/mocks/supabaseSpy";
+import { InventoryScopeError, loadScopedInventory, parseStoreAuthority, scopeInventory, type StoreAuthority } from "./primaryInventory";
 import { IncompleteReadError, readAllPages } from "./paging";
 import { CONFLICT_TEXT, planMapping, saveMapping } from "./mapping";
 import { resolveListingScope } from "./storeScope";
@@ -25,6 +25,10 @@ const CHILDREN = [
 ];
 const harte = (mapped: string[] | undefined) => [st(INFINITI, "Harte INFINITI", true, mapped), ...CHILDREN];
 
+const authOf = (stores: TenantStore[]): StoreAuthority => ({ storeIds: stores.map((s) => s.id), primaryStoreIds: stores.filter((s) => s.is_primary_inventory_store).map((s) => s.id) });
+const reportOf = (stores: TenantStore[], tenant = T) => ({ data: { tenant_id: tenant, stores: stores.map((s) => ({ store_id: s.id, primary: s.is_primary_inventory_store })) }, error: null });
+const scope = (stores: TenantStore[], rows: Row[], authority: StoreAuthority = authOf(stores)) => scopeInventory(T, stores, rows, authority);
+
 type Row = { id: string; tenant_id: string; owning_store_id: string | null; mc_dealer_id: string | null; condition: string };
 const r = (id: string, owner: string | null, dealer: string | null, condition = "used"): Row => ({ id, tenant_id: T, owning_store_id: owner, mc_dealer_id: dealer, condition });
 
@@ -39,7 +43,7 @@ const AUDIT_153: Row[] = [
 
 describe("153-vehicle audit classification", () => {
   it("before mapping: 100 feed vehicles are primary, 53 wait for rooftop review, none are deleted", () => {
-    const s = scopeInventory(T, harte(undefined), AUDIT_153);
+    const s = scope(harte(undefined), AUDIT_153);
     expect(s.totalRead).toBe(153);
     expect(s.summary.primary.total).toBe(100);
     expect(s.summary.review.total).toBe(53);
@@ -47,7 +51,7 @@ describe("153-vehicle audit classification", () => {
   });
 
   it("after mapping dealer 1013372 to Harte INFINITI: 150 primary; the 2 group-site Hyundais and the unverified manual Rogue stay in review", () => {
-    const s = scopeInventory(T, harte(["1013372"]), AUDIT_153);
+    const s = scope(harte(["1013372"]), AUDIT_153);
     expect(s.summary.primary.total).toBe(150);
     expect(s.summary.review.total).toBe(3);
     const reviewed = AUDIT_153.filter((x) => resolveListingScope(x, s.registry).kind === "rooftop_review").map((x) => x.id).sort();
@@ -56,7 +60,7 @@ describe("153-vehicle audit classification", () => {
   });
 
   it("dealer 1028492 is never placed in Harte INFINITI because it shares the group name or address", () => {
-    const s = scopeInventory(T, harte(["1013372"]), AUDIT_153);
+    const s = scope(harte(["1013372"]), AUDIT_153);
     expect(resolveListingScope(r("x", null, "1028492"), s.registry).basis).toBe("unmapped_provider_dealer");
   });
 });
@@ -64,33 +68,73 @@ describe("153-vehicle audit classification", () => {
 describe("fail-closed scope checks", () => {
   const rows = [r("a", INFINITI, null)];
   it("rejects a row from another tenant", () => {
-    expect(() => scopeInventory(T, harte(undefined), [{ ...rows[0], tenant_id: "other" }])).toThrow(InventoryScopeError);
+    expect(() => scope(harte(undefined), [{ ...rows[0], tenant_id: "other" }])).toThrow(InventoryScopeError);
   });
   it("rejects a store from another tenant", () => {
-    expect(() => scopeInventory(T, [...harte(undefined), { ...CHILDREN[0], id: "foreign", tenant_id: "other" }], rows)).toThrow(/wrong_tenant/);
+    expect(() => scope([...harte(undefined), { ...CHILDREN[0], id: "foreign", tenant_id: "other" }], rows)).toThrow(/wrong_tenant/);
   });
   it("rejects rows without scope columns", () => {
-    expect(() => scopeInventory(T, harte(undefined), [{ id: "a", condition: "new" } as unknown as Row])).toThrow(/scope_columns_unavailable/);
+    expect(() => scope(harte(undefined), [{ id: "a", condition: "new" } as unknown as Row])).toThrow(/scope_columns_unavailable/);
   });
   it("rejects a multi-store tenant with no primary, or with two", () => {
-    expect(() => scopeInventory(T, CHILDREN, rows)).toThrow(/no_primary_store/);
-    expect(() => scopeInventory(T, [st("p1", "A", true), st("p2", "B", true)], rows)).toThrow(/multiple_primary_stores/);
+    expect(() => scope(CHILDREN, rows)).toThrow(/no_primary_store/);
+    expect(() => scope([st("p1", "A", true), st("p2", "B", true)], rows)).toThrow(/multiple_primary_stores/);
   });
   it("rejects an empty registry when vehicles are store-owned (registry hidden by permissions)", () => {
-    expect(() => scopeInventory(T, [], rows)).toThrow(/registry_incomplete/);
+    expect(() => scope([], rows)).toThrow(/registry_incomplete/);
   });
   it("a single-rooftop tenant with no stores keeps every listing", () => {
-    expect(scopeInventory(T, [], [r("m", null, null), r("n", null, "555")]).primaryRows).toHaveLength(2);
+    expect(scope([], [r("m", null, null), r("n", null, "555")]).primaryRows).toHaveLength(2);
   });
   it("a vehicle owned by a store outside the registry (wrong rooftop) goes to review", () => {
-    const s = scopeInventory(T, harte(undefined), [r("z", "not-a-harte-store", null)]);
+    const s = scope(harte(undefined), [r("z", "not-a-harte-store", null)]);
     expect(s.summary.review.total).toBe(1);
     expect(s.primaryRows).toHaveLength(0);
   });
   it("a child store's own vehicle never appears in the primary list", () => {
-    const s = scopeInventory(T, harte(["1013372"]), [r("c", "02b4f1ac", "1013372")]);
+    const s = scope(harte(["1013372"]), [r("c", "02b4f1ac", "1013372")]);
     expect(s.primaryRows).toHaveLength(0);
     expect(s.summary.byChild.get("02b4f1ac")?.total).toBe(1);
+  });
+});
+
+describe("server-authoritative store count", () => {
+  const rows = [r("a", INFINITI, null), r("mc", null, "1013372"), r("manual", null, null)];
+  it("RLS showing one of six stores fails closed instead of treating the group as one rooftop", () => {
+    const onlyChild = [CHILDREN[0]];
+    expect(() => scope(onlyChild, [r("mc", null, "1013372"), r("manual", null, null)], authOf(harte(undefined)))).toThrow(/registry_incomplete/);
+  });
+  it("only the primary visible out of six fails closed too", () => {
+    expect(() => scope([harte(undefined)[0]], rows, authOf(harte(undefined)))).toThrow(/registry_incomplete/);
+  });
+  it("an empty visible registry for a tenant the server says has stores fails closed, even with no owned rows", () => {
+    expect(() => scope([], [r("manual", null, null)], authOf(harte(undefined)))).toThrow(/registry_incomplete/);
+  });
+  it("a store visible to the client but unknown to the server, or a different primary, fails closed", () => {
+    expect(() => scope(harte(undefined), rows, authOf(CHILDREN))).toThrow(/registry_incomplete/);
+    expect(() => scope(harte(undefined), rows, { storeIds: authOf(harte(undefined)).storeIds, primaryStoreIds: ["35d5584b"] })).toThrow(/registry_incomplete/);
+  });
+  it("single-rooftop mode follows the server count, not the visible count", () => {
+    const one = [harte(undefined)[0]];
+    const s = scope(one, [r("manual", null, null)], authOf(one));
+    expect(s.mode).toBe("single_rooftop");
+    expect(s.registry.verifiedStoreCount).toBe(1);
+    expect(scope(harte(undefined), rows).registry.verifiedStoreCount).toBe(6);
+  });
+  it("a malformed report, or one for another tenant, is unverified", () => {
+    expect(() => parseStoreAuthority(T, null)).toThrow(/registry_unverified/);
+    expect(() => parseStoreAuthority(T, { tenant_id: "other", stores: [] })).toThrow(/registry_unverified/);
+    expect(() => parseStoreAuthority(T, { tenant_id: T, stores: [{ primary: true }] })).toThrow(/registry_unverified/);
+    expect(parseStoreAuthority(T, reportOf(harte(undefined)).data).storeIds).toHaveLength(6);
+  });
+  it("the loader fails closed when the server report is unavailable, and when it shows more stores than RLS returned", async () => {
+    resetSupabaseSpy();
+    spyResponses.tables.dealer_stores = { data: harte(undefined) };
+    spyResponses.tables.vehicle_listings = { data: rows, count: rows.length };
+    await expect(loadScopedInventory({ tenantId: T, includeArchived: false, columnSets: ["id"] })).rejects.toThrow(/registry_unverified/);
+    spyResponses.tables.dealer_stores = { data: [CHILDREN[0]] };
+    spyResponses.rpcs.inventory_scope_report = reportOf(harte(undefined));
+    await expect(loadScopedInventory({ tenantId: T, includeArchived: false, columnSets: ["id"] })).rejects.toThrow(/registry_incomplete/);
   });
 });
 
@@ -116,6 +160,7 @@ describe("loadScopedInventory", () => {
   beforeEach(() => resetSupabaseSpy());
   it("never falls back to a column set without the scope columns", async () => {
     spyResponses.tables.dealer_stores = { data: harte(undefined) };
+    spyResponses.rpcs.inventory_scope_report = reportOf(harte(undefined));
     const selects: string[] = [];
     spyResponses.tables.vehicle_listings = (ops: SpyOp[]) => {
       selects.push(String(ops.find((o) => o.op === "select")?.args[0]));
@@ -127,6 +172,7 @@ describe("loadScopedInventory", () => {
   });
   it("filters by tenant id only (no null-tenant legacy rows) and orders by id", async () => {
     spyResponses.tables.dealer_stores = { data: harte(undefined) };
+    spyResponses.rpcs.inventory_scope_report = reportOf(harte(undefined));
     const seen: SpyOp[][] = [];
     spyResponses.tables.vehicle_listings = (ops: SpyOp[]) => { seen.push(ops); return { data: [r("a", INFINITI, null)], count: 1 }; };
     await loadScopedInventory({ tenantId: T, includeArchived: false, columnSets: ["id"] });
@@ -161,10 +207,16 @@ describe("rooftop mapping plan", () => {
     resetSupabaseSpy();
     const p = planMapping(stores, AUDIT_153, "1013372", INFINITI, "map");
     const ev = { provider_dealer_name: "Harte Infiniti", provider_dealer_website: null, provider_dealer_address: null, source: "test", feed_vehicles_at_store: 77, confirmed_destination: INFINITI };
-    await expect(saveMapping(p, ev, "Verified on dealer site", null)).rejects.toThrow(/turned off until its database change/);
+    const V = "2026-11-06T00:00:00Z";
+    await expect(saveMapping(p, ev, "Verified on dealer site", null)).rejects.toThrow(/version could not be read/);
+    await expect(saveMapping(p, ev, "Verified on dealer site", "not a time")).rejects.toThrow(/version could not be read/);
+    expect(writeCalls()).toEqual([]);
+    await expect(saveMapping(p, ev, "Verified on dealer site", V)).rejects.toThrow(/turned off until its database change/);
     spyResponses.rpcs.inv_admin_map_provider_dealer = { data: null, error: { code: "42501", message: "platform_admin_required" } };
-    await expect(saveMapping(p, ev, "Verified on dealer site", null)).rejects.toThrow(/Only a platform administrator/);
+    await expect(saveMapping(p, ev, "Verified on dealer site", V)).rejects.toThrow(/Only a platform administrator/);
+    spyResponses.rpcs.inv_admin_map_provider_dealer = { data: null, error: { code: "40001", message: "store_changed_since_loaded" } };
+    await expect(saveMapping(p, ev, "Verified on dealer site", V)).rejects.toThrow(/changed since the page loaded/);
     const blocked = planMapping([st(INFINITI, "Harte INFINITI", true, ["1013372"]), ...CHILDREN], AUDIT_153, "1013372", "02b4f1ac", "map");
-    await expect(saveMapping(blocked, ev, "x".repeat(20), null)).rejects.toThrow(/conflicts/);
+    await expect(saveMapping(blocked, ev, "x".repeat(20), "2026-11-06T00:00:00Z")).rejects.toThrow(/conflicts/);
   });
 });

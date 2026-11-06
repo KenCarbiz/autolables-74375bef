@@ -46,8 +46,14 @@ const MANUAL_CAR = row("a5", "5N1AT3CB7MC736556", "2021 NISSAN Rogue", {});
 
 const listingsOk = (rows = [PRIMARY_CAR, MAPPED_CAR, SISTER_CAR, CHILD_CAR, MANUAL_CAR]) => ({ data: rows, count: rows.length });
 
+// The server's own view of the tenant's stores (inventory_scope_report, SECURITY DEFINER).
+let serverStores: typeof stores = stores;
+const serverReport = () => ({ data: { tenant_id: "t1", stores: serverStores.map((s) => ({ store_id: s.id, primary: s.is_primary_inventory_store })) }, error: null });
+
 beforeEach(() => {
   resetSupabaseSpy();
+  serverStores = stores;
+  spyResponses.rpcs.inventory_scope_report = () => serverReport();
   spyResponses.tables.dealer_stores = { data: stores };
   spyResponses.tables.vehicle_listings = listingsOk();
 });
@@ -77,8 +83,11 @@ describe.each(SCREENS)("$name store scope", ({ ui }) => {
   const failures: Array<[string, () => void, RegExp]> = [
     ["store registry read failure", () => { spyResponses.tables.dealer_stores = { data: null, error: { code: "42501", message: "permission denied" } }; }, /Store list could not be read/],
     ["scope columns missing", () => { spyResponses.tables.vehicle_listings = { data: null, error: { code: "42703", message: "column vehicle_listings.owning_store_id does not exist" } }; }, /Store ownership could not be read/],
-    ["no primary store", () => { spyResponses.tables.dealer_stores = { data: stores.map((s) => ({ ...s, is_primary_inventory_store: false })) }; }, /No primary dealership is set/],
-    ["two primary stores", () => { spyResponses.tables.dealer_stores = { data: stores.map((s) => ({ ...s, is_primary_inventory_store: true })) }; }, /More than one primary dealership/],
+    ["no primary store", () => { serverStores = stores.map((s) => ({ ...s, is_primary_inventory_store: false })); spyResponses.tables.dealer_stores = { data: serverStores }; }, /No primary dealership is set/],
+    ["two primary stores", () => { serverStores = stores.map((s) => ({ ...s, is_primary_inventory_store: true })); spyResponses.tables.dealer_stores = { data: serverStores }; }, /More than one primary dealership/],
+    ["permissions showing only one of the account's stores", () => { spyResponses.tables.dealer_stores = { data: [stores[0]] }; }, /Store list is incomplete/],
+    ["permissions showing only a child store, with no store-owned rows", () => { spyResponses.tables.dealer_stores = { data: [stores[1]] }; spyResponses.tables.vehicle_listings = listingsOk([MAPPED_CAR, SISTER_CAR, MANUAL_CAR]); }, /Store list is incomplete/],
+    ["the server store count is unavailable", () => { spyResponses.rpcs.inventory_scope_report = { data: null, error: { code: "42501", message: "not authorized for tenant" } }; }, /Store list could not be verified/],
     ["registry hidden by permissions while vehicles are store-owned", () => { spyResponses.tables.dealer_stores = { data: [] }; }, /Store list is incomplete/],
     ["a row from another tenant", () => { spyResponses.tables.vehicle_listings = listingsOk([PRIMARY_CAR, { ...SISTER_CAR, tenant_id: "t2" }]); }, /failed a safety check/],
     ["row count that does not add up", () => { spyResponses.tables.vehicle_listings = { data: [PRIMARY_CAR], count: 3 }; }, /total could not be verified/],

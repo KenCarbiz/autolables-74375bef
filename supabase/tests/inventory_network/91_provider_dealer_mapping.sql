@@ -35,6 +35,8 @@ SELECT pg_temp.raises($$SELECT inv_admin_map_provider_dealer('00000000-0000-0000
 SELECT pg_temp.raises($$SELECT inv_admin_map_provider_dealer('00000000-0000-0000-0000-00000000e5b1', '1028492', 'map', NULL, '{"source":"x"}', 'Verified on the group site')$$, 'destination_not_confirmed', 'the evidence must confirm the destination store');
 SELECT pg_temp.raises($$SELECT inv_admin_map_provider_dealer('00000000-0000-0000-0000-00000000e5b1', '1028492', 'map', NULL, '{}', 'Verified on the group site')$$, 'evidence_required', 'evidence is required');
 SELECT pg_temp.raises($$SELECT inv_admin_map_provider_dealer('00000000-0000-0000-0000-00000000e5b1', '1028492', 'map', '2000-01-01', (SELECT j FROM ev_ok), 'Verified on the group site')$$, 'store_changed_since_loaded', 'a stale page cannot overwrite a newer store row');
+SELECT pg_temp.raises($$SELECT inv_admin_map_provider_dealer('00000000-0000-0000-0000-00000000e5b1', '1028492', 'map', NULL, (SELECT j FROM ev_ok), 'Verified on the group site')$$, 'expected_updated_at_required', 'a request without the store version is refused (concurrency check is mandatory)');
+SELECT pg_temp.raises($$SELECT inv_admin_map_provider_dealer('00000000-0000-0000-0000-00000000e5b1', '1028492', 'unmap', NULL, (SELECT j FROM ev_ok), 'Verified on the group site')$$, 'expected_updated_at_required', 'an unmap without the store version is refused too');
 SELECT pg_temp.expect((SELECT count(*) FROM store_provider_mapping_events) = 0, 'refused calls record nothing');
 
 -- ── Map ──────────────────────────────────────────────────────────────────
@@ -48,13 +50,13 @@ SELECT pg_temp.expect((SELECT count(*) FROM inventory_network_audit WHERE entity
   AND after->'provider_ids' ? 'marketcheck_dealer_id') >= 1, 'the store change is also in the network audit with before and after');
 
 -- ── One dealer id, one rooftop ───────────────────────────────────────────
-SELECT pg_temp.raises($$SELECT inv_admin_map_provider_dealer('00000000-0000-0000-0000-00000000e5a1', '1028492', 'map', NULL, '{"source":"x","confirmed_destination":"00000000-0000-0000-0000-00000000e5a1"}', 'Trying to double map it')$$,
+SELECT pg_temp.raises($$SELECT inv_admin_map_provider_dealer('00000000-0000-0000-0000-00000000e5a1', '1028492', 'map', (SELECT updated_at FROM dealer_stores WHERE id = '00000000-0000-0000-0000-00000000e5a1'), '{"source":"x","confirmed_destination":"00000000-0000-0000-0000-00000000e5a1"}', 'Trying to double map it')$$,
   'provider_dealer_id_mapped_to_other_store', 'the same dealer id cannot be mapped to a second store of the group');
-SELECT pg_temp.raises($$SELECT inv_admin_map_provider_dealer('00000000-0000-0000-0000-00000000f5a1', '1013372', 'map', NULL, '{"source":"x","confirmed_destination":"00000000-0000-0000-0000-00000000f5a1"}', 'Trying another account')$$,
+SELECT pg_temp.raises($$SELECT inv_admin_map_provider_dealer('00000000-0000-0000-0000-00000000f5a1', '1013372', 'map', (SELECT updated_at FROM dealer_stores WHERE id = '00000000-0000-0000-0000-00000000f5a1'), '{"source":"x","confirmed_destination":"00000000-0000-0000-0000-00000000f5a1"}', 'Trying another account')$$,
   'provider_dealer_id_mapped_to_other_store', 'nor to a store of another account');
 SELECT pg_temp.raises($$SELECT inv_admin_save_store('{"id":"00000000-0000-0000-0000-00000000f5a1","provider_ids":{"marketcheck_dealer_id":["1013372"]}}'::jsonb)$$,
   'provider_dealer_id_mapped_to_other_store', 'the generic store editor cannot bypass the one-rooftop rule');
-SELECT pg_temp.raises($$SELECT inv_admin_map_provider_dealer('00000000-0000-0000-0000-00000000e5b1', '1028492', 'map', NULL, (SELECT j FROM ev_ok), 'Verified on the group site again')$$, 'already_mapped', 'mapping twice is refused');
+SELECT pg_temp.raises($$SELECT inv_admin_map_provider_dealer('00000000-0000-0000-0000-00000000e5b1', '1028492', 'map', (SELECT updated_at FROM dealer_stores WHERE id = '00000000-0000-0000-0000-00000000e5b1'), (SELECT j FROM ev_ok), 'Verified on the group site again')$$, 'already_mapped', 'mapping twice is refused');
 SELECT pg_temp.raises($$UPDATE store_provider_mapping_events SET reason = 'rewritten history'$$, 'append_only', 'mapping history cannot be rewritten');
 SELECT pg_temp.raises($$DELETE FROM store_provider_mapping_events$$, 'append_only', 'mapping history cannot be deleted');
 
@@ -68,10 +70,13 @@ SELECT pg_temp.expect((SELECT count(*) FROM vehicle_listings WHERE tenant_id = '
 
 -- ── Rollback: unmap ──────────────────────────────────────────────────────
 SELECT pg_temp.as_user('00000000-0000-0000-0000-00000000ad01');
-SELECT inv_admin_map_provider_dealer('00000000-0000-0000-0000-00000000e5b1', '1028492', 'unmap', NULL, (SELECT j FROM ev_ok), 'Rolled back for re-verification');
+CREATE TEMP TABLE v_before_unmap AS SELECT updated_at AS v FROM dealer_stores WHERE id = '00000000-0000-0000-0000-00000000e5b1';
+GRANT SELECT ON v_before_unmap TO PUBLIC;
+SELECT inv_admin_map_provider_dealer('00000000-0000-0000-0000-00000000e5b1', '1028492', 'unmap', (SELECT updated_at FROM dealer_stores WHERE id = '00000000-0000-0000-0000-00000000e5b1'), (SELECT j FROM ev_ok), 'Rolled back for re-verification');
 SELECT pg_temp.expect((SELECT dealer_store_mc_dealer_ids(provider_ids) = '{}'::text[] FROM dealer_stores WHERE id = '00000000-0000-0000-0000-00000000e5b1'), 'unmap removes the dealer id');
 SELECT pg_temp.expect((SELECT count(*) = 2 AND bool_or(action = 'unmap' AND previous_ids = '["1028492"]'::jsonb AND next_ids = '[]'::jsonb) FROM store_provider_mapping_events), 'the rollback is recorded as its own event');
-SELECT pg_temp.raises($$SELECT inv_admin_map_provider_dealer('00000000-0000-0000-0000-00000000e5b1', '1028492', 'unmap', NULL, (SELECT j FROM ev_ok), 'Rolled back for re-verification')$$, 'not_mapped', 'unmapping what is not mapped is refused');
+SELECT pg_temp.raises($$SELECT inv_admin_map_provider_dealer('00000000-0000-0000-0000-00000000e5b1', '1028492', 'map', (SELECT v FROM v_before_unmap), (SELECT j FROM ev_ok), 'Replaying the page loaded before the unmap')$$, 'store_changed_since_loaded', 'a second request carrying the version the first one already changed is refused');
+SELECT pg_temp.raises($$SELECT inv_admin_map_provider_dealer('00000000-0000-0000-0000-00000000e5b1', '1028492', 'unmap', (SELECT updated_at FROM dealer_stores WHERE id = '00000000-0000-0000-0000-00000000e5b1'), (SELECT j FROM ev_ok), 'Rolled back for re-verification')$$, 'not_mapped', 'unmapping what is not mapped is refused');
 SELECT pg_temp.as_user('00000000-0000-0000-0000-00000000e0a1');
 SELECT pg_temp.expect((SELECT (inventory_scope_report('00000000-0000-0000-0000-0000000000e1')->'rooftop_review'->'by_dealer'->>'1028492')::int = 1), 'after rollback the group-site car is back in review');
 

@@ -82,6 +82,7 @@ export class MappingUnavailableError extends Error {}
 const SERVER_TEXT: Array<[RegExp, string]> = [
   [/platform_admin_required|not authorized|42501/i, "Only a platform administrator can change rooftop mappings."],
   [/provider_dealer_id_mapped_to_other_store/, "This dealer id is already mapped to another store. Nothing was changed."],
+  [/expected_updated_at_required/, "This store's version could not be read. Reload and review the mapping again."],
   [/store_changed_since_loaded/, "This store changed since the page loaded. Reload and review the mapping again."],
   [/already_mapped/, "This dealer id is already mapped to this store."],
   [/not_mapped/, "This dealer id is not mapped to this store."],
@@ -92,6 +93,9 @@ const SERVER_TEXT: Array<[RegExp, string]> = [
 /** Saves through the server function only. There is no client-side fallback. */
 export async function saveMapping(plan: MappingPlan, evidence: MappingEvidence, reason: string, expectedUpdatedAt: string | null): Promise<{ affected_listings?: number }> {
   if (plan.conflicts.length || !plan.store) throw new Error("The mapping has unresolved conflicts.");
+  if (!expectedUpdatedAt || Number.isNaN(Date.parse(expectedUpdatedAt))) {
+    throw new Error("This store's version could not be read. Reload and review the mapping again.");
+  }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any).rpc(MAP_RPC, {
     p_store_id: plan.store.id, p_dealer_id: plan.dealerId, p_action: plan.action,
