@@ -196,6 +196,7 @@ export interface StoreDraft {
   is_primary_inventory_store?: boolean; inventory_feed_enabled?: boolean; feed_import_paused?: boolean; inventory_sharing_enabled?: boolean;
   customer_browser_enabled?: boolean; listing_sync_enabled?: boolean; feed_price_updates_listing?: boolean; adopt_legacy_matches?: boolean;
   retirement_automation_enabled?: boolean; missing_snapshot_threshold?: number; max_invalid_rows?: number;
+  provider_ids?: Record<string, unknown>;
 }
 export interface SharingRuleDraft {
   id?: string; source_store_id?: string; destination_store_id?: string;

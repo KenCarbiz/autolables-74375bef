@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { Button, EmptyState, InlineNote, KeyValueList, Panel, QueryState, StatusText, Td, Th, WorkTable } from "@/components/product";
 import { MC_CALL_PRICE_USD } from "../../../../../supabase/functions/_shared/mcCost";
 import { ENRICHMENT_PRODUCTS, explainError, getUsage, listCatalog, saveEnrichmentPolicy, PILOT_ACCOUNT, type EnrichmentMode, type EnrichmentPolicyDraft, type StoreOverview } from "@/lib/inventoryNetwork/api";
+import { DATA_CATEGORIES, categoryState, isSwitchable, setCategory } from "@/lib/inventoryScope/dataControls";
 import { CheckField, NumberField, SelectField, TextField, humanize, mcModeLabel, useAct, useNet, when } from "./shared";
 
 const PRODUCT_INFO: Record<string, string> = {
@@ -82,6 +83,23 @@ function PolicyForm({ s, products }: { s: StoreOverview; products: ProductRow[] 
           <TextField id="mc-roof" label="MarketCheck rooftop ID" value={d.mc_rooftop_id} onChange={(v) => set("mc_rooftop_id", v)} hint="Letters, numbers and . _ : - only. Changing it clears verification unless you tick it again." />
           <div className="self-end pb-2"><CheckField id="mc-ver" label="Rooftop verified" checked={d.mc_rooftop_verified} onChange={(v) => set("mc_rooftop_verified", v)} hint={s.policy?.mc_rooftop_verified_at ? `Verified ${when(s.policy.mc_rooftop_verified_at)}` : "Confirm this rooftop ID belongs to this store."} /></div>
         </div>
+
+        <fieldset>
+          <legend className="mb-2 text-[14px] font-semibold text-adm-ink">Data categories</legend>
+          <p className="mb-3 text-[13px] text-adm-muted">Each switch sets the products behind it. Inventory visibility comes from the feed and is not affected.</p>
+          <ul className="grid gap-3 md:grid-cols-2">
+            {DATA_CATEGORIES.filter((c) => c.id !== "inventory_visibility").map((c) => {
+              const st = categoryState(c, d.allowed_products);
+              return (
+                <li key={c.id}>
+                  {isSwitchable(c)
+                    ? <CheckField id={`mc-c-${c.id}`} checked={st === "on"} onChange={(v) => set("allowed_products", setCategory(d.allowed_products, c.id, v))} label={<>{c.label}{st === "partial" && <span className="font-normal text-adm-muted"> partly on</span>}</>} />
+                    : <p className="text-[14px] text-adm-ink">{c.label} <span className="text-adm-muted">Not available</span><span className="block text-[12px] text-adm-muted">{c.unavailableReason}</span></p>}
+                </li>
+              );
+            })}
+          </ul>
+        </fieldset>
 
         <fieldset>
           <legend className="mb-2 text-[14px] font-semibold text-adm-ink">Approved products</legend>

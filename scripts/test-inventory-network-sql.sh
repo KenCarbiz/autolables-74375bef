@@ -31,3 +31,7 @@ $P -d "$DB" -f supabase/tests/inventory_network/79_estimator_stub.sql
 $P -d "$DB" -f drizzle/migrations/0009_passport_payment_estimator.sql
 $P -d "$DB" -f supabase/proposed/20261108000000_canonical_store_registry.sql
 $P -d "$DB" -f supabase/tests/inventory_network/80_canonical_store_registry.sql
+$P -d "$DB" -f supabase/proposed/20261110000000_store_scope_primary_precedence.sql
+$P -d "$DB" -f supabase/tests/inventory_network/90_store_scope.sql
+$P -d "$DB" -f supabase/proposed/20261110000000_store_scope_primary_precedence.rollback.sql
+$P -d "$DB" -f supabase/proposed/20261110000000_store_scope_primary_precedence.sql
