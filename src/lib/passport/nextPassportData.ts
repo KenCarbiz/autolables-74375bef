@@ -16,6 +16,8 @@
 
 import { identityFromListing, identityYear } from "../factorySticker/vehicleIdentity";
 import type { PassportData } from "@/lib/passportV2Data";
+import type { VehiclePassportDataContract } from "@/lib/vehicleData/dataContract";
+import { resolveFuelEconomy } from "@/lib/passport/fuelEconomy";
 import type { SalePriceCard } from "@/lib/priceModel";
 import type { ReportCheck, VerificationReport, VerificationStatus } from "@/lib/passport/verificationSummary";
 
@@ -71,6 +73,43 @@ export interface NextPassportData {
     estimated: boolean;
     coverages: { key: string; name: string; pct: number | null; color: string; terms: string; remaining: string }[];
   };
+  /** Factory build: installed packages/options, standard equipment, and what is NOT proven installed. */
+  equipment: {
+    state: NextSectionState;
+    /** vin_build = VIN-specific factory decode; typical_for_trim = generic fallback; listing = feed equipment only. */
+    basis: "vin_build" | "typical_for_trim" | "listing" | "none";
+    basisLabel: string;
+    featureCount: number;
+    packages: { name: string; code: string; msrp: number | null; contents: string[]; portInstalled: boolean }[];
+    options: { name: string; code: string; msrp: number | null; portInstalled: boolean }[];
+    notVerified: { name: string; msrp: number | null }[];
+    optionsValue: number | null;
+    categories: { name: string; items: string[] }[];
+    standard: { name: string; items: string[] }[];
+  };
+  /** Factory MSRP ladder. Held (unavailable) when the provider's figures do not reconcile. */
+  factoryMsrp: {
+    state: NextSectionState;
+    label: string;
+    lines: { label: string; value: number }[];
+    total: number | null;
+    status: "reconciled" | "conflict" | "incomplete" | "none";
+    note: string;
+  };
+  fuel: {
+    state: NextSectionState;
+    unit: "MPG" | "MPGe";
+    city: number | null; highway: number | null; combined: number | null;
+    rangeMiles: number | null; annualFuelCost: number | null;
+    source: string; note: string;
+  };
+  recalls: { state: NextSectionState; status: NextStatus; label: string; detail: string; checked: string };
+  priceHistory: {
+    state: NextSectionState;
+    points: { date: string; price: number }[];
+    latestChange: number | null;
+  };
+  specifications: { state: NextSectionState; groups: { name: string; rows: { label: string; value: string }[] }[] };
 }
 
 export interface NextPassportDealer {
@@ -148,6 +187,8 @@ export interface BuildNextPassportArgs {
   /** Dealer packet-module visibility — a module the dealer switched off is
    *  reported unavailable rather than silently rendered empty. */
   isVisible?: (moduleKey: string) => boolean;
+  /** The shared equipment/build-sheet seam (buildVehiclePassportDataContract). */
+  contract?: VehiclePassportDataContract | null;
 }
 
 // ── Vehicle ───────────────────────────────────────────────────────────
@@ -183,17 +224,161 @@ export function buildNextPassportData(args: BuildNextPassportArgs): NextPassport
       specs,
     },
 
-    trustBadges: buildTrustBadges({ report, isCpo, make, d }),
+    trustBadges: buildTrustBadges({ report, isCpo, isNew, make, d }),
     price: buildPrice(saleCard, d),
     payment: buildPayment(d),
     verification: buildVerification(report),
     market: buildMarket(d, pv),
-    reasons: buildReasons({ d, report, isCpo, make }),
+    reasons: buildReasons({ d, report, isCpo, isNew, make }),
     confirm: buildConfirm(listing),
     timeline: buildTimeline(d),
     windowSticker: buildWindowSticker(args),
     warranty: buildWarranty({ d, listing, isNew, pv }),
+    equipment: buildEquipment(args.contract ?? null),
+    factoryMsrp: buildFactoryMsrp(args.contract ?? null, isNew),
+    fuel: buildFuel(d),
+    recalls: buildRecalls(d),
+    priceHistory: buildPriceHistory(d, pv),
+    specifications: buildSpecifications(listing, args.contract ?? null),
   };
+}
+
+// ── Equipment ─────────────────────────────────────────────────────────
+
+function buildEquipment(c: VehiclePassportDataContract | null): NextPassportData["equipment"] {
+  const empty: NextPassportData["equipment"] = {
+    state: "pending", basis: "none", basisLabel: "", featureCount: 0, packages: [], options: [], notVerified: [],
+    optionsValue: null, categories: [], standard: [],
+  };
+  if (!c) return empty;
+  const sheet = c.buildSheet;
+  const basis: NextPassportData["equipment"]["basis"] = sheet
+    ? (sheet.generic ? "typical_for_trim" : "vin_build")
+    : c.equipmentList.length ? "listing" : "none";
+  const basisLabel = basis === "vin_build" ? "Factory build decoded from this VIN"
+    : basis === "typical_for_trim" ? "Typical for this trim — confirm this vehicle's exact build with the dealership"
+    : basis === "listing" ? "Equipment as listed by the dealership"
+    : "";
+  const packages = (sheet?.packages ?? []).map((p) => ({
+    name: p.name, code: p.code ?? "", msrp: p.msrp ?? null, contents: p.contents, portInstalled: !!p.portInstalled,
+  }));
+  const options = (sheet?.options ?? []).map((o) => ({
+    name: o.name, code: o.code ?? "", msrp: o.msrp ?? null, portInstalled: !!o.portInstalled,
+  }));
+  const notVerified = (sheet?.notVerified ?? []).map((o) => ({ name: o.name, msrp: o.msrp ?? null }));
+  const categories = c.equipment.categories.map((x) => ({ name: x.name, items: x.items }));
+  const standard = (sheet?.standard ?? []).map(([name, items]) => ({ name, items }));
+  const featureCount = Math.max(c.equipment.factoryFeatureCount, c.equipmentList.length);
+  const hasAny = featureCount > 0 || packages.length > 0 || options.length > 0;
+  return {
+    state: hasAny ? "success" : basis === "none" ? "pending" : "unavailable",
+    basis, basisLabel, featureCount, packages, options, notVerified,
+    // A typical-for-trim decode is not this car's options, so it never totals a value.
+    optionsValue: basis === "vin_build" ? sheet?.estValue ?? null : null,
+    categories, standard,
+  };
+}
+
+// ── Factory MSRP ──────────────────────────────────────────────────────
+
+/**
+ * The provider's base + options + destination must add up to its own total. A
+ * ladder that does not is held, not repaired: the shopper sees "pending
+ * review", the admin coverage report sees the delta. A used car's figure is
+ * its ORIGINAL sticker, labelled so — it is never a current price.
+ */
+function buildFactoryMsrp(c: VehiclePassportDataContract | null, isNew: boolean): NextPassportData["factoryMsrp"] {
+  const label = isNew ? "Factory MSRP" : "Original Factory MSRP";
+  const m = c?.buildSheet?.msrp;
+  if (!m) return { state: "pending", label, lines: [], total: null, status: "none", note: "" };
+  if (c?.buildSheet?.generic) {
+    return { state: "unavailable", label, lines: [], total: null, status: m.status, note: "Factory pricing is typical-for-trim and is not shown for this vehicle." };
+  }
+  if (m.status !== "reconciled") {
+    return {
+      state: "unavailable", label, lines: [], total: null, status: m.status,
+      note: m.status === "conflict" ? "Factory pricing is held for review." : "Complete factory pricing is not available.",
+    };
+  }
+  const lines: { label: string; value: number }[] = [];
+  if (m.baseMsrp != null) lines.push({ label: "Base MSRP", value: m.baseMsrp });
+  if (m.optionsTotal) lines.push({ label: "Factory & port-installed options", value: m.optionsTotal });
+  if (m.destination != null) lines.push({ label: "Destination charge", value: m.destination });
+  return {
+    state: "success", label, lines, total: m.totalMsrp, status: m.status,
+    note: isNew ? "Manufacturer's suggested retail price as built. Not the selling price." : "Price when new. Not this vehicle's current value or selling price.",
+  };
+}
+
+// ── Fuel economy ──────────────────────────────────────────────────────
+
+function buildFuel(d: PassportData): NextPassportData["fuel"] {
+  const f = resolveFuelEconomy(d.epa);
+  return {
+    state: f.available ? "success" : "unavailable",
+    unit: f.unit,
+    city: f.cityMpg, highway: f.highwayMpg, combined: f.combinedMpg,
+    rangeMiles: f.rangeMiles, annualFuelCost: f.annualFuelCost,
+    source: f.source || "", note: f.note,
+  };
+}
+
+// ── Recalls ───────────────────────────────────────────────────────────
+
+/** Only a VIN-level answer may read clear; everything else is pending. */
+function buildRecalls(d: PassportData): NextPassportData["recalls"] {
+  const v = d.recall.vin;
+  const checked = fmtDate(v.checkedAt);
+  if (v.clearClaimAllowed) return { state: "success", status: "VERIFIED", label: "No open recalls for this VIN", detail: v.detail, checked };
+  if (v.openCount != null && v.openCount > 0) {
+    return { state: "success", status: "ATTENTION", label: `${v.openCount} open recall${v.openCount === 1 ? "" : "s"} reported`, detail: v.detail, checked };
+  }
+  if (d.recall.riskSignalled) return { state: "success", status: "ATTENTION", label: "Recall information needs confirmation", detail: v.detail, checked };
+  return { state: "pending", status: "PENDING", label: v.label || "VIN recall check pending", detail: v.detail, checked };
+}
+
+// ── Price history ─────────────────────────────────────────────────────
+
+function buildPriceHistory(d: PassportData, pv: (k: string) => boolean): NextPassportData["priceHistory"] {
+  if (!pv("marketValue")) return { state: "unavailable", points: [], latestChange: null };
+  const points = d.valueHistory
+    .filter((h) => h.listing_price != null && Number.isFinite(h.listing_price))
+    .map((h) => ({ date: h.captured_at, price: h.listing_price as number }));
+  return { state: points.length >= 2 ? "success" : points.length ? "unavailable" : "pending", points, latestChange: d.priceChangeLatest };
+}
+
+// ── Specifications ────────────────────────────────────────────────────
+
+/** Shopper-readable spec groups from the decoded attributes. Raw codes, provider
+ *  confidence and undocumented-unit dimensions stay out (see fieldRegistry). */
+function buildSpecifications(listing: NextPassportListing, c: VehiclePassportDataContract | null): NextPassportData["specifications"] {
+  const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
+  const v = (k: string): string => {
+    const x = mc[k];
+    if (x == null) return "";
+    const t = String(x).trim();
+    return t === "" || t === "0" ? "" : t;
+  };
+  const row = (label: string, value: string) => ({ label, value });
+  const colors = c?.buildSheet?.colors;
+  const groups = [
+    { name: "Powertrain", rows: [
+      row("Engine", v("engine")), row("Horsepower", v("horsepower") ? `${v("horsepower")} hp` : ""),
+      row("Cylinders", v("cylinders")), row("Displacement", v("engine_size") ? `${v("engine_size")} L` : ""),
+      row("Transmission", v("transmission")), row("Drivetrain", v("drivetrain")),
+      row("Fuel type", v("fuel_type")), row("Powertrain", v("powertrain_type")),
+    ] },
+    { name: "Body & capacity", rows: [
+      row("Body style", v("body_type")), row("Doors", v("doors")),
+      row("Seating", v("seating") || v("std_seating") || v("seating_capacity")),
+    ] },
+    { name: "Colors", rows: [
+      row("Exterior", colors?.exterior?.name || v("exterior_color")),
+      row("Interior", colors?.interior?.name || v("interior_color")),
+    ] },
+    { name: "Origin", rows: [row("Assembled in", c?.buildSheet?.assembly?.country || v("made_in"))] },
+  ].map((g) => ({ name: g.name, rows: g.rows.filter((r) => r.value) })).filter((g) => g.rows.length);
+  return { state: groups.length ? "success" : "unavailable", groups };
 }
 
 // ── Trust badges ──────────────────────────────────────────────────────
@@ -203,15 +388,19 @@ export function buildNextPassportData(args: BuildNextPassportArgs): NextPassport
  * or unavailable produces NO badge — the absence of a badge is honest, an
  * unearned badge is not.
  */
-function buildTrustBadges({ report, isCpo, make, d }: {
-  report: VerificationReport; isCpo: boolean; make: string; d: PassportData;
+function buildTrustBadges({ report, isCpo, isNew, make, d }: {
+  report: VerificationReport; isCpo: boolean; isNew: boolean; make: string; d: PassportData;
 }): { label: string; status: NextStatus }[] {
   const verified = (key: string) => report.checks.find((c) => c.key === key)?.status === "verified";
   const badges: { label: string; status: NextStatus }[] = [];
 
   if (report.valid && verified("history")) badges.push({ label: "Vehicle History Verified", status: "VERIFIED" });
   if (d.marketAvg != null && !d.marketBasisWeak) badges.push({ label: "Market Data Verified", status: "VERIFIED" });
-  if (d.warrantyStr && !d.warrantyExpired) badges.push({ label: "Factory Warranty Active", status: "ACTIVE" });
+  // "Active" is a claim about today, so a used car needs a real in-service date
+  // behind it; terms on file without one are not coverage evidence.
+  if (d.warrantyStr && !d.warrantyExpired && (isNew || !!d.warranty.in_service_date)) {
+    badges.push({ label: "Factory Warranty Active", status: "ACTIVE" });
+  }
   if (isCpo) badges.push({ label: `${make ? `${make} ` : ""}Certified · CPO`.trim(), status: "VERIFIED" });
   if (badges.length < 3 && d.ownerCount === 1) badges.push({ label: "One Owner Reported", status: "VERIFIED" });
   if (badges.length < 3 && verified("recalls")) badges.push({ label: "No Open Recalls", status: "VERIFIED" });
@@ -317,8 +506,10 @@ function buildMarket(d: PassportData, pv: (k: string) => boolean): NextPassportD
   }
   const position = (() => {
     if (d.price == null || d.marketAvg == null) return null;
-    const low = d.marketLow ?? d.marketAvg * 0.85;
-    const high = d.marketHigh ?? d.marketAvg * 1.15;
+    // No provider range, no gauge: a +/-15% band would be invented.
+    if (d.marketLow == null || d.marketHigh == null || d.marketHigh <= d.marketLow) return null;
+    const low = d.marketLow;
+    const high = d.marketHigh;
     return Math.max(0, Math.min(1, (d.price - low) / Math.max(1, high - low)));
   })();
   return {
@@ -336,8 +527,8 @@ function buildMarket(d: PassportData, pv: (k: string) => boolean): NextPassportD
 
 /** Evidence, not marketing. Every line traces to a confirmed record; no
  *  "Amazing Deal", no "Best Choice", no superlatives. */
-function buildReasons({ d, report, isCpo, make }: {
-  d: PassportData; report: VerificationReport; isCpo: boolean; make: string;
+function buildReasons({ d, report, isCpo, isNew, make }: {
+  d: PassportData; report: VerificationReport; isCpo: boolean; isNew: boolean; make: string;
 }): NextPassportData["reasons"] {
   const verified = (key: string) => report.checks.find((c) => c.key === key)?.status === "verified";
   const items = ([
@@ -347,7 +538,7 @@ function buildReasons({ d, report, isCpo, make }: {
     verified("recalls") ? "No open recalls reported" : null,
     isCpo ? `${make ? `${make} ` : ""}Certified pre-owned`.trim() : null,
     d.serviceCount > 0 ? `${d.serviceCount} service record${d.serviceCount === 1 ? "" : "s"} reported` : null,
-    d.warrantyStr && !d.warrantyExpired ? "Factory warranty coverage remaining" : null,
+    d.warrantyStr && !d.warrantyExpired && (isNew || !!d.warranty.in_service_date) ? "Factory warranty coverage remaining" : null,
   ].filter(Boolean)) as string[];
   return { state: items.length ? "success" : "unavailable", items };
 }
@@ -379,8 +570,11 @@ function buildTimeline(d: PassportData): NextPassportData["timeline"] {
   };
   const events: { year: string; label: string; status: NextStatus }[] = [];
   if (h.inServiceDate) events.push({ year: yearOf(h.inServiceDate), label: "Placed in service", status: "VERIFIED" });
-  if (h.owners != null) {
-    events.push({ year: "", label: `${h.owners} owner${h.owners === 1 ? "" : "s"} reported`, status: "VERIFIED" });
+  // history_payload.owners counts dealer listing spells, not owners (a car
+  // relisted by 12 dealers is not a 12-owner car). Only the vendor owner
+  // signal derivePassport already vetted may appear, and it is reported, not verified.
+  if (d.ownerCount != null && d.ownerCount > 0) {
+    events.push({ year: "", label: `${d.ownerCount} owner${d.ownerCount === 1 ? "" : "s"} reported`, status: "ESTIMATED" });
   }
   // First-seen is when a listing appeared in the feed, not a recorded arrival
   // date — inferred, so it can only ever be ESTIMATED.

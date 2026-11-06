@@ -35,7 +35,7 @@ import {
   ChevronLeft, ChevronRight, Bell, User, Menu, Maximize2, CheckCircle2, Clock,
   Info, AlertTriangle, MinusCircle, ShieldCheck, Calendar, Tag, FileText, Star,
   DollarSign, HelpCircle, BookOpen, Car, Phone, MessageSquare, ExternalLink,
-  TrendingUp, RefreshCw,
+  TrendingUp, RefreshCw, Gauge,
 } from "lucide-react";
 
 /* ==========================================================================
@@ -292,7 +292,15 @@ function SafeImage({ src, alt, className = "", ratio = "56.25%", rounded = "roun
 }
 
 const money = (n: number | string | null | undefined): string =>
-  typeof n === "number" ? `$${n.toLocaleString("en-US")}` : n || "—";
+  typeof n === "number" ? (Number.isFinite(n) ? `$${n.toLocaleString("en-US")}` : "—") : n || "—";
+
+const stat = (n: number | null | undefined): string =>
+  typeof n === "number" && Number.isFinite(n) ? n.toLocaleString("en-US") : "—";
+
+const scrollToId = (id: string) => {
+  if (typeof document === "undefined") return;
+  document.getElementById(id)?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+};
 
 /* ==========================================================================
    4. DEFAULT DATA  (replace with API payload)
@@ -473,7 +481,7 @@ function Gallery({ vehicle }: { vehicle: any }) {
     track("vehicle_gallery_interaction", { section: "Vehicle photos", direction: dir > 0 ? "next" : "prev" }, { once: false });
   };
   return (
-    <div className="bg-white">
+    <div id="pp-gallery" className="bg-white">
       <SafeImage
         src={vehicle.photos[i]}
         alt={`${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.trim}`}
@@ -521,7 +529,9 @@ function Identity({ vehicle, badges }: { vehicle: any; badges: any[] }) {
       <h1 className="text-lg font-bold text-gray-900 leading-tight">
         {vehicle.year} {vehicle.make} {vehicle.model} {vehicle.trim}
       </h1>
-      <p className="text-sm text-gray-600 mt-0.5">{vehicle.mileage.toLocaleString("en-US")} miles</p>
+      {typeof vehicle.mileage === "number" && Number.isFinite(vehicle.mileage) && (
+        <p className="text-sm text-gray-600 mt-0.5">{vehicle.mileage.toLocaleString("en-US")} miles</p>
+      )}
 
       <ul className="flex flex-wrap gap-1.5 mt-3">
         {badges.slice(0, 4).map((b: any) => {
@@ -556,10 +566,12 @@ function PriceSection({ price }: { price: any }) {
               </dd>
             </div>
           ))}
-          <div className="flex items-center justify-between pt-2">
-            <dt className="text-xs font-bold text-gray-900">{price.total.label}</dt>
-            <dd className="text-sm font-bold text-gray-900">{money(price.total.value)}</dd>
-          </div>
+          {price.total && (
+            <div className="flex items-center justify-between pt-2">
+              <dt className="text-xs font-bold text-gray-900">{price.total.label}</dt>
+              <dd className="text-sm font-bold text-gray-900">{money(price.total.value)}</dd>
+            </div>
+          )}
         </dl>
 
         <p className="text-gray-500 mt-2 leading-relaxed" style={{ fontSize: "10px" }}>{price.disclosure}</p>
@@ -698,9 +710,9 @@ function MarketSection({ market, onDetail }: { market: any; onDetail: DetailHand
       <DataState state={market.state} title="Market data">
         <div className="grid grid-cols-3 gap-2 text-center">
           {[
-            { v: market.similar, l: "Similar Vehicles" },
-            { v: money(market.belowMarket), l: "Below Market" },
-            { v: market.daysOnMarket, l: "Days on Market" },
+            { v: stat(market.similar), l: "Similar Vehicles" },
+            { v: typeof market.belowMarket === "number" && market.belowMarket > 0 ? money(market.belowMarket) : "—", l: "Below Market" },
+            { v: stat(market.daysOnMarket), l: "Days on Market" },
           ].map((m) => (
             <div key={m.l}>
               <p className="text-xl font-bold text-gray-900 leading-none">{m.v}</p>
@@ -709,24 +721,30 @@ function MarketSection({ market, onDetail }: { market: any; onDetail: DetailHand
           ))}
         </div>
 
-        <div className="mt-3">
-          <div className="relative h-2 rounded-full"
-            style={{ background: "linear-gradient(90deg,#2563eb 0%,#16a34a 32%,#facc15 66%,#dc2626 100%)" }}
-            role="img"
-            aria-label={`Market position: priced ${money(market.belowMarket)} below comparable market listings`}>
-            <span className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-white border-2 border-gray-900"
-              style={{ left: `${Math.min(Math.max(market.position, 0), 1) * 100}%` }} />
+        {typeof market.position === "number" && Number.isFinite(market.position) && (
+          <div className="mt-3">
+            <div className="relative h-2 rounded-full"
+              style={{ background: "linear-gradient(90deg,#2563eb 0%,#16a34a 32%,#facc15 66%,#dc2626 100%)" }}
+              role="img"
+              aria-label={typeof market.belowMarket === "number" && market.belowMarket > 0
+                ? `Market position: priced ${money(market.belowMarket)} below comparable market listings`
+                : "Market position relative to comparable market listings"}>
+              <span className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-white border-2 border-gray-900"
+                style={{ left: `${Math.min(Math.max(market.position, 0), 1) * 100}%` }} />
+            </div>
+            <div className="flex justify-between mt-1 text-gray-500" style={{ fontSize: "10px" }}>
+              <span>Great Price</span><span>Fair Price</span><span>Overpriced</span>
+            </div>
           </div>
-          <div className="flex justify-between mt-1 text-gray-500" style={{ fontSize: "10px" }}>
-            <span>Great Price</span><span>Fair Price</span><span>Overpriced</span>
-          </div>
-        </div>
+        )}
 
         <div className="flex items-center justify-between gap-2 mt-3">
           <LinkRow onClick={() => onDetail("market_intelligence_interaction", "Market Intelligence")}>View market details</LinkRow>
-          <span className="inline-flex items-center gap-1 text-amber-600 font-medium" style={{ fontSize: "10px" }}>
-            <AlertTriangle size={11} aria-hidden="true" />{market.note}
-          </span>
+          {market.note ? (
+            <span className="inline-flex items-center gap-1 text-amber-600 font-medium" style={{ fontSize: "10px" }}>
+              <AlertTriangle size={11} aria-hidden="true" />{market.note}
+            </span>
+          ) : null}
         </div>
       </DataState>
     </Card>
@@ -763,7 +781,7 @@ function ConfirmSection({ confirm, onDetail }: { confirm: any; onDetail: DetailH
       <ul className="space-y-2">
         {confirm.items.map((c: any) => (
           <li key={c.label}>
-            <LinkRow href={c.href} onClick={() => onDetail("documents_interaction", "Confirm Before Purchase")}>
+            <LinkRow href={c.href} onClick={() => onDetail("documents_interaction", c.href ? "External source" : "Confirm Before Purchase")}>
               {c.label}{c.external && <ExternalLink size={11} aria-hidden="true" />}
             </LinkRow>
           </li>
@@ -879,7 +897,255 @@ function WarrantySection({ warranty, onDetail }: { warranty: any; onDetail: Deta
   );
 }
 
-function SpecsSection({ vehicle, onDetail }: { vehicle: any; onDetail: DetailHandler }) {
+const CHIP = "inline-block px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-mono";
+
+function EquipmentSection({ equipment, open, onToggle }: { equipment: any; open: boolean; onToggle: (o: boolean) => void }) {
+  const ref = useSectionView("equipment_view", "Features & packages");
+  const eq = equipment || { state: "unavailable" };
+  const packages: any[] = eq.packages || [];
+  const options: any[] = eq.options || [];
+  const notVerified: any[] = eq.notVerified || [];
+  const categories: any[] = eq.categories || [];
+  const standard: any[] = eq.standard || [];
+  const estimated = eq.basis && eq.basis !== "vin_build" && eq.basis !== "none";
+  return (
+    <Card className="p-4 scroll-mt-16" id="pp-equipment" innerRef={ref}>
+      <CardTitle>Features &amp; Packages</CardTitle>
+      <DataState state={eq.state} title="Equipment">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-xs text-gray-700 leading-snug">
+            {eq.basisLabel}
+            {typeof eq.featureCount === "number" && eq.featureCount > 0 ? ` · ${eq.featureCount.toLocaleString("en-US")} features` : ""}
+          </p>
+          {estimated && <StatusPill status="ESTIMATED" label="Not VIN-specific" className="shrink-0" />}
+        </div>
+
+        {packages.length > 0 && (
+          <div className="mt-3">
+            <p className="text-xs font-semibold text-gray-900 mb-1">Installed packages</p>
+            <ul className="divide-y divide-gray-100">
+              {packages.map((pk: any) => (
+                <li key={`${pk.code}-${pk.name}`} className="py-1.5">
+                  <details>
+                    <summary className="flex items-center justify-between gap-2 cursor-pointer text-xs text-gray-800">
+                      <span className="min-w-0">
+                        {pk.name}
+                        {pk.code ? <span className={`${CHIP} ml-1.5`} style={{ fontSize: "10px" }}>{pk.code}</span> : null}
+                      </span>
+                      <span className="shrink-0 font-semibold text-gray-900">{typeof pk.msrp === "number" ? money(pk.msrp) : ""}</span>
+                    </summary>
+                    {pk.contents?.length > 0 ? (
+                      <ul className="mt-1.5 ml-4 list-disc space-y-0.5 text-gray-600" style={{ fontSize: "11px" }}>
+                        {pk.contents.map((c: string) => <li key={c}>{c}</li>)}
+                      </ul>
+                    ) : (
+                      <p className="mt-1.5 ml-4 text-gray-500" style={{ fontSize: "11px" }}>Package contents were not provided.</p>
+                    )}
+                  </details>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {options.length > 0 && (
+          <div className="mt-3">
+            <div className="flex items-baseline justify-between gap-2 mb-1">
+              <p className="text-xs font-semibold text-gray-900">Installed options</p>
+              {typeof eq.optionsValue === "number" && eq.optionsValue > 0 && (
+                <p className="text-gray-500" style={{ fontSize: "10px" }}>Options total {money(eq.optionsValue)}</p>
+              )}
+            </div>
+            <ul className="divide-y divide-gray-100">
+              {options.map((o: any) => (
+                <li key={`${o.code}-${o.name}`} className="flex items-start justify-between gap-2 py-1.5">
+                  <span className="text-xs text-gray-800 min-w-0">
+                    {o.name}
+                    {o.code ? <span className={`${CHIP} ml-1.5`} style={{ fontSize: "10px" }}>{o.code}</span> : null}
+                    {o.portInstalled ? <span className="block text-gray-400" style={{ fontSize: "10px" }}>Port-installed</span> : null}
+                  </span>
+                  <span className="shrink-0 text-xs font-semibold text-gray-900">{typeof o.msrp === "number" ? money(o.msrp) : ""}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {notVerified.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-dashed border-gray-200">
+            <p className="text-xs font-semibold text-gray-700">Listed by the provider but not verified as installed</p>
+            <ul className="mt-1 space-y-1">
+              {notVerified.map((n: any) => (
+                <li key={n.name} className="flex items-start justify-between gap-2 text-gray-500">
+                  <span className="inline-flex items-start gap-1.5 text-xs">
+                    <MinusCircle size={13} className="mt-px shrink-0 text-gray-400" aria-hidden="true" />{n.name}
+                  </span>
+                  <span className="shrink-0 text-xs">{typeof n.msrp === "number" ? money(n.msrp) : ""}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {(categories.length > 0 || standard.length > 0) && (
+          <details className="mt-3 border-t border-gray-100 pt-3" open={open} onToggle={(e) => onToggle((e.currentTarget as HTMLDetailsElement).open)}>
+            <summary className="cursor-pointer text-xs font-semibold text-blue-600">Full equipment list</summary>
+            <div className="mt-2 space-y-3">
+              {categories.map((c: any) => (
+                <div key={`c-${c.name}`}>
+                  <h3 className="text-xs font-semibold text-gray-900">{c.name}</h3>
+                  <ul className="mt-1 space-y-0.5 text-gray-600" style={{ fontSize: "11px" }}>
+                    {c.items.map((it: string, n: number) => <li key={`${it}-${n}`}>{it}</li>)}
+                  </ul>
+                </div>
+              ))}
+              {standard.map((c: any) => (
+                <div key={`s-${c.name}`}>
+                  <h3 className="text-xs font-semibold text-gray-900">Standard: {c.name}</h3>
+                  <ul className="mt-1 space-y-0.5 text-gray-600" style={{ fontSize: "11px" }}>
+                    {c.items.map((it: string, n: number) => <li key={`${it}-${n}`}>{it}</li>)}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
+      </DataState>
+    </Card>
+  );
+}
+
+function FactoryMsrpSection({ msrp }: { msrp: any }) {
+  const m = msrp || { state: "unavailable" };
+  const lines: any[] = (m.lines || []).filter((l: any) => typeof l.value === "number" && Number.isFinite(l.value));
+  return (
+    <Card className="p-4">
+      <CardTitle>{m.state === "success" && m.label ? m.label : "Factory MSRP"}</CardTitle>
+      <DataState state={m.state} title="Factory MSRP">
+        <dl className="divide-y divide-gray-100">
+          {lines.map((l: any) => (
+            <div key={l.label} className="flex items-center justify-between py-1.5">
+              <dt className="text-xs text-gray-600">{l.label}</dt>
+              <dd className="text-xs font-semibold text-gray-800">{money(l.value)}</dd>
+            </div>
+          ))}
+          <div className="flex items-center justify-between pt-2">
+            <dt className="text-xs font-bold text-gray-900">Total MSRP</dt>
+            <dd className="text-sm font-bold text-gray-900">{money(m.total)}</dd>
+          </div>
+        </dl>
+      </DataState>
+      {m.note ? <p className="text-gray-500 mt-2 leading-relaxed" style={{ fontSize: "10px" }}>{m.note}</p> : null}
+    </Card>
+  );
+}
+
+function FuelSection({ fuel }: { fuel: any }) {
+  const f = fuel || { state: "unavailable" };
+  const unit = f.unit === "MPGe" ? "MPGe" : "MPG";
+  return (
+    <Card className="p-4">
+      <CardTitle right={<Gauge size={14} className="text-gray-400" aria-hidden="true" />}>Fuel Economy</CardTitle>
+      <DataState state={f.state} title="Fuel economy">
+        <div className="grid grid-cols-3 gap-2 text-center">
+          {[
+            { v: f.city, l: "City" },
+            { v: f.highway, l: "Highway" },
+            { v: f.combined, l: "Combined" },
+          ].map((m) => (
+            <div key={m.l}>
+              <p className="text-xl font-bold text-gray-900 leading-none">{stat(m.v)}</p>
+              <p className="text-gray-500 mt-1" style={{ fontSize: "10px" }}>{m.l} {unit}</p>
+            </div>
+          ))}
+        </div>
+        {(typeof f.rangeMiles === "number" || typeof f.annualFuelCost === "number") && (
+          <dl className="mt-3 divide-y divide-gray-100">
+            {typeof f.rangeMiles === "number" && Number.isFinite(f.rangeMiles) && (
+              <div className="flex items-center justify-between py-1.5">
+                <dt className="text-xs text-gray-600">Electric range</dt>
+                <dd className="text-xs font-semibold text-gray-800">{stat(f.rangeMiles)} mi</dd>
+              </div>
+            )}
+            {typeof f.annualFuelCost === "number" && Number.isFinite(f.annualFuelCost) && f.annualFuelCost > 0 && (
+              <div className="flex items-center justify-between py-1.5">
+                <dt className="text-xs text-gray-600">Estimated annual {unit === "MPGe" ? "energy" : "fuel"} cost</dt>
+                <dd className="text-xs font-semibold text-gray-800">{money(f.annualFuelCost)}</dd>
+              </div>
+            )}
+          </dl>
+        )}
+        {f.source ? <p className="text-gray-400 mt-2" style={{ fontSize: "10px" }}>Source: {f.source}</p> : null}
+        {f.note ? <p className="text-gray-400 mt-1 leading-relaxed" style={{ fontSize: "10px" }}>{f.note}</p> : null}
+      </DataState>
+    </Card>
+  );
+}
+
+function RecallsSection({ recalls }: { recalls: any }) {
+  const r = recalls || { state: "unavailable" };
+  return (
+    <Card className="p-4">
+      <CardTitle>Recalls</CardTitle>
+      <DataState state={r.state} title="Recalls">
+        <StatusPill status={r.status} label={r.label} />
+        {r.detail ? <p className="text-xs text-gray-600 mt-1.5 leading-relaxed">{r.detail}</p> : null}
+        {r.checked ? <p className="text-gray-400 mt-1" style={{ fontSize: "10px" }}>Checked {r.checked}</p> : null}
+      </DataState>
+    </Card>
+  );
+}
+
+function Sparkline({ points }: { points: { date: string; price: number }[] }) {
+  const W = 300, H = 56, PAD = 4;
+  const prices = points.map((p) => p.price);
+  const lo = Math.min(...prices), hi = Math.max(...prices);
+  const span = hi - lo || 1;
+  const xy = points.map((p, i) => {
+    const x = PAD + (i / (points.length - 1)) * (W - PAD * 2);
+    const y = H - PAD - ((p.price - lo) / span) * (H - PAD * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-14" role="img"
+      aria-label={`Price history from ${money(prices[0])} to ${money(prices[prices.length - 1])}`}>
+      <polyline points={xy.join(" ")} fill="none" stroke="#2563eb" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PriceHistorySection({ history }: { history: any }) {
+  const h = history || { state: "unavailable", points: [] };
+  const points: { date: string; price: number }[] = (h.points || []).filter((p: any) => typeof p.price === "number" && Number.isFinite(p.price));
+  const state = h.state === "success" && points.length === 0 ? "unavailable" : h.state;
+  return (
+    <Card className="p-4">
+      <CardTitle>Price History</CardTitle>
+      <DataState state={state} title="Price history">
+        {points.length >= 2 && <Sparkline points={points} />}
+        <ul className="divide-y divide-gray-100 mt-1">
+          {points.slice(-6).reverse().map((p, n) => (
+            <li key={`${p.date}-${n}`} className="flex items-center justify-between py-1.5">
+              <span className="text-xs text-gray-600">{p.date}</span>
+              <span className="text-xs font-semibold text-gray-800">{money(p.price)}</span>
+            </li>
+          ))}
+        </ul>
+        {typeof h.latestChange === "number" && h.latestChange !== 0 && (
+          <p className="text-gray-500 mt-1" style={{ fontSize: "10px" }}>
+            Latest change {h.latestChange < 0 ? "-" : "+"}{money(Math.abs(h.latestChange))}
+          </p>
+        )}
+      </DataState>
+    </Card>
+  );
+}
+
+function SpecsSection({ vehicle, specifications, specsOpen, onSpecsToggle, onDetail }: {
+  vehicle: any; specifications: any; specsOpen: boolean; onSpecsToggle: (o: boolean) => void; onDetail: DetailHandler;
+}) {
+  const sp = specifications || { state: "unavailable", groups: [] };
+  const groups: any[] = sp.groups || [];
   return (
     <Card className="p-4">
       <CardTitle>About This Vehicle</CardTitle>
@@ -901,17 +1167,42 @@ function SpecsSection({ vehicle, onDetail }: { vehicle: any; onDetail: DetailHan
           <FileText size={13} className="text-blue-600" aria-hidden="true" /> Full specifications
         </button>
       </div>
+      <details id="pp-specs" className="mt-3 scroll-mt-16" open={specsOpen}
+        onToggle={(e) => onSpecsToggle((e.currentTarget as HTMLDetailsElement).open)}>
+        <summary className="cursor-pointer text-xs font-semibold text-blue-600">Specifications</summary>
+        <DataState state={sp.state === "success" && groups.length === 0 ? "unavailable" : sp.state} title="Specifications">
+          <div className="mt-2 space-y-3">
+            {groups.map((g: any) => (
+              <div key={g.name}>
+                <h3 className="text-xs font-semibold text-gray-900">{g.name}</h3>
+                <dl className="mt-1 divide-y divide-gray-100">
+                  {g.rows.map((r: any) => (
+                    <div key={r.label} className="flex items-start justify-between gap-3 py-1">
+                      <dt className="text-gray-500" style={{ fontSize: "11px" }}>{r.label}</dt>
+                      <dd className="text-gray-800 text-right font-medium" style={{ fontSize: "11px" }}>{r.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            ))}
+          </div>
+        </DataState>
+      </details>
     </Card>
   );
 }
 
-function OverviewSection({ vehicle, onDetail }: { vehicle: any; onDetail: DetailHandler }) {
+function OverviewSection({ vehicle, expanded, onToggle, onDetail }: {
+  vehicle: any; expanded: boolean; onToggle: () => void; onDetail: DetailHandler;
+}) {
   return (
-    <Card className="p-4">
+    <Card className="p-4" id="pp-overview">
       <CardTitle>Vehicle Overview</CardTitle>
-      <p className="text-xs text-gray-700 leading-relaxed">{vehicle.overview}</p>
+      <p className={`text-xs text-gray-700 leading-relaxed ${expanded ? "" : "line-clamp-3"}`}>{vehicle.overview}</p>
       <div className="mt-2">
-        <LinkRow onClick={() => onDetail("vehicle_specs_interaction", "Vehicle Overview")}>Read more overview</LinkRow>
+        <LinkRow onClick={() => { onToggle(); onDetail("vehicle_specs_interaction", "Vehicle Overview"); }}>
+          {expanded ? "Show less" : "Read more overview"}
+        </LinkRow>
       </div>
     </Card>
   );
@@ -1051,32 +1342,48 @@ export default function PassportNextLayout({
   dealer = DEFAULT_DEALER,
   onEvent,
   onAction,
+  onOpenDetail,
 }: {
   data?: any;
   dealer?: any;
   onEvent?: (name: string, payload: any) => void;
   onAction?: (intent: string, payload: any) => void;
+  /** Called with the section name when a detail control is used, so the host can route to a destination page. */
+  onOpenDetail?: (section: string) => void;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const engine = useAnalyticsEngine({ vehicle: data.vehicle, dealerId: dealer.dealer_id, onEvent, onAction });
 
   return (
     <AnalyticsCtx.Provider value={engine}>
-      <PassportBody rootRef={rootRef} data={data} dealer={dealer} />
+      <PassportBody rootRef={rootRef} data={data} dealer={dealer} onOpenDetail={onOpenDetail} />
     </AnalyticsCtx.Provider>
   );
 }
 
-function PassportBody({ rootRef, data, dealer }: { rootRef: React.RefObject<HTMLDivElement>; data: any; dealer: any }) {
+function PassportBody({ rootRef, data, dealer, onOpenDetail }: {
+  rootRef: React.RefObject<HTMLDivElement>; data: any; dealer: any; onOpenDetail?: (section: string) => void;
+}) {
   const { track, act } = useAnalytics();
   useScrollDepth(rootRef);
 
   useEffect(() => { track("passport_view"); }, [track]);
 
-  const detail: DetailHandler = (event, section) => track(event, { section }, { once: false });
+  const [featuresOpen, setFeaturesOpen] = useState(false);
+  const [specsOpen, setSpecsOpen] = useState(false);
+  const [overviewOpen, setOverviewOpen] = useState(false);
+
+  const detail: DetailHandler = (event, section) => {
+    track(event, { section }, { once: false });
+    if (section === "Features & packages") { setFeaturesOpen(true); scrollToId("pp-equipment"); }
+    else if (section === "Full specifications") { setSpecsOpen(true); scrollToId("pp-specs"); }
+    else if (section === "Photos") scrollToId("pp-gallery");
+    onOpenDetail?.(section);
+  };
   const quick = (key: string, label: string) => {
     if (["trade", "contact", "payment"].includes(key)) return act(key, { location: "quick_actions", quick_action: label });
     track(`${key}_interaction`, { section: "Quick actions", quick_action: label }, { once: false });
+    onOpenDetail?.(label);
   };
 
   const { vehicle } = data;
@@ -1101,8 +1408,13 @@ function PassportBody({ rootRef, data, dealer }: { rootRef: React.RefObject<HTML
           <TimelineSection timeline={data.timeline} onDetail={detail} />
           <WindowStickerSection sticker={data.windowSticker} onDetail={detail} />
           <WarrantySection warranty={data.warranty} onDetail={detail} />
-          <SpecsSection vehicle={vehicle} onDetail={detail} />
-          <OverviewSection vehicle={vehicle} onDetail={detail} />
+          <EquipmentSection equipment={data.equipment} open={featuresOpen} onToggle={setFeaturesOpen} />
+          <FactoryMsrpSection msrp={data.factoryMsrp} />
+          <FuelSection fuel={data.fuel} />
+          <RecallsSection recalls={data.recalls} />
+          <PriceHistorySection history={data.priceHistory} />
+          <SpecsSection vehicle={vehicle} specifications={data.specifications} specsOpen={specsOpen} onSpecsToggle={setSpecsOpen} onDetail={detail} />
+          <OverviewSection vehicle={vehicle} expanded={overviewOpen} onToggle={() => setOverviewOpen((o) => !o)} onDetail={detail} />
           <PhotosSection vehicle={vehicle} onDetail={detail} />
           <DealerSection dealer={dealer} />
           <NextSteps onAct={act} />

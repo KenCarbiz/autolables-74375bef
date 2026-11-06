@@ -122,7 +122,10 @@ export type ProviderRejectionCode =
   | "implausible_prediction"
   | "inverted_range"
   | "stale_response"
-  | "unreconstructable_request";
+  | "unreconstructable_request"
+  // v4.8.0 fallback_to_generic: model-level prices in generic_prices[] with the
+  // top-level marketcheck_price/msrp nulled. Never a VIN-level valuation.
+  | "generic_fallback";
 
 export interface ProviderValidation {
   usable: boolean;

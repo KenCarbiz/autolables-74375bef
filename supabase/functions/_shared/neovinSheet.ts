@@ -79,8 +79,12 @@ const warrantyTerm = (type: string, raw: any): NeovinWarrantyTerm | null => {
     return text ? { type, text } : null;
   }
   if (typeof raw !== "object") return null;
-  const months = numOrUndefined(raw.months) ?? (numOrUndefined(raw.years) != null ? numOrUndefined(raw.years)! * 12 : undefined);
-  const miles = numOrUndefined(raw.miles ?? raw.mileage);
+  // NeoVIN's own shape is {duration: months, distance: miles}; a distance of
+  // 999999 / 9999999 is the provider's "unlimited" sentinel, kept as -1 (the
+  // value warranty_info already uses for unlimited miles).
+  const months = numOrUndefined(raw.months ?? raw.duration) ?? (numOrUndefined(raw.years) != null ? numOrUndefined(raw.years)! * 12 : undefined);
+  const rawMiles = numOrUndefined(raw.miles ?? raw.mileage ?? raw.distance);
+  const miles = rawMiles != null && rawMiles >= 999999 ? -1 : rawMiles;
   const text = strOrUndefined(raw.description ?? raw.text ?? raw.term ?? raw.coverage);
   if (months == null && miles == null && !text) return null;
   return { type, ...(months != null ? { months } : {}), ...(miles != null ? { miles } : {}), ...(text ? { text } : {}) };
@@ -171,9 +175,10 @@ export function structuredSheet(payload: any): Record<string, unknown> | null {
     return c || undefined;
   };
 
-  const packages: { name: string; code?: string; msrp?: number; contents: string[] }[] = [];
+  const packages: { name: string; code?: string; msrp?: number; contents: string[]; verified?: boolean; confidence?: string; type?: string }[] = [];
   // Same list under any of the names the provider has been observed to use.
-  const firstArray = (...vals: unknown[]) => vals.find((v) => Array.isArray(v) && v.length) as unknown[] | undefined;
+  // deno-lint-ignore no-explicit-any
+  const firstArray = (...vals: unknown[]) => vals.find((v) => Array.isArray(v) && v.length) as any[] | undefined; // eslint-disable-line @typescript-eslint/no-explicit-any
   const pkgSrc = firstArray(src.options_packages, src.option_packages, src.packages) ?? [];
   for (const p of pkgSrc) {
     const name = flat(p);
@@ -184,7 +189,18 @@ export function structuredSheet(payload: any): Record<string, unknown> | null {
     packages.push({ name, code: codeOf(p), msrp: num(p?.msrp ?? p?.price), contents });
   }
 
-  const options: { name: string; code?: string; msrp?: number }[] = [];
+  // installed_options_details rows carry `verified` (false = available for the
+  // model, NOT proven on this VIN), `confidence` and `type` ("P" = package).
+  // Dropping them made an unverified option indistinguishable from an
+  // installed one downstream.
+  const itemMeta = (x: unknown): { verified?: boolean; confidence?: string; type?: string } => {
+    const r = (x ?? {}) as { verified?: unknown; confidence?: unknown; type?: unknown };
+    const v = r.verified === true || r.verified === "true" ? true : r.verified === false || r.verified === "false" ? false : undefined;
+    const c = typeof r.confidence === "string" && r.confidence.trim() ? r.confidence.trim() : undefined;
+    const t = typeof r.type === "string" && r.type.trim() ? r.type.trim() : undefined;
+    return { ...(v != null ? { verified: v } : {}), ...(c ? { confidence: c } : {}), ...(t ? { type: t } : {}) };
+  };
+  const options: { name: string; code?: string; msrp?: number; verified?: boolean; confidence?: string; type?: string }[] = [];
   const optSrc = firstArray(src.installed_options_details, src.installed_options, src.optional_equipment) ?? [];
   for (const o of optSrc) {
     const name = flat(o);
@@ -193,9 +209,9 @@ export function structuredSheet(payload: any): Record<string, unknown> | null {
     // by the presence of sub-contents.
     const subs = ([] as unknown[]).concat(o?.options ?? o?.contents ?? []).map(flat).filter(Boolean);
     if (/package/i.test(String(o?.type ?? o?.category ?? "")) || subs.length) {
-      if (!packages.some((p) => p.name === name)) packages.push({ name, code: codeOf(o), msrp: num(o?.msrp ?? o?.price), contents: subs });
+      if (!packages.some((p) => p.name === name)) packages.push({ name, code: codeOf(o), msrp: num(o?.msrp ?? o?.price), contents: subs, ...itemMeta(o) });
     } else {
-      options.push({ name, code: codeOf(o), msrp: num(o?.msrp ?? o?.price) });
+      options.push({ name, code: codeOf(o), msrp: num(o?.msrp ?? o?.price), ...itemMeta(o) });
     }
   }
 
@@ -238,7 +254,12 @@ export function structuredSheet(payload: any): Record<string, unknown> | null {
 
   // include_generic=true falls back to typical-for-trim specs when the VIN
   // can't be fully decoded — the passport must label those, never assert them.
-  const generic = Boolean(src.is_generic ?? src.generic ?? /generic/i.test(String(src.decode_mode ?? src.decode ?? "")));
+  // An empty array is how NeoVIN says "nothing generic" on some records;
+  // Boolean([]) would have flagged a VIN-specific build as typical-for-trim.
+  const genericRaw = src.is_generic ?? src.generic;
+  const generic = Array.isArray(genericRaw) ? genericRaw.length > 0
+    : genericRaw != null ? Boolean(genericRaw)
+    : /generic/i.test(String(src.decode_mode ?? src.decode ?? ""));
 
   // ── Sticker-grade fields (Factory Window Sticker Generator) ──────────
   // The raw NeoVIN payload was historically discarded after extraction, so

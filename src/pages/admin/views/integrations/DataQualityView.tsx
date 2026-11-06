@@ -7,6 +7,7 @@ import { summarizeDataQuality } from "@/lib/admin/integrations/dataQuality";
 import { loadDataQualityCounts } from "@/lib/admin/integrations/queries";
 import { AdminCard, AdminTable, InlineNote, SectionTitle, SkeletonBlock, StatusChip, Td, Th } from "@/components/admin/v2/primitives";
 import MarketcheckDataHealthCard from "@/components/admin/MarketcheckDataHealthCard";
+import PassportDataCoveragePanel from "@/components/admin/PassportDataCoveragePanel";
 import { useViewer } from "./common";
 
 // Data quality: tenant-scoped counts over active inventory, each with the
@@ -77,6 +78,8 @@ export default function DataQualityView() {
           </tbody>
         </AdminTable>
       </AdminCard>
+
+      {!fixture && tenantId && <PassportDataCoveragePanel />}
 
       {viewer.canManageSettings && tenantId && (
         <div className="space-y-3">

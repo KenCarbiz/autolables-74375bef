@@ -177,6 +177,13 @@ export const listingEquipment = (listing: VehicleListing): string[] => {
   return cleanEquipmentList(all);
 };
 
+/** EPA unit for a stored fueleconomy.gov record: MPGe only for a pure battery-electric. */
+export const epaUnit = (rec: Record<string, unknown> | null | undefined): "MPG" | "MPGe" => {
+  const atv = String(rec?.atvType ?? "").trim().toLowerCase();
+  const fuel = String(rec?.fuelType ?? "").trim().toLowerCase();
+  return atv === "ev" || fuel === "electricity" ? "MPGe" : "MPG";
+};
+
 export const fmt$ = (n: number | null | undefined) =>
   n == null ? "" : `$${Math.round(n).toLocaleString()}`;
 
@@ -328,7 +335,9 @@ export interface PassportData {
   keySpecs: [string, string][];
   // Official EPA fuel economy (fueleconomy.gov) when the epa-fuel-economy
   // function has matched this listing. Public-domain federal data.
-  epa: { city: number | null; highway: number | null; combined: number | null; annualFuelCost: number | null; ghgScore: number | null; rangeMiles: number | null; fuelType: string | null } | null;
+  // unit is "MPGe" for a battery-electric record: EPA publishes kWh-equivalent
+  // figures there, and labelling them MPG misstates them.
+  epa: { city: number | null; highway: number | null; combined: number | null; annualFuelCost: number | null; ghgScore: number | null; rangeMiles: number | null; fuelType: string | null; unit?: "MPG" | "MPGe" } | null;
   overview: string;
   whyBuy: string[];
   // Reviews
@@ -783,6 +792,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     ghgScore: (epaRaw.ghgScore as number) ?? null,
     rangeMiles: (epaRaw.rangeMiles as number) ?? null,
     fuelType: (epaRaw.fuelType as string) ?? null,
+    unit: epaUnit(epaRaw),
   } : null;
 
   const keySpecs = ([
@@ -792,7 +802,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     ["Drivetrain", ks.drivetrain],
     // Official EPA figures win over feed-provided MPG when available.
     ["Fuel Economy", epa && epa.city && epa.highway
-      ? `${epa.city}/${epa.highway} MPG (EPA)`
+      ? `${epa.city}/${epa.highway} ${epa.unit ?? "MPG"} (EPA)`
       : ks.mpg_city && ks.mpg_hwy ? `${ks.mpg_city}/${ks.mpg_hwy} MPG` : ks.fuel || null],
     ["EPA Range", epa?.rangeMiles ? `${epa.rangeMiles} mi` : null],
     ["Exterior Color", ks.exterior_color],
@@ -815,7 +825,16 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   if (/awd|4wd|4x4/i.test(String(ks.drivetrain || ""))) whyBuy.push(`${ks.drivetrain} — all-weather confidence`);
 
   const rawOffers = (listing as unknown as { incentives?: unknown }).incentives ?? (mc as { incentives?: unknown }).incentives;
-  const offers = (Array.isArray(rawOffers) ? rawOffers : []).map((o) => o as Record<string, unknown>).map((o) => ({
+  // An incentive past its end date, or one the source marked ineligible for
+  // this vehicle, is not an offer the shopper can take.
+  const offerNow = Date.now();
+  const offers = (Array.isArray(rawOffers) ? rawOffers : []).map((o) => o as Record<string, unknown>).filter((o) => {
+    if (o.eligible === false || o.applicable === false) return false;
+    const end = o.valid_through ?? o.end_date ?? o.expires_at;
+    if (end == null || end === "") return true;
+    const t = new Date(String(end)).getTime();
+    return !Number.isFinite(t) || t + 86400000 > offerNow;
+  }).map((o) => ({
     title: (o.title as string) || (o.program as string) || "Offer",
     body: (o.summary as string) || (o.description as string) || (o.amount ? `$${Number(o.amount).toLocaleString()}` : ""),
     exp: o.valid_through ? `Expires ${new Date(o.valid_through as string).toLocaleDateString()}` : "",
