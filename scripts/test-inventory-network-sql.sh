@@ -40,3 +40,7 @@ $P -d "$DB" -f supabase/tests/inventory_network/91_provider_dealer_mapping.sql
 bash supabase/tests/inventory_network/92_mapping_concurrency.sh "$DB"
 $P -d "$DB" -f supabase/proposed/20261111000000_provider_dealer_mapping.rollback.sql
 $P -d "$DB" -f supabase/proposed/20261111000000_provider_dealer_mapping.sql
+$P -d "$DB" -f supabase/proposed/20261112000000_group_inventory_view.sql
+$P -d "$DB" -f supabase/tests/inventory_network/95_group_inventory_view.sql
+$P -d "$DB" -f supabase/proposed/20261112000000_group_inventory_view.rollback.sql
+$P -d "$DB" -f supabase/proposed/20261112000000_group_inventory_view.sql
