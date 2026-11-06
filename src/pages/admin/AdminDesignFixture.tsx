@@ -3,6 +3,8 @@ import { useLocation, useParams, useSearchParams } from "react-router-dom";
 import { AdminFixtureProvider } from "@/lib/admin/dataSource";
 import { ADMIN_SECTIONS, resolveAdminTab } from "@/lib/admin/sections";
 import { AdminShell } from "@/components/admin/v2/AdminShell";
+import { AdminCategoryPage, AdminDirectory } from "@/components/admin/v3/AdminV3";
+import { findCategory } from "@/lib/admin/categories";
 import { ADMIN_VIEWS } from "@/pages/admin/views";
 import { ADMIN_FIXTURES } from "@/pages/admin/fixtures";
 import { ADMIN_CHILD_ROUTE_ELEMENTS } from "@/pages/admin/childRoutes";
@@ -95,6 +97,19 @@ export default function AdminDesignFixture() {
   // The fee-review mock shows the rail and header dimmed behind its dialog, so
   // that screen draws the real frame unless ?chrome=0 asks for the stand-ins.
   const chrome = search.get("chrome") === "1" || (withDialogBackdrop && search.get("chrome") !== "0");
+  // Administration V3: the settings directory (v3-home) and each category
+  // page (v3-<category id>), drawn for an owner. Navigation only; no data.
+  const v3 = screen?.startsWith("v3-") ? screen.slice(3) : null;
+  if (v3) {
+    const ownerCtx = { role: "owner", isAdmin: false } as const;
+    const category = findCategory(v3);
+    const page = v3 === "home" ? <AdminDirectory ctx={ownerCtx} canSeeOverview /> : category ? <AdminCategoryPage category={category} ctx={ownerCtx} /> : <p className="p-8 text-sm">Unknown category {v3}.</p>;
+    return (
+      <div data-admin-fixture={screen} data-product-surface="dealer" className="min-h-screen bg-adm-workspace flex">
+        <FixtureChrome railWidth={railWidth}>{page}</FixtureChrome>
+      </div>
+    );
+  }
   const entry = screen ? ADMIN_FIXTURES[screen] : undefined;
   if (!entry) {
     return (
