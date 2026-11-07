@@ -251,14 +251,32 @@ const ProvenanceTag = ({ provenance }: { provenance: EvidenceProvenance }) => (
   <span className="text-[10.5px] font-semibold text-[#64748B] bg-slate-100 rounded-md px-2 py-0.5">{PROVENANCE_LABEL[provenance]}</span>
 );
 
+// What IS on record for a check that could not be verified: the reported
+// mileage, the VIN, or the dealership's general title policy. Shown as the
+// dealer's or listing's own data, never as a verified result.
+const unavailableNote = (c: ReportCheck): string | null =>
+  c.finding ?? (c.key === "title" ? c.evidence.find((e) => e.label === "Dealer policy")?.value ?? null : null);
+
 const exceptionHeadline = (check: ReportCheck): string => {
   switch (check.key) {
     case "recall":
       return recallHeadline(check);
     case "title":
-      return check.status === "needs_attention" ? "Title brand on record" : "Title and brand check pending";
+      return check.status === "needs_attention" ? "Title brand on record"
+        : check.status === "unavailable" ? "Title record not available"
+        : check.status === "dealer_attested" ? "Title reviewed by the dealer"
+        : "Title and brand check pending";
+    case "vin":
+      return check.status === "needs_confirmation" ? "Vehicle identity needs confirmation"
+        : check.status === "pending" ? "VIN decode pending" : "VIN on record, identity decode not verified";
+    case "odometer":
+      return check.status === "needs_attention" ? "Possible odometer rollback reported"
+        : check.status === "needs_confirmation" ? "Mileage records require review"
+        : "Odometer history not independently verified";
     case "history": return "Reported accident history";
-    default: return check.status === "pending" ? `${check.name} pending` : `${check.name} needs review`;
+    default: return check.status === "pending" ? `${check.name} pending`
+      : check.status === "unavailable" ? `${check.name} not available`
+      : check.status === "needs_confirmation" ? `${check.name} needs confirmation` : `${check.name} needs review`;
   }
 };
 
@@ -348,7 +366,7 @@ const outcomeLabel = (c: ReportCheck): string =>
 
 const supportingLine = (c: ReportCheck): string =>
   c.status === "pending" ? "Pending · No result returned yet"
-  : c.status === "unavailable" ? "Not available · No source data, not verified"
+  : c.status === "unavailable" ? "Not available · Not independently verified"
   : c.status === "needs_confirmation" ? "Sources disagree · Confirm with dealer"
   : c.status === "needs_attention" ? "Needs your attention"
   : "Checked";
@@ -758,12 +776,13 @@ const MobileVerification = ({
       <BottomSheet open={traceOpen} title="Report traceability" onClose={() => setTraceOpen(false)}>
         <div className="space-y-4 pb-1">
           <p className="text-[14px] text-[#334155] leading-relaxed">
-            This report is traceable to the live verification record. The saved PDF and this page reflect the same checks, statuses, sources and dates.
+            This report was built from the stored source records listed here, not from a live lookup at the moment you opened it. The saved PDF and this page carry the same report version, checks, statuses, sources and dates.
           </p>
           <div className="rounded-xl border border-[#E6EAF0] bg-[#FAFBFC] divide-y divide-[#F1F5F9] px-4">
             {[
               { label: "Report ID", value: reportId },
               { label: "Report version", value: verificationSnapshotKey(report, listing.vin) },
+              { label: "Evidence basis", value: "Stored source records" },
               { label: "Generated", value: reportGenerated },
               { label: "Source data through", value: lastChecked },
               { label: "VIN", value: listing.vin || null },
@@ -771,7 +790,7 @@ const MobileVerification = ({
             ].map((r) => (
               <div key={r.label} className="flex items-start justify-between gap-4 py-2.5 text-[13px]">
                 <span className="text-[#64748B] shrink-0">{r.label}</span>
-                <span className={`text-right ${r.value ? "text-[#0F172A] font-medium" : "text-[#94A3B8] italic"}`}>{r.value ?? "Not available"}</span>
+                <span className={`text-right break-all ${r.value ? "text-[#0F172A] font-medium" : "text-[#94A3B8] italic"}`} data-report-version={r.label === "Report version" ? r.value ?? undefined : undefined}>{r.value ?? "Not available"}</span>
               </div>
             ))}
           </div>
@@ -865,7 +884,7 @@ const VerificationPrintDoc = ({ report, listing, slug }: { report: VerificationR
           <p className="text-[14px] font-bold mt-2">AutoLabels Data-Verified Report</p>
           <p className="text-[10.5px] text-neutral-600 mt-0.5">Report generated {reportGenerated}{lastChecked ? ` · Source data last checked ${lastChecked}` : ""}</p>
           <p className="text-[10.5px] text-neutral-500">Report {reportId}</p>
-          <p className="text-[9.5px] text-neutral-400">Version {verificationSnapshotKey(report, listing.vin)}</p>
+          <p className="text-[9.5px] text-neutral-400" data-report-version={verificationSnapshotKey(report, listing.vin)}>Version {verificationSnapshotKey(report, listing.vin)} · stored source records</p>
         </div>
         <div className="text-right shrink-0">
           <p className="text-[14px] font-bold">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}{condition ? ` · ${condition}` : ""}</p>
@@ -1292,8 +1311,15 @@ const VehiclePassportVerification = () => {
                 <div className="flex items-start gap-2.5">
                   <CircleMinus className="w-[18px] h-[18px] text-[#94A3B8] shrink-0 mt-0.5" aria-hidden="true" />
                   <div className="min-w-0">
-                    <p className="text-[13px] font-bold text-[#475569]">Not available <span className="font-medium text-[#94A3B8]">— no source data, so not verified and no problem found</span></p>
-                    <p className="text-[12px] text-[#64748B] mt-0.5">{unavailable.map((c) => c.name).join(", ")} could not run because the underlying records are not available for this vehicle.</p>
+                    <p className="text-[13px] font-bold text-[#475569]">Not available <span className="font-medium text-[#94A3B8]">— not independently verified, and no problem was found</span></p>
+                    <p className="text-[12px] text-[#64748B] mt-0.5">{unavailable.map((c) => c.name).join(", ")} could not be verified because the records they need are not available for this vehicle.</p>
+                    {unavailable.some(unavailableNote) && (
+                      <ul className="mt-1.5 space-y-0.5" data-unavailable-notes>
+                        {unavailable.filter(unavailableNote).map((c) => (
+                          <li key={c.key} className="text-[12px] text-[#475569]">{unavailableNote(c)}</li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1414,6 +1440,7 @@ const VehiclePassportVerification = () => {
               <button onClick={() => scrollTo("sources")} className="mt-1.5 text-[12.5px] font-semibold text-[#2563EB] hover:underline inline-flex items-center gap-1 print:hidden">View sources <ArrowRight className="w-3.5 h-3.5" /></button>
             </div>
             {lastChecked && <p className="text-[11.5px] text-[#94A3B8] mt-3">Source data last checked {lastChecked}</p>}
+            <p className="text-[11px] text-[#94A3B8] mt-1 break-all" data-report-version={verificationSnapshotKey(report, listing.vin)}>Report version {verificationSnapshotKey(report, listing.vin)} · stored source records</p>
             <div className="mt-4 print:hidden"><RailActions /></div>
             {pdfState === "error" && <p className="text-[12px] text-[#DC2626] mt-2 print:hidden">We could not generate the PDF. Please try Print instead.</p>}
           </div>

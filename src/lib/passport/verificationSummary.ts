@@ -11,6 +11,7 @@
 import { fmt$, type PassportData } from "@/lib/passportV2Data";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 import { deriveRecallView, type RecallView } from "@/lib/vehicleTruth/recallView";
+import { canonicalJson, sha256Hex } from "@/lib/passport/evidenceFingerprint";
 
 export type VerificationCategoryState =
   | "verified"
@@ -197,6 +198,13 @@ export interface ReportCheck {
   // Short reviewer note used to compose the banner body for exception checks.
   reviewNote: string | null;
   evidence: EvidenceField[];
+  /**
+   * The normalized evidence behind the status, as raw values (no display
+   * formatting, no report-time fallbacks). The report fingerprint hashes
+   * these, so new evidence changes the fingerprint even when the status
+   * stays the same.
+   */
+  facts: Record<string, unknown>;
   checkedAt: string | null;
   /**
    * Recall check only: WHICH recall answer this is. Status alone cannot carry
@@ -308,29 +316,316 @@ function latestDate(dates: (string | null)[]): string | null {
   return valid.length ? valid[valid.length - 1] : null;
 }
 
-type DecodeBag = { mc_attributes?: Record<string, unknown> | null; key_specs?: Record<string, unknown> | null };
+type Bag = Record<string, unknown>;
+const bag = (v: unknown): Bag => (v && typeof v === "object" && !Array.isArray(v) ? (v as Bag) : {});
+const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : typeof v === "number" ? String(v) : null);
+const isoOf = (v: unknown): string | null => {
+  const s = str(v);
+  return s && !Number.isNaN(Date.parse(s)) ? s : null;
+};
 
-/** Which decode returned data for this VIN, or null when none has. */
-export function vinDecodeEvidence(listing: VehicleListing): string | null {
-  const l = listing as unknown as DecodeBag;
-  const mc = (l.mc_attributes ?? {}) as Record<string, unknown>;
-  if (typeof mc.specs_decoded_at === "string" && mc.specs_decoded_at) return `VIN decode (${String(mc.specs_source || "provider")})`;
-  if (mc.build_sheet && typeof mc.build_sheet === "object") return "VIN build sheet";
-  if (typeof mc.make === "string" && mc.make && typeof mc.model === "string" && mc.model) return "Provider VIN record";
-  if (l.key_specs && typeof l.key_specs === "object" && Object.keys(l.key_specs).length > 0) return "Decoded specifications";
-  return null;
+// ── VIN decode evidence (strict) ───────────────────────────────────────────
+//
+// A decode verifies identity only when a named decoder answered for THIS VIN.
+// The evidence is a decode receipt: the provider's own record of the VIN it
+// decoded, the HTTP outcome, when it answered, and the year/make/model it
+// returned. public-listing-view attaches receipts from neovin_snapshots as
+// `vin_decode_receipts`. Everything else on the listing (the feed's typed
+// year/make/model, MarketCheck listing attributes, a non-empty key_specs,
+// a build sheet with no VIN on it, an attempt counter) can describe the car
+// but cannot prove which VIN was decoded, so none of it verifies the check.
+
+export type VinDecodeState =
+  | "no_vin"
+  | "invalid_format"
+  | "not_attempted"
+  | "in_progress"
+  | "failed"
+  | "unlinked"
+  | "decoded"
+  | "vin_mismatch"
+  | "identity_mismatch"
+  | "provider_conflict";
+
+export interface VinDecodeReceipt {
+  vin: string;
+  provider: string;
+  fetchedAt: string;
+  year: string;
+  make: string;
+  model: string;
+  trim: string | null;
+  payloadHash: string | null;
 }
 
-/** The decode was tried the full number of times and returned nothing. */
-function vinDecodeExhausted(listing: VehicleListing): boolean {
-  const mc = ((listing as unknown as DecodeBag).mc_attributes ?? {}) as Record<string, unknown>;
-  return Number(mc.specs_attempts) >= 3;
+export interface VinDecodeResolution {
+  state: VinDecodeState;
+  formatValid: boolean;
+  receipt: VinDecodeReceipt | null;
+  /** Why a conflict state was reached, in plain words. */
+  conflict: string | null;
+  attempts: number;
 }
+
+/** Decoders whose answers the identity check accepts. */
+export const SUPPORTED_VIN_DECODERS: Record<string, string> = {
+  neovin: "MarketCheck NeoVIN",
+  marketcheck_neovin: "MarketCheck NeoVIN",
+  marketcheck: "MarketCheck VIN decode",
+  marketcheck_basic: "MarketCheck VIN decode",
+  nhtsa_vpic: "NHTSA vPIC",
+  dataone: "DataOne",
+};
+
+const MAKE_ALIAS: Record<string, string> = {
+  CHEVY: "CHEVROLET", VW: "VOLKSWAGEN", MERCEDES: "MERCEDESBENZ", MB: "MERCEDESBENZ", LANDROVER: "LANDROVER",
+};
+const normId = (s: string): string => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
+const normMake = (s: string): string => MAKE_ALIAS[normId(s)] ?? normId(s);
 
 const isValidVin = (vin: string | null | undefined): boolean =>
   !!vin && /^[A-HJ-NPR-Z0-9]{17}$/i.test(vin);
 
-const milesFmt = (n: number) => n.toLocaleString();
+function receiptsOf(listing: VehicleListing): VinDecodeReceipt[] {
+  const raw = (listing as unknown as { vin_decode_receipts?: unknown }).vin_decode_receipts;
+  if (!Array.isArray(raw)) return [];
+  const out: VinDecodeReceipt[] = [];
+  for (const r0 of raw) {
+    const r = bag(r0);
+    const providerKey = String(r.provider ?? "").toLowerCase();
+    const status = Number(r.http_status);
+    const vin = str(r.vin);
+    const fetchedAt = isoOf(r.fetched_at);
+    const year = str(r.year);
+    const make = str(r.make);
+    const model = str(r.model);
+    // A failed request, an unnamed decoder, or an answer with no identity in
+    // it is not a decode, however recent.
+    if (!SUPPORTED_VIN_DECODERS[providerKey] || !(status >= 200 && status < 300)) continue;
+    if (!vin || !fetchedAt || !year || !make || !model) continue;
+    out.push({
+      vin: vin.toUpperCase(), provider: SUPPORTED_VIN_DECODERS[providerKey], fetchedAt,
+      year, make, model, trim: str(r.trim), payloadHash: str(r.payload_hash),
+    });
+  }
+  return out.sort((a, b) => (a.fetchedAt < b.fetchedAt ? 1 : -1));
+}
+
+// Decoders append body styles to the model name ("Wrangler 4-Door", "Ram
+// 1500 Pickup", "C-Class Sedan"); dealers usually do not. Only these words
+// may differ between two model names that are otherwise the same.
+const BODY_SUFFIX = /^(SEDAN|COUPE|CONVERTIBLE|HATCHBACK|WAGON|SPORTBACK|PICKUP|CREWCAB|QUADCAB|DOUBLECAB|EXTENDEDCAB|REGULARCAB|CAB|VAN|SUV|[2-5]DOOR|UNLIMITED4DOOR)+$/;
+const sameModel = (a: string, b: string): boolean => {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const [short, long] = a.length < b.length ? [a, b] : [b, a];
+  return long.startsWith(short) && BODY_SUFFIX.test(long.slice(short.length));
+};
+const makeForms = (make: string): string[] => {
+  const canon = normMake(make);
+  return [...new Set([canon, normId(make), ...Object.keys(MAKE_ALIAS).filter((k) => MAKE_ALIAS[k] === canon)])].filter(Boolean)
+    .sort((x, y) => y.length - x.length);
+};
+const stripMake = (s: string, forms: string[]): string | null => {
+  const f = forms.find((m) => s.startsWith(m));
+  return f ? s.slice(f.length) : null;
+};
+
+/** Does a decoded year/make/model describe the represented vehicle? */
+export function decodedIdentityMatches(ymm: string | null | undefined, id: { year: string; make: string; model: string }): boolean {
+  const m = /^\s*(\d{4})\s+(.+)$/.exec(ymm ?? "");
+  if (!m || m[1] !== String(id.year).trim()) return false;
+  const forms = makeForms(id.make);
+  const listedModel = stripMake(normId(m[2]), forms);
+  if (listedModel == null) return false;
+  const decoded = normId(id.model);
+  const decodedModel = stripMake(decoded, forms) || decoded;
+  return sameModel(listedModel, decoded) || sameModel(listedModel, decodedModel);
+}
+
+const sameIdentity = (a: { year: string; make: string; model: string }, b: { year: string; make: string; model: string }): boolean =>
+  String(a.year).trim() === String(b.year).trim() && normMake(a.make) === normMake(b.make)
+  && (sameModel(normId(a.model), normId(b.model))
+    || sameModel(stripMake(normId(a.model), makeForms(a.make)) || normId(a.model), stripMake(normId(b.model), makeForms(b.make)) || normId(b.model)));
+
+export function resolveVinDecode(listing: VehicleListing): VinDecodeResolution {
+  const vin = (listing.vin || "").trim().toUpperCase();
+  const mc = bag((listing as unknown as { mc_attributes?: unknown }).mc_attributes);
+  const attempts = Number(mc.specs_attempts) || 0;
+  const base = { formatValid: isValidVin(vin), receipt: null, conflict: null, attempts };
+  if (!vin) return { ...base, state: "no_vin" };
+  if (!base.formatValid) return { ...base, state: "invalid_format" };
+
+  const receipts = receiptsOf(listing);
+  const forVin = receipts.filter((r) => r.vin === vin);
+  if (receipts.length > 0 && forVin.length === 0) {
+    return { ...base, state: "vin_mismatch", receipt: receipts[0], conflict: `The saved decode is for VIN ${receipts[0].vin}, not ${vin}.` };
+  }
+  if (forVin.length > 0) {
+    const latest = forVin[0];
+    if (forVin.some((r) => !sameIdentity(r, latest))) {
+      return { ...base, state: "provider_conflict", receipt: latest, conflict: "Decoders returned different vehicles for this VIN." };
+    }
+    if (!decodedIdentityMatches(listing.ymm, latest)) {
+      return { ...base, state: "identity_mismatch", receipt: latest, conflict: `The VIN decodes to a ${latest.year} ${latest.make} ${latest.model}, but the listing shows ${listing.ymm || "no year, make and model"}.` };
+    }
+    // A second record about this car (the listing's own provider attributes)
+    // that disagrees is a conflict, not something to drop silently.
+    const mcYear = str(mc.year), mcMake = str(mc.make), mcModel = str(mc.model);
+    if (mcYear && mcMake && mcModel && !sameIdentity({ year: mcYear, make: mcMake, model: mcModel }, latest)) {
+      return { ...base, state: "provider_conflict", receipt: latest, conflict: `The listing record says ${mcYear} ${mcMake} ${mcModel}; the VIN decode says ${latest.year} ${latest.make} ${latest.model}.` };
+    }
+    return { ...base, state: "decoded", receipt: latest };
+  }
+  if (isoOf(mc.specs_decoded_at)) return { ...base, state: "unlinked" };
+  if (attempts >= 3) return { ...base, state: "failed" };
+  if (attempts > 0 || isoOf(mc.specs_attempted_at)) return { ...base, state: "in_progress" };
+  return { ...base, state: "not_attempted" };
+}
+
+/** Kept for callers that only need to know whether identity was decoded. */
+export function vinDecodeEvidence(listing: VehicleListing): string | null {
+  const r = resolveVinDecode(listing);
+  return r.state === "decoded" && r.receipt ? `${r.receipt.provider} decode` : null;
+}
+
+// ── Odometer evidence ──────────────────────────────────────────────────────
+//
+// The mileage the dealer reports is shown whatever happens here. Verifying
+// "no rollback" needs mileage history from an independent source: either an
+// explicit odometer outcome from a history provider, or at least two dated
+// odometer readings from one. history_payload.entries are MarketCheck listing
+// spells: the mileage dealers ADVERTISED, so they never verify the check,
+// though advertised mileage that goes DOWN over time is a conflict worth
+// asking about. An owner count or a title record says nothing about miles.
+
+export type OdometerState =
+  | "no_mileage"
+  | "reported_only"
+  | "single_reading"
+  | "consistent"
+  | "verified_outcome"
+  | "discrepancy"
+  | "rollback";
+
+export interface OdometerReading { date: string; miles: number; source: string }
+
+export interface OdometerResolution {
+  state: OdometerState;
+  reportedMiles: number | null;
+  readings: OdometerReading[];
+  advertisedObservations: number;
+  outcomeSource: string | null;
+  outcomeAt: string | null;
+  note: string | null;
+}
+
+const DEALER_READING_SOURCES = /^(dealer|listing|feed|sftp|website|dms|manual)/i;
+
+export function resolveOdometer(listing: VehicleListing): OdometerResolution {
+  const reported = typeof listing.mileage === "number" && Number.isFinite(listing.mileage) ? listing.mileage : null;
+  const hp = bag((listing as unknown as { history_payload?: unknown }).history_payload);
+  const check = bag(hp.odometer_check);
+  const readings: OdometerReading[] = (Array.isArray(hp.odometer_readings) ? hp.odometer_readings : [])
+    .map((r0) => {
+      const r = bag(r0);
+      return { date: isoOf(r.date) ?? "", miles: Number(r.miles), source: str(r.source) ?? "" };
+    })
+    .filter((r) => r.date && Number.isFinite(r.miles) && r.source && !DEALER_READING_SOURCES.test(r.source))
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+  const ads = (Array.isArray(hp.entries) ? hp.entries : [])
+    .map((e0) => { const e = bag(e0); return { at: isoOf(e.first_seen) ?? "", miles: Number(e.miles) }; })
+    .filter((e) => e.at && Number.isFinite(e.miles) && e.miles > 0)
+    .sort((a, b) => (a.at < b.at ? -1 : 1));
+  const base = { reportedMiles: reported, readings, advertisedObservations: ads.length, outcomeSource: null, outcomeAt: null, note: null };
+  if (reported == null) return { ...base, state: "no_mileage" };
+
+  const outcome = String(check.outcome ?? check.status ?? "").toLowerCase();
+  const checkVin = str(check.vin);
+  const checkApplies = outcome && str(check.source) && (!checkVin || checkVin.toUpperCase() === (listing.vin || "").toUpperCase());
+  if (checkApplies) {
+    const src = { outcomeSource: str(check.source), outcomeAt: isoOf(check.checked_at) };
+    if (/rollback|not_actual|tmu|exceeds/.test(outcome)) return { ...base, ...src, state: "rollback", note: "A history source reports a possible odometer rollback or not-actual mileage." };
+    if (/discrep|inconsistent|conflict/.test(outcome)) return { ...base, ...src, state: "discrepancy", note: "A history source reports inconsistent mileage records." };
+    if (/consistent|verified|actual|ok|pass/.test(outcome)) return { ...base, ...src, state: "verified_outcome" };
+  }
+
+  for (let i = 1; i < readings.length; i++) {
+    if (readings[i].miles < readings[i - 1].miles) {
+      return { ...base, state: "rollback", note: `Recorded mileage fell from ${readings[i - 1].miles.toLocaleString("en-US")} to ${readings[i].miles.toLocaleString("en-US")} miles.` };
+    }
+  }
+  const maxReading = readings.length ? Math.max(...readings.map((r) => r.miles)) : null;
+  if (maxReading != null && reported < maxReading) {
+    return { ...base, state: "discrepancy", note: `The reported mileage is below a recorded reading of ${maxReading.toLocaleString("en-US")} miles.` };
+  }
+  for (let i = 1; i < ads.length; i++) {
+    if (ads[i].miles < ads[i - 1].miles) {
+      return { ...base, state: "discrepancy", note: `Advertised mileage fell from ${ads[i - 1].miles.toLocaleString("en-US")} to ${ads[i].miles.toLocaleString("en-US")} miles between listings.` };
+    }
+  }
+  const distinctDates = new Set(readings.map((r) => r.date.slice(0, 10)));
+  if (readings.length >= 2 && distinctDates.size >= 2) return { ...base, state: "consistent" };
+  if (readings.length === 1) return { ...base, state: "single_reading" };
+  return { ...base, state: "reported_only" };
+}
+
+// ── Title evidence ─────────────────────────────────────────────────────────
+//
+// Three different things, never merged:
+//   independent  a third-party VIN result (CARFAX title flag / title brand)
+//   dealer VIN   this dealer reviewed THIS VIN's title record (the NMVTIS
+//                title_verification workflow): VIN-specific, dealer-authored
+//   policy       the dealership says it does not retail branded titles; it
+//                is about the store, not this VIN, and counts as nothing
+// A brand from any source wins over every clean statement and every policy.
+
+export type TitleState =
+  | "independent_clean"
+  | "dealer_attested_clean"
+  | "brand_reported"
+  | "conflict"
+  | "no_record";
+
+export interface TitleResolution {
+  state: TitleState;
+  independent: "clean" | "branded" | null;
+  independentBrand: string | null;
+  dealerVin: { status: "clean" | "branded"; verifiedAt: string | null; source: string; reportGeneratedAt: string | null; brandNote: string | null } | null;
+  policy: boolean;
+  policyBy: string | null;
+}
+
+export function resolveTitle(d: PassportData, listing: VehicleListing): TitleResolution {
+  const mc = bag((listing as unknown as { mc_attributes?: unknown }).mc_attributes);
+  const brand = str(mc.title_brand) ?? str(mc.title_status);
+  // d.titleStatus is the passport's merged answer; without a dealer title
+  // review behind it, it can only have come from the independent record.
+  const fromD = !d.titleVerifiedSource && (d.titleStatus === "clean" || d.titleStatus === "branded") ? d.titleStatus : null;
+  const independent: TitleResolution["independent"] =
+    mc.carfax_clean_title === false || (brand != null && !/^clean/i.test(brand)) ? "branded"
+      : mc.carfax_clean_title === true ? "clean" : fromD;
+  const tv = bag((listing as unknown as { title_verification?: unknown }).title_verification);
+  const tvStatus: "clean" | "branded" | null = tv.status === "clean" || tv.status === "branded" ? tv.status : null;
+  const dealerVin = tvStatus && isoOf(tv.verified_at)
+    ? { status: tvStatus, verifiedAt: isoOf(tv.verified_at), source: str(tv.source) ?? "title record", reportGeneratedAt: isoOf(tv.report_generated_at), brandNote: str(tv.brand_note) }
+    : d.titleVerifiedSource && (d.titleStatus === "clean" || d.titleStatus === "branded")
+      ? { status: d.titleStatus, verifiedAt: d.titleVerifiedAt ?? null, source: d.titleVerifiedSource, reportGeneratedAt: null, brandNote: null }
+      : null;
+  const policy = d.titlePolicyAttested || (listing as unknown as { title_policy_no_branded?: unknown }).title_policy_no_branded === true;
+  const policyBy = d.titlePolicyAttestedBy
+    ?? str(bag((listing as unknown as { dealer_snapshot?: unknown }).dealer_snapshot).name);
+  const base = { independent, independentBrand: independent === "branded" ? brand : null, dealerVin, policy, policyBy };
+  const anyBrand = independent === "branded" || dealerVin?.status === "branded";
+  const anyClean = independent === "clean" || dealerVin?.status === "clean";
+  if (anyBrand && anyClean) return { ...base, state: "conflict" };
+  if (anyBrand) return { ...base, state: "brand_reported" };
+  if (independent === "clean") return { ...base, state: "independent_clean" };
+  if (dealerVin?.status === "clean") return { ...base, state: "dealer_attested_clean" };
+  return { ...base, state: "no_record" };
+}
+
+const milesFmt = (n: number) => n.toLocaleString("en-US");
 const dateFmt = (iso: string | null): string | null =>
   iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : null;
 
@@ -363,7 +658,6 @@ function readRecall(listing: VehicleListing): RecallSignals {
  */
 export function deriveVerificationReport(d: PassportData, listing: VehicleListing): VerificationReport {
   const reportTime = d.marketCheckedAt || (listing as unknown as { updated_at?: string }).updated_at || null;
-  const historyConsulted = d.accidentCount != null || d.ownerCount != null || d.titleStatus !== "unknown" || d.cleanTitle;
   const isNew = String((listing as unknown as { condition?: string }).condition || "").toLowerCase() === "new";
   const recall = readRecall(listing);
 
@@ -375,31 +669,50 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
   // 1 — VIN & vehicle identity (OEM / VIN decode)
   checks.push((() => {
     const s = src("oem_vin");
-    // "Decoded" means a VIN decode actually returned data for this VIN. A
-    // year/make/model typed into the dealer feed is not a decode, so on its
-    // own it no longer verifies the identity check.
-    const decodedFrom = vinDecodeEvidence(listing);
-    const decoded = decodedFrom != null && !!listing.ymm;
-    const valid = isValidVin(listing.vin);
-    const status: VerificationStatus = valid && decoded ? "verified"
-      : !listing.vin ? "unavailable"
-      : valid && vinDecodeExhausted(listing) ? "unavailable"
-      : "pending";
+    const r = resolveVinDecode(listing);
+    const status: VerificationStatus =
+      r.state === "decoded" ? "verified"
+        : r.state === "invalid_format" || r.state === "vin_mismatch" || r.state === "identity_mismatch" || r.state === "provider_conflict" ? "needs_confirmation"
+        : r.state === "in_progress" ? "pending"
+        : "unavailable";
+    const decodedName = r.receipt ? `${r.receipt.year} ${r.receipt.make} ${r.receipt.model}${r.receipt.trim ? ` ${r.receipt.trim}` : ""}` : null;
+    const DECODE_RESULT: Record<VinDecodeState, string | null> = {
+      no_vin: null,
+      invalid_format: "Not run: the VIN does not pass the 17-character format check",
+      not_attempted: "No decode has been run for this VIN",
+      in_progress: `Decode requested, no answer yet${r.attempts ? ` (${r.attempts} of 3 attempts)` : ""}`,
+      failed: "The decoder returned no data after 3 attempts",
+      unlinked: "A decode is on file for this listing, but no saved provider record ties it to this exact VIN",
+      decoded: r.receipt ? `${r.receipt.provider} decoded this exact VIN` : null,
+      vin_mismatch: r.conflict,
+      identity_mismatch: r.conflict,
+      provider_conflict: r.conflict,
+    };
     return {
       key: "vin", name: "VIN and vehicle identity", ...s, material: true, highSeverity: false,
       status,
       finding: status === "verified"
-        ? `VIN decodes to the listed ${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""} and passed 17-character format validation.`
-        : status === "pending" ? null : null,
-      reviewNote: null,
+        ? `VIN and vehicle identity verified: ${r.receipt!.provider} decodes this VIN to the listed ${decodedName}.`
+        : status === "needs_confirmation" ? r.conflict ?? "The VIN on record needs confirmation."
+        : listing.vin ? "VIN on record. Identity decode not verified." : null,
+      reviewNote: status === "needs_confirmation"
+        ? (r.state === "invalid_format" ? "confirm the VIN, which does not pass the format check" : "confirm the vehicle identity, because the VIN decode disagrees with the listing")
+        : null,
       evidence: [
         { label: "VIN", value: listing.vin || null },
-        { label: "Format check", value: valid ? "Valid 17-character VIN" : listing.vin ? "Not confirmed" : null },
-        { label: "Decoded vehicle", value: decoded ? `${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""}` : null },
-        { label: "Decode result", value: decoded ? decodedFrom : status === "unavailable" && listing.vin ? "The VIN decode returned no data" : null },
-        { label: "Source", value: FAMILY_META.oem_vin.label },
+        { label: "Format check", value: r.formatValid ? "Valid 17-character VIN" : listing.vin ? "Does not pass the 17-character format check" : null },
+        { label: "Decode result", value: DECODE_RESULT[r.state] },
+        { label: "Decoded vehicle", value: r.state === "decoded" ? decodedName : null },
+        { label: "Decoded on", value: r.receipt ? dateFmt(r.receipt.fetchedAt) : null },
+        { label: "Source", value: r.receipt?.provider ?? FAMILY_META.oem_vin.label },
       ],
-      checkedAt: status === "verified" ? reportTime : null,
+      facts: {
+        scope: "vin", state: r.state, vin: (listing.vin || "").toUpperCase() || null, formatValid: r.formatValid, attempts: r.attempts,
+        provider: r.receipt?.provider ?? null, decodedAt: r.receipt?.fetchedAt ?? null, payloadHash: r.receipt?.payloadHash ?? null,
+        decodedVin: r.receipt?.vin ?? null, year: r.receipt?.year ?? null, make: r.receipt?.make ?? null, model: r.receipt?.model ?? null,
+        trim: r.receipt?.trim ?? null, listedVehicle: listing.ymm ?? null,
+      },
+      checkedAt: r.receipt ? r.receipt.fetchedAt : null,
     };
   })());
 
@@ -420,6 +733,7 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
         { label: "Reported accidents", value: known ? String(count) : null },
         { label: "Source", value: FAMILY_META.vehicle_history.label },
       ],
+      facts: { scope: "vin", accidentCount: d.accidentCount },
       checkedAt: known ? reportTime : null,
     };
   })());
@@ -443,6 +757,7 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
         { label: "Owners on record", value: known ? (isNew ? "0 (new vehicle)" : String(owners)) : null },
         { label: "Source", value: FAMILY_META.vehicle_history.label },
       ],
+      facts: { scope: "vin", ownerCount: d.ownerCount, isNew },
       checkedAt: known ? reportTime : null,
     };
   })());
@@ -450,75 +765,87 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
   // 4 — Odometer reading (Vehicle history)
   checks.push((() => {
     const s = src("vehicle_history");
-    const miles = listing.mileage;
-    // Without any history record there is nothing to corroborate the reading
-    // against and no lookup in flight, so the check is unavailable, not
-    // pending: "pending" is reserved for a result that is still expected.
+    const o = resolveOdometer(listing);
+    const miles = o.reportedMiles;
     const status: VerificationStatus =
-      miles == null || !historyConsulted ? "unavailable" : "verified";
+      o.state === "consistent" || o.state === "verified_outcome" ? "verified"
+        : o.state === "rollback" ? "needs_attention"
+        : o.state === "discrepancy" ? "needs_confirmation"
+        : "unavailable";
+    const reportedLine = miles != null ? `Reported mileage: ${milesFmt(miles)} miles.` : null;
+    const latestReading = o.readings.length ? o.readings[o.readings.length - 1] : null;
     return {
       key: "odometer", name: "Odometer reading", ...s, material: true, highSeverity: false,
       status,
-      finding: status === "verified"
-        ? `Odometer reads ${milesFmt(miles as number)} mi with no rollback indicators in the available records.`
+      finding:
+        status === "verified" ? `${reportedLine} No rollback indicators found in the available mileage records.`
+        : status === "needs_attention" || status === "needs_confirmation" ? `${reportedLine} Mileage records require review. ${o.note ?? ""}`.trim()
+        : reportedLine ? `${reportedLine} Odometer history not independently verified.`
         : null,
-      reviewNote: null,
+      reviewNote: status === "needs_attention" ? "review the mileage records, which show a possible rollback"
+        : status === "needs_confirmation" ? "confirm the mileage, because the records disagree" : null,
       evidence: [
-        { label: "Reported mileage", value: miles != null ? `${milesFmt(miles)} mi` : null },
-        { label: "Rollback indicators", value: status === "verified" ? "None found in available records" : null },
-        { label: "Source", value: FAMILY_META.vehicle_history.label },
+        { label: "Reported mileage", value: miles != null ? `${milesFmt(miles)} mi (dealer reported)` : null },
+        { label: "Mileage history", value:
+          o.state === "verified_outcome" ? `Odometer check by ${o.outcomeSource}${o.outcomeAt ? ` on ${dateFmt(o.outcomeAt)}` : ""}`
+          : o.readings.length >= 2 ? `${o.readings.length} dated readings from independent records${latestReading ? `, latest ${milesFmt(latestReading.miles)} mi on ${dateFmt(latestReading.date)}` : ""}`
+          : o.readings.length === 1 ? "One recorded reading, not enough to compare"
+          : miles != null ? "No independent mileage history on file" : null },
+        { label: "Advertised mileage records", value: o.advertisedObservations ? `${o.advertisedObservations} dealer listing ${o.advertisedObservations === 1 ? "record" : "records"} (advertised mileage, not odometer history)` : null },
+        { label: "Rollback indicators", value: status === "verified" ? "None found in the available mileage records" : status === "needs_attention" ? "Possible rollback reported" : null },
+        { label: "Source", value: o.outcomeSource ?? (o.readings.length ? o.readings[0].source : FAMILY_META.vehicle_history.label) },
       ],
-      checkedAt: status === "verified" ? reportTime : null,
+      facts: {
+        scope: "vin", state: o.state, reportedMiles: miles, advertisedObservations: o.advertisedObservations,
+        readings: o.readings.map((r) => [r.date, r.miles, r.source]), outcomeSource: o.outcomeSource, outcomeAt: o.outcomeAt,
+      },
+      checkedAt: status === "verified" ? (o.outcomeAt ?? latestReading?.date ?? null) : null,
     };
   })());
 
-  // 5 — Title & brand (Vehicle history) — MATERIAL
+  // 5 — Title & brand — MATERIAL
   checks.push((() => {
-    const s = src("vehicle_history");
-    // Order is the whole safeguard. A reported brand is evaluated FIRST, so a
-    // dealer policy can never bury one: attestation only ever answers a
-    // question no source answered.
+    const t = resolveTitle(d, listing);
+    // A brand from any source is evaluated first, so neither a clean record
+    // nor the dealership's general policy can ever bury one.
     const status: VerificationStatus =
-      d.titleStatus === "branded" ? "needs_attention"
-        : d.titleStatus === "clean" ? "verified"
-        : d.titlePolicyAttested ? "dealer_attested"
-        : "pending";
-    // When the dealer pulled the national title record (NMVTIS) and attested,
-    // cite that authoritative source + the verification date explicitly.
-    const nmvtis = d.titleVerifiedSource === "nmvtis";
-    const verifiedOn = nmvtis ? dateFmt(d.titleVerifiedAt) : null;
+      t.state === "brand_reported" || t.state === "conflict" ? "needs_attention"
+        : t.state === "independent_clean" ? "verified"
+        : t.state === "dealer_attested_clean" ? "dealer_attested"
+        : "unavailable";
+    const dv = t.dealerVin;
+    const nmvtis = dv?.source === "nmvtis";
+    const reviewedOn = dv ? dateFmt(dv.verifiedAt) : null;
+    const dealerName = t.policyBy ?? "The selling dealer";
+    const policyLine = t.policy ? `${dealerName} states it does not retail branded-title vehicles. This is a dealership-wide policy, not a check of this VIN.` : null;
     return {
-      key: "title", name: "Title and brand", ...s,
-      // A dealer statement is the dealer's record, not independent history:
-      // it is filed under the dealer family so it is never counted among the
-      // independent sources or listed under "Independent history" (L02).
-      ...(status === "dealer_attested" ? src("dealer") : {}),
+      key: "title", name: "Title and brand",
+      ...src(status === "dealer_attested" ? "dealer" : "vehicle_history"),
       material: true, highSeverity: false,
       status,
-      finding: status === "verified"
-        // Describe the DATA RESULT, not a guarantee — "no brands reported" is
-        // accurate; "clean/guaranteed" over-claims (NMVTIS usage guidance).
-        ? nmvtis
-          ? `No title brands were reported in the NMVTIS title data${verifiedOn ? ` returned on ${verifiedOn}` : ""} — no salvage, flood, lemon, or rebuilt records found. Reviewed by the dealer.`
-          : "Clean title on record — no salvage, flood, lemon, or rebuilt brands found."
-        : status === "needs_attention"
-          ? "A title brand is on record for this vehicle — review the brand details with the dealer."
-        : status === "dealer_attested"
-          // Says exactly what it is and what it is not, and names the author.
-          ? `${d.titlePolicyAttestedBy ?? "This dealer"} states they do not retail branded-title vehicles, and no source has reported a brand on this VIN. This is the dealer's own statement, not an independent title-record check.`
-          : null,
-      reviewNote: status === "pending"
-        ? "the title and brand check is still pending"
+      finding:
+        t.state === "conflict" ? "Title sources disagree: one reports a title brand and another reports none. Treat the brand as on record until the dealer resolves it."
+        : status === "needs_attention" ? "A title brand is on record for this vehicle. Review the brand details with the dealer."
+        : status === "verified" ? "No salvage, flood, lemon, or rebuilt brand was reported in the independent title record for this VIN."
+        : status === "dealer_attested" ? `${dealerName} reviewed the ${nmvtis ? "NMVTIS title record" : "title record"} for this VIN${reviewedOn ? ` on ${reviewedOn}` : ""} and reports no title brand. This is the dealer's statement about this VIN, not an independent title-history report.`
+        : null,
+      reviewNote: t.state === "conflict" ? "confirm the title, because the sources disagree about a brand"
         : status === "needs_attention" ? "a title brand is on record" : null,
       evidence: [
-        { label: "Title status", value: d.titleStatus === "clean" ? "Clean" : d.titleStatus === "branded" ? "Brand on record" : null },
-        { label: "Brands checked", value: status !== "pending" ? "Salvage, flood, lemon, rebuilt" : null },
-        { label: "Verification", value: nmvtis ? `Dealer-verified via NMVTIS${verifiedOn ? ` on ${verifiedOn}` : ""}` : status === "dealer_attested" ? "Dealer statement — no title record was pulled for this VIN" : null },
-        { label: "Source", value: status === "dealer_attested" ? (d.titlePolicyAttestedBy ?? "The selling dealer") : nmvtis ? "NMVTIS national title record" : FAMILY_META.vehicle_history.label },
-        // Required NMVTIS caveat — disclosed wherever the NMVTIS-derived result appears.
+        { label: "Independent title record", value: t.independent === "clean" ? "No brand reported" : t.independent === "branded" ? `Brand reported${t.independentBrand ? `: ${t.independentBrand}` : ""}` : null },
+        { label: "Dealer review of this VIN", value: dv ? `${dv.status === "clean" ? "No brand found" : `Brand found${dv.brandNote ? `: ${dv.brandNote}` : ""}`}${nmvtis ? " in the NMVTIS title record" : ""}${reviewedOn ? `, reviewed ${reviewedOn}` : ""}` : null },
+        { label: "Brands checked", value: status === "verified" || status === "dealer_attested" ? "Salvage, flood, lemon, rebuilt" : null },
+        { label: "Dealer policy", value: policyLine },
+        { label: "Source", value: status === "dealer_attested" ? `${dealerName} (dealer attestation)` : t.independent ? FAMILY_META.vehicle_history.label : null },
+        // Required NMVTIS caveat wherever an NMVTIS-derived result appears.
         { label: "Note", value: nmvtis ? "NMVTIS title data may be incomplete; state participation and reporting timeframes vary. Not a substitute for an independent inspection." : null },
       ],
-      checkedAt: status !== "pending" ? (nmvtis ? (d.titleVerifiedAt || reportTime) : reportTime) : null,
+      facts: {
+        scope: "vin", state: t.state, independent: t.independent, independentBrand: t.independentBrand,
+        dealerVinStatus: dv?.status ?? null, dealerVinSource: dv?.source ?? null, dealerVinReviewedAt: dv?.verifiedAt ?? null,
+        dealerVinReportAt: dv?.reportGeneratedAt ?? null, dealerVinBrandNote: dv?.brandNote ?? null, dealerPolicy: t.policy,
+      },
+      checkedAt: status === "dealer_attested" ? (dv?.verifiedAt ?? null) : status === "unavailable" ? null : reportTime,
     };
   })());
 
@@ -577,6 +904,12 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
         { label: "Last checked", value: asOf },
         { label: "Source", value: v.vin.source ?? model?.source ?? FAMILY_META.nhtsa.label },
       ],
+      facts: {
+        scope: v.vin.source ? "vin" : model ? "model" : "none", outcome, vinState: v.vin.state, vinSource: v.vin.source ?? null,
+        vinCheckedAt: v.vin.checkedAt ?? null, openCount: v.vin.openCount ?? null, doNotDrive: v.doNotDrive, conflict: v.conflict,
+        campaigns: v.campaigns.map((c) => c.number ?? null), modelLabel: model?.label ?? null, modelSource: model?.source ?? null,
+        modelCheckedAt: model?.checkedAt ?? null,
+      },
       checkedAt: status !== "pending" ? (v.vin.checkedAt ?? model?.checkedAt ?? reportTime) : null,
       recallOutcome: outcome,
     };
@@ -600,6 +933,7 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
         { label: "Position", value: below != null ? `${fmt$(below)} below market` : known ? "At market" : null },
         { label: "Source", value: FAMILY_META.live_market.label },
       ],
+      facts: { scope: "vin", marketAvg: d.marketAvg, belowMarket: d.belowMarket, marketCheckedAt: d.marketCheckedAt ?? null },
       checkedAt: known ? reportTime : null,
     };
   })());
@@ -622,6 +956,7 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
         { label: "Status", value: known ? (d.warrantyExpired ? "Term ended" : "Coverage on record") : null },
         { label: "Source", value: FAMILY_META.oem_warranty.label },
       ],
+      facts: { scope: "vin", warranty: d.warrantyStr ?? null, expired: d.warrantyExpired ?? null },
       checkedAt: known ? reportTime : null,
     };
   })());
@@ -684,7 +1019,7 @@ function buildBanner(a: {
     return { tone: "neutral", heading: "Report data unavailable", body: "We could not assemble a complete verification report from the current sources. No verification conclusion has been made.", reviewCount: 0 };
   }
   // Nothing has returned a terminal result yet — never an all-green fallback.
-  if (a.completedChecks === 0) {
+  if (a.completedChecks === 0 && a.unavailableChecks === 0) {
     return { tone: "neutral", heading: "Verification has not started", body: "No checks have returned a result yet for this vehicle. Check back soon or ask the dealer for the latest information.", reviewCount: 0 };
   }
   // Counts line, e.g. "3 checks verified · 1 dealer attested · 1 pending ·
@@ -856,17 +1191,34 @@ export function verificationScopeLine(r: VerificationReport): string {
 }
 
 /**
- * Versioned identity of a report: the same VIN, the same source snapshot and
- * the same report version always produce the same statuses and counts. Shown
- * on the report and the printed PDF so two copies can be compared.
+ * Evidence-snapshot fingerprint. SHA-256 over a canonical serialization of
+ * the methodology version, the VIN and, per check, its status, source family,
+ * provenance, scope and normalized facts. It changes when the evidence
+ * changes (a new decode, an owner count, a recall answer) even when every
+ * status stays the same, and it ignores display wording, locale and the
+ * listing's own edit time. It describes the stored records the report was
+ * built from; it never implies a live source was queried. No credentials,
+ * report URLs or personal data are among the inputs.
  */
-export const VERIFICATION_REPORT_VERSION = "2026-11-07.1";
+export const VERIFICATION_REPORT_VERSION = "2026-11-07.2";
 
+export function verificationEvidenceSnapshot(r: VerificationReport, vin: string | null | undefined): Record<string, unknown> {
+  return {
+    methodology: VERIFICATION_REPORT_VERSION,
+    vin: (vin || "").trim().toUpperCase() || null,
+    basis: "stored_records",
+    checks: r.checks.map((c) => ({ key: c.key, status: c.status, family: c.family, provenance: c.provenance, facts: c.facts ?? {} })),
+  };
+}
+
+export function verificationEvidenceFingerprint(r: VerificationReport, vin: string | null | undefined): string {
+  return sha256Hex(canonicalJson(verificationEvidenceSnapshot(r, vin)));
+}
+
+/** "2026-11-07.2/JN1EV7CR5PM543599/3f9a0c1d2e4b5a69": shown on the desktop
+ *  and mobile report and the printed PDF. */
 export function verificationSnapshotKey(r: VerificationReport, vin: string | null | undefined): string {
-  const statuses = r.checks.map((c) => `${c.key}:${c.status}`).join(",");
-  let h = 0;
-  for (let i = 0; i < statuses.length; i++) h = (h * 31 + statuses.charCodeAt(i)) >>> 0;
-  return `${VERIFICATION_REPORT_VERSION}/${(vin || "novin").toUpperCase()}/${r.lastCheckedAt ?? "unchecked"}/${h.toString(36)}`;
+  return `${VERIFICATION_REPORT_VERSION}/${(vin || "novin").toUpperCase()}/${verificationEvidenceFingerprint(r, vin).slice(0, 16)}`;
 }
 
 // ── Recall wording, one place (L01) ─────────────────────────────────────────

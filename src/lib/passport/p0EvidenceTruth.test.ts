@@ -17,7 +17,11 @@ const dOf = (o: Partial<PassportData>): PassportData => ({
 } as PassportData);
 // Every synthetic listing carries a decoded spec unless a test removes it: the
 // VIN identity check needs a decode that returned, not just a typed ymm.
-const lOf = (o: Partial<VehicleListing>): VehicleListing => ({ key_specs: { engine: "decoded" }, ...(o as object) } as VehicleListing);
+const decodeReceiptFor = (o: Partial<VehicleListing>) => {
+  const m = /^(\d{4})\s+(\S+)\s+(.+)$/.exec(String(o.ymm ?? ""));
+  return m && o.vin ? [{ vin: o.vin, provider: "neovin", http_status: 200, fetched_at: "2026-10-01T00:00:00.000Z", year: m[1], make: m[2], model: m[3], payload_hash: "test" }] : [];
+};
+const lOf = (o: Partial<VehicleListing>): VehicleListing => ({ vin_decode_receipts: decodeReceiptFor(o), ...(o as object) } as unknown as VehicleListing);
 
 // Production shape (QX65 …606923): a VIN-level lookup that answered nothing.
 const UNAVAILABLE_RECALL = {
@@ -27,11 +31,15 @@ const UNAVAILABLE_RECALL = {
 
 const qx65 = () => deriveVerificationReport(
   dOf({
-    // The dealer states it does not retail branded titles; no source checked.
-    titlePolicyAttested: true, titlePolicyAttestedBy: "Harte INFINITI",
+    // The dealer reviewed this VIN's NMVTIS title record (a VIN-specific
+    // attestation). A store-wide no-branded-title policy would not count.
+    titlePolicyAttestedBy: "Harte INFINITI",
     marketAvg: 66000, marketCheckedAt: "2026-11-01T00:00:00Z", warrantyStr: "4 yr / 60,000 mi",
   } as Partial<PassportData>),
-  lOf({ vin: "5N1AC0JX7VC606923", ymm: "2027 INFINITI QX65", mileage: 12, condition: "new", recall_check: UNAVAILABLE_RECALL } as Partial<VehicleListing>),
+  lOf({
+    vin: "5N1AC0JX7VC606923", ymm: "2027 INFINITI QX65", mileage: 12, condition: "new", recall_check: UNAVAILABLE_RECALL,
+    title_verification: { status: "clean", verified_at: "2026-10-30T12:00:00.000Z", verified_by: null, source: "nmvtis", report_generated_at: "2026-10-30T11:59:00.000Z", report_expires_at: null, brand_note: null },
+  } as Partial<VehicleListing>),
 );
 
 const ANY_OPEN_RECALL = /open recall|recall remedy|the remedy/i;

@@ -27,7 +27,20 @@ const dOf = (o: Partial<PassportData>): PassportData => ({
 } as PassportData);
 // Every synthetic listing carries a decoded spec unless a test removes it: the
 // VIN identity check needs a decode that returned, not just a typed ymm.
-const lOf = (o: Partial<VehicleListing>): VehicleListing => ({ key_specs: { engine: "decoded" }, ...(o as object) } as VehicleListing);
+const decodeReceiptFor = (o: Partial<VehicleListing>) => {
+  const m = /^(\d{4})\s+(\S+)\s+(.+)$/.exec(String(o.ymm ?? ""));
+  return m && o.vin ? [{ vin: o.vin, provider: "neovin", http_status: 200, fetched_at: "2026-10-01T00:00:00.000Z", year: m[1], make: m[2], model: m[3], payload_hash: "test" }] : [];
+};
+const lOf = (o: Partial<VehicleListing>): VehicleListing => ({ vin_decode_receipts: decodeReceiptFor(o), ...(o as object) } as unknown as VehicleListing);
+
+// Two dated odometer readings from an independent history source: the
+// minimum that lets the odometer check verify "no rollback indicators".
+const ODO_HISTORY = (latest: number) => ({
+  odometer_readings: [
+    { date: "2025-01-15", miles: Math.max(0, latest - 9000), source: "AutoCheck" },
+    { date: "2026-03-02", miles: Math.max(0, latest - 1500), source: "AutoCheck" },
+  ],
+});
 
 // Every report must satisfy the two arithmetic invariants, always.
 const assertArithmetic = (r: VerificationReport) => {
@@ -38,7 +51,7 @@ const assertArithmetic = (r: VerificationReport) => {
 };
 
 describe("deriveVerificationReport — canonical customer summary", () => {
-  it("the QX50 real-data scenario yields 8/6/1(conf)/1(pending)/7 complete/5 sources", () => {
+  it("the QX50 real-data scenario yields 8/6/1(conf)/1(unavailable)/7 complete/5 sources", () => {
     const r = deriveVerificationReport(
       dOf({
         accidentCount: 0, ownerCount: 1, titleStatus: "unknown", cleanTitle: false,
@@ -47,31 +60,31 @@ describe("deriveVerificationReport — canonical customer summary", () => {
       }),
       lOf({
         vin: "5N1AL1F83VC332076", ymm: "2025 INFINITI QX50", trim: "LUXE AWD",
-        mileage: 12000, condition: "used",
+        mileage: 12000, condition: "used", history_payload: ODO_HISTORY(12000),
         recall_status: "clear", open_recall_count: 1,
         recall_check: { checked_at: "2026-07-10T00:00:00Z", has_open: true, campaigns: [{ campaignNumber: "25V123", component: "Backup camera", summary: "Rearview image may fail.", remedy: "Dealer will update software." }] },
-      }),
+      } as Partial<VehicleListing>),
     );
     assertArithmetic(r);
     expect(r.totalChecks).toBe(8);
     expect(r.verifiedChecks).toBe(6);
     expect(r.needsConfirmationChecks).toBe(1);
-    expect(r.pendingChecks).toBe(1);
+    expect(r.pendingChecks).toBe(0);
     expect(r.needsAttentionChecks).toBe(0);
-    expect(r.unavailableChecks).toBe(0);
+    expect(r.unavailableChecks).toBe(1);
     expect(r.completedChecks).toBe(7);
     expect(r.sourceCount).toBe(5);
     expect(r.valid).toBe(true);
 
     expect(r.checks.find((c) => c.key === "recall")?.status).toBe("needs_confirmation");
-    expect(r.checks.find((c) => c.key === "title")?.status).toBe("pending");
+    // No title record of any kind and no title workflow running: unavailable.
+    expect(r.checks.find((c) => c.key === "title")?.status).toBe("unavailable");
 
     expect(r.banner.tone).toBe("amber");
     expect(r.banner.heading).toBe("Review one item before purchase");
-    expect(r.banner.body).toContain("6 checks verified · 1 needs confirmation · 1 pending");
+    expect(r.banner.body).toContain("6 checks verified · 1 needs confirmation · 1 not available");
     expect(r.banner.body).toContain("Confirm the recall status with the dealer");
-    // A pending check is reported in the counts, never as a review item.
-    expect(r.banner.body).not.toContain("the title and brand check is still pending");
+    expect(r.banner.body).not.toMatch(/title/i);
   });
 
   it("sourceCount counts unique FAMILIES, not checks (four history checks = one family)", () => {
@@ -91,7 +104,7 @@ describe("deriveVerificationReport — canonical customer summary", () => {
   it("an all-verified vehicle shows the green completed banner", () => {
     const r = deriveVerificationReport(
       dOf({ accidentCount: 0, ownerCount: 1, titleStatus: "clean", cleanTitle: true, marketAvg: 61000, belowMarket: 3000, warrantyStr: "4 yr / 60,000 mi" }),
-      lOf({ vin: "5N1AL1F83VC332076", ymm: "2027 INFINITI QX60", mileage: 17, condition: "new", recall_status: "clear", open_recall_count: 0, recall_check: VIN_LEVEL_CLEAR }),
+      lOf({ vin: "5N1AL1F83VC332076", ymm: "2027 INFINITI QX60", mileage: 17, condition: "new", history_payload: { odometer_readings: [{ date: "2026-05-01", miles: 5, source: "Manufacturer PDI" }, { date: "2026-06-01", miles: 12, source: "Manufacturer PDI" }] }, recall_status: "clear", open_recall_count: 0, recall_check: VIN_LEVEL_CLEAR } as Partial<VehicleListing>),
     );
     assertArithmetic(r);
     expect(r.verifiedChecks).toBe(8);
@@ -145,7 +158,7 @@ describe("deriveVerificationReport — canonical customer summary", () => {
   it("a branded title is a conclusive actionable finding (needs_attention), not a conflict", () => {
     const r = deriveVerificationReport(
       dOf({ titleStatus: "branded", accidentCount: 0, ownerCount: 1, marketAvg: 40000, warrantyStr: "3 yr" }),
-      lOf({ vin: "5N1AL1F83VC332076", ymm: "2022 Car", mileage: 40000, condition: "used", recall_status: "clear", recall_check: VIN_LEVEL_CLEAR }),
+      lOf({ vin: "5N1AL1F83VC332076", ymm: "2022 INFINITI Q50", mileage: 40000, condition: "used", recall_status: "clear", recall_check: VIN_LEVEL_CLEAR }),
     );
     assertArithmetic(r);
     const title = r.checks.find((c) => c.key === "title");
@@ -157,7 +170,7 @@ describe("deriveVerificationReport — canonical customer summary", () => {
   it("a do-not-drive recall is high-severity → red banner", () => {
     const r = deriveVerificationReport(
       dOf({ titleStatus: "clean", cleanTitle: true, accidentCount: 0, ownerCount: 1, marketAvg: 40000, warrantyStr: "3 yr" }),
-      lOf({ vin: "5N1AL1F83VC332076", ymm: "2022 Car", mileage: 40000, condition: "used", recall_status: "open", open_recall_count: 1, recall_check: { has_open: true, do_not_drive: true, campaigns: [{ campaignNumber: "24V999" }] } }),
+      lOf({ vin: "5N1AL1F83VC332076", ymm: "2022 INFINITI Q50", mileage: 40000, condition: "used", recall_status: "open", open_recall_count: 1, recall_check: { has_open: true, do_not_drive: true, campaigns: [{ campaignNumber: "24V999" }] } }),
     );
     assertArithmetic(r);
     expect(r.checks.find((c) => c.key === "recall")?.status).toBe("needs_attention");
@@ -168,7 +181,7 @@ describe("deriveVerificationReport — canonical customer summary", () => {
   it("recall conflict (clear status but open campaign) is needs_confirmation, never verified or issue", () => {
     const r = deriveVerificationReport(
       dOf({ titleStatus: "clean", cleanTitle: true, accidentCount: 0, ownerCount: 1 }),
-      lOf({ vin: "5N1AL1F83VC332076", ymm: "2022 Car", mileage: 40000, condition: "used", recall_status: "clear", recall_check: { has_open: true, campaigns: [{ campaignNumber: "24V100" }] } }),
+      lOf({ vin: "5N1AL1F83VC332076", ymm: "2022 INFINITI Q50", mileage: 40000, condition: "used", recall_status: "clear", recall_check: { has_open: true, campaigns: [{ campaignNumber: "24V100" }] } }),
     );
     const recall = r.checks.find((c) => c.key === "recall");
     expect(recall?.status).toBe("needs_confirmation");
@@ -178,14 +191,15 @@ describe("deriveVerificationReport — canonical customer summary", () => {
   it("pending checks are never counted as verified, and missing sources are unavailable not pending", () => {
     const r = deriveVerificationReport(
       dOf({ titleStatus: "unknown", cleanTitle: false }),
-      lOf({ vin: "5N1AL1F83VC332076", ymm: "2022 Car", condition: "used" }),
+      lOf({ vin: "5N1AL1F83VC332076", ymm: "2022 INFINITI Q50", condition: "used" }),
     );
     assertArithmetic(r);
     // No history/market/warranty data → those checks are unavailable, not pending.
     expect(r.checks.find((c) => c.key === "market")?.status).toBe("unavailable");
     expect(r.checks.find((c) => c.key === "warranty")?.status).toBe("unavailable");
-    // Title and recall have no data → pending (material checks awaiting a result).
-    expect(r.checks.find((c) => c.key === "title")?.status).toBe("pending");
+    // No title record and no title workflow in flight → unavailable. A recall
+    // lookup that has not run yet is still expected → pending.
+    expect(r.checks.find((c) => c.key === "title")?.status).toBe("unavailable");
     expect(r.checks.find((c) => c.key === "recall")?.status).toBe("pending");
     expect(r.verifiedChecks).toBeGreaterThanOrEqual(0);
   });
@@ -197,13 +211,13 @@ describe("deriveVerificationReport — canonical customer summary", () => {
     expect(r.completedChecks).toBe(0);
     expect(r.verifiedChecks).toBe(0);
     expect(r.banner.tone).toBe("neutral");
-    expect(r.banner.heading).toBe("Verification has not started");
+    expect(r.banner.heading).toBe("0 of 8 checks verified");
   });
 
   it("a partial report still renders available checks and marks the rest unavailable", () => {
     const r = deriveVerificationReport(
       dOf({ marketAvg: 40000, belowMarket: 1000 }),
-      lOf({ vin: "5N1AL1F83VC332076", ymm: "2022 Car", condition: "used", recall_status: "clear", recall_check: VIN_LEVEL_CLEAR }),
+      lOf({ vin: "5N1AL1F83VC332076", ymm: "2022 INFINITI Q50", condition: "used", recall_status: "clear", recall_check: VIN_LEVEL_CLEAR }),
     );
     assertArithmetic(r);
     expect(r.valid).toBe(true);
@@ -217,7 +231,7 @@ describe("deriveVerificationReport — canonical customer summary", () => {
     const r = deriveVerificationReport(
       dOf({}),
       lOf({
-        vin: "5N1AL1F83VC332076", ymm: "2022 Car", condition: "used",
+        vin: "5N1AL1F83VC332076", ymm: "2022 INFINITI Q50", condition: "used",
         recall_status: "open_recalls", open_recall_count: 1,
         // marketcheck-recalls persists campaigns under these field names, not
         // campaignNumber / summary — the passport must still read them.
@@ -238,7 +252,7 @@ describe("deriveVerificationReport — canonical customer summary", () => {
   it("never labels dealer-provided data as independent, and market as AutoLabels-derived", () => {
     const r = deriveVerificationReport(
       dOf({ marketAvg: 40000, warrantyStr: "3 yr", accidentCount: 0 }),
-      lOf({ vin: "5N1AL1F83VC332076", ymm: "2022 Car", condition: "used", recall_status: "clear", recall_check: VIN_LEVEL_CLEAR }),
+      lOf({ vin: "5N1AL1F83VC332076", ymm: "2022 INFINITI Q50", condition: "used", recall_status: "clear", recall_check: VIN_LEVEL_CLEAR }),
     );
     expect(r.checks.find((c) => c.key === "market")?.provenance).toBe("autolabels_derived");
     expect(r.checks.find((c) => c.key === "history")?.provenance).toBe("independent_history");
@@ -300,61 +314,105 @@ describe("passport surfaces consume the canonical report (cross-surface consiste
     r.checks
       .filter((c) => c.status === "pending" || c.status === "unavailable")
       .forEach((c) => expect(VERIFICATION_STATUS_LABEL[c.status]).not.toBe("Verified"));
-    expect(r.checks.find((c) => c.key === "title")?.status).toBe("pending");
+    expect(r.checks.find((c) => c.key === "title")?.status).toBe("unavailable");
   });
 
-  it("the hero summary string matches the canonical counts (1 needs confirmation · 1 pending)", () => {
-    expect(summarizeVerificationExceptions(conflictReport())).toBe("1 needs confirmation · 1 pending");
+  it("the hero summary string matches the canonical counts (1 needs confirmation · 2 not available)", () => {
+    // Title (no record) and odometer (dealer-reported mileage only).
+    expect(summarizeVerificationExceptions(conflictReport())).toBe("1 needs confirmation · 2 not available");
   });
 });
 
 
-// ── Dealer title attestation ──────────────────────────────────────────
+// ── Dealer title policy vs VIN-specific attestation ───────────────────
 // A franchise store that never retails branded titles is stating a policy
-// about its lot, not evidence about a VIN. It may fill a gap; it may never
-// bury a finding, and it may never read as an independent check.
+// about its lot, not evidence about this VIN. It is shown as the dealer's
+// statement and counts as nothing: the VIN's title check stays unavailable
+// until a title record or a VIN-specific dealer review exists.
 
-describe("a dealer's policy fills a gap and never buries a finding", () => {
+describe("a dealership's title policy is not a VIN title check", () => {
   const withPolicy = (over: Record<string, unknown> = {}) =>
     dOf({ titleStatus: "unknown", titlePolicyAttested: true, titlePolicyAttestedBy: "Harte INFINITI", ...over });
-  const titleOf = (d: PassportData) =>
-    deriveVerificationReport(d, lOf({})).checks.find((c) => c.key === "title")!;
+  const titleOf = (d: PassportData, l: Partial<VehicleListing> = {}) =>
+    deriveVerificationReport(d, lOf(l)).checks.find((c) => c.key === "title")!;
 
-  it("answers an unanswered title check with the dealer's own statement", () => {
-    expect(titleOf(withPolicy()).status).toBe("dealer_attested");
+  it("a policy alone leaves the VIN's title check unavailable", () => {
+    expect(titleOf(withPolicy()).status).toBe("unavailable");
+  });
+
+  it("shows the policy separately, named as the dealership's statement", () => {
+    const c = titleOf(withPolicy());
+    expect(c.finding).toBeNull();
+    expect(c.evidence.find((e) => e.label === "Dealer policy")?.value)
+      .toBe("Harte INFINITI states it does not retail branded-title vehicles. This is a dealership-wide policy, not a check of this VIN.");
+  });
+
+  it("is never counted as attested or verified", () => {
+    const r = deriveVerificationReport(withPolicy(), lOf({}));
+    expect(r.dealerAttestedChecks).toBe(0);
+    expect(r.checks.filter((c) => c.status === "verified").map((c) => c.key)).not.toContain("title");
+    expect(r.dealerSourceUsed).toBe(false);
   });
 
   it("NEVER buries a reported brand", () => {
-    // The safeguard. A branded trade slipping onto a franchise lot must still
-    // surface, policy or no policy.
-    const c = titleOf(withPolicy({ titleStatus: "branded" }));
+    expect(titleOf(withPolicy({ titleStatus: "branded" })).status).toBe("needs_attention");
+    expect(titleOf(withPolicy(), { mc_attributes: { title_brand: "Salvage" } } as Partial<VehicleListing>).status).toBe("needs_attention");
+  });
+
+  it("an independent clean record verifies; the policy does not change that", () => {
+    expect(titleOf(withPolicy(), { mc_attributes: { carfax_clean_title: true } } as Partial<VehicleListing>).status).toBe("verified");
+  });
+
+  it("no title record and no policy is unavailable, never 'clean'", () => {
+    const c = titleOf(dOf({ titleStatus: "unknown" }));
+    expect(c.status).toBe("unavailable");
+    expect(c.finding).toBeNull();
+  });
+});
+
+const NMVTIS_REVIEW = { status: "clean", verified_at: "2026-10-20T15:00:00.000Z", verified_by: null, source: "nmvtis", report_generated_at: "2026-10-20T14:58:00.000Z", report_expires_at: null, brand_note: null };
+
+describe("title evidence: dealer VIN review vs independent record", () => {
+  const titleOf = (l: Partial<VehicleListing>, d: Partial<PassportData> = {}) =>
+    deriveVerificationReport(dOf(d), lOf({ vin: "5N1AL1F83VC332076", ymm: "2025 INFINITI QX50", ...l } as Partial<VehicleListing>)).checks.find((c) => c.key === "title")!;
+
+  it("a VIN-specific dealer review of the title record is dealer attested, with its source and date", () => {
+    const c = titleOf({ title_verification: NMVTIS_REVIEW } as Partial<VehicleListing>, { titlePolicyAttestedBy: "Harte INFINITI" });
+    expect(c.status).toBe("dealer_attested");
+    expect(c.family).toBe("dealer");
+    expect(c.finding).toMatch(/reviewed the NMVTIS title record for this VIN on Oct 20, 2026/);
+    expect(c.finding).toMatch(/not an independent title-history report/);
+    expect(c.evidence.find((e) => e.label === "Note")?.value).toMatch(/NMVTIS title data may be incomplete/);
+  });
+
+  it("a verified independent title record is verified", () => {
+    expect(titleOf({ mc_attributes: { carfax_clean_title: true } } as Partial<VehicleListing>).status).toBe("verified");
+  });
+
+  it("a confirmed title brand needs attention", () => {
+    const c = titleOf({ mc_attributes: { carfax_clean_title: false, title_brand: "Flood" } } as Partial<VehicleListing>);
     expect(c.status).toBe("needs_attention");
+    expect(c.evidence.find((e) => e.label === "Independent title record")?.value).toBe("Brand reported: Flood");
   });
 
-  it("does not downgrade a title a source already proved clean", () => {
-    expect(titleOf(withPolicy({ titleStatus: "clean" })).status).toBe("verified");
+  it("contradictory sources surface the brand and say the sources disagree", () => {
+    const c = titleOf({ title_verification: NMVTIS_REVIEW, mc_attributes: { title_brand: "Rebuilt" } } as Partial<VehicleListing>);
+    expect(c.status).toBe("needs_attention");
+    expect(c.finding).toMatch(/Title sources disagree/);
+    expect(c.reviewNote).toMatch(/^confirm the title/);
   });
 
-  it("leaves the check pending for a dealer with no such policy", () => {
-    expect(titleOf(dOf({ titleStatus: "unknown" })).status).toBe("pending");
+  it("a dealer review that found a brand needs attention", () => {
+    expect(titleOf({ title_verification: { ...NMVTIS_REVIEW, status: "branded", brand_note: "Salvage" } } as Partial<VehicleListing>).status).toBe("needs_attention");
   });
 
-  it("names the dealer in the finding, so the claim has an author", () => {
-    const c = titleOf(withPolicy());
-    expect(c.finding).toContain("Harte INFINITI");
-    expect(c.finding).toMatch(/not an independent title-record check/i);
+  it("missing title history is unavailable", () => {
+    expect(titleOf({}).status).toBe("unavailable");
   });
 
-  it("is counted apart from independently verified checks", () => {
-    // A shopper must never be told N sources checked when one of them was the
-    // seller.
-    const r = deriveVerificationReport(withPolicy(), lOf({}));
-    expect(r.dealerAttestedChecks).toBe(1);
-    expect(r.checks.filter((c) => c.status === "verified").map((c) => c.key)).not.toContain("title");
-  });
-
-  it("still counts as resolved, so the shopper sees no open item", () => {
-    const r = deriveVerificationReport(withPolicy(), lOf({}));
-    expect(r.pendingChecks).toBe(deriveVerificationReport(dOf({ titleStatus: "unknown" }), lOf({})).pendingChecks - 1);
+  it("dealer policy conflicting with a reported brand: the brand wins", () => {
+    const c = titleOf({ mc_attributes: { carfax_clean_title: false } } as Partial<VehicleListing>, { titlePolicyAttested: true, titlePolicyAttestedBy: "Harte INFINITI" });
+    expect(c.status).toBe("needs_attention");
+    expect(c.evidence.find((e) => e.label === "Dealer policy")?.value).toMatch(/dealership-wide policy/);
   });
 });

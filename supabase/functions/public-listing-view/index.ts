@@ -917,6 +917,33 @@ serve(async (req) => {
       delete row.blackbook; delete row.history_payload;
     }
 
+    // ── VIN decode receipts. The Passport's identity check verifies only
+    // against a decoder's own record of the VIN it decoded. Stored snapshots
+    // only: this never calls a decoder. The endpoint (it carries the masked
+    // API key) and the payload stay server side; a receipt is the decoded
+    // VIN, the provider, the HTTP outcome, the time, the identity fields and
+    // the payload hash.
+    try {
+      const vinKey = String(row.vin || "").trim().toUpperCase();
+      row.vin_decode_receipts = [];
+      if (/^[A-HJ-NPR-Z0-9]{17}$/.test(vinKey)) {
+        const { data: snaps } = await admin
+          .from("neovin_snapshots")
+          .select("vin, endpoint, http_status, fetched_at, payload_hash, dvin:payload->>vin, year:payload->>year, make:payload->>make, model:payload->>model, trim:payload->>trim")
+          .eq("vin", vinKey)
+          .order("fetched_at", { ascending: false })
+          .limit(5);
+        row.vin_decode_receipts = (snaps ?? []).map((sn: Record<string, unknown>) => ({
+          vin: String(sn.dvin || "").toUpperCase() || null,
+          provider: String(sn.endpoint || "").includes("/neovin/") ? "neovin" : "marketcheck",
+          http_status: sn.http_status ?? null,
+          fetched_at: sn.fetched_at ?? null,
+          year: sn.year ?? null, make: sn.make ?? null, model: sn.model ?? null, trim: sn.trim ?? null,
+          payload_hash: sn.payload_hash ?? null,
+        }));
+      }
+    } catch { row.vin_decode_receipts = []; }
+
     // ── Final deny sweep. The last thing that touches the payload. ─────────
     //
     // get_vehicle_listing_by_slug is `SELECT * FROM vehicle_listings`, so every

@@ -1,5 +1,5 @@
 {
- "_note": "Real production rows read 2026-11-07 via get_vehicle_listing_by_slug, shaped as public-listing-view ships them (history_payload scrubbed, tenant title_policy_no_branded=true and public_market_flags (market_invalid_claim_suppression=true, the tenant setting on Nov 7) attached; photos and features trimmed). Read-only regression fixtures.",
+ "_note": "Real production rows read 2026-11-07 via get_vehicle_listing_by_slug, shaped as public-listing-view ships them (history_payload scrubbed, tenant title_policy_no_branded=true and public_market_flags (market_invalid_claim_suppression=true, the tenant setting on Nov 7) attached; photos and features trimmed). Read-only regression fixtures. vin_decode_receipts is the projection public-listing-view (PR #67) builds from neovin_snapshots, read 2026-11-07: the Q50 has one NeoVIN snapshot (HTTP 200, payload VIN matches); the QX55 has none.",
  "archivedQ50": {
   "advertised_price_before_doc": 36981,
   "archive_reason": "left_feed",
@@ -222,7 +222,20 @@
   "ymm": "2023 INFINITI Q50",
   "public_market_flags": {
    "market_invalid_claim_suppression": true
-  }
+  },
+  "vin_decode_receipts": [
+   {
+    "vin": "JN1EV7CR5PM543599",
+    "provider": "neovin",
+    "http_status": 200,
+    "fetched_at": "2026-08-31T03:07:20.881Z",
+    "year": "2023",
+    "make": "INFINITI",
+    "model": "Q50",
+    "trim": "SENSORY",
+    "payload_hash": "8d446d1f5136b7f093e3bb0a2d28eba007cfb8509693a8c2a32822ebe6ef0686"
+   }
+  ]
  },
  "activeQX55": {
   "advertised_price_before_doc": null,
@@ -321,6 +334,7 @@
   "ymm": "2022 INFINITI QX55",
   "public_market_flags": {
    "market_invalid_claim_suppression": true
-  }
+  },
+  "vin_decode_receipts": []
  }
 }

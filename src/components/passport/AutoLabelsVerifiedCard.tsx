@@ -56,9 +56,16 @@ const attentionLine = (c: ReportCheck): string => {
   switch (c.status) {
     case "needs_attention":
       return c.key === "title" ? "Title brand on record" : c.key === "history" ? "Reported accident history" : "Needs attention";
-    case "needs_confirmation": return "Needs confirmation";
+    case "needs_confirmation":
+      return c.key === "odometer" ? "Mileage records require review" : c.key === "vin" ? "Identity needs confirmation" : "Needs confirmation";
     case "pending": return "Pending · no result yet";
-    case "unavailable": return "Not available · no source data";
+    case "unavailable": {
+      const miles = typeof c.facts?.reportedMiles === "number" ? (c.facts.reportedMiles as number) : null;
+      if (c.key === "odometer" && miles != null) return `${miles.toLocaleString("en-US")} mi reported · history not verified`;
+      if (c.key === "vin" && c.facts?.formatValid) return "VIN on record · decode not verified";
+      if (c.key === "title" && c.facts?.dealerPolicy) return "Not available · dealer policy only";
+      return "Not available · no source data";
+    }
     default: return "";
   }
 };

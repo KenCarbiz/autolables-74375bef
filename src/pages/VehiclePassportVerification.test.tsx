@@ -31,6 +31,8 @@ const reviewListing = (): VehicleListing => ({
   mileage: 12480, condition: "used", price: 39500, market_value: 41000, market_payload: { belowMarket: 1500 },
   mc_attributes: { owner_count: 1, accident_count: 0, msrp: 45000 },
   key_specs: { engine: "2.0L VC-Turbo" },
+  history_payload: { odometer_readings: [{ date: "2025-02-01", miles: 4100, source: "AutoCheck" }, { date: "2026-04-01", miles: 11020, source: "AutoCheck" }] },
+  vin_decode_receipts: [{ vin: "5N1AL1F83VC332076", provider: "neovin", http_status: 200, fetched_at: "2026-10-01T00:00:00.000Z", year: "2025", make: "INFINITI", model: "QX50", payload_hash: "test" }],
   warranty_info: { factory_months: 48, factory_miles: 60000, in_service_date: "2024-10-01" },
   recall_status: "clear", open_recall_count: 1,
   recall_check: { checked_at: "2026-07-10T00:00:00Z", has_open: true, do_not_drive: false, campaigns: [{ campaignNumber: "25V-118", component: "Rear view camera", summary: "The rearview image may fail.", remedy: "Software update." }] },
@@ -51,7 +53,7 @@ describe("VehiclePassportVerification — rendered report", () => {
   it("leads with the exception-first banner (no numeric score ring)", () => {
     renderReport();
     expect(screen.getByRole("heading", { level: 2, name: "Review one item before purchase" })).toBeInTheDocument();
-    expect(screen.getByText(/6 checks verified · 1 needs confirmation · 1 pending/, { ignore: PRINT_IGNORE })).toBeInTheDocument();
+    expect(screen.getByText(/6 checks verified · 1 needs confirmation · 1 not available/, { ignore: PRINT_IGNORE })).toBeInTheDocument();
     // Governance: no percent/score/grade ring anywhere.
     expect(screen.queryByText(/\d+\s*\/\s*8/)).not.toBeInTheDocument();
     expect(screen.queryByText(/%/)).not.toBeInTheDocument();
@@ -71,9 +73,10 @@ describe("VehiclePassportVerification — rendered report", () => {
     expect(screen.queryByText(/issue found/i)).not.toBeInTheDocument();
   });
 
-  it("shows the pending title as pending — never verified", () => {
+  it("shows the title with no record as not available — never verified", () => {
     renderReport();
-    expect(screen.getByRole("heading", { name: "Title and brand check pending" })).toBeInTheDocument();
+    expect(screen.getByText(/Title and brand could not be verified/, { ignore: PRINT_IGNORE })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /Title and brand/ })).not.toBeInTheDocument();
   });
 
   it("lists verified checks under 'What checked out'", () => {
