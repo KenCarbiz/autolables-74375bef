@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,7 +10,8 @@ import { describeAge } from "@/lib/admin/health";
 import LabelDefaultsPanel from "@/components/admin/LabelDefaultsPanel";
 import FactoryStickerPanel from "@/components/admin/FactoryStickerPanel";
 import StickerPrintTemplates from "@/components/admin/StickerPrintTemplates";
-import { AdminCard, AdminTable, StatusChip, Td, Th } from "@/components/admin/v2/primitives";
+import { AdminButton, AdminCard, AdminTable, KeyValueList, StatusChip, Td, Th } from "@/components/admin/v2/primitives";
+import { DetailDrawer } from "@/components/admin/v3/editor";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { adminTabHref } from "@/lib/admin/sections";
 import { documentRuleRows, rulesFromSettings, serviceGateContext } from "@/lib/admin/documentPolicy";
@@ -72,7 +73,9 @@ async function readTemplateCatalog(): Promise<TemplateVersionRow[] | null> {
   }
 }
 
-export default function TemplatesView() {
+export type TemplatesSection = "all" | "library" | "settings";
+
+export default function TemplatesView({ section = "all" }: { section?: TemplatesSection } = {}) {
   const fixture = useViewFixture<TemplatesFixture>("templates");
   const adminFixture = useAdminFixture();
   const now = useAdminNow();
@@ -96,13 +99,16 @@ export default function TemplatesView() {
 
   const { settings } = useDealerSettings();
   const readiness = useDocumentsReadiness();
+  const [detail, setDetail] = useState<TemplateVersionRow | null>(null);
+  const showLibrary = section !== "settings";
+  const showSettings = section !== "library";
   const matrix = useMemo(() => documentRuleRows(rulesFromSettings(settings), serviceGateContext(settings)), [settings]);
 
   return (
     <div className="flex flex-col gap-4">
-      <LabelDefaultsPanel />
+      {showLibrary && <LabelDefaultsPanel />}
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+      {showSettings && <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
         <AdminCard title="Approval matrix" flush inset="sm" action={<Link to={adminTabHref("approval-rules")} className="text-[14px] font-semibold text-adm-primary hover:underline">Edit rules</Link>}>
           <AdminTable caption="Approval matrix" minWidth={460}>
             <thead>
@@ -144,9 +150,9 @@ export default function TemplatesView() {
             </tbody>
           </AdminTable>
         </AdminCard>
-      </div>
+      </div>}
 
-      <AdminCard id="paper-size" title="Addendum paper size" description="The addendum scales to this size. The FTC Buyers Guide stays at its federally mandated minimum (11 x 7.25 in, 16 CFR 455)." action={<SaveStatus status={paper.status} />}>
+      {showSettings && <AdminCard id="paper-size" title="Addendum paper size" description="The addendum scales to this size. The FTC Buyers Guide stays at its federally mandated minimum (11 x 7.25 in, 16 CFR 455)." action={<SaveStatus status={paper.status} />}>
         <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,320px)_1fr_1fr] gap-3 items-end">
           <div>
             <label htmlFor="paper-size-select" className={FIELD_LABEL}>Paper size</label>
@@ -167,9 +173,9 @@ export default function TemplatesView() {
             </>
           )}
         </div>
-      </AdminCard>
+      </AdminCard>}
 
-      <AdminCard title="Template catalog versions" description="Platform templates and the version each one serves. History is read-only here." flush>
+      {showLibrary && <AdminCard title="Template catalog versions" description="Platform templates and the version each one serves. History is read-only here." flush>
         {rows === undefined ? (
           <p className="px-6 pb-6 text-[13px] text-adm-muted">Checking the template catalog</p>
         ) : rows === null ? (
@@ -184,6 +190,7 @@ export default function TemplatesView() {
                 <Th>Size</Th>
                 <Th>Version</Th>
                 <Th>Status</Th>
+                <Th>Details</Th>
               </tr>
             </thead>
             <tbody>
@@ -199,15 +206,32 @@ export default function TemplatesView() {
                     <span className="block text-[12px] text-adm-muted">{r.publishedAt ? `Published ${describeAge(r.publishedAt, now)}` : "Version not recorded"}</span>
                   </Td>
                   <Td><StatusChip tone={r.active ? "success" : "neutral"}>{r.active ? "Active" : "Inactive"}</StatusChip></Td>
+                  <Td><AdminButton size="sm" aria-label={`Details for ${r.name}`} onClick={() => setDetail(r)}>Details</AdminButton></Td>
                 </tr>
               ))}
             </tbody>
           </AdminTable>
         )}
-      </AdminCard>
+      </AdminCard>}
 
-      <FactoryStickerPanel />
-      <StickerPrintTemplates />
+      {showLibrary && <FactoryStickerPanel />}
+      {showLibrary && <StickerPrintTemplates />}
+
+      <DetailDrawer open={!!detail} onClose={() => setDetail(null)} title={detail?.name ?? "Template"} description="Read from the platform template catalog. Nothing here edits a version.">
+        {detail && (
+          <KeyValueList
+            rows={[
+              { label: "Template ID", value: <span className="break-all font-mono text-[13px]">{detail.id}</span> },
+              { label: "Type", value: detail.type },
+              { label: "Paper size", value: detail.size },
+              { label: "Version served", value: `v${detail.currentVersion}` },
+              { label: "Published", value: detail.publishedAt ? new Date(detail.publishedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Version not recorded" },
+              { label: "Status", value: detail.active ? "Active" : "Inactive" },
+            ]}
+          />
+        )}
+        <p className="text-[13px] leading-[18px] text-adm-muted">A replacement is always a new version. Documents already generated keep the version they were made with.</p>
+      </DetailDrawer>
     </div>
   );
 }
