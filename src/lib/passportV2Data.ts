@@ -1,4 +1,5 @@
 import { verifiedInServiceDate } from "@/lib/warranty/inServiceEvidence";
+import { storedEpaConflict, listingPowertrain, driveOf, litersOf } from "../../supabase/functions/_shared/epaMatch";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 import { deriveRecallView, type RecallView } from "@/lib/vehicleTruth/recallView";
 import { buildDiscountBreakdown, type PriceDisplayMode, type DiscountBreakdown } from "@/lib/priceModel";
@@ -765,7 +766,15 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   ];
 
   // Structured key specs (goal's "Key Specifications" card) — real values only.
-  const epaRaw = (listing as unknown as { epa_economy?: Record<string, unknown> | null }).epa_economy || null;
+  const epaStored = (listing as unknown as { epa_economy?: Record<string, unknown> | null }).epa_economy || null;
+  const epaModel = String(listing.ymm ?? "").trim().split(/\s+/).slice(2).join(" ");
+  // A record that contradicts this car's own decode belongs to another vehicle.
+  const epaRaw = epaStored && storedEpaConflict(epaStored, {
+    powertrain: listingPowertrain({ powertrainType: mc.powertrain_type, fuelType: mc.fuel_type, trim: listing.trim, model: epaModel }),
+    drive: driveOf(ks.drivetrain),
+    liters: litersOf(ks.engine),
+    text: `${epaModel} ${listing.trim ?? ""}`,
+  }) === null ? epaStored : null;
   const epa = epaRaw && (epaRaw.combined != null || epaRaw.city != null) ? {
     city: (epaRaw.city as number) ?? null,
     highway: (epaRaw.highway as number) ?? null,

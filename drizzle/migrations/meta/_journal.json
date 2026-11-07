@@ -127,6 +127,20 @@
       "when": 1793484000001,
       "tag": "0017_apply_feed_completeness_hold",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793981513260,
+      "tag": "0018_store_scope_primary_precedence",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793999490911,
+      "tag": "0019_group_inventory_view",
+      "breakpoints": true
     }
   ]
 }

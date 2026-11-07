@@ -204,3 +204,23 @@ describe("Market verdict basis governance", () => {
     expect((price?.evidence ?? []).some((e) => e.includes("recently sold"))).toBe(false);
   });
 });
+
+describe("EPA figures belong to this car", () => {
+  const lightning = { matchedOption: "2022 Ford F-150 Lightning 4WD — Auto (A1)", city: 76, highway: 61, combined: 68, fuelType: "Electricity", rangeMiles: 230 };
+  const car = (mc: Record<string, unknown>, epa: unknown, trim = "XLT") =>
+    ({ ymm: "2022 Ford F-150", trim, mc_attributes: mc, epa_economy: epa } as unknown as VehicleListing);
+
+  it("hides electric figures stored on a gas F-150", () => {
+    const d = derivePassport(car({ powertrain_type: "Combustion", engine: "2.7L V6", drivetrain: "4WD" }, lightning));
+    expect(d.epa).toBeNull();
+  });
+
+  it("hides electric figures when the decode is silent and the name does not say Lightning", () => {
+    expect(derivePassport(car({}, lightning, "Lariat")).epa).toBeNull();
+  });
+
+  it("keeps figures that agree with the car", () => {
+    const ok = { matchedOption: "2022 Ford F150 Pickup 4WD — Auto 10-spd, 6 cyl, 2.7 L, Turbo", city: 19, highway: 24, combined: 21, fuelType: "Regular" };
+    expect(derivePassport(car({ powertrain_type: "Combustion", engine: "2.7L V6", drivetrain: "4WD" }, ok)).epa?.combined).toBe(21);
+  });
+});

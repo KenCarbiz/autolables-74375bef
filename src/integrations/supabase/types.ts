@@ -6185,6 +6185,42 @@ export type Database = {
         }
         Relationships: []
       }
+      inventory_group_view_grants: {
+        Row: {
+          granted_at: string
+          granted_by: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          granted_at?: string
+          granted_by?: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          granted_at?: string
+          granted_by?: string | null
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_group_view_grants_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_group_view_grants_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_network_audit: {
         Row: {
           action: string
@@ -8858,6 +8894,7 @@ export type Database = {
           monthly_usd_cap: number | null
           pilot_mode: boolean
           plan_name: string | null
+          primary_store_holdback: number
           priority_floors: Json
           protected_reserve: number
           provider: string
@@ -8878,6 +8915,7 @@ export type Database = {
           monthly_usd_cap?: number | null
           pilot_mode?: boolean
           plan_name?: string | null
+          primary_store_holdback?: number
           priority_floors?: Json
           protected_reserve?: number
           provider?: string
@@ -8898,6 +8936,7 @@ export type Database = {
           monthly_usd_cap?: number | null
           pilot_mode?: boolean
           plan_name?: string | null
+          primary_store_holdback?: number
           priority_floors?: Json
           protected_reserve?: number
           provider?: string
@@ -10770,6 +10809,7 @@ export type Database = {
           allowed_products: string[]
           backfill_limit: number
           budget_blocked: boolean
+          condition_priority: string
           credential_ref: string | null
           daily_request_limit: number
           enrich_shared_inventory: boolean
@@ -10795,6 +10835,7 @@ export type Database = {
           allowed_products?: string[]
           backfill_limit?: number
           budget_blocked?: boolean
+          condition_priority?: string
           credential_ref?: string | null
           daily_request_limit?: number
           enrich_shared_inventory?: boolean
@@ -10820,6 +10861,7 @@ export type Database = {
           allowed_products?: string[]
           backfill_limit?: number
           budget_blocked?: boolean
+          condition_priority?: string
           credential_ref?: string | null
           daily_request_limit?: number
           enrich_shared_inventory?: boolean
@@ -15261,6 +15303,20 @@ export type Database = {
         }
         Returns: string
       }
+      inventory_group_view_access: {
+        Args: { p_tenant_id: string }
+        Returns: Json
+      }
+      inventory_group_view_rows: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_store_ids: string[]
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
+      inventory_scope_report: { Args: { p_tenant_id: string }; Returns: Json }
       invite_tenant_member: {
         Args: { p_email: string; p_role: string; p_tenant_id: string }
         Returns: string
