@@ -111,6 +111,8 @@ describe("Hyundai Tucson gasoline template", () => {
         expect(s.filter((x) => x === "Not Available").length).toBe(2);
         expect(s).toContain("5-year fuel cost");
         expect(s.join(" ")).toContain("$2,450");
+        // Both cost figures are tied to the one fueleconomy.gov retrieval.
+        expect(s.join(" ")).toContain("Cost figures are fueleconomy.gov estimates retrieved Nov 5, 2026");
         expect(s).toContain("Overall Vehicle Score");
         expect(s).not.toContain("Driver");
         expect(s).not.toContain("Front seat");

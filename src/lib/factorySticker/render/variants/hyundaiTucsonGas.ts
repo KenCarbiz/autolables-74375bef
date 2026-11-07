@@ -178,6 +178,13 @@ function paintInfoBox(p: Painter, d: FactoryStickerData): { bottom: number; sold
 
 // ── Fuel economy and environment ──────────────────────────────────────
 
+/** "Nov 5, 2026" (UTC) from an ISO timestamp; null when absent or unparseable. */
+export function epaDate(iso: string | undefined): string | null {
+  const t = iso ? Date.parse(iso) : NaN;
+  if (!Number.isFinite(t)) return null;
+  return new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+}
+
 const EPA_X = 704;
 const EPA_W = 504;
 
@@ -197,7 +204,11 @@ function paintEpa(p: Painter, d: FactoryStickerData): void {
 
   const footerTop = Y(344);
   R(p, EPA_X + 3, footerTop, EPA_W - 6, bottom - footerTop - 3, INK);
-  const note = "Actual results will vary for many reasons, including driving conditions and how you drive and maintain your vehicle. Cost estimates are current EPA estimates and may differ from those printed on the original label.";
+  const retrieved = epaDate(r.epaRetrievedAt);
+  const note = "Actual results will vary for many reasons, including driving conditions and how you drive and maintain your vehicle. "
+    + (retrieved
+      ? `Cost figures are fueleconomy.gov estimates retrieved ${retrieved} and may differ from those printed on the original label.`
+      : "Cost estimates are current EPA estimates and may differ from those printed on the original label.");
   wrap(note, "bold", 7.5, 470).forEach((l, i) => T(p, l, 712.6, footerTop + 4 + i * 8.6, 7.5, "bold", { color: PAPER, lh: 8.6 }));
   T(p, "fueleconomy.gov", 712.6, Y(386), 22, "bold", { color: PAPER });
   T(p, "Calculate personalized estimates and compare vehicles", 712.6, Y(410), 8, "bold", { color: PAPER });

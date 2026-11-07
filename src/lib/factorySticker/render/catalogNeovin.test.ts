@@ -31,7 +31,10 @@ describe("NeoVIN decode facts for catalog templates", () => {
       expect(enriched.safety).toMatchObject({ overall: 5, frontal: 5, side: 5, rollover: 4, frontalDriver: null, frontalPassenger: null, sideFront: null, sideRear: null });
       const m = buildRenderLayout(d, theme, undefined, { sampleTemplateId: HYUNDAI_TUCSON_GAS_ID });
       const s = m.drawnStrings;
-      expect(s).toContain("Frontal");
+      // A combined decode rating is NHTSA's overall frontal / side rating, labeled as such.
+      expect(s).toContain("Overall Frontal");
+      expect(s).toContain("Overall Side");
+      expect(s).not.toContain("Frontal");
       expect(s).not.toContain("Driver");
       expect(s).not.toContain("Passenger");
       expect(s).not.toContain("Front seat");
@@ -127,5 +130,29 @@ describe("EPA match conflict guard for catalog templates", () => {
     const d = cases[3][1];
     expect(withCatalogEpaGuard({ ...d, neovin: { ratingMetadata: [], madeIn: null, epaConflict: "engine" } }).epa).toBeNull();
     expect(withCatalogEpaGuard({ ...d, neovin: { ratingMetadata: [], madeIn: null } }).epa).not.toBeNull();
+  });
+});
+
+describe("EPA cost figures come from one timestamped retrieval", () => {
+  const base = tucsonListings()[0];
+  const norm = (epa: Record<string, unknown>) =>
+    normalizeForSticker({ ...base, epa_economy: { ...(base.epa_economy as Record<string, unknown>), ...epa } }, {}, canonicalPassportUrl("x"), "t").data;
+
+  it("reads the 5-year comparison only from a timestamped row and keeps a spend as negative", () => {
+    expect(norm({ fiveYearCostDifference: -1000 }).epa).toMatchObject({ annualFuelCost: 2450, fiveYearCostDifference: -1000, checkedAt: "2026-11-05T14:22:47.944Z" });
+    expect(norm({ fiveYearCostDifference: 750 }).epa?.fiveYearCostDifference).toBe(750);
+    const untimed = norm({ fiveYearCostDifference: -1000, checkedAt: null }).epa;
+    expect(untimed?.fiveYearCostDifference).toBeUndefined();
+    expect(untimed?.checkedAt).toBeUndefined();
+  });
+
+  it("prints a spend from the same row as the annual cost, with the retrieval date", () => {
+    const d = { ...tucsonRenderData(base) };
+    const m = buildRenderLayout({ ...d, epa: { ...d.epa!, fiveYearCostDifference: -1000 } }, theme, undefined, { sampleTemplateId: HYUNDAI_TUCSON_GAS_ID });
+    const all = m.drawnStrings.join(" ");
+    expect(all).toContain("You spend");
+    expect(all).toContain("$1,000");
+    expect(all).toContain("$2,450");
+    expect(all).toContain("retrieved Nov 5, 2026");
   });
 });

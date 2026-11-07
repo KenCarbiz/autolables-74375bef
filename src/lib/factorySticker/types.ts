@@ -119,6 +119,8 @@ export interface StickerRegulatory {
   totalRangeMiles?: number;
   epaClassNote?: string;
   epaSourceReference?: string;
+  /** ISO time the saved fueleconomy.gov row (and its cost figures) was retrieved. */
+  epaRetrievedAt?: string;
   nhtsaStatus: NhtsaStatus;
   overallRating?: number;
   frontalDriverRating?: number;

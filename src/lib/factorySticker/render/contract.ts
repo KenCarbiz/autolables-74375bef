@@ -209,6 +209,8 @@ export interface FactoryStickerRenderData {
     /** Positive = saves vs average new vehicle over 5 years; negative = spends more. */
     fiveYearCostDifference?: number | null;
     classNote?: string | null;
+    /** When the saved fueleconomy.gov row was retrieved; its annual and 5-year cost figures share this one snapshot. */
+    checkedAt?: string | null;
   } | null;
   /** NHTSA star ratings; null field = Not Rated. Omit the block entirely when unverified. */
   safety?: {
@@ -441,6 +443,7 @@ export function adaptRenderData(d: FactoryStickerRenderData): StickerLayoutInput
             ...opt("co2TailpipeGpm", d.epa.co2TailpipeGpm ?? null),
             ...opt("fiveYearCostDifference", d.epa.fiveYearCostDifference ?? null),
             ...opt("epaClassNote", d.epa.classNote ?? null),
+            ...opt("epaRetrievedAt", d.epa.checkedAt ?? null),
           }
         : { epaStatus: "UNAVAILABLE" as const }),
       ...(d.safety

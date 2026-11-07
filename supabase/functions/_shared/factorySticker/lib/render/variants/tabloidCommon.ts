@@ -401,7 +401,9 @@ export function paintSafetyPanel(p: Painter, d: FactoryStickerData, x: number, y
   note("Based on the combined ratings of frontal, side and rollover.", 28);
   note("Should ONLY be compared to other vehicles of similar size and weight.", 40);
   rule(67);
-  tx(p, "Frontal", L, at(71), o.labelSize, "bold");
+  // A single combined rating is NHTSA's overall frontal (or side) rating and is
+  // labeled that way; it is never presented as a per-seat rating.
+  tx(p, combinedFrontal ? "Overall Frontal" : "Frontal", L, at(71), o.labelSize, "bold");
   tx(p, "Crash", L, at(95), o.labelSize, "bold");
   if (combinedFrontal) {
     cell(value(r.frontalRating), at(83));
@@ -414,7 +416,7 @@ export function paintSafetyPanel(p: Painter, d: FactoryStickerData, x: number, y
   note("Based on the risk of injury in a frontal impact.", 113);
   note("Should ONLY be compared to other vehicles of similar size and weight.", 125);
   rule(145);
-  tx(p, "Side", L, at(149), o.labelSize, "bold");
+  tx(p, combinedSide ? "Overall Side" : "Side", L, at(149), o.labelSize, "bold");
   tx(p, "Crash", L, at(173), o.labelSize, "bold");
   if (combinedSide) {
     cell(value(r.sideRating), at(161));

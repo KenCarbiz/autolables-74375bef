@@ -155,9 +155,19 @@ export function normalizeForSticker(
     // Plug-in and electric figures only when the saved row carries them; read for catalog makes only.
     ...(hasBuiltCatalogTemplates(identity.make)
       ? Object.fromEntries(
-        (["combinedMpge", "kwhPer100Miles", "chargeTimeHours", "electricRangeMiles", "totalRangeMiles", "smogScore", "fiveYearCostDifference"] as const)
+        (["combinedMpge", "kwhPer100Miles", "chargeTimeHours", "electricRangeMiles", "totalRangeMiles", "smogScore"] as const)
           .flatMap((k) => (num(epaRow[k]) !== null ? [[k, num(epaRow[k])]] : [])),
-      ) as { combinedMpge?: number; kwhPer100Miles?: number; chargeTimeHours?: number; electricRangeMiles?: number; totalRangeMiles?: number; smogScore?: number; fiveYearCostDifference?: number }
+      ) as { combinedMpge?: number; kwhPer100Miles?: number; chargeTimeHours?: number; electricRangeMiles?: number; totalRangeMiles?: number; smogScore?: number }
+      : {}),
+    // Cost figures are only comparable within one retrieval: the 5-year
+    // comparison is read only from a timestamped row, the same row as the
+    // annual cost, and keeps its sign (negative = spends more).
+    ...(hasBuiltCatalogTemplates(identity.make) && str(epaRow.checkedAt)
+      ? {
+        checkedAt: str(epaRow.checkedAt),
+        ...(Number.isFinite(Number(epaRow.fiveYearCostDifference)) && epaRow.fiveYearCostDifference !== null && epaRow.fiveYearCostDifference !== ""
+          ? { fiveYearCostDifference: Number(epaRow.fiveYearCostDifference) } : {}),
+      }
       : {}),
   } : null;
   if (!epa) missing.push("epa_economy");
