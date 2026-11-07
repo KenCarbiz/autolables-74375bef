@@ -27,6 +27,7 @@ import {
 } from "../equipmentSelection.ts";
 import { resolveReferenceVariant } from "../oem/referenceVariants.ts";
 import { withCatalogEquipment } from "./catalogEquipment.ts";
+import { curateEquipment } from "./catalogCuration.ts";
 import { withCatalogEpaGuard, withCatalogNeovin } from "./catalogNeovin.ts";
 import { CATALOG_LAYOUTS, VARIANT_LAYOUTS, type VariantLayoutBuilder, type VariantRenderInput } from "./variants/index.ts";
 import {
@@ -164,6 +165,8 @@ export interface FactoryStickerRenderData {
   portOptions?: Array<{ name: string; code: string | null; msrp: number | null }>;
   standardEquipment: Record<string, string[]>;
   keyFeatures: Record<string, string[]>;
+  /** Catalog template whose printed-equipment curation applies (render/catalogCuration.ts); never set for the approved masters. */
+  equipmentCuration?: string;
   colors: {
     exterior: { name: string | null; code: string | null };
     interior: { name: string | null; code: string | null };
@@ -284,6 +287,8 @@ export interface FactoryStickerRenderResult {
 const categoryForHint = (hint: string): EquipmentCategory => {
   const key = hint.toLowerCase();
   if (/safety|airbag|security|adas|assist|driver/.test(key)) return "SAFETY_SECURITY";
+  // "Powertrain Technology" (Hyundai) is powertrain, not infotainment.
+  if (/powertrain/.test(key)) return "POWERTRAIN";
   if (/tech|infotainment|audio|connect|entertainment/.test(key)) return "TECHNOLOGY";
   if (/interior|seat/.test(key)) return "INTERIOR";
   if (/exterior|wheel|body/.test(key)) return "EXTERIOR";
@@ -604,7 +609,7 @@ export function classifiedEquipment(data: FactoryStickerRenderData): ClassifiedI
 }
 
 export const equipmentBase = (data: FactoryStickerRenderData): EquipmentSelectionBase =>
-  normalizeEquipment(classifiedEquipment(data));
+  curateEquipment(normalizeEquipment(classifiedEquipment(data)), data.equipmentCuration);
 
 /** The lines a sticker prints when `lineCount` lines fit, as the layout and the completeness check both derive them. */
 export const selectedEquipmentLines = (data: FactoryStickerRenderData, lineCount: number): EquipmentLine[] =>

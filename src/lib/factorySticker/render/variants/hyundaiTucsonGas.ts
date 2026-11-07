@@ -12,7 +12,7 @@
 // fuel-economy panel is a native rebuild of what the reference prints as a
 // scanned image; its 1-10 scales and pointers follow the data.
 
-import type { FactoryStickerData } from "../../types.ts";
+import type { EquipmentCategory, FactoryStickerData } from "../../types.ts";
 import {
   Painter, fuelCategoryLabel, formatMoney, measureText, wrapText, type LayoutFont, type LayoutModel,
 } from "../layout.ts";
@@ -20,9 +20,9 @@ import { PASSPORT_QR_CAPTION } from "../../reproduction.ts";
 import { VARIANT_LOGOS } from "./logoArtwork.ts";
 import { EPA_BLUE, INK, PAPER, baseline, type VariantLayoutBuilder } from "./shared.ts";
 import {
-  TABLOID_HEIGHT, TABLOID_WIDTH, assembleTabloid, buildSections, colorText, dealerLines, flow, paintPlaced,
+  TABLOID_HEIGHT, TABLOID_WIDTH, assembleTabloid, colorText, dealerLines, flow, paintPlaced,
   assemblyLabel, paintSafetyPanel, partsFacts, placedResult, priceRows, toEntries, totalMsrp, underlined, warrantySection,
-  withColumns, type FirstPageContext, type FirstPageResult, type FlowStyle, type TabloidSpec,
+  withColumns, type FirstPageContext, type FirstPageResult, type FlowStyle, type Section, type TabloidSpec,
 } from "./tabloidCommon.ts";
 
 export const HYUNDAI_TUCSON_GAS_ID = "hyundai_2026_tucson_se_awd";
@@ -33,7 +33,48 @@ const Q = (pt: number): number => pt / 0.612;
 /** Maps a reference y (PDF points) onto the page, below the banner and above the disclosure. */
 export const Y = (ref: number): number => 30 + (ref - 18) * 0.93;
 
-const EQ_STYLE: FlowStyle = { size: 11.5, lh: 13.7, hang: 6, inset: 0 };
+/** One readable column at Hyundai's own spacing (8pt type on 9.5pt leading). */
+const EQ_STYLE: FlowStyle = { size: 13, lh: 15.5, hang: 6, inset: 0 };
+
+/** Hyundai's standard-features hierarchy; headings are labels, every item is the VIN's own decoded equipment. */
+const HYUNDAI_HIERARCHY: Array<[string, EquipmentCategory[]]> = [
+  ["Advanced Safety Technologies", ["SAFETY_SECURITY"]],
+  ["Powertrain Technology", ["POWERTRAIN"]],
+  ["Exterior", ["EXTERIOR"]],
+  ["Comfort & Convenience", ["COMFORT_CONVENIENCE", "FUNCTIONAL"]],
+  ["Interior", ["INTERIOR"]],
+  ["Multimedia & Connectivity", ["TECHNOLOGY"]],
+  ["Other Standard Equipment", ["OTHER"]],
+];
+
+export function hyundaiSections(d: FactoryStickerData, groups: Array<{ hint: string; items: string[] }> = []): Section[] {
+  const seen = new Set<string>();
+  const out: Section[] = [];
+  // Source groups already named with Hyundai's own headings keep them.
+  const headings = new Set(HYUNDAI_HIERARCHY.map(([h]) => h.toUpperCase()));
+  if (groups.length && groups.every((g) => headings.has(g.hint.trim().toUpperCase()))) {
+    for (const g of groups) {
+      const items = g.items.map((i) => i.trim()).filter((i) => i && !seen.has(i.toUpperCase()));
+      items.forEach((i) => seen.add(i.toUpperCase()));
+      if (items.length) out.push({ heading: g.hint.trim(), items });
+    }
+    return out;
+  }
+  for (const [heading, cats] of HYUNDAI_HIERARCHY) {
+    const items: string[] = [];
+    for (const g of d.equipment.standard) {
+      if (!cats.includes(g.category)) continue;
+      for (const raw of g.items) {
+        const item = raw.trim();
+        if (!item || seen.has(item.toUpperCase())) continue;
+        seen.add(item.toUpperCase());
+        items.push(item);
+      }
+    }
+    if (items.length) out.push({ heading, items });
+  }
+  return out;
+}
 
 /** Target Passport QR size, quiet zone included: 0.90in. */
 export const PASSPORT_QR_PT = 64.8;
@@ -98,7 +139,8 @@ function paintHeader(p: Painter, d: FactoryStickerData): void {
   T(p, `VIN:    ${v.vin}`, 1192.4, Y(18.2), 10, "bold", { align: "right" });
 }
 
-function paintInfoBox(p: Painter, d: FactoryStickerData): void {
+/** Draws the identity rows; returns the bottom of the content and whether the SOLD TO block was printed. */
+function paintInfoBox(p: Painter, d: FactoryStickerData): { bottom: number; soldTo: boolean } {
   let y = Y(106.1);
   const code = d.factory.dealerCode;
   const dealer = dealerLines(d).slice(0, 4);
@@ -131,6 +173,7 @@ function paintInfoBox(p: Painter, d: FactoryStickerData): void {
       y += 11;
     }
   }
+  return { bottom: y, soldTo: !!(code && dealer.length) };
 }
 
 // ── Fuel economy and environment ──────────────────────────────────────
@@ -192,6 +235,10 @@ function paintEpa(p: Painter, d: FactoryStickerData): void {
     (saves ? ["in fuel costs", "over 5 years"] : ["more in fuel costs", "over 5 years"])
       .forEach((l, i) => T(p, l, 1072.7, Y(199.3) + i * 13, 12.5, "bold", { lh: 12.5 }));
     ["compared to the", "average new vehicle."].forEach((l, i) => T(p, l, 1072.7, Y(228.6) + i * 12.7, 10, "body", { lh: 12 }));
+  } else if (delta === undefined) {
+    T(p, "5-year fuel cost", 1053, Y(138), 12, "bold");
+    T(p, "vs. average new vehicle:", 1053, Y(138) + 14, 10, "body");
+    T(p, "Not Available", 1053, Y(138) + 30, 12, "bold");
   }
 
   R(p, EPA_X + 3, Y(258), EPA_W - 6, 2.2, INK);
@@ -241,14 +288,10 @@ function paintRight(p: Painter, d: FactoryStickerData, barcodePayload: string): 
   R(p, left, ruleB, width, 2.4, INK);
   if (barcodePayload) p.barcode(710.4, ruleB + 6, 288, bottom - ruleB - 14, barcodePayload, INK);
 
+  // Hyundai prints the whole parts-content block. Every line is kept; a value
+  // the verified source does not carry reads NOT AVAILABLE, never a guess.
   const f = partsFacts(d);
-  const hasCarline = !!f.usCan || f.other.length > 0;
-  const hasVehicle = !!f.assembly || !!f.engine || !!f.trans;
-  if (!hasCarline && !hasVehicle) {
-    T(p, "PARTS CONTENT INFORMATION", left + width / 2, ruleA + 8, 11, "bold", { align: "center" });
-    T(p, "Not available for this vehicle.", left + width / 2, ruleA + 24, 10, "body", { align: "center" });
-    return true;
-  }
+  const NA = "NOT AVAILABLE";
   const cx = left + width / 2;
   const limit = ruleB - 3;
   const SIZE = 10;
@@ -262,24 +305,24 @@ function paintRight(p: Painter, d: FactoryStickerData, barcodePayload: string): 
   };
   const run = (draw: boolean): void => {
     y = ruleA + 5;
-    if (hasCarline) {
-      line("PARTS CONTENT INFORMATION", draw, 11, 11);
-      line("FOR VEHICLE IN THIS CARLINE:", draw);
-      if (f.usCan) line(`U.S./CANADIAN PARTS CONTENT: ${f.usCan.value}`, draw);
-      for (const e of f.other) line(`${e.label}: ${e.value}`, draw);
-      y += 2;
-      if (draw) T(p, "Note: Parts content does not include final assembly, distribution, or other non-parts costs.", 710.4, y, 7.5, "body");
+    line("PARTS CONTENT INFORMATION", draw, 11, 11);
+    line("FOR VEHICLE IN THIS CARLINE:", draw);
+    line(`U.S./CANADIAN PARTS CONTENT: ${f.usCan?.value ?? NA}`, draw);
+    if (f.other.length) for (const e of f.other) line(`${e.label}: ${e.value}`, draw);
+    else line(`MAJOR SOURCES OF FOREIGN PARTS CONTENT: ${NA}`, draw);
+    y += 2;
+    if (draw) T(p, "Note: Parts content does not include final assembly, distribution, or other non-parts costs.", 710.4, y, 7.5, "body");
+    y += 9;
+    if (draw) T(p, "FOR THIS VEHICLE:", 710.4, y, SIZE, "bold");
+    y += STEP;
+    line(`${f.assembly ? assemblyLabel(d) : "FINAL ASSEMBLY POINT"}: ${f.assembly ?? NA}`, draw);
+    line("COUNTRY OF ORIGIN:", draw);
+    line(`ENGINE: ${f.engine?.value ?? NA}`, draw);
+    line(`TRANSMISSION: ${f.trans?.value ?? NA}`, draw);
+    if (!f.usCan || !f.engine || !f.trans || !f.assembly) {
+      y += 1;
+      if (draw) T(p, "NOT AVAILABLE: not in the verified source data for this VIN.", 710.4, y, 7.5, "body");
       y += 9;
-    }
-    if (hasVehicle) {
-      if (draw) T(p, "FOR THIS VEHICLE:", 710.4, y, SIZE, "bold");
-      y += STEP;
-      if (f.assembly) line(`${assemblyLabel(d)}: ${f.assembly}`, draw);
-      if (f.engine || f.trans) {
-        line("COUNTRY OF ORIGIN:", draw);
-        if (f.engine) line(`ENGINE: ${f.engine.value}`, draw);
-        if (f.trans) line(`TRANSMISSION: ${f.trans.value}`, draw);
-      }
     }
   };
   run(false);
@@ -340,6 +383,7 @@ function paintPricing(p: Painter, d: FactoryStickerData): boolean {
 
 const spec: TabloidSpec = {
   eqStyle: EQ_STYLE,
+  fixedStyle: true,
   paintFirst(p: Painter, ctx: FirstPageContext): FirstPageResult | null {
     const { d, input } = ctx;
     if (!paintPricing(p, d)) return null;
@@ -349,10 +393,20 @@ const spec: TabloidSpec = {
     const frameTop = Y(99.2);
     const midY = Y(351.5);
     const botY = Y(748.4);
-    R(p, 24.1 - 1.4, frameTop, 338 - 24.1 + 1.4, midY - frameTop, null, 2.85);
-    R(p, 24.1 - 1.4, midY, 350.1 - 24.1 + 1.4, botY - midY, null, 2.85);
-    R(p, 350.1, midY, 677.5 - 350.1, botY - midY, null, 2.85);
-    paintInfoBox(p, d);
+    const info = paintInfoBox(p, d);
+    // Hyundai sizes the identity box for its SOLD TO block. Without one the
+    // standard features move up into the same left column instead of leaving
+    // the box empty; the safety, pricing, EPA and parts blocks do not move.
+    const featuresTop = info.soldTo ? midY : Math.min(midY, Math.max(Y(160), info.bottom + 8));
+    if (featuresTop === midY) {
+      R(p, 24.1 - 1.4, frameTop, 338 - 24.1 + 1.4, midY - frameTop, null, 2.85);
+      R(p, 24.1 - 1.4, midY, 350.1 - 24.1 + 1.4, botY - midY, null, 2.85);
+      R(p, 350.1, midY, 677.5 - 350.1, botY - midY, null, 2.85);
+    } else {
+      R(p, 24.1 - 1.4, frameTop, 338 - 24.1 + 1.4, botY - frameTop, null, 2.85);
+      R(p, 24.1 - 1.4, featuresTop, 338 - 24.1 + 1.4, 2.85, INK);
+      R(p, 338 - 2.85, midY, 677.5 - 338 + 2.85, botY - midY, null, 2.85);
+    }
     paintSafetyPanel(p, d, Q(335.9), Q(frameTop), Q(677.5 - 335.9), Q(midY - frameTop), {
       headerH: 36, footerH: 80, subFrac: 0.29, valFrac: 0.57,
       titleSize: 22.6, labelSize: 17.4, noteSize: 12.1, footSize: 13.8, stretch: 1.04,
@@ -361,11 +415,14 @@ const spec: TabloidSpec = {
     paintPassport(p, d.document.passportUrl.trim());
 
     const warranty = warrantySection(d, "Warranty");
-    const sections = [...(warranty ? [warranty] : []), ...buildSections(input)];
-    underlined(p, "STANDARD FEATURES:", Q(30.1), Q(Y(359)), Q(10));
-    if (!sections.length) T(p, "Standard equipment not available for this vehicle.", Q(30.1) * 0.612, Y(373), 8, "body");
+    const sections = [...(warranty ? [warranty] : []), ...hyundaiSections(d, input.equipmentGroups)];
+    const headTop = featuresTop + (Y(359) - midY);
+    const listTop = featuresTop + (Y(371) - midY);
+    underlined(p, "STANDARD FEATURES:", Q(30.1), Q(headTop), Q(10));
+    if (!sections.length) T(p, "Standard equipment not available for this vehicle.", Q(30.1) * 0.612, listTop + 2, 8, "body");
     const entries = toEntries(sections, (s) => s.toUpperCase(), 3, undefined, input.equipmentNote);
-    const cols = withColumns([{ x: Q(30.1), w: Q(314), top: Q(Y(371)), bottom: Q(Y(743)) }], ctx.extraColumns);
+    const colW = featuresTop === midY ? 314 : 302;
+    const cols = withColumns([{ x: Q(30.1), w: Q(colW), top: Q(listTop), bottom: Q(Y(743)) }], ctx.extraColumns);
     const { placed, rest } = flow(entries, cols, ctx.style);
     paintPlaced(p, placed, ctx.style, { headingFont: "bold" });
     return placedResult(entries, rest);

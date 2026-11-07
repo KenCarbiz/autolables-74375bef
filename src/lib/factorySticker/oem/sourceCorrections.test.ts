@@ -48,6 +48,30 @@ describe("recorded drivetrain corrections", () => {
   });
 });
 
+describe("2026 Hyundai Tucson: Hyundai sells it as FWD or AWD only", () => {
+  const tucson = { year: 2026, make: "Hyundai", model: "Tucson", source: "4WD" };
+
+  it("prints AWD for every gasoline grade whose feed says 4WD, with the Hyundai evidence", () => {
+    for (const trim of ["SE", "SEL", "XRT", "Limited", "SEL Convenience", null]) {
+      const d = decideDrivetrain({ ...tucson, trim });
+      expect(d.value).toBe("AWD");
+      expect(d.sourceValue).toBe("4WD");
+      expect(d.ruleId).toBe("hyundai-tucson-2026-four-wheel-is-awd");
+    }
+    expect(decideDrivetrain({ ...tucson, trim: "SEL" }).evidence?.title).toMatch(/HTRAC AWD/);
+  });
+
+  it("leaves FWD, other years, other Hyundai models and the hybrid lines alone", () => {
+    expect(decideDrivetrain({ ...tucson, trim: "SEL", source: "FWD" }).value).toBe("FWD");
+    expect(decideDrivetrain({ ...tucson, trim: "SEL", year: 2027 }).value).toBe("4WD");
+    expect(decideDrivetrain({ ...tucson, trim: "SEL", model: "Santa Fe" }).value).toBe("4WD");
+    expect(decideDrivetrain({ ...tucson, trim: "SEL", model: "Tucson Hybrid" }).value).toBe("4WD");
+    expect(decideDrivetrain({ ...tucson, trim: "Limited Hybrid" }).value).toBe("4WD");
+    expect(decideDrivetrain({ ...tucson, trim: "SEL PHEV" }).value).toBe("4WD");
+    expect(decideDrivetrain({ ...tucson, make: "Kia", model: "Tucson", trim: "SEL" }).value).toBe("4WD");
+  });
+});
+
 describe("decoder rating metadata is not equipment", () => {
   it("recognises the NeoVIN crash-rating rows", () => {
     for (const s of ["Standard-NHTSA", "Overall-5", "Side Impact-5", "Rollover Rating-4", "Frontal Crash Rating-4", "NHTSA", "Standard IIHS",

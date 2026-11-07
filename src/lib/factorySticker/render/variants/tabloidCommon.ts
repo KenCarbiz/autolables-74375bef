@@ -526,6 +526,12 @@ export interface TabloidSpec {
   paintFirst: (p: Painter, ctx: FirstPageContext) => FirstPageResult | null;
   /** The approved master equipment type; the ladder never grows past it. */
   eqStyle: FlowStyle;
+  /**
+   * Keep the equipment at eqStyle in the template's own columns: no smaller
+   * type and no added columns. Equipment that does not fit is left to the
+   * significance selection, which prints the scope note.
+   */
+  fixedStyle?: boolean;
 }
 
 /** Tightest leading ratio found across the approved tabloid masters. */
@@ -559,8 +565,8 @@ export function assembleTabloid(input: VariantRenderInput, spec: TabloidSpec): L
   const disclosure = disclosureLines(input);
   const footerTop = footerTopFor(disclosure);
 
-  for (const style of styleLadder(spec.eqStyle)) {
-   for (let extraColumns = 0; extraColumns <= MAX_EXTRA_COLUMNS; extraColumns++) {
+  for (const style of spec.fixedStyle ? [spec.eqStyle] : styleLadder(spec.eqStyle)) {
+   for (let extraColumns = 0; extraColumns <= (spec.fixedStyle ? 0 : MAX_EXTRA_COLUMNS); extraColumns++) {
     const ctx: FirstPageContext = { input, d, footerTop, style, extraColumns };
     const probe = spec.paintFirst(new Painter(null), ctx);
     if (probe === null) return null;

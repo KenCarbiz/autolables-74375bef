@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildRenderLayout, templateRoutingFacts, type FactoryStickerRenderData, type FactoryStickerTheme } from "../contract";
+import { buildRenderLayout, equipmentBase, templateRoutingFacts, type FactoryStickerRenderData, type FactoryStickerTheme } from "../contract";
+import { withCatalogEquipment } from "../catalogEquipment";
 import { textBBox, type LayoutModel, type TextPrimitive } from "../layout";
 import { expectNoTextOverlap, pageStrings } from "../__fixtures__/layoutAsserts";
 import { REFERENCE_MATCH_VIN, referenceMatchData, tucsonListings, tucsonRenderData } from "../__fixtures__/tucson";
@@ -69,11 +70,47 @@ describe("Hyundai Tucson gasoline template", () => {
         for (const t of texts(m)) expect(t.size).toBeGreaterThanOrEqual(5.2);
       });
 
+      it("prints a curated standard-features list in Hyundai's hierarchy at 8pt, from the VIN's own items only", () => {
+        expect(m.fit.ok && m.fit.equipmentScope).toBe("selected");
+        expect(m.fit.ok && m.fit.equipmentFontPt).toBeGreaterThanOrEqual(7.9);
+        const printed = m.printedEquipment ?? [];
+        expect(printed.length).toBeGreaterThanOrEqual(30);
+        expect(printed.length).toBeLessThanOrEqual(70);
+        const own = new Set([...Object.values(data.standardEquipment), ...Object.values(data.keyFeatures)].flat().map((x) => x.trim().toUpperCase()));
+        const sources = new Set(equipmentBase(withCatalogEquipment(data, HYUNDAI_TUCSON_GAS_ID)).lines.flatMap((l) => l.sources).map((x) => x.toUpperCase()));
+        for (const sItem of sources) expect(own.has(sItem)).toBe(true);
+        const strings = pageStrings(m, 0);
+        const order = ["ADVANCED SAFETY TECHNOLOGIES", "POWERTRAIN TECHNOLOGY", "EXTERIOR", "COMFORT & CONVENIENCE", "MULTIMEDIA & CONNECTIVITY"]
+          .map((h) => strings.indexOf(h));
+        expect(order.every((x) => x >= 0)).toBe(true);
+        expect([...order].sort((a, b) => a - b)).toEqual(order);
+        // The full list stays in the data the Vehicle Passport reads.
+        expect(Object.values(data.standardEquipment).flat().length).toBeGreaterThan(printed.length * 3);
+      });
+
+      it("titles the vehicle AWD, Hyundai's term for the four-wheel Tucson the decode calls 4WD", () => {
+        expect(data.mechanical?.drivetrain).toBe("AWD");
+        expect(pageStrings(m, 0)).toContain(`2026 TUCSON ${data.identity.trim!.toUpperCase()} AWD`);
+        expect(m.drawnStrings.join(" ")).not.toMatch(/\b4WD\b/);
+      });
+
+      it("keeps every parts-content line and names the values the source lacks", () => {
+        const all = m.drawnStrings.join(" ");
+        expect(all).toContain("U.S./CANADIAN PARTS CONTENT: NOT AVAILABLE");
+        expect(all).toContain("ENGINE: NOT AVAILABLE");
+        expect(all).toContain("TRANSMISSION: NOT AVAILABLE");
+        expect(all).toContain("COUNTRY OF FINAL ASSEMBLY: USA");
+        expect(all).toContain("NOT AVAILABLE: not in the verified source data for this VIN.");
+      });
+
       it("prints EPA values from the record and explicit unavailable states for the rest", () => {
         const s = m.drawnStrings;
         expect(s).toContain("26");
         expect(s).toContain("Gasoline Vehicle");
-        expect(s.filter((x) => x === "Not Available").length).toBe(1);
+        // Smog rating and the 5-year comparison are not in the saved EPA record.
+        expect(s.filter((x) => x === "Not Available").length).toBe(2);
+        expect(s).toContain("5-year fuel cost");
+        expect(s.join(" ")).toContain("$2,450");
         expect(s).toContain("Overall Vehicle Score");
         expect(s).not.toContain("Driver");
         expect(s).not.toContain("Front seat");

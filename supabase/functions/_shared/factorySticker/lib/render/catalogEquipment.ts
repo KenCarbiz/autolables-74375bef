@@ -10,6 +10,7 @@
 import { isDecoderNoise } from "../equipmentNoise.ts";
 import { isRatingMetadata } from "../oem/sourceCorrections.ts";
 import type { FactoryStickerRenderData } from "./contract.ts";
+import { curationProfileFor } from "./catalogCuration.ts";
 
 const EXTRA_NON_EQUIPMENT: RegExp[] = [
   /-\s*(good|acceptable|marginal|poor)\s*$/i,
@@ -64,8 +65,12 @@ const clean = (groups: Record<string, string[]> | undefined, templateId?: string
   return out;
 };
 
-export const withCatalogEquipment = (data: FactoryStickerRenderData, templateId?: string): FactoryStickerRenderData => ({
-  ...data,
-  standardEquipment: clean(data.standardEquipment, templateId),
-  keyFeatures: clean(data.keyFeatures, templateId),
-});
+export const withCatalogEquipment = (data: FactoryStickerRenderData, templateId?: string): FactoryStickerRenderData => {
+  const curation = curationProfileFor(templateId);
+  return {
+    ...data,
+    standardEquipment: clean(data.standardEquipment, templateId),
+    keyFeatures: clean(data.keyFeatures, templateId),
+    ...(curation ? { equipmentCuration: curation } : {}),
+  };
+};

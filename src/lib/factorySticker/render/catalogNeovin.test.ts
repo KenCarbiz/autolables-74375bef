@@ -57,7 +57,9 @@ describe("NeoVIN decode facts for catalog templates", () => {
     expect(all).not.toContain("FINAL ASSEMBLY POINT");
     expect(all).not.toMatch(/\d+ ?%/);
     const none = buildRenderLayout({ ...d, neovin: { ...d.neovin!, madeIn: null } }, theme, undefined, { sampleTemplateId: HYUNDAI_TUCSON_GAS_ID });
-    expect(none.drawnStrings.join(" ")).not.toContain("FINAL ASSEMBLY");
+    // The Tucson template keeps Hyundai's line and says the value is missing rather than dropping it.
+    expect(none.drawnStrings.join(" ")).not.toContain("COUNTRY OF FINAL ASSEMBLY");
+    expect(none.drawnStrings.join(" ")).toContain("FINAL ASSEMBLY POINT: NOT AVAILABLE");
   });
 
   it("does nothing outside the catalog path and for makes without catalog templates", () => {

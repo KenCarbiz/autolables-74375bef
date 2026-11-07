@@ -1,5 +1,5 @@
 {
- "note": "Compact extract of two saved production vehicle_listings rows (read-only SELECT 2026-11-04). The XRT standard/key-feature lists are stored as an ordered patch over the SEL list; the patch reproduces the saved record's items.",
+ "note": "Compact extract of two saved production vehicle_listings rows (read-only SELECT 2026-11-04). The XRT standard/key-feature lists are stored as an ordered patch over the SEL list; the patch reproduces the saved record's items. epa_economy re-read 2026-11-07 (read-only SELECT): both rows were refreshed by the EPA matcher on 2026-11-05 and now carry the same fueleconomy.gov record, including checkedAt and matchBasis; pricing, options and equipment were unchanged.",
  "sharedStandard": [
   "Load Restraint-Hooks",
   "6 Speakers",
@@ -355,13 +355,24 @@
    "keyPatch": [],
    "epa_economy": {
     "annualFuelCost": 2450,
+    "atvType": null,
+    "checkedAt": "2026-11-05T14:22:47.944Z",
     "city": 24,
     "co2TailpipeGpm": 337,
     "combined": 26,
     "fuelType": "Regular",
     "ghgScore": 5,
     "highway": 30,
+    "matchBasis": {
+     "candidates": 1,
+     "drive": "4",
+     "liters": "2.5",
+     "matcher_version": "epa-match-v3",
+     "powertrain": "gas",
+     "record_powertrain": "gas"
+    },
     "matchedOption": "2026 Hyundai Tucson AWD — Auto (S8), 4 cyl, 2.5 L",
+    "matcherVersion": "epa-match-v3",
     "rangeMiles": null,
     "source": "fueleconomy.gov",
     "vehicleId": 49500
@@ -519,14 +530,25 @@
     }
    ],
    "epa_economy": {
-    "annualFuelCost": 2600,
+    "annualFuelCost": 2450,
+    "atvType": null,
+    "checkedAt": "2026-11-05T14:29:25.208Z",
     "city": 24,
     "co2TailpipeGpm": 337,
     "combined": 26,
     "fuelType": "Regular",
     "ghgScore": 5,
     "highway": 30,
+    "matchBasis": {
+     "candidates": 1,
+     "drive": "4",
+     "liters": "2.5",
+     "matcher_version": "epa-match-v3",
+     "powertrain": "gas",
+     "record_powertrain": "gas"
+    },
     "matchedOption": "2026 Hyundai Tucson AWD — Auto (S8), 4 cyl, 2.5 L",
+    "matcherVersion": "epa-match-v3",
     "rangeMiles": null,
     "source": "fueleconomy.gov",
     "vehicleId": 49500

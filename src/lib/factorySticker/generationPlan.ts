@@ -230,8 +230,8 @@ export function assessRenderedSticker(input: {
     : { pass: true, code: "OK" as const, reasons: [] };
   // Fit is never trusted. The manifest states everything the document is
   // required to print and the render is checked against it.
-  const completenessData = plan.templateRouting.status === "approved_match" && !plan.templateRouting.servedByApprovedMaster
-    ? withCatalogEpaGuard(withCatalogEquipment(normalized.data)) : normalized.data;
+  const completenessData = catalogTemplate
+    ? withCatalogEpaGuard(withCatalogEquipment(normalized.data, catalogTemplate.id)) : normalized.data;
   const completeness = checkRenderedCompleteness(completenessData, {
     width: Number(layout.widthPt ?? 0),
     height: Number(layout.heightPt ?? 0),
