@@ -45,4 +45,5 @@ $P -d "$DB" -f supabase/tests/inventory_network/95_group_inventory_view.sql
 $P -d "$DB" -f supabase/proposed/20261112000000_group_inventory_view.rollback.sql
 $P -d "$DB" -f supabase/proposed/20261112000000_group_inventory_view.sql
 $P -d "$DB" -f supabase/tests/inventory_network/96_legacy_retirement.sql
+bash supabase/tests/inventory_network/97_legacy_batch_scripts.sh "$DB"
 $P -d "$DB" -f supabase/proposed/20261113000000_legacy_scrape_retirement.rollback.sql

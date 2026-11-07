@@ -164,3 +164,82 @@ SELECT pg_temp.expect((SELECT count(*) = (SELECT count(*) FROM si_before) FROM s
 -- ── Not reachable from the client roles ─────────────────────────────────────
 SELECT pg_temp.expect(NOT has_function_privilege('authenticated', 'public.legacy_listing_retire(uuid, uuid[], text[], text[], text[], text, text, boolean)', 'EXECUTE')
   AND NOT has_function_privilege('anon', 'public.legacy_listing_restore(uuid, text)', 'EXECUTE'), 'retire/restore are not callable by anon or authenticated');
+
+-- ── Batch record and baseline ───────────────────────────────────────────────
+SELECT pg_temp.expect((SELECT count(*) = 1 AND bool_and(cardinality(listing_ids) = 3 AND baseline ? 'store_inventory_hash' AND baseline ? 'store_snapshots'
+  AND approval = 'Ken approved list v1 (test)') FROM legacy_retirement_batches WHERE batch_id = (SELECT (r->>'batch_id')::uuid FROM run)), 'the batch, its VINs and the pre-run baseline are recorded');
+SELECT pg_temp.raises($$UPDATE legacy_retirement_batches SET approval = 'changed approval text'$$, 'legacy_retirement_batches_immutable', 'the batch record cannot be edited');
+SELECT pg_temp.raises($$DELETE FROM legacy_retirement_batches$$, 'legacy_retirement_batches_immutable', 'the batch record cannot be deleted');
+SELECT pg_temp.expect((SELECT legacy_retirement_baseline('00000000-0000-0000-0000-000000000c71')->>'store_inventory_hash')
+  = (SELECT baseline->>'store_inventory_hash' FROM legacy_retirement_batches WHERE batch_id = (SELECT (r->>'batch_id')::uuid FROM run)), 'store_inventory hash still equals the pre-run baseline');
+
+-- ── Batch B shape: a retired row whose car is in a sister store's SFTP feed ─
+-- Re-retire the sister-store car (restored above), then turn that store's
+-- listing sync on with the most permissive settings: legacy adoption on and
+-- feed price authoritative.
+CREATE TEMP TABLE runb AS SELECT legacy_listing_retire('00000000-0000-0000-0000-000000000c71', ARRAY[pg_temp.lid('sister')],
+  ARRAY['LGV00000000000003'], ARRAY['harteinfiniti.com'], ARRAY['LGV00000000000003'], 'Batch B: legacy scrape row for a car in the sister feed', 'Ken approved batch B (test)', false) AS r;
+UPDATE inventory_feed_controls SET ingestion_paused = false, emergency_stop = false WHERE id = 1;
+UPDATE dealer_stores SET listing_sync_enabled = true, adopt_legacy_matches = true, feed_price_updates_listing = true, subscription_status = 'subscribed'
+ WHERE id = '00000000-0000-0000-0000-0000000007c2';
+INSERT INTO inventory_source_mappings (source_dealer_id, group_id, store_id, status, observed_identity, approved_at)
+VALUES ('MP2', '00000000-0000-0000-0000-00000000cc01', '00000000-0000-0000-0000-0000000007c2', 'approved', '{}'::jsonb, now());
+CREATE OR REPLACE FUNCTION pg_temp.snap_b(p_minute int, p_price numeric) RETURNS uuid LANGUAGE plpgsql AS $$
+DECLARE v_id uuid;
+BEGIN
+  INSERT INTO inventory_store_snapshots (path, source_dealer_id, store_id, group_id, mapping_id, source_mtime, content_sha256, clean, valid_count, row_count)
+  VALUES ('prod/inventory/vauto/inbound/MP2_inventory.csv', 'MP2', '00000000-0000-0000-0000-0000000007c2', '00000000-0000-0000-0000-00000000cc01',
+          (SELECT id FROM inventory_source_mappings WHERE source_dealer_id = 'MP2'), timestamptz '2026-11-08 00:00Z' + make_interval(mins => p_minute),
+          'sha-mp2-' || p_minute, true, 1, 1)
+  RETURNING id INTO v_id;
+  INSERT INTO inventory_snapshot_vehicles (snapshot_id, vin, row_number, stock_number, condition, year, make, model, feed_price, feed_price_status, photos)
+  VALUES (v_id, 'LGV00000000000003', 1, 'IN6936', 'new', 2027, 'INFINITI', 'QX65', p_price, 'known', '[]'::jsonb);
+  RETURN v_id;
+END $$;
+CREATE TEMP TABLE sister_before AS SELECT * FROM vehicle_listings WHERE id = pg_temp.lid('sister');
+CREATE TEMP TABLE ap1 AS SELECT inventory_apply_store_snapshot_mode(pg_temp.snap_b(1, 61000), 'no_absence') AS r;
+SELECT pg_temp.expect((SELECT r->>'mode' IS NOT NULL OR (r->>'applied')::boolean IS DISTINCT FROM false FROM ap1)
+  AND (SELECT last_snapshot_id IS NOT NULL AND feed_price = 61000 FROM store_inventory WHERE store_id = '00000000-0000-0000-0000-0000000007c2' AND vin = 'LGV00000000000003'),
+  'listing sync applied the sister feed (store inventory now at the feed price)');
+SELECT pg_temp.expect((SELECT to_jsonb(l) = to_jsonb(b) FROM vehicle_listings l, sister_before b WHERE l.id = b.id),
+  'listing sync leaves the retired row untouched: still archived, scraped price, no rooftop');
+SELECT pg_temp.expect((SELECT count(*) FROM vehicle_listings WHERE upper(vin) = 'LGV00000000000003') = 1, 'no second listing is created for the VIN');
+SELECT pg_temp.expect((SELECT count(*) = 1 FROM inventory_vin_conflicts WHERE vin = 'LGV00000000000003' AND kind = 'archived_listing' AND status = 'open'
+  AND existing_listing_id = pg_temp.lid('sister')), 'the feed raises an archived_listing conflict for a person instead');
+SELECT pg_temp.expect((SELECT listing_id IS NULL FROM store_inventory WHERE store_id = '00000000-0000-0000-0000-0000000007c2' AND vin = 'LGV00000000000003'),
+  'the feed record is not linked to the retired row');
+CREATE TEMP TABLE ap2 AS SELECT inventory_apply_store_snapshot_mode(pg_temp.snap_b(2, 61500), 'no_absence') AS r;
+SELECT pg_temp.expect((SELECT to_jsonb(l) = to_jsonb(b) FROM vehicle_listings l, sister_before b WHERE l.id = b.id)
+  AND (SELECT count(*) = 1 FROM inventory_vin_conflicts WHERE vin = 'LGV00000000000003' AND kind = 'archived_listing' AND status = 'open'),
+  'a second feed run (new price) still leaves it retired, with one open conflict');
+-- The old adopt path, run as the feed writer, cannot touch a retired row.
+SELECT pg_temp.raises($q$DO $x$ BEGIN PERFORM set_config('app.inventory_writer', 'filescom_apply', true);
+  UPDATE vehicle_listings SET owning_store_id = '00000000-0000-0000-0000-0000000007c2', feed_source = 'filescom', price = 61500 WHERE id = pg_temp.lid('sister'); END $x$$q$,
+  'legacy_listing_retired', 'a feed-writer adoption cannot re-own or reprice a retired row');
+SELECT pg_temp.raises($q$DO $x$ BEGIN PERFORM set_config('app.inventory_writer', 'inventory_reconcile', true);
+  UPDATE vehicle_listings SET status = 'published' WHERE id = pg_temp.lid('sister'); END $x$$q$,
+  'legacy_listing_retired', 'the reconcile writer cannot republish a retired row');
+
+-- ── Reviewed rehome: draft, feed price, never published ─────────────────────
+SELECT pg_temp.raises($$SELECT legacy_listing_rehome(pg_temp.lid('sister'), '00000000-0000-0000-0000-0000000007c2', '')$$, 'legacy_rehome_approval_required', 'rehome needs approval text');
+SELECT pg_temp.raises($$SELECT legacy_listing_rehome(pg_temp.lid('sister'), '00000000-0000-0000-0000-0000000007c1', 'Ken approved rehome (test)')$$,
+  'legacy_rehome_not_in_store_feed', 'rehome only to a store whose current feed has the VIN');
+SELECT pg_temp.raises($$SELECT legacy_listing_rehome(pg_temp.lid('lead'), '00000000-0000-0000-0000-0000000007c2', 'Ken approved rehome (test)')$$,
+  'legacy_rehome_not_retired', 'rehome only applies to a retired legacy row');
+CREATE TEMP TABLE rh AS SELECT legacy_listing_rehome(pg_temp.lid('sister'), '00000000-0000-0000-0000-0000000007c2', 'Ken approved rehome (test)') AS r;
+SELECT pg_temp.expect((SELECT status = 'draft' AND published_at IS NULL AND archived_at IS NULL AND archive_reason IS NULL
+  AND owning_store_id = '00000000-0000-0000-0000-0000000007c2' AND price = 61500 AND advertised_price_before_doc IS NULL AND website_sale_price IS NULL
+  AND inventory_record_id = (SELECT id FROM store_inventory WHERE store_id = '00000000-0000-0000-0000-0000000007c2' AND vin = 'LGV00000000000003')
+  FROM vehicle_listings WHERE id = pg_temp.lid('sister')), 'rehome makes it a draft of the feed store at the current feed price, not published');
+SELECT pg_temp.expect((SELECT status = 'dismissed' FROM inventory_vin_conflicts WHERE vin = 'LGV00000000000003' AND kind = 'archived_listing'), 'the open conflict is closed by the rehome');
+SELECT pg_temp.expect((SELECT rehomed_at IS NOT NULL AND rehome_store_id = '00000000-0000-0000-0000-0000000007c2' FROM legacy_listing_retirements
+  WHERE batch_id = (SELECT (r->>'batch_id')::uuid FROM runb)), 'the audit row records the rehome');
+SELECT pg_temp.raises($$SELECT legacy_listing_rehome(pg_temp.lid('sister'), '00000000-0000-0000-0000-0000000007c2', 'Ken approved rehome (again)')$$,
+  'legacy_rehome_not_retired', 'rehome happens once');
+SELECT pg_temp.expect((SELECT (r->>'restored')::int = 0 FROM (SELECT legacy_listing_restore((SELECT (r->>'batch_id')::uuid FROM runb), 'Ken approved rollback (test)') AS r) x)
+  AND (SELECT status = 'draft' FROM vehicle_listings WHERE id = pg_temp.lid('sister')), 'restore skips a rehomed row');
+CREATE TEMP TABLE ap3 AS SELECT inventory_apply_store_snapshot_mode(pg_temp.snap_b(3, 62000), 'no_absence') AS r;
+SELECT pg_temp.expect((SELECT status = 'draft' AND price = 62000 AND owning_store_id = '00000000-0000-0000-0000-0000000007c2' FROM vehicle_listings WHERE id = pg_temp.lid('sister'))
+  AND (SELECT listing_id = pg_temp.lid('sister') FROM store_inventory WHERE store_id = '00000000-0000-0000-0000-0000000007c2' AND vin = 'LGV00000000000003'),
+  'after rehome the store feed owns the draft normally (links it, applies its price, does not publish)');
+SELECT pg_temp.expect(NOT has_function_privilege('authenticated', 'public.legacy_listing_rehome(uuid, uuid, text)', 'EXECUTE'), 'rehome is not callable by authenticated');
