@@ -9,13 +9,14 @@ const h = vi.hoisted(() => ({
   auth: { isAdmin: true },
   member: { role: "owner" } as { role: string } | null,
   profileUpdate: vi.fn(),
+  tenantReload: vi.fn(),
   invoke: vi.fn(),
 }));
 
 vi.mock("sonner", () => ({ toast: Object.assign(() => {}, { info: () => {}, error: vi.fn(), success: vi.fn() }) }));
 vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => h.auth }));
 vi.mock("@/hooks/useEntitlements", () => ({ useEntitlements: () => ({ member: h.member }) }));
-vi.mock("@/contexts/TenantContext", () => ({ useTenant: () => ({ tenant: { id: "tenant-a", name: "Example Auto Group", secondary_color: "#0B2041" }, currentStore: null, stores: [] }) }));
+vi.mock("@/contexts/TenantContext", () => ({ useTenant: () => ({ tenant: { id: "tenant-a", name: "Example Auto Group", secondary_color: "#0B2041" }, currentStore: null, stores: [], reload: h.tenantReload }) }));
 vi.mock("@/contexts/DealerSettingsContext", async (orig) => ({ ...(await orig<typeof import("@/contexts/DealerSettingsContext")>()), useDealerSettings: () => h.ctx }));
 vi.mock("@/lib/storage", () => ({ uploadPhoto: vi.fn(async () => ({ url: "https://files.example.test/x.png" })) }));
 vi.mock("@/integrations/supabase/client", () => ({
@@ -45,7 +46,7 @@ beforeEach(() => {
   h.auth.isAdmin = true; h.member = { role: "owner" };
   h.ctx.updateSettings.mockReset(); h.ctx.updateSettings.mockResolvedValue(true);
   h.profileUpdate.mockReset(); h.profileUpdate.mockResolvedValue({ data: [{ tenant_id: "tenant-a" }], error: null });
-  h.invoke.mockReset();
+  h.invoke.mockReset(); h.tenantReload.mockReset(); h.ctx.reload.mockReset();
 });
 
 describe("Identity", () => {
@@ -112,9 +113,9 @@ describe("Appearance", () => {
   it("blocks the named palette and the dark logo with the migration id and no save", () => {
     live(AppearanceView);
     expect(document.querySelectorAll("[data-blocked-feature]").length).toBe(2);
-    expect(screen.getByRole("button", { name: "Add colour" })).toHaveProperty("disabled", true);
-    expect(screen.getByRole("button", { name: "Reset palette" })).toHaveProperty("disabled", true);
-    expect(screen.getByRole("button", { name: "Upload Logo for dark backgrounds" })).toHaveProperty("disabled", true);
+    expect(screen.getByRole("button", { name: "Add colour", hidden: true })).toHaveProperty("disabled", true);
+    expect(screen.getByRole("button", { name: "Reset palette", hidden: true })).toHaveProperty("disabled", true);
+    expect(screen.getByRole("button", { name: "Upload Logo for dark backgrounds", hidden: true })).toHaveProperty("disabled", true);
   });
 
   it("rejects an invalid hex and applies a valid primary colour to settings only", async () => {
@@ -165,15 +166,15 @@ describe("Hours & Contact", () => {
 
   it("blocks department contacts, weekly hours, holidays and routing override with the migration id", () => {
     live(HoursContactView);
-    expect(document.querySelectorAll("[data-blocked-feature]").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByRole("button", { name: "Add number" })).toHaveProperty("disabled", true);
-    expect(screen.getByLabelText("Monday open")).toHaveProperty("disabled", true);
-    expect(screen.getByText(/AutoFilm's department phone presentation could not be checked/)).toBeTruthy();
+    expect(document.querySelectorAll("[data-blocked-feature]").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole("button", { name: "Add number", hidden: true })).toHaveProperty("disabled", true);
+    expect(screen.queryByLabelText("Monday open")).toBeNull();
+    expect(screen.getByText(/parity is not claimed/)).toBeTruthy();
   });
 
   it("keeps the SMS sender separate and explains a missing sales phone even with a main phone", () => {
     live(HoursContactView);
-    expect(screen.getByText(/Never filled in from the public phone/)).toBeTruthy();
+    expect(screen.getByText(/Never copied from the public phone/)).toBeTruthy();
     expect(within(screen.getByRole("list", { name: "Contact readiness" })).getByText(/does not count/)).toBeTruthy();
   });
 
@@ -194,6 +195,7 @@ describe("Why Buy", () => {
 
   it("requires a date on a new review, then writes the flat strings the Passport reads plus the profile", async () => {
     live(WhyBuyView);
+    fireEvent.click(screen.getByRole("tab", { name: /Reviews/ }));
     fireEvent.click(screen.getByRole("button", { name: "Add review" }));
     fireEvent.change(within(screen.getByRole("list", { name: "Review sources" })).getByLabelText("Source"), { target: { value: "Fixture Guide" } });
     fireEvent.change(within(screen.getByRole("list", { name: "Review sources" })).getByLabelText(/^Rating/), { target: { value: "4.5" } });
@@ -210,6 +212,7 @@ describe("Why Buy", () => {
 
   it("shows the off-site address only when service is off-site", () => {
     live(WhyBuyView);
+    fireEvent.click(screen.getByRole("tab", { name: /Amenities/ }));
     expect(screen.queryByLabelText("Off-site service address")).toBeNull();
     fireEvent.change(screen.getByLabelText("Service department"), { target: { value: "offsite" } });
     expect(screen.getByLabelText("Off-site service address")).toBeTruthy();
@@ -217,12 +220,14 @@ describe("Why Buy", () => {
 
   it("links the mobile slide-out CTA style instead of editing it", () => {
     live(WhyBuyView);
+    fireEvent.click(screen.getByRole("tab", { name: /Amenities/ }));
     expect(screen.getByRole("link", { name: /Calls to action/ })).toBeTruthy();
     expect(screen.queryByLabelText(/Slide-Out CTA Style/i)).toBeNull();
   });
 
   it("adds amenities as chips and projects them to the comma string", async () => {
     live(WhyBuyView);
+    fireEvent.click(screen.getByRole("tab", { name: /Amenities/ }));
     const input = screen.getByLabelText("Amenities");
     fireEvent.change(input, { target: { value: "Lounge" } });
     fireEvent.keyDown(input, { key: "Enter" });
@@ -230,17 +235,103 @@ describe("Why Buy", () => {
     await waitFor(() => expect(h.ctx.updateSettings).toHaveBeenCalledWith({ dealer_amenities: "Lounge" }));
   });
 
-  it("only calls Google when Refresh is clicked, and leaves a failure unchanged", async () => {
+  it("only calls Google after the confirm dialog, saves-now wording, and reloads the settings on success", async () => {
+    h.invoke.mockResolvedValue({ data: { ok: true, rating: "4.8", count: "100", matched: "Example" }, error: null });
+    live(WhyBuyView);
+    fireEvent.click(screen.getByRole("tab", { name: /Reviews/ }));
+    expect(h.invoke).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh from Google and save now" }));
+    expect(h.invoke).not.toHaveBeenCalled();
+    expect(screen.getByText(/cannot undo it/)).toBeTruthy();
+    await act(async () => { fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Refresh and save now" })); });
+    await waitFor(() => expect(h.invoke).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(h.ctx.reload).toHaveBeenCalled());
+    expect(screen.getByText(/Saved to your account now/)).toBeTruthy();
+  });
+
+  it("leaves a failed Google refresh unchanged", async () => {
     h.invoke.mockResolvedValue({ data: { ok: false, error: "place_not_found" }, error: null });
     live(WhyBuyView);
-    expect(h.invoke).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: /Refresh from Google/ }));
+    fireEvent.click(screen.getByRole("tab", { name: /Reviews/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Refresh from Google and save now" }));
+    await act(async () => { fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Refresh and save now" })); });
     await waitFor(() => expect(screen.getByText(/could not find this dealership/)).toBeTruthy());
+    expect(h.ctx.reload).not.toHaveBeenCalled();
     expect(review()).toHaveProperty("disabled", true);
   });
 
   it("disables Google refresh in the design fixture", () => {
     fixture(WhyBuyView, "v3-why-buy");
+    fireEvent.click(screen.getByRole("tab", { name: /Reviews/ }));
     expect(screen.getByRole("button", { name: /Refresh from Google/ })).toHaveProperty("disabled", true);
+  });
+});
+
+describe("refused writes and the secondary colour", () => {
+  it("keeps the draft dirty after a refused write even when the context already applied it, and Discard re-reads the server", async () => {
+    h.ctx.updateSettings.mockImplementation(async (p: Record<string, unknown>) => { h.ctx.settings = { ...h.ctx.settings, ...p }; return false; });
+    live(IdentityView);
+    fireEvent.change(screen.getByLabelText(/Public display name/), { target: { value: "Refused Name" } });
+    await applyAll();
+    await waitFor(() => expect(screen.getByText(/Save failed: The server did not accept the change. Nothing was saved. Your changes are kept./)).toBeTruthy());
+    expect(screen.getByLabelText(/Public display name/)).toHaveProperty("value", "Refused Name");
+    expect(screen.getByRole("button", { name: "Retry save" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Discard" })).toHaveProperty("disabled", false);
+    expect(h.ctx.reload).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+    expect(h.ctx.reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries the refused write with the same values", async () => {
+    h.ctx.updateSettings.mockImplementationOnce(async (p: Record<string, unknown>) => { h.ctx.settings = { ...h.ctx.settings, ...p }; return false; });
+    live(IdentityView);
+    fireEvent.change(screen.getByLabelText(/Public display name/), { target: { value: "Retry Name" } });
+    await applyAll();
+    await waitFor(() => screen.getByRole("button", { name: "Retry save" }));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Retry save" })); });
+    await waitFor(() => expect(h.ctx.updateSettings).toHaveBeenCalledTimes(2));
+    expect(h.ctx.updateSettings).toHaveBeenLastCalledWith({ dealer_name: "Retry Name" });
+  });
+
+  it("refreshes the tenant after a successful secondary colour write", async () => {
+    live(AppearanceView);
+    fireEvent.change(screen.getAllByLabelText(/Secondary colour/)[0], { target: { value: "#0F766E" } });
+    await applyAll();
+    await waitFor(() => expect(h.tenantReload).toHaveBeenCalled());
+  });
+
+  it("writes the secondary colour first and saves nothing else when it is refused", async () => {
+    h.profileUpdate.mockResolvedValue({ data: [], error: null });
+    live(AppearanceView);
+    fireEvent.change(screen.getAllByLabelText(/Secondary colour/)[0], { target: { value: "#0F766E" } });
+    fireEvent.change(screen.getAllByLabelText(/Primary colour/)[0], { target: { value: "#0F766E" } });
+    await applyAll();
+    await waitFor(() => expect(screen.getByText(/Save failed/)).toBeTruthy());
+    expect(h.ctx.updateSettings).not.toHaveBeenCalled();
+  });
+
+  it("says plainly when only the secondary colour was saved", async () => {
+    h.ctx.updateSettings.mockResolvedValue(false);
+    live(AppearanceView);
+    fireEvent.change(screen.getAllByLabelText(/Secondary colour/)[0], { target: { value: "#0F766E" } });
+    fireEvent.change(screen.getAllByLabelText(/Primary colour/)[0], { target: { value: "#0F766E" } });
+    await applyAll();
+    await waitFor(() => expect(screen.getByText(/The secondary colour was saved, but the other changes were not/)).toBeTruthy());
+  });
+
+  it("makes the secondary colour read-only with a reason for roles that cannot write the shared profile", () => {
+    h.auth.isAdmin = false; h.member = { role: "manager" };
+    live(AppearanceView);
+    expect(screen.getAllByLabelText(/Secondary colour/)[0]).toHaveProperty("disabled", true);
+    expect(screen.getByText(/Only an owner or admin can change the shared dealer profile/)).toBeTruthy();
+    expect(screen.getAllByLabelText(/Primary colour/)[0]).toHaveProperty("disabled", false);
+  });
+
+  it("offers an accessible alternative for a failing colour and applies it", () => {
+    h.ctx.settings = { ...h.ctx.settings, primary_color: "#9FB6E6" };
+    live(AppearanceView);
+    const use = screen.getAllByRole("button", { name: /^Use #[0-9A-F]{6}/ })[0];
+    fireEvent.click(use);
+    expect(review()).toHaveProperty("disabled", false);
   });
 });

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { AdminButton } from "@/components/admin/v2/primitives";
 import { useReturnFocus } from "@/components/admin/v2/useReturnFocus";
-import { AdminIcon, AdminIconTile, StatusBadge, type AdminIconName } from "@/components/admin/v3/editor";
+import { AdminIcon, AdminIconTile, AdvancedDisclosure, BlockedFeatureNotice, StatusBadge, type AdminIconName } from "@/components/admin/v3/editor";
 import { cn } from "@/lib/utils";
 
 /** Small caption saying which stored value a field reads and writes. */
@@ -53,12 +53,12 @@ export const ReadinessList = ({ items, label }: { items: ReadinessItem[]; label:
       <li key={r.key} className="py-3 first:pt-0 last:pb-0 flex items-start gap-3">
         <AdminIcon name={r.ready ? "check-circle" : "alert"} size="card" className={cn("mt-0.5", r.ready ? "text-adm-success" : "text-adm-warning")} />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center justify-between gap-2">
             <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{r.label}</p>
             <StatusBadge state={r.ready ? "enabled" : "setup_required"} label={r.ready ? "Ready" : "Incomplete"} />
           </div>
           <p className={cn("text-[14px] leading-[20px] break-words", r.ready ? "text-adm-ink" : "text-adm-muted")}>{r.value}</p>
-          {!r.ready && r.reason && <p className="mt-0.5 text-[13px] leading-[18px] text-adm-muted">{r.reason}</p>}
+          {!r.ready && r.reason && <p className="mt-0.5 text-[13px] leading-[18px] text-adm-muted max-sm:hidden">{r.reason}</p>}
           {!r.ready && <div className="mt-1"><EditLink to={r.editTo}>Fix where it is set</EditLink></div>}
         </div>
       </li>
@@ -120,3 +120,26 @@ export const ConfirmDialog = ({ open, title, children, confirmLabel, onConfirm, 
     </DialogPrimitive.Root>
   );
 };
+
+/**
+ * A setting that needs an unapplied database update: one compact card with what it will do and the migration id.
+ * The optional inert preview sits in a collapsed disclosure and never carries data.
+ */
+export const BlockedCard = ({ icon, title, does, migrationId, preview, className }: { icon: AdminIconName; title: string; does: ReactNode; migrationId: string; preview?: ReactNode; className?: string }) => (
+  <section aria-label={`${title}, needs a database update`} className={cn("rounded-xl bg-adm-surface border border-adm-divider shadow-[0_1px_2px_rgba(27,43,59,0.06)] p-4 sm:p-5 space-y-3 min-w-0", className)}>
+    <div className="flex items-start gap-3">
+      <AdminIconTile name={icon} tone="neutral" />
+      <div className="min-w-0 flex-1">
+        <h2 className="text-[16px] leading-[22px] font-semibold text-adm-ink">{title}</h2>
+        <p className="text-[14px] leading-[20px] text-adm-muted">{does}</p>
+      </div>
+    </div>
+    <BlockedFeatureNotice migrationId={migrationId} />
+    {preview && (
+      <AdvancedDisclosure title="Preview the editor">
+        <p className="text-[13px] leading-[18px] text-adm-muted">Inert preview. Nothing here is saved or reflects your data.</p>
+        <fieldset disabled className="space-y-3 opacity-70 min-w-0">{preview}</fieldset>
+      </AdvancedDisclosure>
+    )}
+  </section>
+);

@@ -34,8 +34,8 @@ export function draftBarText(state: DraftBarState): string {
     case "reviewing": return "Reviewing changes";
     case "saving": return "Saving changes";
     case "saved": return "Saved";
-    case "failed": return state.message ? `Save failed: ${state.message}. Your changes are kept.` : "Save failed. Your changes are kept.";
-    case "conflict": return state.message ? `Conflict: ${state.message}` : "Conflict: these settings changed elsewhere. Refresh and review before applying.";
+    case "failed": return state.message ? `Save failed: ${state.message.trim().replace(/[.\s]+$/, "")}. Your changes are kept.` : "Save failed. Your changes are kept.";
+    case "conflict": return state.message ? `Conflict: ${state.message.trim().replace(/[.\s]+$/, "")}.` : "Conflict: these settings changed elsewhere. Refresh and review before applying.";
   }
 }
 

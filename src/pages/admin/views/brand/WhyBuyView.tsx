@@ -14,8 +14,8 @@ import {
 } from "@/lib/admin/brand/whyBuy";
 import { BrandEditorFrame, LoadingState } from "./editor/BrandEditorFrame";
 import { settingsWriter, useBrandEditor, useBrandEditorContext } from "./editor/useBrandEditor";
-import { EditLink, OwnedValue, PreviewFrame, SourceLine } from "./editor/parts";
-import { AddRow, DateInput, LegacyDateNote, PhotoField, RemoveButton, SelectNotSpecified, WhyBuyPreview } from "./editor/whyBuyParts";
+import { ConfirmDialog, EditLink, OwnedValue, PreviewFrame, SourceLine } from "./editor/parts";
+import { AddRow, DateInput, GroupNav, LegacyDateNote, PhotoField, RemoveButton, SelectNotSpecified, WhyBuyPreview, type GroupTab } from "./editor/whyBuyParts";
 
 const LABELS: Record<string, string> = {
   dealer_tagline: "Tagline", why_buy_here: "Brand promise", warranty_programs: "Warranty and program messaging", dealer_years_in_business: "Years in business",
@@ -65,6 +65,8 @@ export default function WhyBuyView() {
   const [uploadError, setUploadError] = useState<{ kind: "store" | "advisor"; message: string } | null>(null);
   const [refresh, setRefresh] = useState<{ busy: boolean; note: string | null; failed: boolean }>({ busy: false, note: null, failed: false });
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [group, setGroup] = useState("brand");
+  const [confirmRefresh, setConfirmRefresh] = useState(false);
   if (!draft || !baseline) return <LoadingState />;
 
   const disabled = !ctx.editable;
@@ -96,6 +98,7 @@ export default function WhyBuyView() {
 
   const refreshGoogle = async () => {
     if (!source.tenantId) return;
+    setConfirmRefresh(false);
     setRefresh({ busy: true, note: null, failed: false });
     try {
       const { data, error } = await supabase.functions.invoke("google-reviews", { body: { tenant_id: source.tenantId } });
@@ -104,10 +107,8 @@ export default function WhyBuyView() {
         setRefresh({ busy: false, failed: true, note: d?.error === "place_not_found" ? "Google could not find this dealership. Check the display name and address on Identity and Hours & Contact." : "Google did not return a rating right now. Nothing was changed." });
         return;
       }
-      set("dealer_google_rating", String(d.rating));
-      set("dealer_google_count", String(d.count));
-      setRep({ googleAsOf: today });
-      setRefresh({ busy: false, failed: false, note: `Google returned ${d.rating} from ${Number(d.count).toLocaleString()} reviews, matched to "${d.matched}". Review and apply to record today's date.` });
+      setRefresh({ busy: false, failed: false, note: `Saved to your account now: Google returned ${d.rating} from ${Number(d.count).toLocaleString()} reviews, matched to "${d.matched}".` });
+      ctx.reload();
     } catch {
       setRefresh({ busy: false, failed: true, note: "Google did not return a rating right now. Nothing was changed." });
     }
@@ -117,6 +118,13 @@ export default function WhyBuyView() {
   const awardItems = draft.awards.map((a, i) => ({ ...a, label: a.name.trim() || `Award ${i + 1}` }));
   const patchReview = (id: string, p: Partial<ReviewItem>) => set("reviews", draft.reviews.map((r) => (r.id === id ? { ...r, ...p } : r)));
   const patchAward = (id: string, p: Partial<AwardItem>) => set("awards", draft.awards.map((a) => (a.id === id ? { ...a, ...p } : a)));
+  const tabs: GroupTab[] = [
+    { id: "brand", label: "Brand promise", count: null, issue: !!(errs.top.dealer_tagline || errs.top.dealer_years_in_business || errs.top.dealer_storefront_url) },
+    { id: "reviews", label: "Reviews & reputation", count: draft.reviews.length, issue: !!(errs.top.dealer_google_rating || errs.top.dealer_google_count || errs.top.googleAsOf || errs.top.bbbAsOf || errs.top.satisfactionSource || errs.top.satisfactionAsOf || Object.keys(errs.reviews).length) },
+    { id: "amenities", label: "Amenities & services", count: draft.services.length + draft.amenities.length, issue: false },
+    { id: "awards", label: "Awards", count: draft.awards.length, issue: !!(Object.keys(errs.awards).length || Object.keys(errs.iihs).length) },
+    { id: "advisor", label: "Advisor", count: null, issue: !!errs.top.dealer_advisor_photo },
+  ];
   const offsite = draft.dealer_service_location === "offsite";
   const cta = settings.mobile_slideout_cta_variant || "dealer_availability";
 
@@ -137,6 +145,9 @@ export default function WhyBuyView() {
         </PreviewFrame>
       }
     >
+      <GroupNav tabs={tabs} value={group} onChange={setGroup} />
+
+      <div role="tabpanel" id="why-buy-panel-brand" aria-labelledby="why-buy-tab-brand" hidden={group !== "brand"} className="min-w-0">
       <SectionCard icon="star" title="Brand promise" description="Your headline message and the facts about the dealership.">
         <div className="grid gap-4 md:grid-cols-2">
           <FieldRow label="Tagline" optional className="md:col-span-2" error={errs.top.dealer_tagline} help={<SourceLine>Dealer settings (dealer_tagline). Shown under the dealership name on documents.</SourceLine>}>
@@ -165,16 +176,18 @@ export default function WhyBuyView() {
           urlError={errs.top.dealer_storefront_url}
         />
       </SectionCard>
+      </div>
 
+      <div role="tabpanel" id="why-buy-panel-reviews" aria-labelledby="why-buy-tab-reviews" hidden={group !== "reviews"} className="min-w-0">
       <SectionCard icon="chart" title="Reviews & reputation" description="Every rating needs a source and the date it was retrieved or entered. Nothing is filled in for you.">
         <div className="rounded-lg border border-adm-divider p-4 space-y-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <h3 className="text-[14px] leading-[20px] font-semibold text-adm-ink">Google rating</h3>
             <div className="flex items-center gap-2 flex-wrap">
               {source.isFixture ? <StatusBadge state="unavailable" label="Refresh unavailable in fixture" /> : null}
-              <AdminButton variant="secondary" disabled={disabled || source.isFixture || refresh.busy} onClick={() => void refreshGoogle()}>
+              <AdminButton variant="secondary" disabled={disabled || source.isFixture || refresh.busy || editor.dirty} onClick={() => setConfirmRefresh(true)}>
                 <AdminIcon name="refresh" className={refresh.busy ? "animate-spin motion-reduce:animate-none" : undefined} />
-                {refresh.busy ? "Refreshing" : "Refresh from Google"}
+                {refresh.busy ? "Refreshing" : "Refresh from Google and save now"}
               </AdminButton>
             </div>
           </div>
@@ -184,6 +197,7 @@ export default function WhyBuyView() {
             <DateInput label="Retrieved on" value={rep.googleAsOf} max={today} disabled={disabled} error={errs.top.googleAsOf} onChange={(v) => setRep({ googleAsOf: v })} />
           </div>
           <LegacyDateNote show={missingDate(draft.dealer_google_rating, rep.googleAsOf, baseline.dealer_google_rating, baseline.reputation.googleAsOf)} />
+          {editor.dirty && !source.isFixture && <p className="text-[13px] leading-[18px] text-adm-muted">Apply or discard your changes before refreshing. The refresh saves immediately and reloads these values.</p>}
           <p role="status" className={`text-[13px] leading-[18px] ${refresh.failed ? "text-adm-danger" : "text-adm-muted"}`}>
             {refresh.note ?? (syncedAt ? `Last refreshed from Google on ${new Date(syncedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}.` : "Refresh uses your connected Google listing. If nothing is connected, enter the rating yourself with its date.")}
           </p>
@@ -218,15 +232,16 @@ export default function WhyBuyView() {
                 const r = draft.reviews.find((x) => x.id === item.id) as ReviewItem;
                 const err = errs.reviews[r.id];
                 return (
-                  <div className="space-y-3 py-1">
-                    <div className="grid gap-3 sm:grid-cols-[1fr_96px_150px]">
-                      <FieldRow label="Source" error={err && /source|bar/i.test(err) ? err : undefined}>{(p) => <input {...p} className={INPUT_CLASS} value={r.source} disabled={disabled} placeholder="Google, Edmunds" onChange={(e) => patchReview(r.id, { source: e.target.value })} />}</FieldRow>
-                      <FieldRow label="Rating" optional error={err && /rating from/i.test(err) ? err : undefined}>{(p) => <input {...p} inputMode="decimal" className={INPUT_CLASS} value={r.rating} disabled={disabled} placeholder="0 to 5" onChange={(e) => patchReview(r.id, { rating: e.target.value })} />}</FieldRow>
-                      <DateInput label="Date" value={r.asOf} max={today} disabled={disabled} error={err && /date/i.test(err) ? err : undefined} onChange={(v) => patchReview(r.id, { asOf: v })} />
+                  <div className="grid gap-3 py-1 sm:grid-cols-[minmax(0,1fr)_96px_156px_44px] sm:items-end">
+                    <FieldRow label="Source" error={err && /source|bar/i.test(err) ? err : undefined}>{(p) => <input {...p} className={INPUT_CLASS} value={r.source} disabled={disabled} placeholder="Google, Edmunds" onChange={(e) => patchReview(r.id, { source: e.target.value })} />}</FieldRow>
+                    <FieldRow label="Rating" optional error={err && /rating from/i.test(err) ? err : undefined}>{(p) => <input {...p} inputMode="decimal" className={INPUT_CLASS} value={r.rating} disabled={disabled} placeholder="0 to 5" onChange={(e) => patchReview(r.id, { rating: e.target.value })} />}</FieldRow>
+                    <DateInput label="Date" value={r.asOf} max={today} disabled={disabled} error={err && /date/i.test(err) ? err : undefined} onChange={(v) => patchReview(r.id, { asOf: v })} />
+                    <span className="hidden sm:flex sm:row-start-1 sm:col-start-4 justify-center"><RemoveButton label={`Remove review ${r.source || ""}`.trim()} disabled={disabled} onClick={() => set("reviews", draft.reviews.filter((x) => x.id !== r.id))} /></span>
+                    <div className="sm:col-span-4"><FieldRow label="Quote" optional error={err && /quote/i.test(err) ? err : undefined}>{(p) => <textarea {...p} rows={2} className={`${INPUT_CLASS} resize-y`} value={r.quote} disabled={disabled} onChange={(e) => patchReview(r.id, { quote: e.target.value })} />}</FieldRow></div>
+                    <div className="sm:col-span-4 flex items-center justify-between gap-2 flex-wrap">
+                      <LegacyDateNote show={!!r.rating.trim() && !r.asOf} />
+                      <span className="sm:hidden ml-auto"><RemoveButton label={`Remove review ${r.source || ""}`.trim()} disabled={disabled} onClick={() => set("reviews", draft.reviews.filter((x) => x.id !== r.id))} /></span>
                     </div>
-                    <FieldRow label="Quote" optional error={err && /quote/i.test(err) ? err : undefined}>{(p) => <textarea {...p} rows={2} className={`${INPUT_CLASS} resize-y`} value={r.quote} disabled={disabled} onChange={(e) => patchReview(r.id, { quote: e.target.value })} />}</FieldRow>
-                    <LegacyDateNote show={!!r.rating.trim() && !r.asOf} />
-                    <RemoveButton label={`Remove review ${r.source || ""}`.trim()} disabled={disabled} onClick={() => set("reviews", draft.reviews.filter((x) => x.id !== r.id))} />
                   </div>
                 );
               }}
@@ -235,7 +250,9 @@ export default function WhyBuyView() {
           <AddRow label="Add review" disabled={disabled || draft.reviews.length >= 12} onClick={() => set("reviews", [...draft.reviews, { id: newId("review"), source: "", rating: "", quote: "", asOf: today }])} />
         </div>
       </SectionCard>
+      </div>
 
+      <div role="tabpanel" id="why-buy-panel-amenities" aria-labelledby="why-buy-tab-amenities" hidden={group !== "amenities"} className="min-w-0">
       <SectionCard icon="coffee" title="Amenities & services" description="What a visitor can count on at this dealership. Only what you set appears.">
         <div className="grid gap-4 md:grid-cols-2">
           <SelectNotSpecified label="Service department" value={draft.dealer_service_location} disabled={disabled} onChange={(v) => set("dealer_service_location", v)} options={[["onsite", "On-site (same location as sales)"], ["offsite", "Off-site (separate location)"], ["none", "No service department"]]} />
@@ -253,7 +270,9 @@ export default function WhyBuyView() {
           <OwnedValue label="Mobile slide-out CTA style" value={CTA_LABELS[cta] ?? cta} source="Dealer settings (mobile_slideout_cta_variant). Owned by the Calls to action editor, not edited on this page." editTo={adminTabHref("calls-to-action")} editLabel="Calls to action" />
         </div>
       </SectionCard>
+      </div>
 
+      <div role="tabpanel" id="why-buy-panel-awards" aria-labelledby="why-buy-tab-awards" hidden={group !== "awards"} className="min-w-0">
       <SectionCard icon="award" title="Awards" description="Manufacturer and industry recognition. Add only awards the dealership holds.">
         {draft.awards.length === 0 ? (
           <EditorEmpty artwork="documents" title="No awards added" description="Awards appear to shoppers only after you add them here." className="py-6" />
@@ -265,10 +284,10 @@ export default function WhyBuyView() {
             renderItem={(item) => {
               const a = draft.awards.find((x) => x.id === item.id) as AwardItem;
               return (
-                <div className="grid gap-3 sm:grid-cols-[1fr_1fr] py-1">
+                <div className="grid gap-3 py-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] sm:items-end">
                   <FieldRow label="Award" error={errs.awards[a.id]}>{(p) => <input {...p} className={INPUT_CLASS} value={a.name} disabled={disabled} onChange={(e) => patchAward(a.id, { name: e.target.value })} />}</FieldRow>
                   <FieldRow label="Awarded by" optional>{(p) => <input {...p} className={INPUT_CLASS} value={a.issuer} disabled={disabled} onChange={(e) => patchAward(a.id, { issuer: e.target.value })} />}</FieldRow>
-                  <div className="sm:col-span-2"><RemoveButton label={`Remove award ${a.name}`.trim()} disabled={disabled} onClick={() => set("awards", draft.awards.filter((x) => x.id !== a.id))} /></div>
+                  <span className="flex justify-end sm:justify-center"><RemoveButton label={`Remove award ${a.name}`.trim()} disabled={disabled} onClick={() => set("awards", draft.awards.filter((x) => x.id !== a.id))} /></span>
                 </div>
               );
             }}
@@ -300,7 +319,9 @@ export default function WhyBuyView() {
           <AddRow label="Add IIHS row" disabled={disabled} onClick={() => set("iihs_awards", [...draft.iihs_awards, { year: "", make: "", model: "", award: "tsp_plus" }])} />
         </AdvancedDisclosure>
       </SectionCard>
+      </div>
 
+      <div role="tabpanel" id="why-buy-panel-advisor" aria-labelledby="why-buy-tab-advisor" hidden={group !== "advisor"} className="min-w-0">
       <SectionCard icon="user" title="Advisor" description="The person shown in the customer conversion panel. Leave blank for a generic specialist card.">
         {team.length > 0 && (
           <FieldRow label="Choose from your team" optional help={<>People listed in <EditLink to={adminTabHref("routing")}>Contact & Routing</EditLink>. Choosing one fills the fields below.</>}>
@@ -335,6 +356,18 @@ export default function WhyBuyView() {
           urlError={errs.top.dealer_advisor_photo}
         />
       </SectionCard>
+      </div>
+
+      <ConfirmDialog
+        open={confirmRefresh}
+        title="Refresh the Google rating and save it now?"
+        confirmLabel="Refresh and save now"
+        onCancel={() => setConfirmRefresh(false)}
+        onConfirm={() => void refreshGoogle()}
+      >
+        <p>This asks Google for your current rating and review count, then saves them to your account immediately. It is not part of Review and Apply, so Discard cannot undo it.</p>
+        <p>The customer Passport shows the new rating as soon as it is saved. If Google finds no match, nothing changes.</p>
+      </ConfirmDialog>
 
       <DetailDrawer open={previewOpen} onClose={() => setPreviewOpen(false)} title="Customer preview" description="Draft values. Only populated facts appear.">
         <WhyBuyPreview draft={draft} dealerName={dealerName} />

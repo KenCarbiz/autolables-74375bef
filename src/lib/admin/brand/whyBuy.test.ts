@@ -35,6 +35,11 @@ describe("why buy adapter", () => {
     expect(readWhyBuy(settings({ dealer_review_sources: "Google | 4.7 | Nice", why_buy_profile: profile })).reviews[0].asOf).toBe("");
   });
 
+  it("uses the server-recorded Google sync date when it is newer than the stored one", () => {
+    const d = readWhyBuy(settings({ dealer_google_rating: "4.8", google_rating_synced_at: "2026-11-05T10:00:00Z" }));
+    expect(d.reputation.googleAsOf).toBe("2026-11-05");
+  });
+
   it("writes nothing when nothing changed", () => {
     const base = readWhyBuy(settings({ dealer_services: "A" }));
     expect(buildWhyBuyPatch(base, base)).toEqual({});

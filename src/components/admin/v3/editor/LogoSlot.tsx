@@ -35,6 +35,8 @@ export const LogoSlot = ({
   onSelectFile,
   onRemove,
   surface = "light",
+  emptyLabel = "No logo uploaded",
+  plain = false,
   children,
 }: {
   label: string;
@@ -52,6 +54,10 @@ export const LogoSlot = ({
   onSelectFile: (file: File) => void;
   onRemove?: () => void;
   surface?: "light" | "dark";
+  /** Text shown while empty. Photos say "No photo uploaded". */
+  emptyLabel?: string;
+  /** Neutral grey stage instead of the transparency checkerboard (photos). */
+  plain?: boolean;
   children?: ReactNode;
 }) => {
   const input = useRef<HTMLInputElement>(null);
@@ -65,14 +71,14 @@ export const LogoSlot = ({
       <div
         data-logo-stage=""
         data-surface={surface}
-        className={cn("relative flex items-center justify-center w-full h-[96px] sm:h-[120px] rounded-lg border border-dashed border-adm-border p-6 overflow-hidden", surface === "dark" ? "bg-[#162638]" : CHECKERBOARD)}
+        className={cn("relative flex items-center justify-center w-full h-[96px] sm:h-[120px] rounded-lg border border-dashed border-adm-border p-6 overflow-hidden", surface === "dark" ? "bg-[#162638]" : plain ? "bg-adm-workspace" : CHECKERBOARD)}
       >
         {has ? (
           <img src={src ?? undefined} alt={alt ?? `${label} preview`} className="max-w-full max-h-full w-auto h-auto object-contain" />
         ) : (
           <div className="flex flex-col items-center text-center gap-1">
             <EditorArtwork name="upload-logo" className="h-[56px] w-[90px]" />
-            <span className={cn("text-[13px]", surface === "dark" ? "text-white/80" : "text-adm-muted")}>No logo uploaded</span>
+            <span className={cn("text-[13px]", surface === "dark" ? "text-white/80" : "text-adm-muted")}>{emptyLabel}</span>
           </div>
         )}
       </div>
@@ -98,6 +104,7 @@ export const LogoSlot = ({
           accept={allowedTypes.join(",")}
           className="sr-only"
           tabIndex={-1}
+          disabled={disabled || uploading}
           aria-labelledby={`${id}-label`}
           onChange={(e) => {
             const file = e.target.files?.[0];
