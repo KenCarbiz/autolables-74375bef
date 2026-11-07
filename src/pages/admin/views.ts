@@ -34,6 +34,7 @@ export const ADMIN_VIEWS: Readonly<Record<string, LazyExoticComponent<ComponentT
   jobs: lazy(() => import("./views/integrations/JobsView")),
   activity: lazy(() => import("./views/integrations/ActivityView")),
   approvals: lazy(() => import("./views/publishing/ApprovalsView")),
+  destinations: lazy(() => import("./views/publishing/DestinationsView")),
   "change-history": lazy(() => import("./views/publishing/ChangeHistoryView")),
   templates: lazy(() => import("./views/documents/TemplatesView")),
   "approval-rules": lazy(() => import("./views/documents/ApprovalRulesView")),

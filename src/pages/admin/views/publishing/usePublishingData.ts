@@ -4,6 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings, type DealerSettings } from "@/contexts/DealerSettingsContext";
 import { useAdminNow, useViewFixture } from "@/lib/admin/dataSource";
+import { realTenantId } from "@/lib/tenant/realTenantId";
+import { PUBLISHING_AUDIT_ACTION } from "@/lib/admin/publishingPolicy";
+import { useWaveCVariant, type WaveCVariant } from "./waveCVariant";
 import { knownCount, type CountValue } from "@/lib/admin/health";
 import {
   publishingDraftFrom,
@@ -18,8 +21,21 @@ import {
 // Data for the Publishing views. Fixture first, live second. The live reads
 // are tenant-scoped SELECTs and head counts; nothing here writes.
 
+export interface PolicyHistoryEntry {
+  id: string;
+  at: string;
+  actor: string | null;
+  keys: string[];
+  prev: Record<string, unknown> | null;
+  next: Record<string, unknown> | null;
+  version: string | number | null;
+}
+
 export interface PublishingFixture {
   rooftopLabel: string;
+  groupLabel?: string;
+  history?: PolicyHistoryEntry[];
+  seeds?: Partial<Record<WaveCVariant, Partial<Omit<PublishingFixture, "seeds">>>>;
   settings: PublishingSettingsSlice;
   description: DescriptionPolicy | null;
   counts: ListingCounts | null;
@@ -89,6 +105,34 @@ export async function loadPublishingLive(tenantId: string): Promise<PublishingLi
   return { description, counts, loadFailed };
 }
 
+type AuditRow = { id: string; created_at: string; user_id: string | null; user_email: string | null; details: Record<string, unknown> | null };
+
+const asRecord = (v: unknown): Record<string, unknown> | null => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
+
+/**
+ * The settings writer and the review dialog each record a row for one apply, seconds apart. The dialog's row carries
+ * the idempotency key and the readable rule names, so it wins when two rows from one user fall within ten seconds.
+ */
+export function toPolicyHistory(rows: AuditRow[]): PolicyHistoryEntry[] {
+  const sorted = [...rows].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const out: AuditRow[] = [];
+  for (const r of sorted) {
+    const near = out.findIndex((o) => o.user_id === r.user_id && Math.abs(Date.parse(o.created_at) - Date.parse(r.created_at)) < 10_000);
+    if (near === -1) out.push(r);
+    else if (!asRecord(out[near].details)?.idempotency_key && asRecord(r.details)?.idempotency_key) out[near] = r;
+  }
+  return out.map((r) => {
+    const d = asRecord(r.details) ?? {};
+    return { id: r.id, at: r.created_at, actor: r.user_email, keys: Array.isArray(d.keys) ? d.keys.map(String) : [], prev: asRecord(d.prev), next: asRecord(d.next), version: (d.policy_version as string | number | undefined) ?? null };
+  });
+}
+
+export async function loadPolicyHistory(tenantId: string): Promise<PolicyHistoryEntry[]> {
+  const { data, error } = await db().from("audit_log").select("id, created_at, user_id, user_email, details").eq("store_id", tenantId).eq("action", PUBLISHING_AUDIT_ACTION).order("created_at", { ascending: false }).limit(20);
+  if (error) throw new Error("history read failed");
+  return toPolicyHistory((data as AuditRow[] | null) ?? []);
+}
+
 export interface StoredPublishingPolicy {
   version: string;
   settings: PublishingDraftSource;
@@ -112,6 +156,7 @@ export function usePublishingData() {
   const { tenant } = useTenant();
   const { settings, loading: settingsLoading } = useDealerSettings();
   const tenantId = tenant?.id ?? null;
+  const variant = useWaveCVariant(!!fixture);
 
   const live = useQuery({
     queryKey: ["admin-v2", "publishing", tenantId],
@@ -120,24 +165,42 @@ export function usePublishingData() {
     staleTime: 30_000,
   });
 
-  const settingsSlice = useMemo<PublishingSettingsSlice>(() => fixture?.settings ?? publishingSlice(settings), [fixture, settings]);
-  const policyVersion = useMemo(() => (fixture ? fixture.policyVersion : publishingPolicyVersion(publishingDraftFrom(settingsSlice))), [fixture, settingsSlice]);
+  const historyQ = useQuery({
+    queryKey: ["admin-v2", "publishing-policy-history", tenantId],
+    enabled: !fixture && !!realTenantId(tenant),
+    queryFn: () => loadPolicyHistory(tenantId as string),
+    staleTime: 30_000,
+    retry: false,
+  });
+
+  const seeded = fixture ? { ...fixture, ...(fixture.seeds?.[variant] ?? {}) } : null;
+  const settingsSlice = useMemo<PublishingSettingsSlice>(() => seeded?.settings ?? publishingSlice(settings), [seeded, settings]);
+  const policyVersion = useMemo(() => (seeded ? seeded.policyVersion : publishingPolicyVersion(publishingDraftFrom(settingsSlice))), [seeded, settingsSlice]);
 
   const place = [settings.dealer_city, settings.dealer_state].filter(Boolean).join(", ");
   const name = settings.dealer_name || tenant?.name || "this rooftop";
-  const rooftopLabel = fixture?.rooftopLabel ?? (place ? `${name} (${place})` : name);
+  const rooftopLabel = seeded?.rooftopLabel ?? (place ? `${name} (${place})` : name);
+  const groupLabel = seeded?.groupLabel ?? (tenant?.name && tenant.id !== "house" ? tenant.name : null);
+  const history: { state: "loading" | "ok" | "unavailable"; entries: PolicyHistoryEntry[] } = seeded
+    ? { state: variant === "error" ? "unavailable" : "ok", entries: variant === "error" || variant === "empty" ? [] : seeded.history ?? [] }
+    : historyQ.isError ? { state: "unavailable", entries: [] }
+    : historyQ.isLoading ? { state: "loading", entries: [] }
+    : { state: "ok", entries: historyQ.data ?? [] };
 
   return {
-    fixture,
+    fixture: seeded,
+    variant,
+    groupLabel,
+    history,
     now,
     tenantId,
     settingsSlice,
     rooftopLabel,
     policyVersion,
     loading: !fixture && (settingsLoading || live.isLoading),
-    loadFailed: !fixture && (live.isError || !!live.data?.loadFailed),
-    description: fixture ? fixture.description : live.data ? live.data.description : undefined,
-    counts: fixture ? fixture.counts : live.data ? live.data.counts : undefined,
+    loadFailed: seeded ? variant === "error" : live.isError || !!live.data?.loadFailed,
+    description: seeded ? seeded.description : live.data ? live.data.description : undefined,
+    counts: seeded ? seeded.counts : live.data ? live.data.counts : undefined,
     refetch: live.refetch,
   };
 }

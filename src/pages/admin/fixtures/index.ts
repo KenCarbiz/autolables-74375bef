@@ -20,6 +20,7 @@ import { PAYMENT_ESTIMATOR_FIXTURES } from "./paymentEstimator";
 import { WAVE_B_BRAND_FIXTURES } from "./WaveBBrandFixtures";
 import { WAVE_B_FEEDS_FIXTURES } from "./WaveBFeedsFixtures";
 import { WAVE_C_ROUTING_FIXTURES } from "./WaveCRoutingFixtures";
+import { WAVE_C_PUBLISHING_FIXTURES } from "./WaveCPublishingFixtures";
 
 // Design fixtures for the parity harness. Each entry renders one reference
 // screen with synthetic data under /admin/design-fixture/:screen, a route that
@@ -77,4 +78,5 @@ export const ADMIN_FIXTURES: Record<string, AdminScreenFixture> = {
   ...WAVE_B_BRAND_FIXTURES,
   ...WAVE_B_FEEDS_FIXTURES,
   ...WAVE_C_ROUTING_FIXTURES,
+  ...WAVE_C_PUBLISHING_FIXTURES,
 };
