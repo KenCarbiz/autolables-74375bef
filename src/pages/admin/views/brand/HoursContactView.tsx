@@ -1,12 +1,12 @@
 import { useMemo } from "react";
-import { AdminIcon, AdvancedDisclosure, FieldRow, INPUT_CLASS, SectionCard, SelectField, type ReviewChangeRow } from "@/components/admin/v3/editor";
+import { AdminIcon, FieldRow, INPUT_CLASS, SectionCard, SelectField, type ReviewChangeRow } from "@/components/admin/v3/editor";
 import { AdminButton } from "@/components/admin/v2/primitives";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { adminTabHref } from "@/lib/admin/sections";
 import type { DraftErrors, EditorDraftChange } from "@/lib/admin/useEditorDraft";
 import { formatDealerPhone, normalizeDealerWebsite } from "@/lib/dealerIdentity";
 import { contactReadiness, fieldLabel, validateHoursContact } from "./brandModel";
 import { BrandEditorFrame, LoadingState } from "./editor/BrandEditorFrame";
+import { useNarrow } from "./editor/useNarrow";
 import { settingsWriter, useBrandEditor, useBrandEditorContext } from "./editor/useBrandEditor";
 import { BlockedCard, EditLink, OwnedValue, PreviewFrame, ReadinessList, SourceLine, type ReadinessItem } from "./editor/parts";
 
@@ -65,6 +65,7 @@ export default function HoursContactView() {
   const address = [draft.dealer_address.trim(), [settings.dealer_city, settings.dealer_state].filter(Boolean).join(", "), draft.dealer_zip.trim()].filter(Boolean).join(", ");
 
   const baseRows = contactReadiness({ ...settings, dealer_website_url: draft.dealer_website_url, public_landing_url: draft.public_landing_url });
+  const narrow = useNarrow();
   const items: ReadinessItem[] = [
     { key: "main_phone", label: "Main phone", value: phone || "Not configured", ready: !!phone, editTo: "#contact-phone", reason: draft.dealer_phone && !phone ? "The number is incomplete or looks like a placeholder." : undefined },
     ...baseRows.map((r) => ({
@@ -84,17 +85,8 @@ export default function HoursContactView() {
     })),
   ];
 
-  const mobile = useIsMobile();
-  return (
-    <BrandEditorFrame
-      ctx={ctx}
-      editor={editor}
-      scopeNote="Public contact details, address, licensing and the saved hours text are stored once for the account."
-      impact="Customer pages and documents read these values the next time they load. Routing readiness reads the Contact & Routing editor, not this page."
-      previewLabel="What shoppers see"
-      preview={
-        <>
-          <PreviewFrame title="What shoppers see" draft={editor.dirty} caption="Built from the draft values on this page.">
+  const shopper = (
+    <PreviewFrame title="What shoppers see" draft={editor.dirty} caption="Built from the draft values on this page.">
             <div className="rounded-lg border border-adm-border bg-white text-[#142338] p-4 space-y-3" aria-label="Customer contact preview">
               <div>
                 <p className="text-[13px] leading-[18px] font-semibold text-[#475569]">Call</p>
@@ -111,27 +103,36 @@ export default function HoursContactView() {
               </div>
             </div>
           </PreviewFrame>
-          {mobile ? (
-            <AdvancedDisclosure key="m" title={`Contact readiness: ${items.filter((i) => !i.ready).length ? `${items.filter((i) => !i.ready).length} need attention` : "all ready"}`}>
-              <ReadinessList items={items} label="Contact readiness" />
-            </AdvancedDisclosure>
-          ) : (
-            <section aria-label="Contact readiness" className="rounded-xl border border-adm-divider bg-adm-surface p-4 sm:p-5 space-y-3">
-              <h2 className="text-[16px] leading-[22px] font-semibold text-adm-ink">Contact readiness</h2>
-              <p className="text-[13px] leading-[18px] text-adm-muted">Each row reads the field that owns it, so an existing main phone is never reported as missing.</p>
-              <ReadinessList items={items} label="Contact readiness" />
-            </section>
-          )}
+  );
+  const readiness = (
+    <section aria-label="Contact readiness" className="rounded-xl border border-adm-divider bg-adm-surface p-4 sm:p-5 space-y-3">
+      <h2 className="text-[16px] leading-[22px] font-semibold text-adm-ink">Contact readiness</h2>
+      <p className="text-[13px] leading-[18px] text-adm-muted max-lg:hidden">Each row reads the field that owns it, so an existing main phone is never reported as missing.</p>
+      <ReadinessList items={items} label="Contact readiness" collapseReady={narrow} />
+    </section>
+  );
+  return (
+    <BrandEditorFrame
+      ctx={ctx}
+      editor={editor}
+      scopeNote="Public contact details, address, licensing and the saved hours text are stored once for the account."
+      impact="Customer pages and documents read these values the next time they load. Routing readiness reads the Contact & Routing editor, not this page."
+      previewLabel="What shoppers see"
+      preview={
+        <>
+          {shopper}
+          {readiness}
         </>
       }
+      mobilePreview={{ top: shopper, after: readiness }}
     >
-      <SectionCard icon="phone" title="Public contact" description="The numbers and web addresses customers see.">
+      <SectionCard icon="phone" title="Public contact" description="Numbers and addresses customers see.">
         <div id="contact-phone" className="grid gap-4 md:grid-cols-2">
           <FieldRow
             label="Main public phone"
             optional
             error={errors.dealer_phone}
-            help={<SourceLine>Dealer settings (dealer_phone).</SourceLine>}
+            help={<SourceLine hideOnPhone>Dealer settings (dealer_phone).</SourceLine>}
           >
             {(p) => <input {...p} className={INPUT_CLASS} value={draft.dealer_phone} inputMode="tel" autoComplete="tel" disabled={disabled} onChange={(e) => editor.set("dealer_phone", e.target.value)} onBlur={() => { const f = formatDealerPhone(draft.dealer_phone); if (f && f !== draft.dealer_phone) editor.set("dealer_phone", f); }} />}
           </FieldRow>
@@ -143,30 +144,30 @@ export default function HoursContactView() {
             editTo={adminTabHref("routing")}
             editLabel="Contact & Routing"
           />
-          <FieldRow label="Website" optional error={errors.dealer_website_url} help={site.display ? `Customers see ${site.display}` : <SourceLine>Dealer settings (dealer_website_url).</SourceLine>}>
+          <FieldRow label="Website" optional error={errors.dealer_website_url} help={site.display ? `Customers see ${site.display}` : <SourceLine hideOnPhone>Dealer settings (dealer_website_url).</SourceLine>}>
             {(p) => <input {...p} className={INPUT_CLASS} value={draft.dealer_website_url} inputMode="url" disabled={disabled} onChange={(e) => editor.set("dealer_website_url", e.target.value)} />}
           </FieldRow>
-          <FieldRow label="Public landing page" optional error={errors.public_landing_url} help={landing.display ? `Printed as ${landing.display}` : <SourceLine>Dealer settings (public_landing_url).</SourceLine>}>
+          <FieldRow label="Public landing page" optional error={errors.public_landing_url} help={landing.display ? `Printed as ${landing.display}` : <SourceLine hideOnPhone>Dealer settings (public_landing_url).</SourceLine>}>
             {(p) => <input {...p} className={INPUT_CLASS} value={draft.public_landing_url} inputMode="url" disabled={disabled} onChange={(e) => editor.set("public_landing_url", e.target.value)} />}
           </FieldRow>
         </div>
       </SectionCard>
 
-      <SectionCard icon="clock" title="Business hours" description="What is saved today, and the structured schedule that will replace it.">
+      <SectionCard icon="clock" title="Business hours" description="The saved hours text shoppers see.">
         <FieldRow
           label="Store hours"
           optional
-          help={<SourceLine>Dealer settings (dealer_hours). Shown to shoppers as written.</SourceLine>}
+          help={<SourceLine hideOnPhone>Dealer settings (dealer_hours). Shown to shoppers as written.</SourceLine>}
         >
-          {(p) => <textarea {...p} rows={3} className={`${INPUT_CLASS} resize-y`} value={draft.dealer_hours} disabled={disabled} placeholder="One line per day or range" onChange={(e) => editor.set("dealer_hours", e.target.value)} />}
+          {(p) => <textarea {...p} rows={2} className={`${INPUT_CLASS} resize-y`} value={draft.dealer_hours} disabled={disabled} placeholder="One line per day or range" onChange={(e) => editor.set("dealer_hours", e.target.value)} />}
         </FieldRow>
-        <OwnedValue label="Time zone" value={settings.dealer_timezone} empty="No time zone set" source="Dealer settings (dealer_timezone)." editTo={adminTabHref("identity")} editLabel="Identity" />
+        <OwnedValue label="Time zone" value={settings.dealer_timezone} empty="No time zone set" source="Dealer settings (dealer_timezone)." editTo={adminTabHref("identity")} editLabel="Identity" compactOnPhone />
       </SectionCard>
 
       <BlockedCard
         icon="calendar"
-        title="Structured hours and department numbers"
-        does="A weekly schedule with holidays and a routing schedule, plus labelled department phones with extensions. Your saved hours text stays the source until a schedule is entered. AutoFilm parity is not claimed."
+        title="Structured hours and phones"
+        does="Weekly schedule, holidays, routing hours and department phones. Your saved hours text stays the source. AutoFilm parity is not claimed."
         migrationId={MIGRATION}
         preview={
           <>
@@ -177,20 +178,21 @@ export default function HoursContactView() {
         }
       />
 
-      <SectionCard icon="pin" title="Address and licensing" description="Identifies the licensed seller on the addendum and Buyers Guide.">
-        <div className="grid gap-4 md:grid-cols-2">
-          <FieldRow label="Street address" optional className="md:col-span-2" help={<SourceLine>Dealer settings (dealer_address).</SourceLine>}>
+      <SectionCard icon="pin" title="Address and licensing" description="Seller identity on the addendum and Buyers Guide.">
+        <div className="grid grid-cols-2 gap-4">
+          <FieldRow label="Street address" optional className="col-span-2" help={<SourceLine hideOnPhone>Dealer settings (dealer_address).</SourceLine>}>
             {(p) => <input {...p} className={INPUT_CLASS} value={draft.dealer_address} autoComplete="street-address" disabled={disabled} onChange={(e) => editor.set("dealer_address", e.target.value)} />}
           </FieldRow>
-          <OwnedValue label="City and state" value={[settings.dealer_city, settings.dealer_state].filter(Boolean).join(", ")} empty="Not set" source="Dealer settings. Edited on Identity." editTo={adminTabHref("identity")} editLabel="Identity" />
+          <div className="col-span-2 md:col-span-1"><OwnedValue label="City and state" value={[settings.dealer_city, settings.dealer_state].filter(Boolean).join(", ")} empty="Not set" source="Dealer settings. Edited on Identity." editTo={adminTabHref("identity")} editLabel="Identity" compactOnPhone /></div>
           <FieldRow label="ZIP" optional error={errors.dealer_zip}>
             {(p) => <input {...p} className={INPUT_CLASS} value={draft.dealer_zip} inputMode="numeric" autoComplete="postal-code" disabled={disabled} onChange={(e) => editor.set("dealer_zip", e.target.value)} />}
           </FieldRow>
-          <FieldRow label="Dealer principal" optional >
-            {(p) => <input {...p} className={INPUT_CLASS} value={draft.dealer_principal} disabled={disabled} onChange={(e) => editor.set("dealer_principal", e.target.value)} />}
-          </FieldRow>
           <FieldRow label="DMV dealer license number" optional>
             {(p) => <input {...p} className={INPUT_CLASS} value={draft.dealer_license_number} disabled={disabled} onChange={(e) => editor.set("dealer_license_number", e.target.value)} />}
+          </FieldRow>
+        
+          <FieldRow label="Dealer principal" optional className="col-span-2 md:col-span-1" >
+            {(p) => <input {...p} className={INPUT_CLASS} value={draft.dealer_principal} disabled={disabled} onChange={(e) => editor.set("dealer_principal", e.target.value)} />}
           </FieldRow>
         </div>
         <div>

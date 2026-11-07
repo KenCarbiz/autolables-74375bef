@@ -7,8 +7,8 @@ import { AdminIcon, AdminIconTile, AdvancedDisclosure, BlockedFeatureNotice, Sta
 import { cn } from "@/lib/utils";
 
 /** Small caption saying which stored value a field reads and writes. */
-export const SourceLine = ({ children }: { children: ReactNode }) => (
-  <span className="flex items-start gap-1.5 text-[13px] leading-[18px] text-adm-muted">
+export const SourceLine = ({ children, hideOnPhone }: { children: ReactNode; hideOnPhone?: boolean }) => (
+  <span className={cn("flex items-start gap-1.5 text-[13px] leading-[18px] text-adm-muted", hideOnPhone && "max-sm:hidden")}>
     <AdminIcon name="database" size="inline" className="mt-px" />
     <span className="min-w-0 break-words">{children}</span>
   </span>
@@ -22,7 +22,7 @@ export const EditLink = ({ to, children }: { to: string; children: ReactNode }) 
 );
 
 /** A value owned by another editor: shown, sourced, never editable here. */
-export const OwnedValue = ({ label, value, empty = "Not set", source, editTo, editLabel }: { label: string; value: string; empty?: string; source: ReactNode; editTo?: string; editLabel?: string }) => (
+export const OwnedValue = ({ label, value, empty = "Not set", source, editTo, editLabel, compactOnPhone }: { label: string; value: string; empty?: string; source: ReactNode; editTo?: string; editLabel?: string; compactOnPhone?: boolean }) => (
   <div className="rounded-lg border border-adm-divider bg-adm-workspace px-4 py-3 min-w-0">
     <div className="flex items-start justify-between gap-3 flex-wrap">
       <div className="min-w-0">
@@ -31,7 +31,7 @@ export const OwnedValue = ({ label, value, empty = "Not set", source, editTo, ed
       </div>
       {editTo && <EditLink to={editTo}>{editLabel ?? "Edit"}</EditLink>}
     </div>
-    <div className="mt-1.5"><SourceLine>{source}</SourceLine></div>
+    <div className={cn("mt-1.5", compactOnPhone && "max-sm:hidden")}><SourceLine>{source}</SourceLine></div>
   </div>
 );
 
@@ -47,24 +47,34 @@ export const IconHeading = ({ icon, title, children }: { icon: AdminIconName; ti
 
 export interface ReadinessItem { key: string; label: string; value: string; ready: boolean; reason?: ReactNode; editTo: string }
 
-export const ReadinessList = ({ items, label }: { items: ReadinessItem[]; label: string }) => (
-  <ul aria-label={label} className="divide-y divide-adm-divider">
-    {items.map((r) => (
-      <li key={r.key} className="py-3 first:pt-0 last:pb-0 flex items-start gap-3">
-        <AdminIcon name={r.ready ? "check-circle" : "alert"} size="card" className={cn("mt-0.5", r.ready ? "text-adm-success" : "text-adm-warning")} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{r.label}</p>
-            <StatusBadge state={r.ready ? "enabled" : "setup_required"} label={r.ready ? "Ready" : "Incomplete"} />
+export const ReadinessList = ({ items, label, collapseReady }: { items: ReadinessItem[]; label: string; collapseReady?: boolean }) => {
+  const ready = collapseReady ? items.filter((r) => r.ready) : [];
+  const rows = collapseReady ? items.filter((r) => !r.ready) : items;
+  return (
+    <ul aria-label={label} className="divide-y divide-adm-divider">
+      {rows.map((r) => (
+        <li key={r.key} className="py-3 first:pt-0 last:pb-0 flex items-start gap-3">
+          <AdminIcon name={r.ready ? "check-circle" : "alert"} size="card" className={cn("mt-0.5", r.ready ? "text-adm-success" : "text-adm-warning")} />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{r.label}</p>
+              <StatusBadge state={r.ready ? "enabled" : "setup_required"} label={r.ready ? "Ready" : "Incomplete"} />
+            </div>
+            <p className={cn("text-[14px] leading-[20px] break-words", r.ready ? "text-adm-ink" : "text-adm-muted", collapseReady && !r.ready && r.reason && "hidden")}>{r.value}</p>
+            {!r.ready && r.reason && <p className="mt-0.5 text-[13px] leading-[18px] text-adm-muted">{r.reason}</p>}
+            {!r.ready && <div className="mt-1"><EditLink to={r.editTo}>Fix where it is set</EditLink></div>}
           </div>
-          <p className={cn("text-[14px] leading-[20px] break-words", r.ready ? "text-adm-ink" : "text-adm-muted")}>{r.value}</p>
-          {!r.ready && r.reason && <p className="mt-0.5 text-[13px] leading-[18px] text-adm-muted max-sm:hidden">{r.reason}</p>}
-          {!r.ready && <div className="mt-1"><EditLink to={r.editTo}>Fix where it is set</EditLink></div>}
-        </div>
-      </li>
-    ))}
-  </ul>
-);
+        </li>
+      ))}
+      {ready.length > 0 && (
+        <li className="py-3 first:pt-0 last:pb-0 flex items-start gap-3">
+          <AdminIcon name="check-circle" size="card" className="mt-0.5 text-adm-success" />
+          <p className="min-w-0 flex-1 text-[14px] leading-[20px] text-adm-ink"><span className="font-semibold">Ready:</span> {ready.map((r) => r.label).join(", ")}</p>
+        </li>
+      )}
+    </ul>
+  );
+};
 
 export const PreviewFrame = ({ title, caption, children, draft }: { title: string; caption?: ReactNode; children: ReactNode; draft?: boolean }) => (
   <section aria-label={title} className="rounded-xl border border-adm-divider bg-adm-surface shadow-[0_1px_2px_rgba(27,43,59,0.06)]">

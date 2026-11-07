@@ -123,7 +123,7 @@ export default function AppearanceView() {
         try {
           await writeSettings(rest);
         } catch (e) {
-          const why = e instanceof Error ? e.message : "The server did not accept the change.";
+          const why = (e instanceof Error ? e.message : "The server did not accept the change.").replace(/\s*Nothing was saved\.?/i, "").trim();
           throw new Error(secondary_color !== undefined ? `The secondary colour was saved, but the other changes were not. ${why}` : why);
         }
       }

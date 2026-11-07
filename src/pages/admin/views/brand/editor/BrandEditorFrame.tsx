@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
-import { AdminIcon, DraftActionBar, EditorEmpty, EditorLayout, LeaveGuardDialog, ReviewChangesDialog, ScopeLabel, StatusBadge } from "@/components/admin/v3/editor";
+import { AdminIcon, AdvancedDisclosure, DraftActionBar, EditorEmpty, EditorLayout, LeaveGuardDialog, ReviewChangesDialog, ScopeLabel, StatusBadge } from "@/components/admin/v3/editor";
 import { AdminButton } from "@/components/admin/v2/primitives";
+import { useNarrow } from "./useNarrow";
 import type { BrandEditor, BrandEditorContext } from "./useBrandEditor";
 
 export const Notice = ({ tone = "info", title, children }: { tone?: "info" | "warning" | "danger"; title: string; children?: ReactNode }) => {
@@ -26,11 +27,13 @@ interface FrameProps<T extends Record<string, unknown>> {
   impact?: ReactNode;
   preview?: ReactNode;
   previewLabel?: string;
+  mobilePreview?: { top: ReactNode; after?: ReactNode };
   children: ReactNode;
 }
 
 /** Scope row, access notices, the form and preview columns, and the shared draft, review and leave-guard controls. */
-export function BrandEditorFrame<T extends Record<string, unknown>>({ ctx, editor, scopeNote, impact, preview, previewLabel, children }: FrameProps<T>) {
+export function BrandEditorFrame<T extends Record<string, unknown>>({ ctx, editor, scopeNote, impact, preview, previewLabel, mobilePreview, children }: FrameProps<T>) {
+  const narrow = useNarrow();
   const { source, canEdit, blockedReason } = ctx;
   return (
     <div className="space-y-4" data-brand-editor="">
@@ -54,7 +57,10 @@ export function BrandEditorFrame<T extends Record<string, unknown>>({ ctx, edito
         </Notice>
       )}
 
-      <EditorLayout preview={preview} previewLabel={previewLabel}>{children}</EditorLayout>
+      <EditorLayout preview={narrow ? mobilePreview?.after : preview} previewLabel={previewLabel}>
+        {narrow && (mobilePreview?.top ?? preview) && <AdvancedDisclosure title="Preview" className="bg-adm-surface"><div className="space-y-4">{mobilePreview ? mobilePreview.top : preview}</div></AdvancedDisclosure>}
+        {children}
+      </EditorLayout>
 
       {canEdit && (
         <DraftActionBar

@@ -47,15 +47,21 @@ function mix(hex: string, toward: "#000000" | "#FFFFFF", amount: number): string
 }
 
 /**
- * The closest accessible alternative to `hex` against `background`: the same hue, darkened on a light background or
- * lightened on a dark one, in 2 percent steps until it reaches `target`. Null when the colour already passes.
+ * The closest accessible alternative to `hex` against `background`: the same hue pushed toward black or white in 2
+ * percent steps, trying both directions and keeping the one that needs the smaller change. Null when the colour
+ * already passes or neither direction can reach `target`.
  */
 export function suggestAccessible(hex: string, background: string, target = AA_NORMAL_TEXT): string | null {
   if (!normalizeHex(hex) || contrastRatio(hex, background) >= target) return null;
-  const toward = relativeLuminance(background) > 0.4 ? "#000000" : "#FFFFFF";
-  for (let a = 0.02; a <= 1.0001; a += 0.02) {
-    const c = mix(hex, toward, a);
-    if (contrastRatio(c, background) >= target) return c;
-  }
-  return null;
+  const search = (toward: "#000000" | "#FFFFFF"): { colour: string; step: number } | null => {
+    for (let step = 1; step <= 50; step++) {
+      const c = mix(hex, toward, step * 0.02);
+      if (contrastRatio(c, background) >= target) return { colour: c, step };
+    }
+    return null;
+  };
+  const dark = search("#000000");
+  const light = search("#FFFFFF");
+  if (dark && light) return dark.step <= light.step ? dark.colour : light.colour;
+  return (dark ?? light)?.colour ?? null;
 }

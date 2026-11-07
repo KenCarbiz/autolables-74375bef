@@ -119,9 +119,9 @@ export default function WhyBuyView() {
   const patchReview = (id: string, p: Partial<ReviewItem>) => set("reviews", draft.reviews.map((r) => (r.id === id ? { ...r, ...p } : r)));
   const patchAward = (id: string, p: Partial<AwardItem>) => set("awards", draft.awards.map((a) => (a.id === id ? { ...a, ...p } : a)));
   const tabs: GroupTab[] = [
-    { id: "brand", label: "Brand promise", count: null, issue: !!(errs.top.dealer_tagline || errs.top.dealer_years_in_business || errs.top.dealer_storefront_url) },
-    { id: "reviews", label: "Reviews & reputation", count: draft.reviews.length, issue: !!(errs.top.dealer_google_rating || errs.top.dealer_google_count || errs.top.googleAsOf || errs.top.bbbAsOf || errs.top.satisfactionSource || errs.top.satisfactionAsOf || Object.keys(errs.reviews).length) },
-    { id: "amenities", label: "Amenities & services", count: draft.services.length + draft.amenities.length, issue: false },
+    { id: "brand", label: "Promise", count: null, issue: !!(errs.top.dealer_tagline || errs.top.dealer_years_in_business || errs.top.dealer_storefront_url) },
+    { id: "reviews", label: "Reviews", count: draft.reviews.length, issue: !!(errs.top.dealer_google_rating || errs.top.dealer_google_count || errs.top.googleAsOf || errs.top.bbbAsOf || errs.top.satisfactionSource || errs.top.satisfactionAsOf || Object.keys(errs.reviews).length) },
+    { id: "amenities", label: "Amenities", count: draft.services.length + draft.amenities.length, issue: false },
     { id: "awards", label: "Awards", count: draft.awards.length, issue: !!(Object.keys(errs.awards).length || Object.keys(errs.iihs).length) },
     { id: "advisor", label: "Advisor", count: null, issue: !!errs.top.dealer_advisor_photo },
   ];
