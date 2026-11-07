@@ -25,7 +25,9 @@ const dOf = (o: Partial<PassportData>): PassportData => ({
   marketCheckedAt: null,
   ...(o as object),
 } as PassportData);
-const lOf = (o: Partial<VehicleListing>): VehicleListing => ({ ...(o as object) } as VehicleListing);
+// Every synthetic listing carries a decoded spec unless a test removes it: the
+// VIN identity check needs a decode that returned, not just a typed ymm.
+const lOf = (o: Partial<VehicleListing>): VehicleListing => ({ key_specs: { engine: "decoded" }, ...(o as object) } as VehicleListing);
 
 // Every report must satisfy the two arithmetic invariants, always.
 const assertArithmetic = (r: VerificationReport) => {
@@ -68,7 +70,8 @@ describe("deriveVerificationReport — canonical customer summary", () => {
     expect(r.banner.heading).toBe("Review one item before purchase");
     expect(r.banner.body).toContain("6 checks verified · 1 needs confirmation · 1 pending");
     expect(r.banner.body).toContain("Confirm the recall status with the dealer");
-    expect(r.banner.body).toContain("the title and brand check is still pending");
+    // A pending check is reported in the counts, never as a review item.
+    expect(r.banner.body).not.toContain("the title and brand check is still pending");
   });
 
   it("sourceCount counts unique FAMILIES, not checks (four history checks = one family)", () => {

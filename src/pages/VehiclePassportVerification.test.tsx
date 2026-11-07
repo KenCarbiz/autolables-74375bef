@@ -30,6 +30,7 @@ const reviewListing = (): VehicleListing => ({
   id: "veh1", slug: "sample", vin: "5N1AL1F83VC332076", ymm: "2025 INFINITI QX50", trim: "LUXE AWD",
   mileage: 12480, condition: "used", price: 39500, market_value: 41000, market_payload: { belowMarket: 1500 },
   mc_attributes: { owner_count: 1, accident_count: 0, msrp: 45000 },
+  key_specs: { engine: "2.0L VC-Turbo" },
   warranty_info: { factory_months: 48, factory_miles: 60000, in_service_date: "2024-10-01" },
   recall_status: "clear", open_recall_count: 1,
   recall_check: { checked_at: "2026-07-10T00:00:00Z", has_open: true, do_not_drive: false, campaigns: [{ campaignNumber: "25V-118", component: "Rear view camera", summary: "The rearview image may fail.", remedy: "Software update." }] },

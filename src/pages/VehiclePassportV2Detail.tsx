@@ -18,6 +18,7 @@ import Logo from "@/components/brand/Logo";
 import { fmt$, type PassportData } from "@/lib/passportV2Data";
 import { governedPassportData } from "@/lib/passport/publicSurface";
 import { resolvePassportBack, passportForwardPath } from "@/lib/passportReturn";
+import { deriveVerificationReport, verificationCountsLine, verificationScopeLine, VERIFICATION_STATUS_LABEL, type VerificationStatus } from "@/lib/passport/verificationSummary";
 import { readBuildSheet } from "@/lib/buildSheet";
 import { resolveTodaysPrice } from "@/lib/todaysPrice";
 import TodaysPriceExperience from "@/components/passport/TodaysPriceExperience";
@@ -863,28 +864,32 @@ type SectionRender = (ctx: { d: PassportData; listing: VehicleListing; slug: str
 const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: boolean; hideCrossCta?: boolean; headerPill?: string }> = {
   "verification-report": {
     title: "Verification Report",
-    render: ({ d }) => (
-      <>
-        <SectionHeading icon={ShieldCheck} title="Verification Report" subtitle="Every check on this vehicle against trusted automotive data." />
-        <Card className="p-5 !border-emerald-200 !bg-emerald-50/40">
-          <div className="space-y-3">
-            {d.verifyRows.map((r) => (
-              <div key={r.label} className="flex items-center gap-3 text-[14px] font-medium text-slate-800"><CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />{r.label} <span className="ml-auto text-[12px] font-semibold text-emerald-600">Verified</span></div>
-            ))}
-            {d.verifyRows.length === 0 && <p className="text-[13px] text-slate-500">Verification checks appear here as data becomes available for this vehicle.</p>}
-          </div>
-        </Card>
-        {d.verifiedBy.length > 0 && (
-          <Card className="p-5 mt-4">
-            <p className="text-[12px] font-bold uppercase tracking-wider text-slate-400 mb-2">Data sources</p>
-            <div className="flex flex-wrap gap-2">
-              {d.verifiedBy.map((v) => <span key={v} className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate-700 bg-slate-100 rounded-full px-3 py-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />{v}</span>)}
+    // The same canonical report every other surface renders, so this page can
+    // never show a check as "Verified" that the Passport shows as pending.
+    render: ({ d, listing }) => {
+      const report = deriveVerificationReport(d, listing);
+      const tone = (st: VerificationStatus) =>
+        st === "verified" ? "text-emerald-600" : st === "dealer_attested" ? "text-teal-700"
+          : st === "needs_attention" || st === "needs_confirmation" ? "text-amber-600"
+          : st === "pending" ? "text-blue-600" : "text-slate-500";
+      return (
+        <>
+          <SectionHeading icon={ShieldCheck} title="Verification Report" subtitle={`${verificationScopeLine(report)} · ${verificationCountsLine(report)}`} />
+          <Card className="p-5">
+            <div className="space-y-3">
+              {report.checks.map((c) => (
+                <div key={c.key} className="flex items-center gap-3 text-[14px] font-medium text-slate-800">
+                  {c.status === "verified" ? <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" /> : <ShieldCheck className={`w-5 h-5 shrink-0 ${tone(c.status)}`} />}
+                  {c.name}
+                  <span className={`ml-auto text-[12px] font-semibold ${tone(c.status)}`}>{VERIFICATION_STATUS_LABEL[c.status]}</span>
+                </div>
+              ))}
             </div>
-            <p className="text-[11px] text-slate-400 mt-3 leading-snug">Verification reflects data provided by third-party sources (vehicle history, live market data, NHTSA) and the dealership. Confirm details directly with the dealer before purchase.</p>
           </Card>
-        )}
-      </>
-    ),
+          <p className="text-[11px] text-slate-400 mt-3 leading-snug">Pending and not-available checks have no result and are never counted as verified. Dealer-attested items are the dealer's own statement. Confirm details directly with the dealer before purchase.</p>
+        </>
+      );
+    },
   },
   "market-price": {
     title: "Market Price Analysis",

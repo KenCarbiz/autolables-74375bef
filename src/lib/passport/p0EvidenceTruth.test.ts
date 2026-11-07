@@ -15,7 +15,9 @@ const dOf = (o: Partial<PassportData>): PassportData => ({
   marketCheckedAt: null,
   ...(o as object),
 } as PassportData);
-const lOf = (o: Partial<VehicleListing>): VehicleListing => ({ ...(o as object) } as VehicleListing);
+// Every synthetic listing carries a decoded spec unless a test removes it: the
+// VIN identity check needs a decode that returned, not just a typed ymm.
+const lOf = (o: Partial<VehicleListing>): VehicleListing => ({ key_specs: { engine: "decoded" }, ...(o as object) } as VehicleListing);
 
 // Production shape (QX65 …606923): a VIN-level lookup that answered nothing.
 const UNAVAILABLE_RECALL = {
@@ -38,7 +40,8 @@ describe("L01 — recall wording comes from the exact VIN-level result", () => {
   it("an unavailable lookup never asserts an open recall, a clear VIN or a completed remedy", () => {
     const r = qx65();
     const recall = r.checks.find((c) => c.key === "recall")!;
-    expect(recall.status).toBe("pending");
+    // The VIN lookup ran and returned nothing usable: unavailable, not pending.
+    expect(recall.status).toBe("unavailable");
     expect(recall.recallOutcome).toBe("unavailable");
     expect(recallHeadline(recall)).toBe("Recall not verified for this VIN");
     const steps = deriveNextSteps(r).join(" \n ");
@@ -121,7 +124,7 @@ describe("L02 — one check-status inventory for every summary", () => {
     expect(r.completedChecks).toBeLessThan(r.totalChecks);
     const s = verificationScopeLine(r);
     expect(s).not.toMatch(/completed/);
-    expect(s).toBe(`8 data checks · ${r.completedChecks} returned a result`);
+    expect(s).toBe(`${r.verifiedChecks} of 8 checks verified`);
   });
 
   it("the dealer is never counted as an independent source family; pending checks consulted nothing", () => {

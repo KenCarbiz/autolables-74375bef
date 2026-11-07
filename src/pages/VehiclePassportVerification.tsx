@@ -16,6 +16,7 @@ import {
   deriveNextSteps, recallHeadline, verificationCountsLine,
   type VerificationReport, type ReportCheck, type VerificationStatus, type EvidenceProvenance,
   isSettledCheck,
+  verificationSnapshotKey,
 } from "@/lib/passport/verificationSummary";
 import { resolvePassportBack } from "@/lib/passportReturn";
 import { subjectIcon, incompleteIcon, rankActionable, resolveFinding } from "@/lib/passport/verificationFindings";
@@ -81,7 +82,7 @@ const HERO_TONE: Record<string, { bg: string; border: string; icon: React.Elemen
   green:   { bg: "bg-emerald-50", border: "border-emerald-200", icon: CircleCheck,   iconCls: "text-[#16A34A]", chip: "bg-emerald-100 text-[#15803D]", eyebrow: "Verification complete" },
   amber:   { bg: "bg-amber-50",   border: "border-amber-200",   icon: TriangleAlert, iconCls: "text-[#D97706]", chip: "bg-amber-100 text-[#B45309]", eyebrow: "Review before purchase" },
   red:     { bg: "bg-red-50",     border: "border-red-200",     icon: CircleAlert,   iconCls: "text-[#DC2626]", chip: "bg-red-100 text-[#B91C1C]", eyebrow: "Review before purchase" },
-  neutral: { bg: "bg-slate-50",   border: "border-slate-200",   icon: ShieldCheck,   iconCls: "text-[#64748B]", chip: "bg-slate-200 text-[#475569]", eyebrow: "Verification in progress" },
+  neutral: { bg: "bg-slate-50",   border: "border-slate-200",   icon: ShieldCheck,   iconCls: "text-[#64748B]", chip: "bg-slate-200 text-[#475569]", eyebrow: "Verification status" },
 };
 
 const dateLabel = (iso: string | null | undefined): string | null =>
@@ -346,8 +347,8 @@ const outcomeLabel = (c: ReportCheck): string =>
   c.status === "verified" ? (OUTCOME_LABEL[c.key] ?? "Verified") : VERIFICATION_STATUS_LABEL[c.status];
 
 const supportingLine = (c: ReportCheck): string =>
-  c.status === "pending" ? "Still processing · No result yet"
-  : c.status === "unavailable" ? "Source data unavailable · Not verified"
+  c.status === "pending" ? "Pending · No result returned yet"
+  : c.status === "unavailable" ? "Not available · No source data, not verified"
   : c.status === "needs_confirmation" ? "Sources disagree · Confirm with dealer"
   : c.status === "needs_attention" ? "Needs your attention"
   : "Checked";
@@ -491,10 +492,11 @@ const MobileVerification = ({
 
   const bannerHeading = attentionCount > 0
     ? `${attentionCount} item${attentionCount === 1 ? "" : "s"} need${attentionCount === 1 ? "s" : ""} your attention`
-    : report.pendingChecks > 0
-      ? `${report.pendingChecks} check${report.pendingChecks === 1 ? "" : "s"} still processing`
-      : "Verification checks completed";
-  const bannerCalm = attentionCount === 0 && report.pendingChecks === 0;
+    : report.banner.heading;
+  // Green only when the canonical banner is green (every check settled); a
+  // report with unavailable or pending checks and nothing to act on is neutral.
+  const bannerCalm = report.banner.tone === "green";
+  const bannerNeutral = report.banner.tone === "neutral";
   // Verdict breakdown reads the SAME terms and counts as the status grid, so the
   // two can never conflict — completed · attention · pending · unavailable.
   // One status inventory (L02): every non-zero status, dealer attestation
@@ -565,9 +567,9 @@ const MobileVerification = ({
         </section>
 
         {/* Overall-result banner */}
-        <section className={`rounded-2xl bg-white border border-[#E6EAF0] ${bannerCalm ? "border-l-4 border-l-[#16A34A]" : "border-l-4 border-l-[#D97706]"} p-4 flex items-center gap-3.5`} aria-live="polite">
-          <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${bannerCalm ? "bg-emerald-50" : "bg-amber-50"}`}>
-            {bannerCalm ? <ShieldCheck className="w-6 h-6 text-[#16A34A]" strokeWidth={1.9} /> : <ShieldAlert className="w-6 h-6 text-[#D97706]" strokeWidth={1.9} />}
+        <section className={`rounded-2xl bg-white border border-[#E6EAF0] ${bannerCalm ? "border-l-4 border-l-[#16A34A]" : bannerNeutral ? "border-l-4 border-l-[#94A3B8]" : "border-l-4 border-l-[#D97706]"} p-4 flex items-center gap-3.5`} aria-live="polite">
+          <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${bannerCalm ? "bg-emerald-50" : bannerNeutral ? "bg-slate-100" : "bg-amber-50"}`}>
+            {bannerCalm ? <ShieldCheck className="w-6 h-6 text-[#16A34A]" strokeWidth={1.9} /> : bannerNeutral ? <ShieldCheck className="w-6 h-6 text-[#64748B]" strokeWidth={1.9} /> : <ShieldAlert className="w-6 h-6 text-[#D97706]" strokeWidth={1.9} />}
           </span>
           <div className="min-w-0">
             <p className="text-[18px] font-bold leading-snug">{bannerHeading}</p>
@@ -638,7 +640,7 @@ const MobileVerification = ({
         {/* Checks completed */}
         {completedRows.length > 0 && (
           <section>
-            <h2 className="text-[17px] font-semibold px-1 mb-2">Checks completed</h2>
+            <h2 className="text-[17px] font-semibold px-1 mb-2">{(report.dealerAttestedChecks ?? 0) > 0 ? "Verified and dealer attested" : "Verified"}</h2>
             <div className="rounded-2xl bg-white border border-[#E6EAF0] divide-y divide-[#EEF1F4] overflow-hidden">
               {completedRows.map((c) => {
                 const Icon = subjectIcon(c);
@@ -646,7 +648,7 @@ const MobileVerification = ({
                   <button key={c.key} onClick={() => openCheck(c)} className="w-full min-h-[58px] px-4 py-3 flex items-center gap-3 text-left active:bg-slate-50">
                     <span className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0"><Icon className="w-[25px] h-[25px] text-[#16A34A]" strokeWidth={1.9} aria-hidden="true" /></span>
                     <p className="text-[15px] font-semibold text-[#0F172A] leading-snug min-w-0 flex-1">{c.name}</p>
-                    <span className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-[#16A34A] shrink-0"><CircleCheck className="w-[18px] h-[18px]" aria-hidden="true" />{outcomeLabel(c)}</span>
+                    <span className={`inline-flex items-center gap-1.5 text-[13.5px] font-semibold shrink-0 ${c.status === "dealer_attested" ? "text-[#0F766E]" : "text-[#16A34A]"}`}>{c.status === "dealer_attested" ? <ShieldCheck className="w-[18px] h-[18px]" aria-hidden="true" /> : <CircleCheck className="w-[18px] h-[18px]" aria-hidden="true" />}{outcomeLabel(c)}</span>
                     <ChevronRight className="w-[19px] h-[19px] text-[#94A3B8] shrink-0" aria-hidden="true" />
                   </button>
                 );
@@ -761,6 +763,7 @@ const MobileVerification = ({
           <div className="rounded-xl border border-[#E6EAF0] bg-[#FAFBFC] divide-y divide-[#F1F5F9] px-4">
             {[
               { label: "Report ID", value: reportId },
+              { label: "Report version", value: verificationSnapshotKey(report, listing.vin) },
               { label: "Generated", value: reportGenerated },
               { label: "Source data through", value: lastChecked },
               { label: "VIN", value: listing.vin || null },
@@ -862,6 +865,7 @@ const VerificationPrintDoc = ({ report, listing, slug }: { report: VerificationR
           <p className="text-[14px] font-bold mt-2">AutoLabels Data-Verified Report</p>
           <p className="text-[10.5px] text-neutral-600 mt-0.5">Report generated {reportGenerated}{lastChecked ? ` · Source data last checked ${lastChecked}` : ""}</p>
           <p className="text-[10.5px] text-neutral-500">Report {reportId}</p>
+          <p className="text-[9.5px] text-neutral-400">Version {verificationSnapshotKey(report, listing.vin)}</p>
         </div>
         <div className="text-right shrink-0">
           <p className="text-[14px] font-bold">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}{condition ? ` · ${condition}` : ""}</p>
@@ -898,7 +902,7 @@ const VerificationPrintDoc = ({ report, listing, slug }: { report: VerificationR
       {/* Verified checks */}
       {verified.length > 0 && (
         <section className="mb-4">
-          <H2>Verified checks ({verified.length})</H2>
+          <H2>{`Verified checks (${report.verifiedChecks})${(report.dealerAttestedChecks ?? 0) > 0 ? ` and dealer attested (${report.dealerAttestedChecks})` : ""}`}</H2>
           {verified.map((c) => <PrintCheckCard key={c.key} check={c} />)}
         </section>
       )}
@@ -1288,7 +1292,7 @@ const VehiclePassportVerification = () => {
                 <div className="flex items-start gap-2.5">
                   <CircleMinus className="w-[18px] h-[18px] text-[#94A3B8] shrink-0 mt-0.5" aria-hidden="true" />
                   <div className="min-w-0">
-                    <p className="text-[13px] font-bold text-[#475569]">Awaiting source data <span className="font-medium text-[#94A3B8]">— no result, not a problem found</span></p>
+                    <p className="text-[13px] font-bold text-[#475569]">Not available <span className="font-medium text-[#94A3B8]">— no source data, so not verified and no problem found</span></p>
                     <p className="text-[12px] text-[#64748B] mt-0.5">{unavailable.map((c) => c.name).join(", ")} could not run because the underlying records are not available for this vehicle.</p>
                   </div>
                 </div>
@@ -1304,7 +1308,7 @@ const VehiclePassportVerification = () => {
           <section id="v-verified" className="scroll-mt-6">
             <div className="flex items-baseline justify-between gap-3">
               <h2 className="text-[17px] font-bold">What checked out</h2>
-              <span className="text-[12.5px] text-[#94A3B8]">{verified.length} verified {verified.length === 1 ? "check" : "checks"}</span>
+              <span className="text-[12.5px] text-[#94A3B8]">{report.verifiedChecks} verified {report.verifiedChecks === 1 ? "check" : "checks"}{(report.dealerAttestedChecks ?? 0) > 0 ? ` · ${report.dealerAttestedChecks} dealer attested` : ""}</span>
             </div>
             {verified.length === 0 ? (
               <div className={`${CARD} p-5 mt-3`}><p className="text-[13.5px] text-[#64748B]">No checks have returned a verified result yet.</p></div>

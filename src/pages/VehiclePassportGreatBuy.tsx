@@ -334,10 +334,13 @@ const VehiclePassportGreatBuy = () => {
   }));
 
   // Hero trust badges — each renders only when the underlying data backs it.
-  const oemVerified = Object.keys(mc).length > 0 || (listing.key_specs && Object.keys(listing.key_specs).length > 0);
+  // Claims read the canonical report: a stored provider field (even a retry
+  // counter) is not a verified source, and a photo plus an equipment list is
+  // not a dealer verification.
+  const oemVerified = vReport.checks.find((c) => c.key === "vin")?.status === "verified";
+  const checksLine = vReport.verifiedChecks > 0 ? `${vReport.verifiedChecks} of ${vReport.totalChecks} data checks verified` : null;
   const trustBadges = [
     d.ownerCount === 1 ? "One Owner" : null,
-    d.verifyRows.length > 0 ? "Dealer Verified" : null,
     oemVerified ? "OEM Verified" : null,
     recallVerified ? "No Open Recalls" : null,
     d.marketAvg != null || d.comparables.length > 0 ? "Market Data Verified" : null,
@@ -351,7 +354,7 @@ const VehiclePassportGreatBuy = () => {
   // AI summary confidence tiles — data-gated; the three strongest render.
   const insights: { icon: LucideIcon; label: string }[] = ([
     (gbSheet?.packages.length ?? 0) > 0 || equipCount >= 8 ? { icon: Sparkles, label: "Well equipped for the price" } : null,
-    d.verifyRows.length > 0 ? { icon: ShieldCheck, label: "Verified and thoroughly checked" } : null,
+    checksLine ? { icon: ShieldCheck, label: checksLine } : null,
     isNew || d.ownerCount === 1 ? { icon: Users, label: "One-owner advantage" } : null,
     (d.belowMarket && d.belowMarket > 0) || (msrpDelta != null && msrpDelta > 0) || (priceFactor?.score ?? 0) >= 85 ? { icon: DollarSign, label: "Above average value" } : null,
     (d.marketMeta.daysSupply != null && d.marketMeta.daysSupply < 60) || (d.viewCount ?? 0) > 20 ? { icon: TrendingUp, label: "High local demand" } : null,
@@ -361,7 +364,6 @@ const VehiclePassportGreatBuy = () => {
   const why: string[] = [];
   if (d.ownerCount === 1) why.push("One previous owner");
   if (isNew) why.push("New — you are the first owner");
-  if (d.verifyRows.length > 0) why.push("Dealer verified");
   if (premium) why.push(`Premium trim — ${listing.trim}`);
   if (oemVerified) why.push("OEM data verified");
   if (d.belowMarket && d.belowMarket > 0) why.push(`Priced ${fmt$(d.belowMarket)} below market`);
@@ -470,7 +472,6 @@ const VehiclePassportGreatBuy = () => {
   };
   const subjectPros = [
     d.ownerCount === 1 ? "One owner" : isNew ? "New — first owner" : null,
-    d.verifyRows.length > 0 ? "Dealer verified" : null,
     gbSheet?.estValue ? "Better equipment" : null,
     d.belowMarket && d.belowMarket > 0 ? "Below market price" : null,
     d.warrantyStr && !d.warrantyExpired ? "Warranty remains" : null,
@@ -491,7 +492,6 @@ const VehiclePassportGreatBuy = () => {
   if (d.belowMarket && d.belowMarket > 0) buyNow.push("Priced below the market average right now.");
   if (sold.velocity) buyNow.push(`${sold.velocity}.`);
   if (d.saveVsMsrp) buyNow.push(`Priced ${fmt$(d.saveVsMsrp)} below MSRP.`);
-  if (d.verifyRows.length > 0) buyNow.push("Dealer verified and ready for the next step.");
   if (d.dom != null && d.marketMeta.avgDom != null && d.marketMeta.avgDom <= CREDIBLE_AVG_DOM_MAX && d.dom < d.marketMeta.avgDom) buyNow.push("Market days are favorable compared with similar listings.");
   else if (isPreview && buyNow.length < 4) buyNow.push("Market days are favorable compared with similar listings.");
   if ((d.viewCount ?? 0) > 20 && buyNow.length < 5) buyNow.push("High shopper interest in your area.");

@@ -308,6 +308,25 @@ function latestDate(dates: (string | null)[]): string | null {
   return valid.length ? valid[valid.length - 1] : null;
 }
 
+type DecodeBag = { mc_attributes?: Record<string, unknown> | null; key_specs?: Record<string, unknown> | null };
+
+/** Which decode returned data for this VIN, or null when none has. */
+export function vinDecodeEvidence(listing: VehicleListing): string | null {
+  const l = listing as unknown as DecodeBag;
+  const mc = (l.mc_attributes ?? {}) as Record<string, unknown>;
+  if (typeof mc.specs_decoded_at === "string" && mc.specs_decoded_at) return `VIN decode (${String(mc.specs_source || "provider")})`;
+  if (mc.build_sheet && typeof mc.build_sheet === "object") return "VIN build sheet";
+  if (typeof mc.make === "string" && mc.make && typeof mc.model === "string" && mc.model) return "Provider VIN record";
+  if (l.key_specs && typeof l.key_specs === "object" && Object.keys(l.key_specs).length > 0) return "Decoded specifications";
+  return null;
+}
+
+/** The decode was tried the full number of times and returned nothing. */
+function vinDecodeExhausted(listing: VehicleListing): boolean {
+  const mc = ((listing as unknown as DecodeBag).mc_attributes ?? {}) as Record<string, unknown>;
+  return Number(mc.specs_attempts) >= 3;
+}
+
 const isValidVin = (vin: string | null | undefined): boolean =>
   !!vin && /^[A-HJ-NPR-Z0-9]{17}$/i.test(vin);
 
@@ -356,20 +375,28 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
   // 1 — VIN & vehicle identity (OEM / VIN decode)
   checks.push((() => {
     const s = src("oem_vin");
-    const decoded = !!listing.ymm;
+    // "Decoded" means a VIN decode actually returned data for this VIN. A
+    // year/make/model typed into the dealer feed is not a decode, so on its
+    // own it no longer verifies the identity check.
+    const decodedFrom = vinDecodeEvidence(listing);
+    const decoded = decodedFrom != null && !!listing.ymm;
     const valid = isValidVin(listing.vin);
-    const status: VerificationStatus = valid && decoded ? "verified" : listing.vin ? "pending" : "unavailable";
+    const status: VerificationStatus = valid && decoded ? "verified"
+      : !listing.vin ? "unavailable"
+      : valid && vinDecodeExhausted(listing) ? "unavailable"
+      : "pending";
     return {
       key: "vin", name: "VIN and vehicle identity", ...s, material: true, highSeverity: false,
       status,
       finding: status === "verified"
         ? `VIN decodes to the listed ${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""} and passed 17-character format validation.`
         : status === "pending" ? null : null,
-      reviewNote: status === "pending" ? "the VIN decode has not completed" : null,
+      reviewNote: null,
       evidence: [
         { label: "VIN", value: listing.vin || null },
         { label: "Format check", value: valid ? "Valid 17-character VIN" : listing.vin ? "Not confirmed" : null },
         { label: "Decoded vehicle", value: decoded ? `${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""}` : null },
+        { label: "Decode result", value: decoded ? decodedFrom : status === "unavailable" && listing.vin ? "The VIN decode returned no data" : null },
         { label: "Source", value: FAMILY_META.oem_vin.label },
       ],
       checkedAt: status === "verified" ? reportTime : null,
@@ -424,15 +451,18 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
   checks.push((() => {
     const s = src("vehicle_history");
     const miles = listing.mileage;
+    // Without any history record there is nothing to corroborate the reading
+    // against and no lookup in flight, so the check is unavailable, not
+    // pending: "pending" is reserved for a result that is still expected.
     const status: VerificationStatus =
-      miles == null ? "unavailable" : historyConsulted ? "verified" : "pending";
+      miles == null || !historyConsulted ? "unavailable" : "verified";
     return {
       key: "odometer", name: "Odometer reading", ...s, material: true, highSeverity: false,
       status,
       finding: status === "verified"
         ? `Odometer reads ${milesFmt(miles as number)} mi with no rollback indicators in the available records.`
         : null,
-      reviewNote: status === "pending" ? "the odometer reading is still being corroborated against history records" : null,
+      reviewNote: null,
       evidence: [
         { label: "Reported mileage", value: miles != null ? `${milesFmt(miles)} mi` : null },
         { label: "Rollback indicators", value: status === "verified" ? "None found in available records" : null },
@@ -508,6 +538,10 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
     else if (v.conflict) status = "needs_confirmation";
     else if (v.riskSignalled) status = "needs_attention";
     else if (v.vin.clearClaimAllowed) status = "verified";
+    // A VIN lookup that ran and returned nothing usable is unavailable. Only a
+    // lookup that has not run yet, or a result that has gone stale and is due
+    // a refresh, is pending. Neither is ever "no recalls".
+    else if (recallOutcomeOf(v) === "unavailable" && v.vin.source != null) status = "unavailable";
     else status = "pending";
     const outcome = recallOutcomeOf(v);
     const asOf = dateFmt(v.vin.checkedAt ?? model?.checkedAt ?? null);
@@ -531,7 +565,7 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
         : status === "needs_attention" && highSeverity ? "a do-not-drive recall is reported"
         : outcome === "vin_open" ? "an open recall is reported for this VIN"
         : status === "needs_attention" ? "ask whether this VIN is part of the recall campaigns on its model"
-        : status === "pending" ? "recall verification for this VIN is unavailable" : null,
+        : status === "pending" ? "the VIN recall check has not returned a result yet" : null,
       evidence: [
         { label: "Campaign number", value: recall.campaign.number },
         { label: "Affected component", value: recall.campaign.component },
@@ -664,38 +698,49 @@ function buildBanner(a: {
   if (a.unavailableChecks > 0) parts.push(`${a.unavailableChecks} not available`);
   const countsLine = parts.join(" · ");
 
-  // The headline counts items that genuinely need buyer action (attention +
-  // confirmation). When there are none, outstanding PENDING checks are what to
-  // watch, so they drive the count instead. Green only when neither exists.
+  // The headline counts ONLY items that ask something of the buyer (attention
+  // + confirmation). Pending and unavailable checks are reported as what they
+  // are, never folded into a "review" count, and nothing reads green unless
+  // every check in scope returned an independent or attested result.
   const actionCount = a.needsAttentionChecks + a.needsConfirmationChecks;
-  const headlineCount = actionCount > 0 ? actionCount : a.pendingChecks;
+  const settled = a.verifiedChecks + a.dealerAttestedChecks;
+  const total = settled + actionCount + a.pendingChecks + a.unavailableChecks;
+  const progress = `${a.verifiedChecks} of ${total} ${total === 1 ? "check" : "checks"} verified`;
 
-  if (actionCount === 0 && a.pendingChecks === 0) {
+  if (actionCount === 0) {
+    if (a.pendingChecks === 0 && a.unavailableChecks === 0) {
+      return {
+        tone: "green",
+        heading: "Verification checks completed",
+        body: `${countsLine}. Every check returned a result, and none needs review before purchase.`,
+        reviewCount: 0,
+      };
+    }
+    const which = a.pendingChecks > 0 && a.unavailableChecks > 0 ? "pending or not available"
+      : a.pendingChecks > 0 ? "pending" : "not available";
     return {
-      tone: "green",
-      heading: a.unavailableChecks > 0 ? "No items need review" : "Verification checks completed",
-      body: a.unavailableChecks > 0
-        ? `${countsLine}. Nothing needs review before purchase; checks marked not available had no source data.`
-        : `${countsLine}. Every check returned a result — no items need review before purchase.`,
+      tone: "neutral",
+      heading: progress,
+      body: `${countsLine}. No source reported a problem. Checks marked ${which} have no result and are not counted as verified.`,
       reviewCount: 0,
     };
   }
 
   // Actionable notes (imperative, verb-led — "confirm the recall...") are asked
-  // first; status notes ("the title check is still pending") follow as context.
+  // first; status notes ("a title brand is on record") follow as context.
   const reviewNotes = a.checks
-    .filter((c) => c.reviewNote && (c.status === "needs_attention" || c.status === "needs_confirmation" || c.status === "pending"))
+    .filter((c) => c.reviewNote && (c.status === "needs_attention" || c.status === "needs_confirmation"))
     .map((c) => c.reviewNote as string);
   const actions = reviewNotes.filter(startsWithVerb);
   const statuses = reviewNotes.filter((n) => !startsWithVerb(n));
   const clauses: string[] = [];
   if (actions.length) clauses.push(capitalizeFirst(joinList(actions)));
   if (statuses.length) clauses.push(`${actions.length ? "and note that " : "Note that "}${joinList(statuses)}`);
-  const reviewSentence = clauses.length ? `Most information checked out. ${clauses.join(", ")}.` : "";
+  const reviewSentence = clauses.length ? `${clauses.join(", ")}.` : "";
 
-  const heading = headlineCount === 1 ? "Review one item before purchase" : `Review ${headlineCount} items before purchase`;
+  const heading = actionCount === 1 ? "Review one item before purchase" : `Review ${actionCount} items before purchase`;
   const tone: VerificationBanner["tone"] = a.anyHighSeverity ? "red" : "amber";
-  return { tone, heading, body: `${countsLine}. ${reviewSentence}`.trim(), reviewCount: headlineCount };
+  return { tone, heading, body: `${countsLine}. ${reviewSentence}`.trim(), reviewCount: actionCount };
 }
 
 const VERB_RE = /^(confirm|ask|review|contact|verify|check)\b/i;
@@ -802,14 +847,26 @@ export function verificationCountsLine(r: VerificationReport): string {
 }
 
 /**
- * The hero subtitle. Never "8 checks completed" when some have no result —
- * it says how many checks ran and how many returned a result.
+ * The hero subtitle, e.g. "4 of 8 checks verified". Never "8 checks
+ * completed": only independently verified checks are counted here.
  */
 export function verificationScopeLine(r: VerificationReport): string {
   const total = r.totalChecks;
-  const returned = r.completedChecks;
-  if (returned === total) return `${total} data ${total === 1 ? "check" : "checks"}, all returned a result`;
-  return `${total} data ${total === 1 ? "check" : "checks"} · ${returned} returned a result`;
+  return `${r.verifiedChecks} of ${total} ${total === 1 ? "check" : "checks"} verified`;
+}
+
+/**
+ * Versioned identity of a report: the same VIN, the same source snapshot and
+ * the same report version always produce the same statuses and counts. Shown
+ * on the report and the printed PDF so two copies can be compared.
+ */
+export const VERIFICATION_REPORT_VERSION = "2026-11-07.1";
+
+export function verificationSnapshotKey(r: VerificationReport, vin: string | null | undefined): string {
+  const statuses = r.checks.map((c) => `${c.key}:${c.status}`).join(",");
+  let h = 0;
+  for (let i = 0; i < statuses.length; i++) h = (h * 31 + statuses.charCodeAt(i)) >>> 0;
+  return `${VERIFICATION_REPORT_VERSION}/${(vin || "novin").toUpperCase()}/${r.lastCheckedAt ?? "unchecked"}/${h.toString(36)}`;
 }
 
 // ── Recall wording, one place (L01) ─────────────────────────────────────────
