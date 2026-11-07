@@ -10,9 +10,9 @@ import { useSaveFlow } from "@/lib/admin/useSaveFlow";
 import { deriveDraftBarState, useLeaveGuard, type ReviewChangeRow } from "@/components/admin/v3/editor";
 import { useBrandSource, type BrandSource } from "../useBrandForm";
 
-export type FixtureVariant = "default" | "empty" | "invalid" | "readonly" | "error" | "paused" | "match" | "ambiguous" | "missing" | "variant" | "none" | "partial" | "broken" | "conflict";
+export type FixtureVariant = "default" | "empty" | "invalid" | "readonly" | "error" | "paused" | "match" | "ambiguous" | "missing" | "variant" | "none" | "partial" | "broken" | "conflict" | "blocked";
 
-const VARIANTS: readonly FixtureVariant[] = ["default", "empty", "invalid", "readonly", "error", "paused", "match", "ambiguous", "missing", "variant", "none", "partial", "broken", "conflict"];
+const VARIANTS: readonly FixtureVariant[] = ["default", "empty", "invalid", "readonly", "error", "paused", "match", "ambiguous", "missing", "variant", "none", "partial", "broken", "conflict", "blocked"];
 
 export function useFixtureVariant(active: boolean): FixtureVariant {
   const { search } = useLocation();
