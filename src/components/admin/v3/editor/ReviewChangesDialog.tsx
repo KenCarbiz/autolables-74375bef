@@ -52,21 +52,21 @@ export const ReviewChangesDialog = ({
   onApply: () => void;
 }) => {
   const returnFocus = useReturnFocus(open);
-  const body = useRef<HTMLDivElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(next) => { if (!next && !applying) onCancel(); }}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[#0B1526]/50" />
         <DialogPrimitive.Content
           data-admin-v3=""
-          onOpenAutoFocus={(e) => { e.preventDefault(); body.current?.focus(); }}
+          onOpenAutoFocus={(e) => { e.preventDefault(); titleRef.current?.focus(); }}
           onCloseAutoFocus={returnFocus}
           onInteractOutside={(e) => { if (applying) e.preventDefault(); }}
-          className="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-24px)] sm:w-full max-w-[720px] max-h-[calc(100dvh-24px)] max-sm:left-0 max-sm:top-0 max-sm:translate-x-0 max-sm:translate-y-0 max-sm:w-screen max-sm:h-[100dvh] max-sm:max-h-none max-sm:rounded-none flex flex-col rounded-xl bg-adm-surface border border-adm-border shadow-xl text-adm-ink"
+          className="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-24px)] sm:w-full max-w-[720px] max-h-[calc(100dvh-24px)] max-sm:inset-0 max-sm:translate-x-0 max-sm:translate-y-0 max-sm:w-auto max-sm:h-dvh max-sm:max-h-none max-sm:rounded-none max-sm:border-0 flex flex-col rounded-xl bg-adm-surface border border-adm-border shadow-xl text-adm-ink"
         >
           <header className="flex items-start justify-between gap-4 px-5 sm:px-6 pt-5 pb-4 border-b border-adm-divider">
             <div className="min-w-0">
-              <DialogPrimitive.Title className="text-[20px] leading-[28px] font-bold">{title}</DialogPrimitive.Title>
+              <DialogPrimitive.Title ref={titleRef} tabIndex={-1} className="text-[20px] leading-[28px] font-bold outline-none">{title}</DialogPrimitive.Title>
               <DialogPrimitive.Description className="mt-1 text-[14px] leading-[20px] text-adm-muted">
                 {changes.length === 1 ? "1 change" : `${changes.length} changes`} will be applied. Nothing is saved until you apply.
               </DialogPrimitive.Description>
@@ -75,7 +75,7 @@ export const ReviewChangesDialog = ({
               <IconButton name="close" label="Close review" disabled={applying} />
             </DialogPrimitive.Close>
           </header>
-          <div ref={body} tabIndex={0} role="region" aria-label="Changes to review" className="px-5 sm:px-6 py-5 overflow-y-auto min-h-0 flex-1 space-y-5 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-adm-primary">
+          <div tabIndex={0} role="region" aria-label="Changes to review" className="px-5 sm:px-6 py-5 overflow-y-auto min-h-0 flex-1 space-y-5 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-adm-primary">
             <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-[120px_1fr] text-[14px] leading-[20px]">
               <dt className="text-adm-muted">Scope</dt>
               <dd className="font-medium min-w-0 break-words">{scope}</dd>

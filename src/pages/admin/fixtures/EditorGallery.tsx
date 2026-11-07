@@ -6,7 +6,7 @@ import { AdminButton } from "@/components/admin/v2/primitives";
 import {
   AdminIcon, ADMIN_ICON_NAMES, AdvancedDisclosure, BlockedFeatureNotice, ChipInput, ColorField, DataTable, DetailDrawer, DraftActionBar,
   EditorEmpty, EditorLayout, FieldGroup, FieldRow, INPUT_CLASS, LogoSlot, MetricCard, PreviewOnlyNotice, ReviewChangesDialog,
-  LeaveGuardDialog, ScopeLabel, SelectField, useLeaveGuard, SectionCard, SortableList, StatusBadge, WeekScheduleEditor, type DaySchedule, type StatusState, type WeekSchedule, WEEK_DAYS,
+  LeaveGuardDialog, useIsNarrow, ScopeLabel, SelectField, useLeaveGuard, SectionCard, SortableList, StatusBadge, WeekScheduleEditor, type DaySchedule, type StatusState, type WeekSchedule, WEEK_DAYS,
   type DataColumn, type SortableItem,
 } from "@/components/admin/v3/editor";
 import { STATUS_META } from "@/components/admin/v3/editor/StatusBadge";
@@ -69,6 +69,17 @@ export default function EditorGallery() {
   const [chips, setChips] = useState(["fixture-one", "fixture-two"]);
   const [week, setWeek] = useState<WeekSchedule>(INITIAL_WEEK);
   const [detail, setDetail] = useState<Row | null>(drawerOpen ? ROWS[2] : null);
+  const narrow = useIsNarrow();
+  const iconGrid = (
+    <ul className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-2">
+                {ADMIN_ICON_NAMES.map((n) => (
+                  <li key={n} className="flex flex-col items-center gap-1 rounded-lg border border-adm-divider bg-adm-surface px-2 py-3 text-[12px] text-adm-muted">
+                    <AdminIcon name={n} size="card" className="text-adm-ink" />
+                    <span className="break-all text-center">{n}</span>
+                  </li>
+                ))}
+              </ul>
+  );
   const stateList = useMemo(() => Object.keys(STATUS_META) as StatusState[], []);
 
   return (
@@ -147,29 +158,35 @@ export default function EditorGallery() {
 
         <Block title="Inputs">
           <div className="grid gap-4 lg:grid-cols-2 items-start">
-            <SectionCard title="Colors" icon="palette">
-              <ColorField name="Fixture primary" role="Primary" value={color} onChange={setColor} />
-              <ColorField name="Fixture invalid" role="Accent" value={badColor} onChange={setBadColor} />
-              <ColorField name="Fixture pale" value="#F5F5A0" onChange={() => {}} />
-            </SectionCard>
-            <SectionCard title="Logos" icon="image">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <LogoSlot label="Logo for light backgrounds" src={lightLogo} guidance="PNG or SVG, transparent, up to 2 MB." onSelectFile={(f) => setLightLogo(URL.createObjectURL(f))} onRemove={() => setLightLogo(null)} />
-                <LogoSlot label="Logo for dark backgrounds" surface="dark" uploading progress={45} error="Fixture error: file could not be read." onSelectFile={() => {}} />
-              </div>
-            </SectionCard>
-            <SectionCard title="Sortable list and chips" icon="list">
-              <SortableList label="Fixture modules" items={items} onChange={setItems} />
-              <ChipInput label="Fixture tags" values={chips} onChange={setChips} />
-            </SectionCard>
-            <SectionCard title="Weekly hours" icon="clock" description="Saturday shows a zero-length range. Friday is overnight, Thursday closes at midnight, Wednesday is open 24 hours.">
-              <WeekScheduleEditor
-                value={week}
-                onChange={setWeek}
-                timezoneSlot={<FieldRow label="Time zone">{(p) => <SelectField {...p}><option>Fixture / Zone</option></SelectField>}</FieldRow>}
-              />
-            </SectionCard>
+            <div className="space-y-4 min-w-0">
+              <SectionCard title="Colors" icon="palette">
+                <ColorField name="Fixture primary" role="Primary" value={color} onChange={setColor} />
+                <ColorField name="Fixture invalid" role="Accent" value={badColor} onChange={setBadColor} />
+                <ColorField name="Fixture pale" value="#F5F5A0" onChange={() => {}} />
+              </SectionCard>
+              <SectionCard title="Tags" icon="tag">
+                <ChipInput label="Fixture tags" values={chips} onChange={setChips} />
+              </SectionCard>
+            </div>
+            <div className="space-y-4 min-w-0">
+              <SectionCard title="Logos" icon="image">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <LogoSlot label="Logo for light backgrounds" src={lightLogo} guidance="PNG or SVG, transparent, up to 2 MB." onSelectFile={(f) => setLightLogo(URL.createObjectURL(f))} onRemove={() => setLightLogo(null)} />
+                  <LogoSlot label="Logo for dark backgrounds" surface="dark" uploading progress={45} error="Fixture error: file could not be read." onSelectFile={() => {}} />
+                </div>
+              </SectionCard>
+              <SectionCard title="Sortable list" icon="list">
+                <SortableList label="Fixture modules" items={items} onChange={setItems} />
+              </SectionCard>
+            </div>
           </div>
+          <SectionCard title="Weekly hours" icon="clock" description="Saturday shows a zero-length range. Friday is overnight, Thursday closes at midnight, Wednesday is open 24 hours.">
+            <WeekScheduleEditor
+              value={week}
+              onChange={setWeek}
+              timezoneSlot={<FieldRow label="Time zone" className="max-w-md">{(p) => <SelectField {...p}><option>Fixture / Zone</option></SelectField>}</FieldRow>}
+            />
+          </SectionCard>
         </Block>
 
         <Block title="Table with 60 rows, plus empty, error and loading">
@@ -190,14 +207,7 @@ export default function EditorGallery() {
         </Block>
 
         <Block title={`Icon set (${ADMIN_ICON_NAMES.length})`}>
-          <ul className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-2">
-            {ADMIN_ICON_NAMES.map((n) => (
-              <li key={n} className="flex flex-col items-center gap-1 rounded-lg border border-adm-divider bg-adm-surface px-2 py-3 text-[12px] text-adm-muted">
-                <AdminIcon name={n} size="card" className="text-adm-ink" />
-                <span className="break-all text-center">{n}</span>
-              </li>
-            ))}
-          </ul>
+          {narrow ? <AdvancedDisclosure title="Show all icons">{iconGrid}</AdvancedDisclosure> : iconGrid}
         </Block>
       </div>
 

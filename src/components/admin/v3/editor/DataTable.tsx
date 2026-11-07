@@ -1,29 +1,15 @@
 import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
-
-const NARROW = "(max-width: 767px)";
-function useNarrow() {
-  const get = () => typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia(NARROW).matches;
-  const [narrow, setNarrow] = useState(get);
-  useEffect(() => {
-    const mq = window.matchMedia(NARROW);
-    const on = () => setNarrow(mq.matches);
-    on();
-    mq.addEventListener?.("change", on);
-    return () => mq.removeEventListener?.("change", on);
-  }, []);
-  return narrow;
-}
-
 import { AdminButton } from "@/components/admin/v2/primitives";
 import { ScrollRegion } from "@/components/admin/v2/ScrollRegion";
 import { cn } from "@/lib/utils";
 import { AdminIcon } from "./AdminIcon";
+import { useIsNarrow } from "./useIsNarrow";
 import { INPUT_CLASS } from "./EditorLayout";
 import { SelectField } from "./FormControls";
 import { EditorEmpty } from "./EditorArtwork";
 
 export const PAGE_SIZES = [25, 50, 100] as const;
-export type PageSize = (typeof PAGE_SIZES)[number];
+export type PageSize = (typeof PAGE_SIZES)[number] | 10;
 
 export interface DataColumn<T> {
   id: string;
@@ -48,7 +34,8 @@ export interface DataTableProps<T> {
   emptyTitle?: string;
   emptyDescription?: ReactNode;
   emptyAction?: ReactNode;
-  initialPageSize?: PageSize;
+  /** Defaults to 25, or 10 below 768px. */
+  initialPageSize?: PageSize | 10;
   onOpenRow?: (row: T) => void;
   rowLabel?: (row: T) => string;
   minWidth?: number;
@@ -58,13 +45,13 @@ const SKELETON_ROWS = 5;
 
 export function DataTable<T>({
   caption, columns, rows, rowKey, searchText, searchLabel = "Search", filters, loading, error, emptyTitle = "Nothing here yet",
-  emptyDescription, emptyAction, initialPageSize = 25, onOpenRow, rowLabel, minWidth = 640,
+  emptyDescription, emptyAction, initialPageSize, onOpenRow, rowLabel, minWidth = 640,
 }: DataTableProps<T>) {
   const id = useId();
   const [query, setQuery] = useState("");
-  const [pageSize, setPageSize] = useState<PageSize>(initialPageSize);
+  const narrow = useIsNarrow();
+  const [pageSize, setPageSize] = useState<PageSize>(initialPageSize ?? (narrow ? 10 : 25));
   const [page, setPage] = useState(0);
-  const narrow = useNarrow();
 
   const filtered = useMemo(() => {
     if (!rows) return [];
@@ -177,7 +164,7 @@ export function DataTable<T>({
               <label className="flex items-center gap-2">
                 <span>Rows per page</span>
                 <SelectField value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value) as PageSize); setPage(0); }} wrapperClassName="w-auto">
-                  {PAGE_SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
+                  {(narrow ? [10, ...PAGE_SIZES] : PAGE_SIZES).map((n) => <option key={n} value={n}>{n}</option>)}
                 </SelectField>
               </label>
               <nav aria-label={`${caption} pages`} className="flex items-center gap-2">

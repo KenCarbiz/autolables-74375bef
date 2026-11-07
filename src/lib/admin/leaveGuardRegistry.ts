@@ -13,7 +13,7 @@ const entries = new Set<LeaveGuardEntry>();
 let installed = false;
 let lastIdx: number | null = null;
 let lastPath = "";
-let restoring = false;
+let pending: { originIdx: number | null; timer: ReturnType<typeof setTimeout> } | null = null;
 let bypass = false;
 let uninstall: (() => void) | null = null;
 
@@ -29,8 +29,20 @@ export function syncLeaveGuardLocation() {
   lastPath = pathOf();
 }
 
+// One install per window: a re-evaluated module (HMR, duplicate import) must not stack a second set of
+// history wrappers and popstate listeners.
+const GLOBAL_KEY = "__autolabelsLeaveGuard";
+type Slot = { uninstall: () => void };
+const slot = () => (window as unknown as Record<string, Slot | undefined>)[GLOBAL_KEY];
+
+const clearPending = () => {
+  if (pending) clearTimeout(pending.timer);
+  pending = null;
+};
+
 export function installLeaveGuardListener(): () => void {
   if (installed && uninstall) return uninstall;
+  slot()?.uninstall();
   installed = true;
   syncLeaveGuardLocation();
 
@@ -46,10 +58,15 @@ export function installLeaveGuardListener(): () => void {
   };
 
   const onPop = (event: PopStateEvent) => {
-    if (restoring) {
-      restoring = false;
+    if (pending) {
       event.stopImmediatePropagation();
-      syncLeaveGuardLocation();
+      const current = idxOf();
+      if (pending.originIdx === null || current === pending.originIdx) {
+        clearPending();
+        syncLeaveGuardLocation();
+      } else if (current !== null) {
+        window.history.go(pending.originIdx - current);
+      }
       return;
     }
     if (bypass) {
@@ -66,7 +83,10 @@ export function installLeaveGuardListener(): () => void {
     }
     event.stopImmediatePropagation();
     const delta = nextIdx !== null && lastIdx !== null && nextIdx !== lastIdx ? nextIdx - lastIdx : -1;
-    restoring = true;
+    pending = {
+      originIdx: lastIdx,
+      timer: setTimeout(() => { pending = null; syncLeaveGuardLocation(); }, 500),
+    };
     window.history.go(-delta);
     dirty.onBlocked(() => {
       bypass = true;
@@ -81,15 +101,20 @@ export function installLeaveGuardListener(): () => void {
     window.history.replaceState = replace;
     installed = false;
     uninstall = null;
-    restoring = false;
+    clearPending();
     bypass = false;
     entries.clear();
+    if (slot()?.uninstall === self) delete (window as unknown as Record<string, Slot | undefined>)[GLOBAL_KEY];
   };
+  const self = uninstall as () => void;
+  (window as unknown as Record<string, Slot | undefined>)[GLOBAL_KEY] = { uninstall: self };
   return uninstall;
 }
 
 export function registerLeaveGuard(entry: LeaveGuardEntry): () => void {
   installLeaveGuardListener();
+
+import.meta.hot?.dispose(() => uninstall?.());
   syncLeaveGuardLocation();
   entries.add(entry);
   return () => { entries.delete(entry); };
@@ -98,3 +123,5 @@ export function registerLeaveGuard(entry: LeaveGuardEntry): () => void {
 export const leaveGuardEntryCount = () => entries.size;
 
 installLeaveGuardListener();
+
+import.meta.hot?.dispose(() => uninstall?.());

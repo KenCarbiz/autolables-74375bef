@@ -89,25 +89,34 @@ export const TimeRangeRow = ({
     );
   };
   return (
-    <div role="group" aria-label={day} data-day={day} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2">
-      <span className="w-[88px] text-[14px] leading-[20px] font-medium text-adm-ink">{day}</span>
+    <div
+      role="group"
+      aria-label={day}
+      data-day={day}
+      className="grid grid-cols-[1fr_auto_auto] items-center gap-x-3 gap-y-1 py-2 md:grid-cols-[96px_104px_minmax(0,1fr)_176px] md:gap-x-4 md:min-h-[60px]"
+    >
+      <span className="text-[14px] leading-[20px] font-medium text-adm-ink">{day}</span>
       <SwitchField label="Open" ariaLabel={`${day} open`} checked={value.open} disabled={disabled} onChange={(open) => onChange({ ...value, open })} />
-      {value.open ? (
-        <>
-          {!value.allDay && (
+      <div className="order-last col-span-3 md:order-none md:col-span-1 min-w-0">
+        {value.open ? (
+          !value.allDay ? (
             <span className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
               {select("from")}
               <span aria-hidden="true" className="text-adm-muted">to</span>
               {select("to")}
               {closesNextDay(value) && <span className="text-[13px] leading-[18px] text-adm-muted whitespace-nowrap">closes next day</span>}
             </span>
-          )}
-          <SwitchField label="Open 24 hours" ariaLabel={`${day} open 24 hours`} checked={Boolean(value.allDay)} disabled={disabled} onChange={(allDay) => onChange({ ...value, allDay })} />
-        </>
-      ) : (
-        <span className="text-[14px] text-adm-muted">Closed</span>
-      )}
-      {error && <p id={`${id}-err`} role="alert" className="basis-full text-[13px] leading-[18px] font-medium text-adm-danger">{error}</p>}
+          ) : (
+            <span className="text-[14px] text-adm-muted">Open around the clock</span>
+          )
+        ) : (
+          <span className="text-[14px] text-adm-muted">Closed</span>
+        )}
+      </div>
+      <div className="md:col-start-4 md:row-start-1 justify-self-end md:justify-self-start">
+        {value.open && <SwitchField label="Open 24 hours" ariaLabel={`${day} open 24 hours`} checked={Boolean(value.allDay)} disabled={disabled} onChange={(allDay) => onChange({ ...value, allDay })} />}
+      </div>
+      {error && <p id={`${id}-err`} role="alert" className="col-span-3 md:col-span-4 order-last text-[13px] leading-[18px] font-medium text-adm-danger">{error}</p>}
     </div>
   );
 };

@@ -238,6 +238,22 @@ describe("round 2 fixes", () => {
     expect(dialog.querySelectorAll("[data-swatch]")).toHaveLength(2);
     const region = within(dialog).getByRole("region", { name: "Changes to review" });
     expect(region).toHaveAttribute("tabindex", "0");
-    await waitFor(() => expect(region).toHaveFocus());
+    await waitFor(() => expect(within(dialog).getByRole("heading", { name: "Review changes" })).toHaveFocus());
+  });
+});
+
+describe("round 3", () => {
+  it("DataTable defaults to 10 rows below 768px unless overridden", () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((q: string) => ({ matches: true, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, onchange: null, dispatchEvent: () => false })) as unknown as typeof window.matchMedia;
+    try {
+      const { unmount } = render(<DataTable caption="Fixtures" columns={cols} rows={rows} rowKey={(r) => r.id} />);
+      expect(screen.getByText("Showing 1 to 10 of 60")).toBeInTheDocument();
+      unmount();
+      render(<DataTable caption="Fixtures" columns={cols} rows={rows} rowKey={(r) => r.id} initialPageSize={50} />);
+      expect(screen.getByText("Showing 1 to 50 of 60")).toBeInTheDocument();
+    } finally {
+      window.matchMedia = original;
+    }
   });
 });
