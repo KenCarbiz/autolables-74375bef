@@ -1,5 +1,6 @@
 import { verifiedInServiceDate } from "@/lib/warranty/inServiceEvidence";
 import { storedEpaConflict, listingPowertrain, driveOf, litersOf } from "../../supabase/functions/_shared/epaMatch";
+import { readEpa, type EpaView } from "../../supabase/functions/_shared/epaSnapshot";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 import { deriveRecallView, type RecallView } from "@/lib/vehicleTruth/recallView";
 import { buildDiscountBreakdown, type PriceDisplayMode, type DiscountBreakdown } from "@/lib/priceModel";
@@ -328,7 +329,9 @@ export interface PassportData {
   keySpecs: [string, string][];
   // Official EPA fuel economy (fueleconomy.gov) when the epa-fuel-economy
   // function has matched this listing. Public-domain federal data.
-  epa: { city: number | null; highway: number | null; combined: number | null; annualFuelCost: number | null; ghgScore: number | null; rangeMiles: number | null; fuelType: string | null } | null;
+  // Every figure, including the five-year comparison and its retrieval date,
+  // comes from one stored snapshot via readEpa (shared with the sticker).
+  epa: { city: number | null; highway: number | null; combined: number | null; annualFuelCost: number | null; ghgScore: number | null; rangeMiles: number | null; fuelType: string | null; fiveYear?: EpaView["fiveYear"]; retrievedAt?: string | null } | null;
   overview: string;
   whyBuy: string[];
   // Reviews
@@ -775,14 +778,17 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     liters: litersOf(ks.engine),
     text: `${epaModel} ${listing.trim ?? ""}`,
   }) === null ? epaStored : null;
-  const epa = epaRaw && (epaRaw.combined != null || epaRaw.city != null) ? {
-    city: (epaRaw.city as number) ?? null,
-    highway: (epaRaw.highway as number) ?? null,
-    combined: (epaRaw.combined as number) ?? null,
-    annualFuelCost: (epaRaw.annualFuelCost as number) ?? null,
-    ghgScore: (epaRaw.ghgScore as number) ?? null,
-    rangeMiles: (epaRaw.rangeMiles as number) ?? null,
-    fuelType: (epaRaw.fuelType as string) ?? null,
+  const epaView = epaRaw ? readEpa(epaRaw, { vin: listing.vin, year: listingModelYear(listing) }) : null;
+  const epa = epaView && (epaView.combined != null || epaView.city != null) ? {
+    city: epaView.city,
+    highway: epaView.highway,
+    combined: epaView.combined,
+    annualFuelCost: epaView.annualFuelCost,
+    ghgScore: epaView.ghgScore,
+    rangeMiles: epaView.rangeMiles,
+    fuelType: epaView.fuelType,
+    fiveYear: epaView.fiveYear,
+    retrievedAt: epaView.retrievedAt,
   } : null;
 
   const keySpecs = ([

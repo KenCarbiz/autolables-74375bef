@@ -5,6 +5,7 @@
 // dealer_profiles.settings. It performs NO provider calls and invents no
 // facts: missing fields stay null and lower the confidence grade.
 import { parseYmm } from "../_shared/factorySticker/lib/ymm.ts";
+import { readEpa } from "../_shared/epaSnapshot.ts";
 
 import type { FactoryStickerRenderData } from "../_shared/factorySticker/render.ts";
 
@@ -119,17 +120,20 @@ export function normalizeForSticker(
     country: str(sheet?.assembly?.country),
   };
 
-  const epaRow = (listing.epa_economy || null) as AnyRow | null;
-  const epaCombined = epaRow && !epaRow.error ? num(epaRow.combined) : null;
-  const epa = epaRow && !epaRow.error ? {
-    city: num(epaRow.city),
-    highway: num(epaRow.highway),
-    combined: epaCombined,
-    annualFuelCost: num(epaRow.annualFuelCost),
-    ghgScore: num(epaRow.ghgScore),
-    rangeMiles: num(epaRow.rangeMiles),
-    fuelType: str(epaRow.fuelType),
-    gallonsPer100Miles: epaCombined ? Math.round((100 / epaCombined) * 10) / 10 : null,
+  // The same reader as the Passport: one snapshot, never a mix of retrievals.
+  // The five-year figure and the retrieval date are not mapped for the
+  // approved masters: they print neither, and both are part of the generation
+  // fingerprint, so adding them would re-render every published sticker.
+  const epaView = readEpa(listing.epa_economy, { vin: str(listing.vin), year: identity.year });
+  const epa = epaView ? {
+    city: epaView.city,
+    highway: epaView.highway,
+    combined: epaView.combined,
+    annualFuelCost: epaView.annualFuelCost,
+    ghgScore: epaView.ghgScore,
+    rangeMiles: epaView.rangeMiles,
+    fuelType: epaView.fuelType,
+    gallonsPer100Miles: epaView.combined ? Math.round((100 / epaView.combined) * 10) / 10 : null,
   } : null;
   if (!epa) missing.push("epa_economy");
 
