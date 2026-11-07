@@ -61,4 +61,20 @@ describe("Passport V2 and the window sticker read one EPA snapshot", () => {
     expect(derivePassport(l).epa).toBeNull();
     expect(sticker(l)).toBeNull();
   });
+
+  it("a plug-in hybrid shows the same annual figure on both, named as gasoline-only on the Passport, with no 5-year claim", () => {
+    const phev = buildEpaSnapshot(
+      { id: "47000", year: "2026", make: "Hyundai", model: "Tucson Plug-in Hybrid AWD", city08: "35", highway08: "38", comb08: "35",
+        fuelType: "Regular Gas or Electricity", fuelType1: "Regular Gasoline", fuelType2: "Electricity", atvType: "Plug-in Hybrid",
+        fuelCost08: "1500", fuelCostA08: "700", youSaveSpend: "2000", ghgScore: "8", co2TailpipeGpm: "250", co2TailpipeAGpm: "0" },
+      { listingVin: VIN, matchedOption: "2026 Hyundai Tucson Plug-in Hybrid AWD", matchBasis: null, matcherVersion: "epa-match-v4", retrievedAt: "2026-11-07T17:40:00.000Z" },
+    )!;
+    const l = { ...listing(phev), ymm: "2026 Hyundai Tucson Plug-in Hybrid", trim: "SEL AWD" } as VehicleListing;
+    const fuel = resolveFuelEconomy(derivePassport(l).epa);
+    expect(fuel.annualFuelCost).toBe(1500);
+    expect(sticker(l)?.annualFuelCost).toBe(1500);
+    expect(fuel.annualFuelCostLabel).toBe("EPA estimated annual fuel cost on regular gasoline only");
+    expect(fuel.fiveYear).toBeNull();
+    expect(fuel.fiveYearSentence).toBeNull();
+  });
 });

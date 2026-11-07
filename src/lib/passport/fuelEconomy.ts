@@ -64,7 +64,11 @@ export function resolveFuelEconomy(epa: PassportData["epa"]): FuelEconomyView {
     combinedMpg: epa.combined ?? null,
     rangeMiles: epa.rangeMiles ?? null,
     annualFuelCost: hasCost ? epa.annualFuelCost : null,
-    annualFuelCostLabel: hasCost ? "EPA estimated annual fuel cost" : null,
+    // On a plug-in hybrid or flex-fuel vehicle EPA's figure covers the
+    // conventional fuel only, so the label says which fuel.
+    annualFuelCostLabel: hasCost
+      ? epa.annualFuelCostFuel ? `EPA estimated annual fuel cost on ${epa.annualFuelCostFuel} only` : "EPA estimated annual fuel cost"
+      : null,
     fiveYear,
     fiveYearSentence: fiveYearSentence(fiveYear),
     retrievedAt: retrieved ? epa.retrievedAt ?? null : null,

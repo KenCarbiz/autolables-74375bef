@@ -331,7 +331,7 @@ export interface PassportData {
   // function has matched this listing. Public-domain federal data.
   // Every figure, including the five-year comparison and its retrieval date,
   // comes from one stored snapshot via readEpa (shared with the sticker).
-  epa: { city: number | null; highway: number | null; combined: number | null; annualFuelCost: number | null; ghgScore: number | null; rangeMiles: number | null; fuelType: string | null; fiveYear?: EpaView["fiveYear"]; retrievedAt?: string | null } | null;
+  epa: { city: number | null; highway: number | null; combined: number | null; annualFuelCost: number | null; ghgScore: number | null; rangeMiles: number | null; fuelType: string | null; fiveYear?: EpaView["fiveYear"]; retrievedAt?: string | null; annualFuelCostFuel?: string | null } | null;
   overview: string;
   whyBuy: string[];
   // Reviews
@@ -789,6 +789,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     fuelType: epaView.fuelType,
     fiveYear: epaView.fiveYear,
     retrievedAt: epaView.retrievedAt,
+    annualFuelCostFuel: epaView.annualFuelCostFuel,
   } : null;
 
   const keySpecs = ([

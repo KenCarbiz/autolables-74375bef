@@ -59,9 +59,21 @@ export interface EpaSnapshot {
   ghgScore: number | null;
   rangeMiles: number | null;
   fuelType: string | null;
+  /** The conventional fuel on a dual-fuel vehicle (PHEV, FFV, bi-fuel); the only fuel otherwise. */
+  fuelType1: string | null;
+  /** The alternative fuel on a dual-fuel vehicle; null for single-fuel vehicles. */
+  fuelType2: string | null;
+  dualFuel: boolean;
   atvType: string | null;
+  /** fuelCost08: annual cost on fuelType1 only. */
   annualFuelCost: number | null;
-  /** youSaveSpend as supplied: positive = saves vs the average new vehicle, negative = spends more. */
+  /** fuelCostA08: annual cost on fuelType2, when supplied. */
+  annualFuelCostAlt: number | null;
+  co2TailpipeAGpm: number | null;
+  /**
+   * youSaveSpend as supplied: positive = saves vs the average new vehicle,
+   * negative = spends more. For a dual-fuel vehicle it covers gasoline only.
+   */
   fiveYearCostDifference: number | null;
   costBasis: EpaCostBasis;
   /** When fueleconomy.gov returned these values. */
@@ -83,6 +95,13 @@ const positive = (v: unknown): number | null => {
   return Number.isFinite(n) && n > 0 ? n : null;
 };
 
+// EPA's CO2 fields use -1 for "not available"; 0 is a real reading (an EV's
+// tailpipe, a PHEV's electric mode).
+const measured = (v: unknown): number | null => {
+  const n = typeof v === "number" ? v : typeof v === "string" && v.trim() ? Number(v) : NaN;
+  return Number.isFinite(n) && n >= 0 ? n : null;
+};
+
 const signed = (v: unknown): number | null => {
   if (v === null || v === undefined) return null;
   const s = String(v).trim();
@@ -99,6 +118,40 @@ const text = (v: unknown): string | null => {
 const isoOk = (v: unknown): v is string => typeof v === "string" && Number.isFinite(Date.parse(v));
 
 const sameUtcDay = (a: string, b: string) => new Date(a).toISOString().slice(0, 10) === new Date(b).toISOString().slice(0, 10);
+
+const ALT_TECH = /plug-?in hybrid|phev|ffv|flex|bifuel|bi-fuel/i;
+
+/**
+ * Dual fuel per fueleconomy.gov: a second fuel (E85, Electricity, CNG, LPG).
+ * The stored fuelType reads "Regular Gas or Electricity" (or "... and ..." for
+ * a blended plug-in) for these; records from before fuelType2 was kept are
+ * recognised by that wording or the atvType.
+ */
+export function isDualFuel(r: { fuelType2?: unknown; fuelType?: unknown; atvType?: unknown }): boolean {
+  if (text(r.fuelType2)) return true;
+  if (/\s(or|and)\s/i.test(String(r.fuelType ?? ""))) return true;
+  return ALT_TECH.test(String(r.atvType ?? ""));
+}
+
+/** The conventional fuel's customer-facing name ("premium gasoline", "diesel"). */
+export function conventionalFuelName(r: { fuelType1?: unknown; fuelType?: unknown }): string | null {
+  const raw = text(r.fuelType1) ?? text(String(r.fuelType ?? "").split(/\s+(?:or|and)\s+/i)[0]);
+  if (!raw) return null;
+  const f = raw.toLowerCase();
+  if (/diesel/.test(f)) return "diesel";
+  const grade = /premium/.test(f) ? "premium " : /midgrade/.test(f) ? "midgrade " : /regular/.test(f) ? "regular " : "";
+  return /gasoline|regular|premium|midgrade/.test(f) ? `${grade}gasoline` : f;
+}
+
+/**
+ * Fuel prices are fetched at most once per request. A new cache is made for
+ * every request, so a reused server instance never serves an earlier
+ * request's prices.
+ */
+export function requestFuelPriceCache(fetchPrices: () => Promise<unknown>, now: () => string): () => Promise<EpaFuelPrices | null> {
+  let pending: Promise<EpaFuelPrices | null> | null = null;
+  return () => (pending ??= fetchPrices().then((b) => parseFuelPrices(b, now())).catch(() => null));
+}
 
 export function fiveYearDirection(difference: number): FiveYearDirection {
   return difference > 0 ? "save" : difference < 0 ? "spend" : "same";
@@ -145,12 +198,17 @@ export function buildEpaSnapshot(v: Raw, ctx: SnapshotContext): EpaSnapshot | nu
     city: positive(v.city08),
     highway: positive(v.highway08),
     combined: positive(v.comb08),
-    co2TailpipeGpm: positive(v.co2TailpipeGpm),
+    co2TailpipeGpm: measured(v.co2TailpipeGpm),
     ghgScore: positive(v.ghgScore),
     rangeMiles: positive(v.rangeA) ?? positive(v.range),
     fuelType: text(v.fuelType),
+    fuelType1: text(v.fuelType1),
+    fuelType2: text(v.fuelType2),
+    dualFuel: isDualFuel(v),
     atvType: text(v.atvType),
     annualFuelCost: positive(v.fuelCost08),
+    annualFuelCostAlt: positive(v.fuelCostA08),
+    co2TailpipeAGpm: text(v.fuelType2) ? measured(v.co2TailpipeAGpm) : null,
     fiveYearCostDifference: signed(v.youSaveSpend),
     costBasis: { ...EPA_COST_BASIS, fuelPrices: prices },
     checkedAt: ctx.retrievedAt,
@@ -172,8 +230,8 @@ export function snapshotListingMismatch(
 }
 
 const VALUE_KEYS = [
-  "vehicleId", "city", "highway", "combined", "co2TailpipeGpm", "ghgScore", "rangeMiles",
-  "fuelType", "atvType", "annualFuelCost", "fiveYearCostDifference",
+  "vehicleId", "city", "highway", "combined", "co2TailpipeGpm", "co2TailpipeAGpm", "ghgScore", "rangeMiles",
+  "fuelType", "fuelType1", "fuelType2", "atvType", "annualFuelCost", "annualFuelCostAlt", "fiveYearCostDifference",
 ] as const;
 
 const pricesKey = (p: unknown) => {
@@ -263,9 +321,18 @@ export interface EpaView {
   ghgScore: number | null;
   rangeMiles: number | null;
   fuelType: string | null;
-  /** Null unless the snapshot carries a retrieval date. */
+  dualFuel: boolean;
+  /** Null unless the snapshot carries a retrieval date. On a dual-fuel vehicle it is the conventional fuel only. */
   annualFuelCost: number | null;
+  /** The fuel annualFuelCost covers when the vehicle has two ("premium gasoline"); null for single-fuel vehicles. */
+  annualFuelCostFuel: string | null;
+  /**
+   * Withheld for dual-fuel vehicles: fueleconomy.gov's youSaveSpend for them
+   * is the gasoline-only figure, which is not what a plug-in hybrid or
+   * flex-fuel owner should be told they save or spend.
+   */
   fiveYear: { difference: number; amount: number; direction: FiveYearDirection } | null;
+  fiveYearWithheld: "dual_fuel_gasoline_only" | null;
   /** The latest retrieval that returned the cost figures shown. */
   retrievedAt: string | null;
   fuelPrices: EpaFuelPrices | null;
@@ -293,7 +360,9 @@ export function readEpa(
     if (mismatch && mismatch !== "model_year_missing") return null;
   }
   const dated = isoOk(r.checkedAt) ? (isoOk(r.confirmedAt) && Date.parse(r.confirmedAt) > Date.parse(r.checkedAt) ? r.confirmedAt : r.checkedAt) : null;
-  const diff = dated ? signed(r.fiveYearCostDifference) : null;
+  const dual = isDualFuel(r);
+  const supplied = dated ? signed(r.fiveYearCostDifference) : null;
+  const diff = dual ? null : supplied;
   const prices = r.costBasis?.fuelPrices;
   return {
     vehicleId: Number.isInteger(Number(r.vehicleId)) ? Number(r.vehicleId) : null,
@@ -303,8 +372,11 @@ export function readEpa(
     ghgScore: positive(r.ghgScore),
     rangeMiles: positive(r.rangeMiles),
     fuelType: text(r.fuelType),
+    dualFuel: dual,
     annualFuelCost: dated ? positive(r.annualFuelCost) : null,
+    annualFuelCostFuel: dual ? conventionalFuelName(r) : null,
     fiveYear: diff === null ? null : { difference: diff, amount: Math.abs(diff), direction: fiveYearDirection(diff) },
+    fiveYearWithheld: dual && supplied !== null ? "dual_fuel_gasoline_only" : null,
     retrievedAt: dated,
     fuelPrices: dated && prices && typeof prices === "object" && isoOk(prices.retrievedAt) ? prices as EpaFuelPrices : null,
   };
@@ -327,4 +399,68 @@ export function fiveYearSentence(f: EpaView["fiveYear"]): string | null {
   if (f.direction === "save") return `You save ${dollars(f.amount)} in fuel costs over 5 years compared to the average new vehicle.`;
   if (f.direction === "spend") return `You spend ${dollars(f.amount)} more in fuel costs over 5 years compared to the average new vehicle.`;
   return "Fuel costs over 5 years are the same as the average new vehicle.";
+}
+
+export interface WriteResult {
+  /** Rows the guarded update changed; 0 means another refresh got there first. */
+  rows: number;
+  error: string | null;
+}
+
+export type RefreshOutcome = MergeOutcome | "concurrent_refresh" | "db_error";
+
+export interface RefreshResult {
+  outcome: RefreshOutcome;
+  reason?: string;
+  /** What is stored after this refresh, as far as this request knows. */
+  record: EpaEconomyRecord | null;
+  error?: string;
+}
+
+/**
+ * Merges and writes one refresh. Only a write the database confirmed counts:
+ * an error is db_error, a guarded update that changed no row is
+ * concurrent_refresh, and in both cases the stored record is left as it was.
+ */
+export async function persistEpaRefresh(
+  stored: unknown,
+  next: EpaSnapshot,
+  verifiedMatchers: readonly string[],
+  write: (record: EpaEconomyRecord) => Promise<WriteResult>,
+): Promise<RefreshResult> {
+  const prior = (stored && typeof stored === "object" ? stored : null) as EpaEconomyRecord | null;
+  const m = mergeEpaSnapshot(stored, next, verifiedMatchers);
+  if (m.outcome === "stale") return { outcome: "stale", reason: m.reason, record: m.record };
+  let w: WriteResult;
+  try {
+    w = await write(m.record);
+  } catch (e) {
+    w = { rows: 0, error: e instanceof Error ? e.message : String(e) };
+  }
+  if (w.error) return { outcome: "db_error", error: w.error, record: prior };
+  if (w.rows < 1) return { outcome: "concurrent_refresh", record: prior };
+  return { outcome: m.outcome, reason: m.reason, record: m.record };
+}
+
+export interface RefreshTally {
+  checked: number;
+  matched: number;
+  conflicts: number;
+  stale: number;
+  concurrent: number;
+  dbErrors: number;
+  refused: number;
+}
+
+export const emptyTally = (): RefreshTally => ({ checked: 0, matched: 0, conflicts: 0, stale: 0, concurrent: 0, dbErrors: 0, refused: 0 });
+
+/** A match is counted only when its snapshot is stored: created, replaced or confirmed and written. */
+export function tallyRefresh(t: RefreshTally, outcome: RefreshOutcome): RefreshTally {
+  const next = { ...t, checked: t.checked + 1 };
+  if (outcome === "created" || outcome === "replaced" || outcome === "confirmed") next.matched++;
+  else if (outcome === "conflict") next.conflicts++;
+  else if (outcome === "stale") next.stale++;
+  else if (outcome === "concurrent_refresh") next.concurrent++;
+  else next.dbErrors++;
+  return next;
 }
