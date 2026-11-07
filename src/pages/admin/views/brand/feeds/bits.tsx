@@ -22,13 +22,13 @@ export const Banner = ({ tone = "info", icon, title, children, action, className
 );
 
 export const StatTile = ({ icon, label, value, state, stateLabel, hint }: { icon: AdminIconName; label: string; value: ReactNode; state?: StatusState; stateLabel?: string; hint?: ReactNode }) => (
-  <div className="rounded-xl border border-adm-divider bg-adm-surface p-4 flex items-start gap-3 min-w-0">
-    <AdminIconTile name={icon} />
+  <div className="rounded-xl border border-adm-divider bg-adm-surface p-3 sm:p-4 flex items-start gap-3 min-w-0">
+    <span className="max-sm:hidden"><AdminIconTile name={icon} /></span>
     <div className="min-w-0 flex-1">
       <p className="text-[13px] leading-[18px] text-adm-muted">{label}</p>
       <p className="text-[16px] leading-[24px] font-semibold text-adm-ink break-words">{value}</p>
-      {state && <StatusBadge state={state} label={stateLabel} className="mt-1.5" />}
-      {hint && <p className="mt-1 text-[13px] leading-[18px] text-adm-muted">{hint}</p>}
+      {state && <StatusBadge state={state} label={stateLabel} className={cn("mt-1.5", state === "enabled" && "max-sm:hidden")} />}
+      {hint && <p className="mt-1 max-sm:hidden text-[13px] leading-[18px] text-adm-muted">{hint}</p>}
     </div>
   </div>
 );

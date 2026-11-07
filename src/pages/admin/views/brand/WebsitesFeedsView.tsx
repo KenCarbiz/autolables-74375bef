@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { AdminButton } from "@/components/admin/v2/primitives";
 import {
   AdminIcon, AdvancedDisclosure, DraftActionBar, EditorEmpty, FieldRow, INPUT_CLASS, LeaveGuardDialog, PreviewOnlyNotice, ReviewChangesDialog,
-  ScopeLabel, SectionCard, StatusBadge, SwitchField,
+  ScopeLabel, SectionCard, StatusBadge, SwitchField, useIsNarrow,
 } from "@/components/admin/v3/editor";
 import { ADMIN_CHILD_ROUTES, adminTabHref } from "@/lib/admin/sections";
 import { checkUrl, joinLabels, parseLabels, parseTerms, PROVIDERS, validateWebsiteDraft, WEBSITES_FEED_KEYS, WEBSITES_FEED_LABELS, type ProviderSpec, type WebsitesFeedKey } from "./feeds/websitesModel";
@@ -31,6 +31,7 @@ export default function WebsitesFeedsView() {
   const ed = useSettingsEditor(OPTIONS);
   const { source, edit, canEdit, variant } = ed;
   const draft = edit.draft;
+  const narrow = useIsNarrow();
   const [drawer, setDrawer] = useState<ProviderSpec | null>(null);
   const [testUrl, setTestUrl] = useState("");
   const [acknowledged, setAcknowledged] = useState(false);
@@ -74,7 +75,7 @@ export default function WebsitesFeedsView() {
       {!source.isFixture && source.loadError && <Banner tone="danger" title="Settings could not be read">{source.loadError}. Nothing can be saved until they load.</Banner>}
       {source.isFixture && variant === "error" && <Banner tone="danger" title="Settings could not be read">The server did not answer. Your values are not shown as saved and nothing can be applied until they load.</Banner>}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3" aria-label="Summary">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3" aria-label="Summary">
         <StatTile icon="globe" label="Dealer inventory pages" value={hasInventory ? "Address saved" : "Not set"} state={hasInventory ? "enabled" : "setup_required"} stateLabel={hasInventory ? "Format valid" : "Setup required"} />
         <StatTile icon="database" label="DMS provider" value={draft.dms_provider?.trim() || "Not set"} state={draft.dms_provider?.trim() ? "enabled" : "setup_required"} stateLabel={draft.dms_provider?.trim() ? "Recorded" : "Setup required"} hint="A label only. It does not connect to your DMS." />
         <StatTile icon="link" label="Marketplace listing pages" value={`${savedProviders} of ${PROVIDERS.length} saved`} state={savedProviders > 0 ? "enabled" : "setup_required"} stateLabel={savedProviders > 0 ? "Addresses saved" : "Setup required"} hint="Saved is not connected." />
@@ -83,14 +84,14 @@ export default function WebsitesFeedsView() {
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4 xl:gap-6 items-start">
         <div className="min-w-0 space-y-4">
-          <SectionCard icon="globe" title="Dealer website and DMS" description="Your DMS is the source of truth for inventory and pricing. These addresses let AutoLabels find your vehicle pages.">
+          <SectionCard icon="globe" title="Dealer website and DMS" description={narrow ? undefined : "Your DMS is the source of truth for inventory and pricing. These addresses let AutoLabels find your vehicle pages."}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <FieldRow label="DMS provider" htmlFor="dms-provider" help="For example CDK, Reynolds, Dealertrack or Tekion.">
                 {(p) => <input {...p} value={draft.dms_provider ?? ""} disabled={!canEdit} onChange={(e) => set("dms_provider", e.target.value)} className={INPUT_CLASS} placeholder="Your DMS name" />}
               </FieldRow>
               <div className="rounded-lg bg-adm-workspace border border-adm-divider px-4 py-3 text-[14px] leading-[20px]">
-                <p className="font-medium text-adm-ink">Public website</p>
-                <p className="text-adm-muted">Edited under Hours &amp; Contact, so it is not saved twice.</p>
+                <p className="font-medium text-adm-ink">Public website <span className="sm:hidden font-normal text-adm-muted">(edited under Hours &amp; Contact)</span></p>
+                <p className="text-adm-muted max-sm:hidden">Edited under Hours &amp; Contact, so it is not saved twice.</p>
                 <Link to={adminTabHref("hours-contact")} className="mt-1 inline-flex items-center gap-1 min-h-[40px] max-sm:min-h-[44px] items-center font-semibold text-adm-primary hover:underline">Open Hours &amp; Contact <AdminIcon name="chevron-right" size="inline" /></Link>
               </div>
               <div className="md:col-span-2 space-y-5">
@@ -98,10 +99,20 @@ export default function WebsitesFeedsView() {
               <UrlField id="used-inventory" label="Used inventory page" value={draft.used_inventory_url ?? ""} onChange={(v) => set("used_inventory_url", v)} error={err("used_inventory_url")} disabled={!canEdit} placeholder="https://your-dealer-site.example/used-inventory" />
               </div>
             </div>
-            <p className="text-[13px] leading-[18px] text-adm-muted">AutoLabels checks the format of an address when you type it. It does not open the page until a crawler run or the test below.</p>
+            <p className="max-sm:hidden text-[13px] leading-[18px] text-adm-muted">AutoLabels checks the format of an address when you type it. It does not open the page until a crawler run or the test below.</p>
           </SectionCard>
         </div>
         <aside aria-label="Feed diagnostics" className="min-w-0 xl:sticky xl:top-4">
+          {narrow ? (
+            <AdvancedDisclosure title="Feed diagnostics">
+              <div className="space-y-2">
+              <LinkRow to={adminTabHref("inventory-feed")} icon="database" title="Inventory feed" description="Sync status, freshness and failures" />
+              <LinkRow to={ADMIN_CHILD_ROUTES.storeInventory} icon="building" title="Store inventory" description="Per-rooftop inventory and feeds" />
+              <LinkRow to={ADMIN_CHILD_ROUTES.jobs} icon="clock" title="Jobs" description="Crawler and sync runs" />
+              <LinkRow to={adminTabHref("data-quality")} icon="shield-check" title="Data quality" description="Price evidence and mismatches" />
+            </div>
+            </AdvancedDisclosure>
+          ) : (
           <SectionCard icon="activity" title="Feed diagnostics" description="Feed internals are managed under Integrations.">
             <div className="space-y-2">
               <LinkRow to={adminTabHref("inventory-feed")} icon="database" title="Inventory feed" description="Sync status, freshness and failures" />
@@ -110,23 +121,24 @@ export default function WebsitesFeedsView() {
               <LinkRow to={adminTabHref("data-quality")} icon="shield-check" title="Data quality" description="Price evidence and mismatches" />
             </div>
           </SectionCard>
+          )}
         </aside>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
 
-          <SectionCard icon="link" title="Marketplace listing pages" description="Where your inventory is advertised. The price crawler compares these pages with your sticker price."
+          <SectionCard icon="link" title="Marketplace listing pages" description={narrow ? undefined : "Where your inventory is advertised. The price crawler compares these pages with your sticker price."}
 >
-            <div><StatusBadge state={savedProviders > 0 ? "enabled" : "setup_required"} label={`${savedProviders} of ${PROVIDERS.length} saved`} /></div>
-            <Banner tone="neutral" icon="info" title="A saved address is not a connected account">Each card lists what the address does today. AutoLabels holds no login or live link to any marketplace, and no price is marked verified until a crawler run or test reads it.</Banner>
-            <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" aria-label="Marketplace providers">
+            {!narrow && <div><StatusBadge state={savedProviders > 0 ? "enabled" : "setup_required"} label={`${savedProviders} of ${PROVIDERS.length} saved`} /></div>}
+            <Banner tone="neutral" icon="info" title="A saved address is not a connected account">{narrow ? "No login or live link. No price is verified until a crawler run." : "Each card lists what the address does today. AutoLabels holds no login or live link to any marketplace, and no price is marked verified until a crawler run or test reads it."}</Banner>
+            <ul className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-3 sm:gap-4" aria-label="Marketplace providers">
               {PROVIDERS.map((p) => (
                 <ProviderCard key={p.id} provider={p} value={(draft[p.key] as string) ?? ""} onChange={(v) => set(p.key, v)} error={err(p.key)} canEdit={canEdit} onDetails={() => setDrawer(p)} />
               ))}
             </ul>
           </SectionCard>
 
-          <SectionCard icon="tag" title="Advertised price extraction" description="The wording your website uses beside the selling price. The crawler tries each label in order.">
+          <SectionCard icon="tag" title="Advertised price extraction" description={narrow ? undefined : "The wording your website uses beside the selling price. The crawler tries each label in order."}>
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8 items-start">
             <div className="min-w-0 space-y-5">
             <LabelList labels={labels} onChange={(next) => set("vdp_price_labels", joinLabels(next))} canEdit={canEdit} error={err("vdp_price_labels")} />
@@ -136,10 +148,12 @@ export default function WebsitesFeedsView() {
             </div>
 
             </div>
-            <div className="min-w-0 border-t xl:border-t-0 xl:border-l border-adm-divider pt-5 xl:pt-0 xl:pl-8 space-y-4" id="price-test">
+            {narrow ? (
+              <AdvancedDisclosure title="Test one vehicle page" className="min-w-0">
+                <div className="space-y-4" id="price-test">
               <div>
                 <h3 className="text-[16px] leading-[24px] font-semibold text-adm-ink">Test one vehicle page</h3>
-                <p className="text-[14px] leading-[20px] text-adm-muted">Reads one page with your saved labels and shows which label matched, the value and why it failed.</p>
+                <p className="max-sm:hidden text-[14px] leading-[20px] text-adm-muted">Reads one page with your saved labels and shows which label matched, the value and why it failed.</p>
               </div>
               <PreviewOnlyNotice>Read-only. The test stores nothing, publishes nothing and changes no price. It uses the saved labels, not unsaved edits.</PreviewOnlyNotice>
               {canEdit ? (
@@ -162,18 +176,59 @@ export default function WebsitesFeedsView() {
                 <p className="text-[14px] text-adm-muted">Only people who can manage settings can run the test.</p>
               )}
               {result ? <PriceTestResultPanel result={result} labels={labels} /> : (
-                <EditorEmpty artwork="search" title="No test run yet" description="Results appear here with the matched label, the value read and the reason when nothing was found." className="py-6" />
+                narrow ? <p className="text-[13px] leading-[18px] text-adm-muted">No test run yet. Results show the matched label, the value read and the reason when nothing was found.</p> : <EditorEmpty artwork="search" title="No test run yet" description="Results appear here with the matched label, the value read and the reason when nothing was found." className="py-6" />
               )}
             </div>
+              </AdvancedDisclosure>
+            ) : (
+            <div className="min-w-0 border-t xl:border-t-0 xl:border-l border-adm-divider pt-5 xl:pt-0 xl:pl-8 space-y-4" id="price-test">
+              <div>
+                <h3 className="text-[16px] leading-[24px] font-semibold text-adm-ink">Test one vehicle page</h3>
+                <p className="max-sm:hidden text-[14px] leading-[20px] text-adm-muted">Reads one page with your saved labels and shows which label matched, the value and why it failed.</p>
+              </div>
+              <PreviewOnlyNotice>Read-only. The test stores nothing, publishes nothing and changes no price. It uses the saved labels, not unsaved edits.</PreviewOnlyNotice>
+              {canEdit ? (
+                <>
+                  <label className="flex items-start gap-3 rounded-lg border border-adm-divider bg-adm-workspace px-4 py-3 min-h-[44px] cursor-pointer">
+                    <input type="checkbox" checked={acknowledged} onChange={(e) => setAcknowledged(e.target.checked)} className="mt-0.5 h-5 w-5 flex-shrink-0 accent-[rgb(var(--adm-primary))]" />
+                    <span className="text-[14px] leading-[20px] text-adm-ink">I understand this one test may use one metered page render if the website blocks a plain read. The tick covers a single run. The crawler can also be paused, in which case nothing runs.</span>
+                  </label>
+                  <FieldRow label="Vehicle page address" htmlFor="price-test-url" error={invalidTest ? (checkUrl(testUrl) as { reason: string }).reason : undefined}>
+                    {(p) => (
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <input {...p} value={testUrl} onChange={(e) => setTestUrl(e.target.value)} placeholder="https://your-dealer-site.example/used/vehicle-page" inputMode="url" className={INPUT_CLASS} />
+                        <AdminButton variant="primary" onClick={() => void runTest()} disabled={testing || !!testBlocked} className="sm:w-auto sm:whitespace-nowrap sm:shrink-0">{testing ? "Reading the page" : "Run one test (may use one metered render)"}</AdminButton>
+                      </div>
+                    )}
+                  </FieldRow>
+                  {testBlocked && <p className="text-[13px] leading-[18px] text-adm-muted">{testBlocked}</p>}
+                </>
+              ) : (
+                <p className="text-[14px] text-adm-muted">Only people who can manage settings can run the test.</p>
+              )}
+              {result ? <PriceTestResultPanel result={result} labels={labels} /> : (
+                narrow ? <p className="text-[13px] leading-[18px] text-adm-muted">No test run yet. Results show the matched label, the value read and the reason when nothing was found.</p> : <EditorEmpty artwork="search" title="No test run yet" description="Results appear here with the matched label, the value read and the reason when nothing was found." className="py-6" />
+              )}
+            </div>
+            )}
             </div>
           </SectionCard>
 
-          <SectionCard icon="car" title="Vehicle condition mapping" description="Each term your team uses is stored as New, Used or CPO for documents and compliance.">
+          <SectionCard icon="car" title="Vehicle condition mapping" description={narrow ? undefined : "Each term your team uses is stored as New, Used or CPO for documents and compliance."}>
             <ConditionMapping terms={terms} onChange={(next) => set("vehicle_conditions", next.join(", "))} canEdit={canEdit} />
             {err("vehicle_conditions") && <p role="alert" className="text-adm-danger text-[13px]">{err("vehicle_conditions")}</p>}
           </SectionCard>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+{narrow ? (
+            <AdvancedDisclosure title="What this page does not claim">
+              <ul className="space-y-2 text-[14px] leading-[20px] text-adm-ink list-disc pl-5">
+              <li>A valid address is only well formed. It may still be the wrong page.</li>
+              <li>No marketplace price is called verified here. Only a crawler run that reads the page can do that.</li>
+              <li>Your feed data is never changed by the condition list.</li>
+            </ul>
+            </AdvancedDisclosure>
+          ) : (
           <SectionCard icon="info" title="What this page does not claim">
             <ul className="space-y-2 text-[14px] leading-[20px] text-adm-ink list-disc pl-5">
               <li>A valid address is only well formed. It may still be the wrong page.</li>
@@ -181,6 +236,7 @@ export default function WebsitesFeedsView() {
               <li>Your feed data is never changed by the condition list.</li>
             </ul>
           </SectionCard>
+          )}
           <AdvancedDisclosure title="Advanced: how these settings are stored">
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-[14px] leading-[20px]">
               {WEBSITES_FEED_KEYS.map((k) => (
