@@ -34,6 +34,7 @@ describe("template catalog", () => {
     expect(getCatalogTemplate("volvo_2025_xc60_b5_awd_plus")!.blockers).toContain("reference_is_2025");
     expect(getCatalogTemplate("toyota_2026_4runner_trd_sport")!.blockers).toContain("marked_online_copy");
     expect(getCatalogTemplate("ram_2026_2500_limited")!.blockers).toContain("carb_panel_pending");
+    expect(getCatalogTemplate("cadillac_2026_escalade_iql_premium_sport")!.blockers).not.toContain("carb_panel_pending");
     expect(getCatalogTemplate("hyundai_2026_tucson_se_awd")!.blockers).not.toContain("reference_is_2025");
   });
 

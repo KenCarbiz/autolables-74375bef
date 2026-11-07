@@ -14,8 +14,7 @@
 // Every printed value comes from render data. The wings emblem is an
 // alpha-masked raster cropped from the scan. The faded car photograph, the
 // engine-number line, the bumper-quality paragraph, the "Best Sports Car"
-// advertisement and window tag, the social icons, the import-costs line (no
-// field in the render data), agency seals and the source QR are not reproduced;
+// advertisement and window tag, the social icons, agency seals and the source QR are not reproduced;
 // the 0.90in Vehicle Passport QR takes the Smartphone QR slot. The scan's free
 // area under the fuel-economy panel carries a third equipment column.
 
@@ -76,6 +75,7 @@ function paintPricing(p: Painter, d: FactoryStickerData, m: Ym): number | null {
 
   const pr = d.pricing;
   const rows: Array<[string, string]> = [];
+  if (pr.importCharge !== undefined) rows.push(["Import Costs", formatMoney(pr.importCharge)]);
   if (pr.gasGuzzlerTax !== undefined) rows.push(["Gas Guzzler", formatMoney(pr.gasGuzzlerTax)]);
   rows.push(["Transportation and handling", pr.destinationCharge !== undefined ? formatMoney(pr.destinationCharge) : "NOT AVAILABLE"]);
   const total = totalMsrp(d);

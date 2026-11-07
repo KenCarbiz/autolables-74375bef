@@ -32,7 +32,7 @@ import { paintCarbPanel } from "./carbPanel.ts";
 import { GM_EQ_STYLE, flowGmEquipment, gmGrid, paintGmEquipmentFrame, paintGmSpecColumns, paintGmVinDealer } from "./gmCommon.ts";
 
 export interface GmTruckBrand {
-  logo: "chevrolet" | "gmc" | null;
+  logo: "chevrolet" | "gmc" | "cadillac" | null;
   /** Neutral wordmark printed when no logo artwork is packaged. */
   wordmark?: string;
   logoX: number;

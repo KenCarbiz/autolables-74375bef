@@ -6,8 +6,8 @@
 // keeps the horizontals and compresses verticals to clear the reproduction
 // banner and disclosure.
 //
-// Every printed value comes from render data. The monogram artwork is not
-// packaged, the source QR, agency seals, carrier and port lines are not
+// Every printed value comes from render data. The RR monogram is taken from
+// the reference label PDF (logoArtwork.ts); the source QR, agency seals, carrier and port lines are not
 // reproduced, and the electric panel prints Not Available for every figure the
 // verified EPA record does not carry.
 
@@ -15,12 +15,14 @@ import type { FactoryStickerData } from "../../types.ts";
 import { Painter, type LayoutModel } from "../layout.ts";
 import { INK, type VariantLayoutBuilder } from "./shared.ts";
 import { R, T } from "./hyundaiTucsonGas.ts";
+import { fitSize } from "./fcaCommon.ts";
 import {
   TABLOID_HEIGHT, TABLOID_WIDTH, assembleTabloid, colorText, dealerLines, totalMsrp, warrantySection, yearModelTrim,
   type FirstPageContext, type FirstPageResult, type FlowStyle, type TabloidSpec,
 } from "./tabloidCommon.ts";
 import { PX, makeGrid, money, msrpWithOptions, paintCatalogParts, paintCatalogSafety, paintWarranty } from "./catalogBlocks.ts";
 import { paintEvEpa } from "./evPanels.ts";
+import { VARIANT_LOGOS } from "./logoArtwork.ts";
 import { flowEquipmentColumns, paintPriceList } from "./catalogPage.ts";
 
 export const ROLLS_ROYCE_SPECTRE_EV_ID = "rolls-royce_2026_spectre";
@@ -31,7 +33,9 @@ const g = makeGrid(28, 40, 709, 1066);
 function paintHeader(p: Painter, d: FactoryStickerData): void {
   const sameTrim = (d.vehicle.trim ?? "").trim().toLowerCase() === d.vehicle.model.trim().toLowerCase();
   const title = yearModelTrim(d, sameTrim ? ["year", "make", "model"] : ["year", "make", "model", "trim"], d.vehicle.make);
-  T(p, title, g.x(48), g.y(54), 26, "bold");
+  const logo = VARIANT_LOGOS.rollsroyce;
+  p.image(logo.png, logo.assetId, g.x(logo.slot.x), g.y(logo.slot.y), logo.slot.w * PX, g.y(logo.slot.y + logo.slot.h) - g.y(logo.slot.y));
+  T(p, title, g.x(135), g.y(54), 26, "bold");
 }
 
 function paintLeft(p: Painter, d: FactoryStickerData): boolean {
@@ -86,14 +90,17 @@ const spec: TabloidSpec = {
       ["Motor:", d.vehicle.engine?.toUpperCase() ?? null],
       ["Transmission:", d.vehicle.transmission?.toUpperCase() ?? null],
     ];
+    const BAR_X = g.x(262);
     let cy = 992;
     for (const [label, value] of colors) {
       if (!value) continue;
       T(p, label, g.x(48), g.y(cy), 8, "bold");
-      T(p, value, g.x(48) + 76, g.y(cy), 8, "body");
+      T(p, value, g.x(48) + 76, g.y(cy), fitSize(value, "body", 8, BAR_X - 6 - (g.x(48) + 76), 5.5), "body");
       cy += 14;
     }
-    if (input.layout.barcodePayload) p.barcode(g.x(280), g.y(990), 170 * PX, g.y(1064) - g.y(990), input.layout.barcodePayload, INK);
+    // Widened from the reference's empty corner so a 17-character VIN prints at
+    // about 8.4 mil per module, the same as the approved Letter masters.
+    if (input.layout.barcodePayload) p.barcode(BAR_X, g.y(990), g.x(458) - BAR_X, g.y(1064) - g.y(990), input.layout.barcodePayload, INK);
     const result = flowEquipmentColumns(p, ctx, [{ x: g.x(465), w: 415 * PX, top: g.y(122), bottom: g.y(1055) }], {
       unavailableAt: [g.x(468), g.y(130)],
     });

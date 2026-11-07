@@ -18,6 +18,8 @@ export interface NormalizeResult {
   data: FactoryStickerRenderData;
   confidence: "HIGH" | "MEDIUM" | "LOW";
   missing: string[];
+  /** Options and packages the decode marks verified=false: available for the model, not proven on this VIN. Never printed as installed. */
+  unverifiedOptions: string[];
   /** From build_sheet.pricing when present (sticker-grade fields). */
   baseMsrp: number | null;
   destinationCharge: number | null;
@@ -78,20 +80,30 @@ export function normalizeForSticker(
   };
   if (!identity.year || !identity.make || !identity.model) missing.push("identity");
 
-  const packages = (Array.isArray(sheet?.packages) ? sheet!.packages : []).map((p: AnyRow) => ({
+  // NeoVIN marks an option verified=false when it is only available for the
+  // model; printing it under installed options would misstate the build.
+  const unverifiedOptions: string[] = [];
+  const installed = (x: AnyRow): boolean => {
+    if (x?.verified !== false && x?.verified !== "false") return true;
+    const name = String(x?.name ?? "").trim();
+    if (name) unverifiedOptions.push(name);
+    return false;
+  };
+  const packages = (Array.isArray(sheet?.packages) ? sheet!.packages : []).filter(installed).map((p: AnyRow) => ({
     name: String(p?.name ?? ""),
     code: str(p?.code),
     msrp: num(p?.msrp),
     contents: (Array.isArray(p?.contents) ? p.contents : []).map((c: unknown) => String(c ?? "")).filter(Boolean),
   })).filter((p: { name: string }) => p.name);
 
-  const options = (Array.isArray(sheet?.options) ? sheet!.options : []).map((o: AnyRow) => ({
+  const options = (Array.isArray(sheet?.options) ? sheet!.options : []).filter(installed).map((o: AnyRow) => ({
     name: String(o?.name ?? ""),
     code: str(o?.code),
     msrp: num(o?.msrp),
   })).filter((o: { name: string }) => o.name);
 
   if (!sheet) missing.push("build_sheet");
+  if (unverifiedOptions.length) missing.push("option_install_unverified");
 
   // marketcheck-specs lifts base MSRP to the top level precisely so every
   // consumer can read it there, and DECODE_OWNED_KEYS preserves that copy
@@ -235,6 +247,7 @@ export function normalizeForSticker(
     },
     confidence,
     missing,
+    unverifiedOptions,
     baseMsrp,
     destinationCharge,
     optionsTotal,

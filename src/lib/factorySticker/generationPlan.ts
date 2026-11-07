@@ -28,6 +28,8 @@ export interface NormalizedForPlan {
   destinationCharge: number | null;
   optionsTotal: number | null;
   statedTotalMsrp: number | null;
+  /** Decoded options not proven on this VIN; any one holds the document for review. */
+  unverifiedOptions?: string[];
 }
 
 export interface StoredTemplateOverride {
@@ -261,6 +263,9 @@ export function assessRenderedSticker(input: {
     completeness,
     geometry,
     onePageFit: layout.fit ? { ok: layout.fit.ok, detail: layout.fit.detail ?? "" } : { ok: true, detail: "" },
+    unverifiedOptions: normalized.unverifiedOptions ?? [],
+    epaAvailable: completenessData.epa != null,
+    epaConflict: normalized.data.neovin?.epaConflict ?? null,
   });
   return {
     qaChecks,

@@ -42,6 +42,7 @@ const config: ToyotaFamilyConfig = {
   eqStyle: EQ_STYLE,
   grid: g,
   logo: { key: "lexus", x: 75, y: 58, w: 350 },
+  frame: [57, 51, 1492, 1044],
   header,
   eqHeading: { text: "STANDARD EQUIPMENT", x: 89, y: 160, size: 10.4, spacing: 2.4, note: { text: "UNLESS REPLACED BY INSTALLED OPTIONS", x: 444, y: 164, size: 5.8 } },
   eqColumns: (grid, extra, priceEnd) => [

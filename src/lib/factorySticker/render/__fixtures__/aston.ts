@@ -30,7 +30,7 @@ export function astonReferenceMatchData(base: FactoryStickerRenderData): Factory
     identity: { year: "2026", make: "Aston Martin", model: "Vantage", trim: "Roadster Auto" },
     bodyClass: "Convertible",
     mechanical: { engine: "4.0L Twin Turbo V8", transmission: "8-speed automatic", drivetrain: "RWD" },
-    pricing: { baseMsrp: 205900, destinationCharge: 3500, optionsTotal: 4925, totalMsrp: 221525, gasGuzzlerTax: 0 },
+    pricing: { baseMsrp: 205900, destinationCharge: 3500, optionsTotal: 4925, totalMsrp: 221525, gasGuzzlerTax: 0, importCharge: 7200 },
     packages: [],
     options: [
       { name: "Leather Colour - Contemporary", code: null, msrp: 3500 },

@@ -1,3 +1,5 @@
+import { describe, expect, it } from "vitest";
+import { buildRenderLayout } from "../contract";
 import { describeCatalogTemplate } from "../__fixtures__/catalogTemplateSuite";
 import { ASTON_REFERENCE_VIN, astonListing, astonReferenceMatchData, astonRenderData } from "../__fixtures__/aston";
 import { ASTON_MARTIN_VANTAGE_ROADSTER_GAS_ID } from "./astonMartinVantageRoadsterGas";
@@ -27,4 +29,17 @@ describeCatalogTemplate({
     { label: "other model", patch: (d) => ({ ...d, identity: { ...d.identity, model: "DB12" } }) },
     { label: "SUV body", patch: (d) => ({ ...d, bodyClass: "SUV" }) },
   ],
+});
+
+describe("Aston Martin price table reconciles on the label's own lines", () => {
+  it("prints the import-costs line, so base + options + import + transport = total", () => {
+    const d = astonReferenceMatchData(astonRenderData());
+    const m = buildRenderLayout(d, { oemThemeId: "o", oemThemeVersion: "1", canonicalOemId: null, templateFamilyId: "x", templateVersion: "1", logoAssetId: null, logoAssetVersion: null }, undefined, { sampleTemplateId: ASTON_MARTIN_VANTAGE_ROADSTER_GAS_ID });
+    const s = m.drawnStrings;
+    expect(s).toContain("Import Costs");
+    expect(s).toContain("$7,200.00");
+    expect(s).toContain("$221,525.00");
+    const p = d.pricing;
+    expect(p.baseMsrp! + p.optionsTotal! + (p.importCharge ?? 0) + p.destinationCharge! + (p.gasGuzzlerTax ?? 0)).toBe(p.totalMsrp);
+  });
 });

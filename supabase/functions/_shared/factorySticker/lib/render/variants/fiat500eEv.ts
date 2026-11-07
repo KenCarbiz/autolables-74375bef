@@ -7,15 +7,16 @@
 // 1:933). It shares the FCA label family (fcaCommon.ts); the right-hand panels
 // are the electric fuel-economy panel (evPanels.ts), the safety panel, the
 // parts-content box and the Passport QR in place of the FlexCare advertisement.
-// The Fiat logo artwork is not packaged, so a neutral wordmark prints in its
-// place (missing_source_artwork). The reference is a 2025 example.
+// The FIAT and 500e lockup is taken from the reference label PDF
+// (logoArtwork.ts). The reference is a 2025 example.
 
 import type { FactoryStickerData } from "../../types.ts";
 import type { Painter, LayoutModel } from "../layout.ts";
 import { T, Y } from "./hyundaiTucsonGas.ts";
 import { buildFcaLayout, paintParts, paintPassport, paintSafety } from "./fcaCommon.ts";
 import { PX, type Grid } from "./catalogBlocks.ts";
-import { paintEvEpa, paintWordmark } from "./evPanels.ts";
+import { paintEvEpa } from "./evPanels.ts";
+import { VARIANT_LOGOS } from "./logoArtwork.ts";
 import { priceRowsWithoutColors } from "./tabloidCommon.ts";
 import type { VariantLayoutBuilder } from "./shared.ts";
 
@@ -24,7 +25,12 @@ export const FIAT_500E_EV_ID = "fiat_2025_500e_giorgio_armani";
 const grid: Grid = { x: (px) => px * PX, y: (px) => Y(px * PX), k: 0.93 * PX };
 
 function paintHeader(p: Painter, d: FactoryStickerData): void {
-  paintWordmark(p, "Fiat", 58, Y(50), 46);
+  // Lockup slots are the reference's 100 dpi pixels; 0.72 converts to points.
+  for (const key of ["fiat", "fiat500"] as const) {
+    const l = VARIANT_LOGOS[key];
+    const top = Y(l.slot.y * PX);
+    p.image(l.png, l.assetId, l.slot.x * PX, top, l.slot.w * PX, Y((l.slot.y + l.slot.h) * PX) - top);
+  }
   const v = d.vehicle;
   if (v.year > 0) T(p, `${v.year} MODEL YEAR`, 143, Y(98), 14, "bold");
   T(p, "For more information visit: www.fiatusa.com", 880, Y(66), 12, "body", { align: "center" });

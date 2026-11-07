@@ -81,6 +81,8 @@ export interface StickerPricing {
   destinationCharge?: number;
   /** Federal gas-guzzler tax when applicable and source-backed. */
   gasGuzzlerTax?: number;
+  /** Import costs the manufacturer prints as its own line (e.g. Aston Martin); only when the price record states it. */
+  importCharge?: number;
   calculatedTotalMsrp?: number;
   sourceReportedTotalMsrp?: number;
   reconciliationDifference?: number;

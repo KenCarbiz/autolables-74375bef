@@ -37,6 +37,8 @@ export interface ToyotaFamilyConfig {
   eqStyle: FlowStyle;
   grid: Grid;
   logo: { key: "lexus" | "toyota"; x: number; y: number; w: number };
+  /** Outer label border in reference px (x1, y1, x2, y2), drawn where the reference has one. */
+  frame?: [number, number, number, number];
   header: (p: Painter, d: FactoryStickerData, g: Grid) => void;
   eqHeading: { text: string; x: number; y: number; size: number; align?: "left" | "center"; spacing?: number; note?: { text: string; x: number; y: number; size: number } };
   /** Equipment columns in reference pixels; `extra` re-splits the leading region. */
@@ -121,6 +123,10 @@ export function toyotaFamilySpec(cfg: ToyotaFamilyConfig): TabloidSpec {
     eqStyle: cfg.eqStyle,
     paintFirst(p: Painter, ctx: FirstPageContext): FirstPageResult | null {
       const { d, input } = ctx;
+      if (cfg.frame) {
+        const [x1, y1, x2, y2] = cfg.frame;
+        R(p, g.x(x1), g.y(y1), g.x(x2) - g.x(x1), g.y(y2) - g.y(y1), null, 2.4);
+      }
       paintLogo(p, cfg);
       cfg.header(p, d, g);
       const priceEnd = paintOptions(p, d, cfg);

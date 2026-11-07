@@ -147,6 +147,8 @@ export interface FactoryStickerRenderData {
     portOptionsTotal?: number | null;
     /** Federal gas-guzzler tax; only when applicable and on the source record. */
     gasGuzzlerTax?: number | null;
+    /** Manufacturer-labeled import costs; only when on the source price record. */
+    importCharge?: number | null;
   };
   packages: Array<{ name: string; code: string | null; msrp: number | null; contents: string[] }>;
   options: Array<{
@@ -333,7 +335,7 @@ function reconcile(pricing: FactoryStickerRenderData["pricing"]): {
   if (pricing.baseMsrp === null) return { calculated: undefined, status: "INSUFFICIENT_DATA" };
   const calculated = pricing.baseMsrp + (pricing.optionsTotal ?? 0) +
     (pricing.portOptionsTotal ?? 0) + (pricing.destinationCharge ?? 0) +
-    (pricing.gasGuzzlerTax ?? 0);
+    (pricing.gasGuzzlerTax ?? 0) + (pricing.importCharge ?? 0);
   if (pricing.totalMsrp === null) return { calculated, status: "INSUFFICIENT_DATA" };
   const diff = Math.abs(calculated - pricing.totalMsrp);
   const status: ReconciliationStatus =
@@ -403,6 +405,7 @@ export function adaptRenderData(d: FactoryStickerRenderData): StickerLayoutInput
       ...opt("factoryInstalledTotal", d.pricing.optionsTotal),
       ...opt("portOptionsTotal", d.pricing.portOptionsTotal ?? null),
       ...opt("gasGuzzlerTax", d.pricing.gasGuzzlerTax ?? null),
+      ...opt("importCharge", d.pricing.importCharge ?? null),
       ...opt("destinationCharge", d.pricing.destinationCharge),
       ...opt("calculatedTotalMsrp", calculated),
       ...opt("sourceReportedTotalMsrp", d.pricing.totalMsrp),
@@ -763,6 +766,11 @@ function resolveVariantRoute(
   const build = VARIANT_LAYOUTS[variantKey];
   if (!build) return null;
   return { variantKey, masterRouted: !exact, build };
+}
+
+/** The layout production routing picks for this record: a variant or catalog key, or null for the generic layout. */
+export function productionLayoutKey(data: FactoryStickerRenderData, theme: FactoryStickerTheme): string | null {
+  return resolveVariantRoute(data, theme, adaptRenderData(data))?.variantKey ?? null;
 }
 
 export function catalogResolutionFor(data: FactoryStickerRenderData): CatalogResolution {

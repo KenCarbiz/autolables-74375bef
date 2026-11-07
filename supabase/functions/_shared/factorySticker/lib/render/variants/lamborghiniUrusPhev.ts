@@ -10,8 +10,8 @@
 // the horizontals and compresses verticals to clear the reproduction banner
 // and disclosure.
 //
-// Every printed value comes from render data. The shield artwork is not
-// packaged (a neutral wordmark prints), the importer block, stock status,
+// Every printed value comes from render data. The shield is taken from the
+// reference label PDF (logoArtwork.ts); the importer block, stock status,
 // agency seals, source QR and barcode are not reproduced, and the plug-in
 // panel prints Not Available for every figure the verified EPA record does not
 // carry.
@@ -25,17 +25,18 @@ import {
   type FirstPageContext, type FirstPageResult, type FlowStyle, type TabloidSpec,
 } from "./tabloidCommon.ts";
 import { PRICE_FOOTNOTE, PX, makeGrid, money, paintCatalogParts, paintCatalogSafety } from "./catalogBlocks.ts";
-import { paintEvEpa, paintWordmark } from "./evPanels.ts";
+import { paintEvEpa } from "./evPanels.ts";
+import { VARIANT_LOGOS } from "./logoArtwork.ts";
 import { flowEquipmentColumns, paintPriceList, paintTotals } from "./catalogPage.ts";
 
 export const LAMBORGHINI_URUS_PHEV_ID = "lamborghini_2026_urus_se";
 
 const EQ_STYLE: FlowStyle = { size: 12.8, lh: 14.8, hang: 6, inset: 0 };
 
-function paintDealerBox(p: Painter, x: number, label: string, lines: string[]): void {
-  R(p, x, 34, 205 * PX, 50, PAPER, 1);
-  T(p, label, x + 5, 38, 7.4, "bold");
-  lines.slice(0, 4).forEach((l, i) => T(p, l, x + 5, 50 + i * 8, 6.6, "body"));
+// The reference prints its address blocks as plain text columns, not boxes.
+function paintDealerColumn(p: Painter, x: number, y: number, label: string, lines: string[]): void {
+  T(p, label, x, y, 7.4, "bold");
+  lines.slice(0, 4).forEach((l, i) => T(p, l, x, y + 10 + i * 8, 6.6, "body"));
 }
 
 const spec: TabloidSpec = {
@@ -48,7 +49,8 @@ const spec: TabloidSpec = {
     const right = g.x(468);
 
     T(p, [v.make, v.model].filter(Boolean).join(" "), left, g.y(138), 14, "body");
-    paintWordmark(p, "Lamborghini", g.x(790), g.y(142), 12, { align: "right" });
+    const logo = VARIANT_LOGOS.lamborghini;
+    p.image(logo.png, logo.assetId, g.x(logo.slot.x), g.y(logo.slot.y), logo.slot.w * PX, g.y(logo.slot.y + logo.slot.h) - g.y(logo.slot.y));
     const table: Array<[string, string | null]> = [
       ["Model", [v.make, v.model, v.trim ?? ""].filter(Boolean).join(" ")],
       ["Year", v.year > 0 ? String(v.year) : null],
@@ -73,7 +75,8 @@ const spec: TabloidSpec = {
     T(p, "Optional Equipment", left, g.y(mTop + 30), 8, "bold");
     const end = paintPriceList(p, d, { x: left, y: g.y(mTop + 45), w: right - left, limit: g.y(860), amountRight: right });
     if (end === null) return null;
-    const totalsY = end + 10;
+    // Destination and total sit at the foot of the price column, as on the reference.
+    const totalsY = Math.max(end + 10, g.y(812));
     paintTotals(p, d, { x: left, right, y: totalsY, destinationLabel: "Destination Charge", totalLabel: "Total Suggested Retail Price", size: 7.8 });
     const noteY = totalsY + 34;
     const noteLines = wrap(PRICE_FOOTNOTE, "body", 6.2, right - left);
@@ -82,24 +85,26 @@ const spec: TabloidSpec = {
     const barcodeTop = g.y(1004);
     if (tailTop > barcodeTop - 20) return null;
 
-    const result = flowEquipmentColumns(p, ctx, [{ x: g.x(505), w: 290 * PX, top: g.y(168), bottom: g.y(1050) }], {
+    const result = flowEquipmentColumns(p, ctx, [{ x: g.x(505), w: 245 * PX, top: g.y(168), bottom: g.y(1050) }], {
       tail: [{ x: left, w: right - left, top: tailTop, bottom: barcodeTop - 6 }],
       unavailableAt: [g.x(508), g.y(174)],
     });
     if (input.layout.barcodePayload) p.barcode(left, barcodeTop, 250 * PX, g.y(1052) - barcodeTop, input.layout.barcodePayload, "#000000");
 
     const dealer = dealerLines(d);
-    paintDealerBox(p, g.x(1000), "Dealer sold to", dealer);
-    paintDealerBox(p, g.x(1250), "Dealer delivered to", d.factory.transportMethod ? [`Transport method: ${d.factory.transportMethod}`] : []);
+    paintDealerColumn(p, g.x(1106), g.y(132), "Dealer sold to", dealer);
+    paintDealerColumn(p, g.x(1280), g.y(132), "Dealer Delivered to", d.factory.transportMethod ? [`Transport method: ${d.factory.transportMethod}`] : []);
 
-    const epaTop = 92;
-    const gr = makeGrid(epaTop, 210, epaTop + 405 * PX, 615);
+    // Reference right column (100 dpi px): EPA 860-1500 x 210-620 (drawn from
+    // 800 so the fixed-size EPA type keeps its spacing), safety
+    // 630-850, parts content 852-1020.
+    const gr = makeGrid(g.y(210), 210, g.y(210) + 453 * PX, 210 + 453);
     paintEvEpa(p, d, gr, 800, 210, { mode: "phev", widthPx: 700, qr: true });
-    const safetyTop = gr.y(210 + 453) + 8;
-    const safetyH = Math.min(182, (ctx.footerTop * 0.612 - 8 - safetyTop) * 0.64);
-    paintCatalogSafety(p, d, g.x(800), safetyTop, 700 * PX, safetyH);
-    const partsTop = safetyTop + safetyH + 8;
-    paintCatalogParts(p, d, g.x(800), partsTop, 700 * PX, ctx.footerTop * 0.612 - 8 - partsTop, 2);
+    const safetyTop = Math.max(g.y(630), gr.y(210 + 453) + 6);
+    const safetyBottom = Math.max(g.y(850), safetyTop + 182);
+    paintCatalogSafety(p, d, g.x(800), safetyTop, 700 * PX, safetyBottom - safetyTop);
+    const partsTop = safetyBottom + 4;
+    paintCatalogParts(p, d, g.x(800), partsTop, 700 * PX, Math.min(g.y(1030), ctx.footerTop * 0.612 - 8) - partsTop, 2);
     return result;
   },
 };

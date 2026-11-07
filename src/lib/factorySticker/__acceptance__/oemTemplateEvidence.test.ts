@@ -839,7 +839,7 @@ const EV_DOCS: Record<string, EvDoc> = {
     title: "Cadillac 2026 Escalade IQL Premium Sport (electric)", mode: "electric", logo: "Cadillac logo",
     page: "the reference PDF is 1224x792pt (17x11in landscape); the render is the same size and exactly one page.",
     sample: "- stress record: a saved 2026 Tesla Model Y (other make), not a production candidate. Production has no Cadillac record. The standard-equipment list is trimmed to about 100 items.",
-    extra: ["Shared General Motors layout family (gmTruckCommon.ts) with a Cadillac wordmark header and the CARB panel (carb_panel_pending)."],
+    extra: ["Shared General Motors layout family (gmTruckCommon.ts) with a Cadillac wordmark header and the CARB panel. As an electricity-only vehicle it prints A+ for both ratings, the value CARB fixes for zero-emission vehicles, never an estimate."],
   },
   fiat: {
     title: "Fiat 2025 500e Giorgio Armani (electric)", mode: "electric", logo: "Fiat logo",
@@ -1001,7 +1001,9 @@ async function writeSample(
   const qr = m.pages[0].primitives.find((p) => p.kind === "qr") as { size: number; payload: string } | undefined;
   const barcode = m.pages[0].primitives.find((p) => p.kind === "barcode") as { payload: string } | undefined;
   const p = data.pricing;
-  const calculated = p.baseMsrp !== null ? p.baseMsrp + (p.optionsTotal ?? 0) + (p.destinationCharge ?? 0) : null;
+  const calculated = p.baseMsrp !== null
+    ? p.baseMsrp + (p.optionsTotal ?? 0) + (p.portOptionsTotal ?? 0) + (p.destinationCharge ?? 0) + (p.gasGuzzlerTax ?? 0) + (p.importCharge ?? 0)
+    : null;
   const refInfo = await sh("pdfinfo", [refPdf]);
   const refSize = /Page size:\s+([\d.]+) x ([\d.]+) pts/.exec(refInfo)!;
   const refRot = Number(/Page rot:\s+(\d+)/.exec(refInfo)?.[1] ?? 0);
@@ -1022,6 +1024,8 @@ async function writeSample(
     textOutsidePage: outOfBounds(m),
     pricing: {
       baseMsrp: p.baseMsrp, factoryOptionsTotal: p.optionsTotal, destinationCharge: p.destinationCharge,
+      ...(p.gasGuzzlerTax != null ? { gasGuzzlerTax: p.gasGuzzlerTax } : {}),
+      ...(p.importCharge != null ? { importCharge: p.importCharge } : {}),
       calculatedTotal: calculated, printedTotal: p.totalMsrp,
       reconciled: calculated !== null && p.totalMsrp !== null && Math.abs(calculated - p.totalMsrp) <= 5,
       optionLines: data.options.length,

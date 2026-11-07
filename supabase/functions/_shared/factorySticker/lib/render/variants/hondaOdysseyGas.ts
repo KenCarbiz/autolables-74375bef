@@ -111,11 +111,13 @@ const spec: TabloidSpec = {
 
     const g = makeGrid(0, 0, EPA_PANEL_H * 0.68, EPA_PANEL_H);
     paintScaled(p, EPA_SCALE, RIGHT, 30, (q) => paintCatalogEpa(q, d, g, 0, 0));
-    const safetyTop = 30 + EPA_PANEL_H * 0.68 * EPA_SCALE + 5;
-    const safetyScale = RIGHT_W / 500;
-    paintScaled(p, safetyScale, RIGHT, safetyTop, (q) => paintCatalogSafety(q, d, 0, 0, 500, 204));
-    const partsTop = safetyTop + 204 * safetyScale + 5;
-    paintCatalogParts(p, d, RIGHT, partsTop, RIGHT_W, 540 - partsTop, 2);
+    // Reference order under the fuel-economy panel: the parts-content box on
+    // the left and the safety ratings beside it, sharing one band.
+    const bandTop = 30 + EPA_PANEL_H * 0.68 * EPA_SCALE + 5;
+    const partsW = 118;
+    const safetyX = RIGHT + partsW + 6;
+    paintCatalogParts(p, d, RIGHT, bandTop, partsW, 540 - bandTop, 1);
+    paintCatalogSafety(p, d, safetyX, bandTop, RIGHT + RIGHT_W - safetyX, 540 - bandTop);
     return placedResult(entries, rest);
   },
 };

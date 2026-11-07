@@ -9,8 +9,8 @@
 // (1611 x 969) and mapped by a Grid that keeps the horizontals and compresses
 // verticals to clear the mandatory banner and disclosure strips.
 //
-// Every printed value comes from render data. The winged emblem is not
-// packaged (a neutral wordmark prints), the tagline, the source QR, agency
+// Every printed value comes from render data. The winged emblem and BENTLEY
+// wordmark are taken from the reference label PDF (logoArtwork.ts); the tagline, the source QR, agency
 // seals and the "affixed pursuant to" legal wording are not reproduced, and
 // the plug-in panel prints Not Available for every figure the verified EPA
 // record does not carry.
@@ -20,8 +20,9 @@ import { Painter, type LayoutModel } from "../layout.ts";
 import { PAPER, type VariantLayoutBuilder } from "./shared.ts";
 import { R, T, wrap } from "./hyundaiTucsonGas.ts";
 import { colorText, dealerLines, type FirstPageContext, type FirstPageResult, type FlowStyle, type TabloidSpec } from "./tabloidCommon.ts";
-import { PRICE_FOOTNOTE, PX, makeGrid, money, paintCatalogParts, paintCatalogSafety } from "./catalogBlocks.ts";
-import { paintEvEpa, paintWordmark } from "./evPanels.ts";
+import { PRICE_FOOTNOTE, PX, isNhtsaRated, makeGrid, money, paintCatalogParts, paintCatalogSafety } from "./catalogBlocks.ts";
+import { paintEvEpa } from "./evPanels.ts";
+import { VARIANT_LOGOS } from "./logoArtwork.ts";
 import { catalogPageBuilder, flowEquipmentColumns, paintPriceList, paintTotals } from "./catalogPage.ts";
 
 export const BENTLEY_CONTINENTAL_GT_PHEV_ID = "bentley_2026_continental_gt_azure";
@@ -46,7 +47,8 @@ const spec: TabloidSpec = {
 
     const title = [v.year > 0 ? String(v.year) : "", v.model, v.trim ?? ""].filter(Boolean).join(" ");
     T(p, title, g.x(40), g.y(40), 22, "bold");
-    paintWordmark(p, "Bentley", g.x(840), g.y(80), 13, { align: "right" });
+    const logo = VARIANT_LOGOS.bentley;
+    p.image(logo.png, logo.assetId, g.x(logo.slot.x), g.y(logo.slot.y), logo.slot.w * PX, g.y(logo.slot.y + logo.slot.h) - g.y(logo.slot.y));
     const facts: Array<[string, string | null]> = [
       ["Exterior:", colorText(v.exteriorColor, v.exteriorColorCode)],
       ["Main Hide:", colorText(v.interiorColor, v.interiorColorCode)],
@@ -88,11 +90,13 @@ const spec: TabloidSpec = {
     noteLines.forEach((l, i) => T(p, l, left, noteY + i * 7.2, 6.2, "body"));
     const tailTop = noteY + noteLines.length * 7.2 + 8;
     const barcodeTop = g.y(884);
-    const partsTop = g.y(742);
-    if (tailTop > partsTop - 20) return null;
+    if (tailTop > barcodeTop - 20) return null;
+    const rated = isNhtsaRated(d);
+    const leftPartsTop = Math.max(tailTop + 4, g.y(742));
+    if (rated && leftPartsTop > barcodeTop - 40) return null;
 
     const result = flowEquipmentColumns(p, ctx, [{ x: g.x(478), w: 385 * PX, top: g.y(152), bottom: g.y(925) }], {
-      tail: [{ x: left, w: right - left, top: tailTop, bottom: partsTop - 6 }],
+      tail: [{ x: left, w: right - left, top: tailTop, bottom: (rated ? leftPartsTop : barcodeTop) - 6 }],
       unavailableAt: [g.x(478), g.y(158)],
     });
     if (input.layout.barcodePayload) p.barcode(left, barcodeTop, 300 * PX, g.y(930) - barcodeTop, input.layout.barcodePayload, "#000000");
@@ -101,13 +105,24 @@ const spec: TabloidSpec = {
     paintDealerBox(p, g, 938, "SOLD TO", dealer, []);
     paintDealerBox(p, g, 1293, "SHIP TO", [], d.factory.transportMethod ? [`Transportation Method: ${d.factory.transportMethod.toUpperCase()}`] : []);
 
-    paintCatalogParts(p, d, left, partsTop, right - left, g.y(872) - partsTop, 2);
-
     const epaTop = g.y(118);
     const gr = makeGrid(epaTop, 118, epaTop + 453 * PX, 571);
     paintEvEpa(p, d, gr, 885, 118, { mode: "phev", widthPx: 700, qr: true });
+    // As on the reference, an unrated vehicle stacks safety then parts content
+    // in the right column. A rated vehicle needs the full star panel there, so
+    // parts content moves to the foot of the price column.
     const safetyTop = gr.y(571) + 8;
-    paintCatalogSafety(p, d, g.x(885), safetyTop, 700 * PX, g.y(935) - safetyTop);
+    const columnBottom = g.y(935);
+    if (rated) {
+      paintCatalogSafety(p, d, g.x(885), safetyTop, 700 * PX, columnBottom - safetyTop);
+      paintCatalogParts(p, d, left, leftPartsTop, right - left, barcodeTop - 8 - leftPartsTop, 2);
+    } else {
+      const safetyH = Math.min(110, (columnBottom - safetyTop) * 0.55);
+      paintCatalogSafety(p, d, g.x(885), safetyTop, 700 * PX, safetyH);
+      const partsTop = safetyTop + safetyH + 6;
+      R(p, g.x(885), partsTop, 700 * PX, columnBottom - partsTop, PAPER);
+      paintCatalogParts(p, d, g.x(885), partsTop, 700 * PX, columnBottom - partsTop, 2);
+    }
     return result;
   },
 };

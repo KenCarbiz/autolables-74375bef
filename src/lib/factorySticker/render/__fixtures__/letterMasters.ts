@@ -15,6 +15,7 @@ export const PATHFINDER_REFERENCE_VIN = "5N1DR3DK0TC000002";
 export const qx60ReferenceMatchData = (): FactoryStickerRenderData => ({
   ...infinitiBenchmark(),
   vin: QX60_REFERENCE_VIN,
+  barcodePayload: QX60_REFERENCE_VIN,
   title: "Reference match (side-by-side comparison only)",
   identity: { year: "2026", make: "INFINITI", model: "QX60", trim: "SPORT" },
   mechanical: { engine: "2.0L VC-TURBO I4", transmission: "9-SPEED A/T", drivetrain: "AWD" },
@@ -30,6 +31,7 @@ export const qx60ReferenceMatchData = (): FactoryStickerRenderData => ({
 export const pathfinderReferenceMatchData = (): FactoryStickerRenderData => ({
   ...nissanBenchmark(),
   vin: PATHFINDER_REFERENCE_VIN,
+  barcodePayload: PATHFINDER_REFERENCE_VIN,
   title: "Reference match (side-by-side comparison only)",
   identity: { year: "2026", make: "Nissan", model: "Pathfinder", trim: "PLATINUM" },
   dealerRole: null,

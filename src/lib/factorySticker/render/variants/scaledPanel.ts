@@ -2,7 +2,8 @@
 // smaller, for the letter-size catalog layouts. Positions, rules, paths and
 // type scale together; type never drops below the readable minimum, and a
 // Passport QR keeps its fixed 0.90in size, anchored at the scaled position of
-// its original bottom-right corner.
+// its original bottom-right corner. The QR's white backing box keeps the
+// same full size, so the code never spills onto a dark band unbacked.
 
 import { Painter, type LayoutPrimitive } from "../layout.ts";
 
@@ -19,6 +20,8 @@ export function paintScaled(p: Painter, s: number, ox: number, oy: number, draw:
   const beside = (x: number, y: number, align: string): boolean => qr !== null && align === "right" && y >= qr.y - 2 && y <= qr.y + qr.size && x <= qr.x;
   const X = (v: number): number => ox + v * s;
   const Y = (v: number): number => oy + v * s;
+  const isQrBacking = (r: { x: number; y: number; w: number; h: number }): boolean =>
+    qr !== null && Math.abs(r.x - qr.x) < 0.01 && Math.abs(r.y - qr.y) < 0.01 && Math.abs(r.w - qr.size) < 0.01 && Math.abs(r.h - qr.size) < 0.01;
   for (const prim of local.primitives as LayoutPrimitive[]) {
     switch (prim.kind) {
       case "text":
@@ -29,6 +32,10 @@ export function paintScaled(p: Painter, s: number, ox: number, oy: number, draw:
         });
         break;
       case "rect":
+        if (qr && isQrBacking(prim)) {
+          p.rect(X(qr.x + qr.size) - qr.size, Y(qr.y + qr.size) - qr.size, qr.size, qr.size, prim.fill, prim.stroke, prim.strokeWidth);
+          break;
+        }
         p.rect(X(prim.x), Y(prim.y), prim.w * s, prim.h * s, prim.fill, prim.stroke, prim.strokeWidth !== undefined ? prim.strokeWidth * s : undefined);
         break;
       case "rule":

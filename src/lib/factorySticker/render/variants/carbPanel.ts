@@ -3,7 +3,11 @@
 // 700 x 452 px panel (100 dpi) and scaled to the rectangle it is given.
 //
 // The data model carries no CARB letter grades, so both rating scales print an
-// explicit "Not Available" in place of the grade and pointer. The fuel-type tag
+// explicit "Not Available" in place of the grade and pointer, except for a
+// vehicle whose only fuel is electricity: CARB's label specification exempts
+// those from testing and fixes both ratings at A+ (California Environmental
+// Performance Label Specifications for 2021+ MDVs, section on zero-emission
+// vehicles), with the note that upstream electricity emissions are excluded. The fuel-type tag
 // is drawn only when the record states a fuel type (EPA match or engine text).
 // The California Air Resources Board emblem is not reproduced; its name is
 // printed as a plain wordmark.
@@ -20,6 +24,11 @@ const TRACK = "#d9d9d9";
 export function carbFuelTag(d: FactoryStickerData): string | null {
   if (d.vehicle.fuelType) return fuelCategoryLabel(d.vehicle.fuelType);
   return /diesel/i.test(d.vehicle.engine ?? "") ? "Diesel Vehicle" : null;
+}
+
+/** Grades fixed by rule, never estimated: A+/A+ only when the verified EPA fuel type is electricity alone. */
+export function carbGrades(d: FactoryStickerData): { ghg: "A+"; smog: "A+" } | null {
+  return /^\s*electricity\s*$/i.test(d.vehicle.fuelType ?? "") ? { ghg: "A+", smog: "A+" } : null;
 }
 
 export function paintCarbPanel(p: Painter, d: FactoryStickerData, x: number, y: number, w: number, h: number): void {
@@ -53,7 +62,7 @@ export function paintCarbPanel(p: Painter, d: FactoryStickerData, x: number, y: 
   };
   head("Greenhouse Gas Rating", 14);
   head("Smog Rating", 470);
-  const track = (px: number, width: number): void => {
+  const track = (px: number, width: number, grade: string | null): void => {
     const ty = Yy(262);
     const th = H(30);
     const cap = W(34);
@@ -62,11 +71,20 @@ export function paintCarbPanel(p: Painter, d: FactoryStickerData, x: number, y: 
     R(p, X(px + width) - cap, ty, cap, th, INK);
     T(p, "A+", X(px) + cap / 2, ty + th * 0.2, 16 * k, "bold", { align: "center", color: PAPER });
     T(p, "D", X(px + width) - cap / 2, ty + th * 0.2, 16 * k, "bold", { align: "center", color: PAPER });
-    T(p, "Not Available", X(px) + W(width) / 2, ty + th * 0.22, 15 * k, "bold", { align: "center" });
+    if (grade) {
+      // The pointer sits on the track beside the A+ end the grade names.
+      const mw = W(40);
+      R(p, X(px) + cap + W(4), ty + H(3), mw, th - H(6), "#0b7a34");
+      T(p, grade, X(px) + cap + W(4) + mw / 2, ty + th * 0.22, 15 * k, "bold", { align: "center", color: PAPER });
+    } else {
+      T(p, "Not Available", X(px) + W(width) / 2, ty + th * 0.22, 15 * k, "bold", { align: "center" });
+    }
     T(p, "Cleaner", X(px), ty + th + H(6), 14 * k, "body");
   };
-  track(14, 310);
-  track(470, 200);
+  const grades = carbGrades(d);
+  track(14, 310, grades?.ghg ?? null);
+  track(470, 200, grades?.smog ?? null);
+  if (grades) T(p, "Does not include emissions from producing electricity.", X(350), Yy(322), 14 * k, "body", { align: "center" });
 
   const foot = wrap("Vehicle emissions are a primary contributor to climate change and smog. Ratings are determined by the California Air Resources Board based on this vehicle's measured emissions.", "body", 15.2 * k, W(672));
   foot.forEach((l, i) => T(p, l, X(10), Yy(362) + i * H(19), 15.2 * k, "body", { color: PAPER }));

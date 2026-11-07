@@ -132,11 +132,15 @@ export function paintCatalogEpa(p: Painter, d: FactoryStickerData, g: Grid, ox: 
 }
 
 /** NHTSA panel (points); a not-rated or unavailable record prints the explicit message panel. */
-export function paintCatalogSafety(p: Painter, d: FactoryStickerData, x: number, y: number, w: number, h: number): void {
+export function isNhtsaRated(d: FactoryStickerData): boolean {
   const r = d.regulatory;
   const ratings = [r.overallRating, r.frontalDriverRating, r.frontalPassengerRating, r.sideFrontRating, r.sideRearRating, r.rolloverRating, r.frontalRating, r.sideRating];
-  const anyRated = r.nhtsaStatus === "VERIFIED" && ratings.some((n) => n !== undefined && n > 0);
-  if (anyRated) {
+  return r.nhtsaStatus === "VERIFIED" && ratings.some((n) => n !== undefined && n > 0);
+}
+
+export function paintCatalogSafety(p: Painter, d: FactoryStickerData, x: number, y: number, w: number, h: number): void {
+  const r = d.regulatory;
+  if (isNhtsaRated(d)) {
     const footerH = 60;
     const headerH = 30;
     const body = Q(h) - headerH - footerH;
