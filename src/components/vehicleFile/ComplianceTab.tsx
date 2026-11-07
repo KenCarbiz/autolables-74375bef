@@ -16,7 +16,8 @@ import { useVehicleEvidence } from "@/lib/stickerStudio/useVehicleEvidence";
 import { useRecallTask } from "@/hooks/useRecallTask";
 import { Card, EmptyNote, Pair, btn, fmtWhen } from "./primitives";
 import { IdentityStrip, VehicleSubHeader, lifecycleFacts } from "./SubPageHeader";
-import { useComplianceFacts } from "./useComplianceFacts";
+import { useComplianceFacts, type ComplianceFacts } from "./useComplianceFacts";
+import { buildComplianceBlockers } from "./complianceBlockers";
 import RecallCard from "./RecallCard";
 import PriceIntegrityCards from "./PriceIntegrityCard";
 import SignaturesSection, { useVehicleSignatures } from "./SignaturesSection";
@@ -101,8 +102,10 @@ const OfficialFormsCard = ({ vehicle }: { vehicle: VehicleRow }) => {
   );
 };
 
-export const ComplianceTab = ({ vehicle, ready, recall, lifecycle, onReload }: {
+export const ComplianceTab = ({ vehicle, ready, recall, lifecycle, onReload, cf: cfProp }: {
   strip?: ReactNode;
+  /** The vehicle file's shared compliance facts; read here only when absent. */
+  cf?: ComplianceFacts;
   vehicle: VehicleRow;
   ready: ReadinessSummary;
   lifecycle: LifecycleResult;
@@ -119,21 +122,10 @@ export const ComplianceTab = ({ vehicle, ready, recall, lifecycle, onReload }: {
   const facts = deriveStatusFacts({ vehicle, ready, lifecycle });
   const recallLine = recallFact(vehicle);
   const readiness = { label: facts.retail.value };
-  const cf = useComplianceFacts(vehicle);
-
-  const blockerRows: { key: string; item: string; details: string; evidence?: { label: string; to: string }; when: string | null }[] = [];
-  if (recallLine.tone === "neutral") {
-    blockerRows.push({ key: "recall", item: "Recall status unknown", details: "No VIN-level recall check has answered.", evidence: { label: "View recall card", to: "#vf-recall-card" }, when: vehicle.recall_checked_at });
-  }
-  for (const b of ready.blockers.filter((c) => /recall/i.test(c.label))) {
-    blockerRows.push({ key: `ready-${b.label}`, item: b.label, details: "Blocks publishing until the service department records an outcome.", when: b.when });
-  }
-  if (!cf.loading) {
-    if (cf.price.tone === "danger") blockerRows.push({ key: "price", item: "Price mismatch", details: cf.price.detail ?? "", evidence: { label: "View price card", to: "#vf-price-card" }, when: cf.price.checkedAt });
-    if (cf.safety.tone === "danger") blockerRows.push({ key: "safety", item: `Safety inspection ${cf.safety.value.toLowerCase()}`, details: cf.safety.detail ?? "", evidence: { label: "View inspection", to: "#vf-forms-card" }, when: cf.safety.checkedAt });
-    if (cf.delivery.tone === "warning") blockerRows.push({ key: "delivery", item: "Delivery sign-offs incomplete", details: `${cf.delivery.value}. ${cf.delivery.detail ?? ""}`.trim(), evidence: { label: "View sign-offs", to: "#vf-delivery-card" }, when: null });
-    if (cf.title.tone === "warning") blockerRows.push({ key: "title", item: "Title missing", details: cf.title.detail ?? "", evidence: { label: "View title", to: "#vf-title-card" }, when: null });
-  }
+  const ownCf = useComplianceFacts(vehicle, { enabled: !cfProp });
+  const cf = cfProp ?? ownCf;
+  // The same blocker list the Overview card and the identity strip count (L05).
+  const blockerRows = buildComplianceBlockers({ vehicle, ready, cf }).rows;
   const strip = (
     <IdentityStrip
       vehicle={vehicle}

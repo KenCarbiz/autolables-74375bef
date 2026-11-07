@@ -214,7 +214,7 @@ export default function DeliveriesSection() {
         {t && (
           <div className="space-y-4">
             <Panel title="Exception queue" description="Open problems with deliveries. Resolving needs a reason." flush>
-              {t.exceptions.length === 0 ? <EmptyState title="No open exceptions" compact /> : (
+              {t.exceptions.length === 0 ? <EmptyState title="No open delivery exceptions" detail="This queue covers delivery problems only. Queued or overdue Files.com imports are shown under Runs and on the Overview." compact /> : (
                 <WorkTable caption="Delivery exceptions" minWidth={960}>
                   <thead><tr><Th>Opened</Th><Th>Severity</Th><Th>Kind</Th><Th>Feed</Th><Th>Detail</Th><Th align="right">Resolve</Th></tr></thead>
                   <tbody>{t.exceptions.map((e) => <ExceptionRow key={e.id} e={e} />)}</tbody>

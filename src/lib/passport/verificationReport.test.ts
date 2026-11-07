@@ -77,7 +77,8 @@ describe("deriveVerificationReport — canonical customer summary", () => {
       lOf({ vin: "5N1AL1F83VC332076", ymm: "2025 INFINITI QX50", mileage: 12000, condition: "used" }),
     );
     // vin + 4 vehicle-history checks all returned data, but only 2 families.
-    const consulted = new Set(r.checks.filter((c) => c.status !== "unavailable").map((c) => c.family));
+    // A pending check consulted nothing (L02), so it is not a source either.
+    const consulted = new Set(r.checks.filter((c) => c.status !== "unavailable" && c.status !== "pending").map((c) => c.family));
     expect(consulted.has("oem_vin")).toBe(true);
     expect(consulted.has("vehicle_history")).toBe(true);
     expect(r.sourceCount).toBe(consulted.size);

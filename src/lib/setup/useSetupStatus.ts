@@ -4,6 +4,8 @@ import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useStickerPrefs } from "@/lib/stickerStudio/useStickerPrefs";
 import { useDealerPrintSettings } from "@/lib/stickerStudio/useDealerPrintSettings";
+import { deriveRoutingReadiness } from "@/lib/admin/effectivePolicy";
+import { ADMIN_CHILD_ROUTES } from "@/lib/admin/sections";
 
 // ──────────────────────────────────────────────────────────────────────
 // Dealer setup status. Computes a go-live checklist by READING the existing
@@ -61,6 +63,11 @@ export function useSetupStatus(): SetupStatus {
   const rulesDone = !!settings.document_rules;
   const inventoryDone = inv.vehicles > 0;
   const passportDone = inv.published > 0;
+  // Lead routing is part of going live (L04): a published Passport whose
+  // contact requests have no working destination must not read as "ready to
+  // go live". This reads the same readiness rule as Contact & Routing; it
+  // never fills a recipient in.
+  const routing = deriveRoutingReadiness(settings.passport_contact_routing, settings.passport_agents);
 
   const steps: SetupStep[] = [
     { id: "profile", label: "Dealership profile", done: profileDone, to: "/admin?tab=hours-contact", hint: "Name, address, phone, and operating state." },
@@ -70,6 +77,7 @@ export function useSetupStatus(): SetupStatus {
     { id: "rules", label: "Document workflow rules", done: rulesDone, optional: true, to: "/admin?tab=document-rules", hint: "Approval, stale, and packet rules for your store." },
     { id: "inventory", label: "Inventory connected", done: inventoryDone, to: "/inventory", hint: "Vehicles from your website/feed appear here." },
     { id: "passport", label: "Vehicle Passport live", done: passportDone, to: "/inventory", hint: "Publish a vehicle to activate its scan page." },
+    { id: "routing", label: "Lead routing ready", done: routing.ready, to: ADMIN_CHILD_ROUTES.contactRouting, hint: routing.ready ? "Every enabled routing path ends at a configured destination." : `Not ready: ${routing.blockers.join(" ")}` },
   ];
 
   const required = steps.filter((s) => !s.optional);

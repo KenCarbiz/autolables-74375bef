@@ -13,6 +13,7 @@ import Logo from "@/components/brand/Logo";
 import { derivePassport, type PassportData } from "@/lib/passportV2Data";
 import {
   deriveVerificationReport, PROVENANCE_LABEL, VERIFICATION_STATUS_LABEL,
+  deriveNextSteps, recallHeadline, verificationCountsLine,
   type VerificationReport, type ReportCheck, type VerificationStatus, type EvidenceProvenance,
   isSettledCheck,
 } from "@/lib/passport/verificationSummary";
@@ -252,15 +253,22 @@ const ProvenanceTag = ({ provenance }: { provenance: EvidenceProvenance }) => (
 const exceptionHeadline = (check: ReportCheck): string => {
   switch (check.key) {
     case "recall":
-      if (check.status === "needs_confirmation") return "Recall status needs confirmation";
-      if (check.highSeverity) return "Do-not-drive recall reported";
-      if (check.status === "needs_attention") return "Open safety recall found";
-      return "Recall check pending";
+      return recallHeadline(check);
     case "title":
       return check.status === "needs_attention" ? "Title brand on record" : "Title and brand check pending";
     case "history": return "Reported accident history";
     default: return check.status === "pending" ? `${check.name} pending` : `${check.name} needs review`;
   }
+};
+
+// Names the independent families that actually answered, from the report —
+// never a hard-coded list (L02). Dealer statements are named separately.
+const independentSourceSentence = (report: VerificationReport): string => {
+  const names = report.sources.filter((s) => s.family !== "dealer").map((s) => s.label);
+  const count = report.sourceCount;
+  const list = names.length ? ` (${names.join(", ")})` : "";
+  const dealer = report.dealerSourceUsed ? " The dealer's own statements are shown separately and are not counted as independent sources." : "";
+  return `${count} independent source ${count === 1 ? "family" : "families"}${list} returned data for this VIN.${dealer}`;
 };
 
 const FAMILY_SHORT: Record<string, string> = {
@@ -489,11 +497,9 @@ const MobileVerification = ({
   const bannerCalm = attentionCount === 0 && report.pendingChecks === 0;
   // Verdict breakdown reads the SAME terms and counts as the status grid, so the
   // two can never conflict — completed · attention · pending · unavailable.
-  const verdictSegments: string[] = [`${report.verifiedChecks} completed`];
-  if (attentionCount > 0) verdictSegments.push(`${attentionCount} attention`);
-  if (report.pendingChecks > 0) verdictSegments.push(`${report.pendingChecks} pending`);
-  if (report.unavailableChecks > 0) verdictSegments.push(`${report.unavailableChecks} unavailable`);
-  const bannerSupport = verdictSegments.join(" · ");
+  // One status inventory (L02): every non-zero status, dealer attestation
+  // included, so the line always adds up to the total number of checks.
+  const bannerSupport = verificationCountsLine(report);
 
   const FAMILY_TAG: Record<string, string> = {
     oem_vin: "OEM", nhtsa: "Government", vehicle_history: "History",
@@ -509,7 +515,9 @@ const MobileVerification = ({
   const activeSheetCheck = sheetKey ? report.checks.find((c) => c.key === sheetKey) : undefined;
 
   const STATUS_TILES: { label: string; count: number; icon: React.ElementType; fg: string; bg: string }[] = [
-    { label: "Completed", count: report.verifiedChecks, icon: CircleCheck, fg: "text-[#16A34A]", bg: "bg-emerald-50" },
+    // "Verified" is independent verification only; a dealer statement is named
+    // as such and never folded into this count (L02).
+    { label: (report.dealerAttestedChecks ?? 0) > 0 ? `Verified (+${report.dealerAttestedChecks} dealer attested)` : "Verified", count: report.verifiedChecks, icon: CircleCheck, fg: "text-[#16A34A]", bg: "bg-emerald-50" },
     { label: "Attention", count: attentionCount, icon: TriangleAlert, fg: "text-[#D97706]", bg: "bg-amber-50" },
     { label: "Pending", count: report.pendingChecks, icon: Clock, fg: "text-[#2563EB]", bg: "bg-blue-50" },
     { label: "Unavailable", count: report.unavailableChecks, icon: FileMinus, fg: "text-[#64748B]", bg: "bg-slate-100" },
@@ -586,7 +594,7 @@ const MobileVerification = ({
             <div className="flex items-start gap-3">
               <span className="w-10 h-10 rounded-xl bg-white border border-amber-200 flex items-center justify-center shrink-0"><ShieldAlert className="w-7 h-7 text-[#D97706]" strokeWidth={2} aria-hidden="true" /></span>
               <div className="min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-[0.07em] text-[#B45309]">{recallCheck.status === "needs_confirmation" ? "Needs confirmation" : "Needs attention"}</p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.07em] text-[#B45309]">{recallCheck.status === "needs_confirmation" ? "Needs confirmation" : recallCheck.status === "needs_attention" ? "Needs attention" : "Not verified"}</p>
                 <h2 className="text-[19px] font-bold text-[#0F172A] leading-snug mt-0.5">{exceptionHeadline(recallCheck)}</h2>
                 {recallCheck.finding && <p className="text-[14px] text-[#475569] mt-1.5 leading-relaxed">{recallCheck.finding}</p>}
                 <p className="text-[12px] text-[#94A3B8] mt-2">NHTSA{recallCheckedLabel ? ` · Checked ${recallCheckedLabel}` : ""}</p>
@@ -652,7 +660,7 @@ const MobileVerification = ({
           <span className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><SourcesShieldIcon className="w-[25px] h-[25px] text-[#2563EB]" strokeWidth={1.9} aria-hidden="true" /></span>
           <div className="min-w-0 flex-1">
             <p className="text-[15px] font-semibold text-[#0F172A]">Sources and methodology</p>
-            <p className="text-[13px] text-[#64748B] mt-0.5">Checked across {report.sourceCount} automotive data source{report.sourceCount === 1 ? "" : "s"}</p>
+            <p className="text-[13px] text-[#64748B] mt-0.5">Checked across {report.sourceCount} independent data source{report.sourceCount === 1 ? "" : "s"}{report.dealerSourceUsed ? " plus dealer statements" : ""}</p>
             {sourceFamilies.length > 0 && <p className="text-[12.5px] text-[#94A3B8] mt-0.5">{sourceFamilies.join(" · ")}</p>}
           </div>
           <ChevronRight className="w-[19px] h-[19px] text-[#94A3B8] shrink-0 self-center" aria-hidden="true" />
@@ -833,20 +841,8 @@ const VerificationPrintDoc = ({ report, listing, slug }: { report: VerificationR
   const unavailable = exceptions.filter((c) => c.status === "unavailable");
   const secondary = exceptions.filter((c) => c.status !== "unavailable" && c.key !== "recall");
 
-  // Same derivation rules as the on-screen "What should I do next?" list —
-  // presentational copy driven purely by which exceptions exist.
-  const nextSteps: string[] = [];
-  if (recallIsException) {
-    nextSteps.push("Ask the dealer about the open recall and whether the remedy is available.");
-    nextSteps.push("Confirm the recall remedy has been completed before you take delivery.");
-  }
-  secondary.forEach((c) => {
-    if (c.key === "title") nextSteps.push("Review the title and brand details with the dealer once that check completes.");
-    else nextSteps.push(`Ask the dealer about ${c.name.toLowerCase()}.`);
-  });
-  if (unavailable.length) nextSteps.push("Ask the dealer for the records behind any checks marked unavailable.");
-  if (nextSteps.length === 0) nextSteps.push("Review the verified checks above — every completed check returned a clear result.");
-  nextSteps.push("Keep this report for your records. It reflects the source data as of the date shown.");
+  // Same shared derivation as the on-screen "What should I do next?" list.
+  const nextSteps = deriveNextSteps(report);
 
   const H2 = ({ children }: { children: React.ReactNode }) => (
     <h2 className="text-[12px] font-bold uppercase tracking-wide text-black border-b border-neutral-300 pb-1 mb-2.5">{children}</h2>
@@ -909,7 +905,7 @@ const VerificationPrintDoc = ({ report, listing, slug }: { report: VerificationR
 
       {/* Data sources — a fresh page keeps the reference block and next steps together */}
       <section className="mb-4 print:break-before-page">
-        <H2>Data sources ({report.sourceCount})</H2>
+        <H2>Data sources ({report.sources.length})</H2>
         <div className="grid grid-cols-2 gap-2">
           {report.sources.map((s) => (
             <div key={s.family} className="vp-card border border-neutral-300 rounded-lg p-2.5">
@@ -1149,20 +1145,9 @@ const VehiclePassportVerification = () => {
     );
   }
 
-  // Next-step checklist, derived purely from which exceptions exist — never a
-  // fabricated recommendation.
-  const nextSteps: string[] = [];
-  if (recallIsException) {
-    nextSteps.push("Ask the dealer about the open recall and whether the remedy is available.");
-    nextSteps.push("Confirm the recall remedy has been completed before you take delivery.");
-  }
-  secondary.forEach((c) => {
-    if (c.key === "title") nextSteps.push("Review the title and brand details with the dealer once that check completes.");
-    else nextSteps.push(`Ask the dealer about ${c.name.toLowerCase()}.`);
-  });
-  if (unavailable.length) nextSteps.push("Ask the dealer for the records behind any checks marked unavailable.");
-  if (nextSteps.length === 0) nextSteps.push("Review the verified checks above — every completed check returned a clear result.");
-  nextSteps.push("Keep this report for your records. It reflects the source data as of the date shown.");
+  // Next-step checklist from the shared derivation — worded from the exact
+  // recall outcome, never a fabricated recommendation (L01).
+  const nextSteps = deriveNextSteps(report);
 
   const CountRow = ({ label, value, status }: { label: string; value: number; status: VerificationStatus }) => {
     const ui = STATUS_UI[status];
@@ -1345,7 +1330,7 @@ const VehiclePassportVerification = () => {
               <div className={`${CARD} p-5`}>
                 <Database className="w-6 h-6 text-[#2563EB]" aria-hidden="true" />
                 <h3 className="text-[15px] font-bold text-[#0F172A] mt-2.5">Where the data came from</h3>
-                <p className="text-[13px] text-[#475569] mt-1.5 leading-relaxed">{report.sourceCount} independent source {report.sourceCount === 1 ? "family" : "families"} — manufacturer, government, independent history, live market, and dealer records — compared for agreement.</p>
+                <p className="text-[13px] text-[#475569] mt-1.5 leading-relaxed">{independentSourceSentence(report)}</p>
               </div>
               <div className={`${CARD} p-5`}>
                 <BadgeCheck className="w-6 h-6 text-[#16A34A]" aria-hidden="true" />
@@ -1368,7 +1353,7 @@ const VehiclePassportVerification = () => {
 
           {/* Data sources — the detailed cards live here only */}
           <section id="v-sources" className="scroll-mt-6">
-            <h2 className="text-[17px] font-bold mb-3">Data sources ({report.sourceCount})</h2>
+            <h2 className="text-[17px] font-bold mb-3">Data sources ({report.sources.length})</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {report.sources.map((s) => (
                 <div key={s.family} onClick={() => track("verification_source_viewed", { source_id: s.family })} className={`${CARD} p-4`}>
@@ -1411,6 +1396,7 @@ const VehiclePassportVerification = () => {
             <p className="text-[15px] font-bold text-[#0F172A] mt-1.5 leading-snug">{report.banner.heading}</p>
             <div className="mt-4 space-y-3">
               <CountRow label="Verified" value={report.verifiedChecks} status="verified" />
+              {(report.dealerAttestedChecks ?? 0) > 0 && <CountRow label="Dealer attested" value={report.dealerAttestedChecks} status="dealer_attested" />}
               {report.needsAttentionChecks > 0 && <CountRow label="Needs attention" value={report.needsAttentionChecks} status="needs_attention" />}
               {report.needsConfirmationChecks > 0 && <CountRow label="Needs confirmation" value={report.needsConfirmationChecks} status="needs_confirmation" />}
               {report.pendingChecks > 0 && <CountRow label="Pending" value={report.pendingChecks} status="pending" />}
@@ -1418,7 +1404,7 @@ const VehiclePassportVerification = () => {
             </div>
             <div className="mt-4 pt-4 border-t border-[#EEF1F4]">
               <div className="flex items-center justify-between">
-                <span className="inline-flex items-center gap-2 text-[13.5px] text-[#475569]"><Database className="w-[18px] h-[18px] text-[#2563EB]" />Data sources</span>
+                <span className="inline-flex items-center gap-2 text-[13.5px] text-[#475569]"><Database className="w-[18px] h-[18px] text-[#2563EB]" />Independent sources</span>
                 <span className="text-[18px] font-extrabold tabular-nums text-[#0F172A]">{report.sourceCount}</span>
               </div>
               <button onClick={() => scrollTo("sources")} className="mt-1.5 text-[12.5px] font-semibold text-[#2563EB] hover:underline inline-flex items-center gap-1 print:hidden">View sources <ArrowRight className="w-3.5 h-3.5" /></button>

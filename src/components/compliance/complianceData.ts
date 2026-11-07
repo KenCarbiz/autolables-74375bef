@@ -263,6 +263,14 @@ export interface PriceRow {
   docFee: number;
   difference: number | null;
   matchedWithDocFee: boolean;
+  /**
+   * The website figure actually compared with the reference, on the SAME
+   * basis as the reference (L06). Equals websitePrice when nothing was
+   * adjusted. Null when no website price was captured.
+   */
+  websiteComparedPrice: number | null;
+  /** How the website figure was put on the reference's basis. */
+  comparisonBasis: PriceComparisonBasis | null;
   state: PriceState;
   currentIssue: string | null;
   openFlags: number;
@@ -311,23 +319,114 @@ export const feeExclusiveEquivalent = (
   return beforeDoc;
 };
 
+/**
+ * How the website figure was put on the same basis as the reference price:
+ *   fee_removed_from_website  the page showed a fee-inclusive total; the
+ *                             crawl's fee-exclusive figure is compared
+ *   fee_added_to_website      the page showed a selling price; the doc fee is
+ *                             added because the reference appears to include it
+ *   as_displayed              compared exactly as both were captured
+ */
+export type PriceComparisonBasis = "fee_removed_from_website" | "fee_added_to_website" | "as_displayed";
+
 export const reconcileGap = (
   websitePrice: number,
   referencePrice: number,
   docFee: number,
   feeExclusiveWebsitePrice?: number | null,
-): { difference: number; matchedWithDocFee: boolean } => {
+): { difference: number; matchedWithDocFee: boolean; comparedWebsitePrice: number; basis: PriceComparisonBasis } => {
   if (feeExclusiveWebsitePrice != null && Number.isFinite(feeExclusiveWebsitePrice)) {
+    const removed = feeExclusiveWebsitePrice !== websitePrice;
     return {
       difference: feeExclusiveWebsitePrice - referencePrice,
-      matchedWithDocFee: feeExclusiveWebsitePrice !== websitePrice,
+      matchedWithDocFee: removed,
+      comparedWebsitePrice: feeExclusiveWebsitePrice,
+      basis: removed ? "fee_removed_from_website" : "as_displayed",
     };
   }
   const raw = websitePrice - referencePrice;
   const withFee = websitePrice + docFee - referencePrice;
   const useFee = docFee > 0 && Math.abs(withFee) < Math.abs(raw);
-  return { difference: useFee ? withFee : raw, matchedWithDocFee: useFee };
+  return {
+    difference: useFee ? withFee : raw,
+    matchedWithDocFee: useFee,
+    comparedWebsitePrice: useFee ? websitePrice + docFee : websitePrice,
+    basis: useFee ? "fee_added_to_website" : "as_displayed",
+  };
 };
+
+// ── Named price bases (L06) ─────────────────────────────────────────────────
+// Every sentence and every Current/Proposed cell on the price review is built
+// from this one structured comparison, so the explanation can never disagree
+// with the numbers beside it, and identical values always read "No change".
+
+export interface PriceSide { sellingPrice: number | null; docFee: number; advertisedTotal: number | null }
+
+export interface PriceComparison {
+  /** One sentence stating both amounts on the SAME basis and the gap. */
+  summary: string;
+  /** How the website figure was read, in words, or null when nothing was adjusted. */
+  basisNote: string | null;
+  /**
+   * Set when the gap is exactly the doc fee and the reference equals the
+   * website's displayed amount: the two may agree and only the fee basis is
+   * unknown. A person must confirm the basis before anything changes.
+   */
+  feeBasisQuestion: string | null;
+  current: PriceSide;
+  proposed: PriceSide;
+  /** True when proposed equals current on every line: nothing to correct. */
+  noChange: boolean;
+}
+
+const plus = (a: number | null, b: number): number | null => (a == null ? null : a + b);
+
+export function comparePriceBases(row: Pick<PriceRow,
+  "websitePrice" | "websiteComparedPrice" | "comparisonBasis" | "referencePrice" | "referenceLabel" | "docFee" | "difference">): PriceComparison {
+  const ref = row.referenceLabel === "Dealer-confirmed" ? "dealer-confirmed price" : "feed price";
+  const fee = row.docFee;
+  if (row.referencePrice == null) {
+    const side: PriceSide = { sellingPrice: null, docFee: fee, advertisedTotal: null };
+    return { summary: "No reference price is on record, so there is nothing to compare.", basisNote: null, feeBasisQuestion: null, current: side, proposed: side, noChange: true };
+  }
+  if (row.websitePrice == null || row.websiteComparedPrice == null || row.difference == null) {
+    const side: PriceSide = { sellingPrice: row.referencePrice, docFee: fee, advertisedTotal: plus(row.referencePrice, fee) };
+    return { summary: "No website price has been captured to compare.", basisNote: null, feeBasisQuestion: null, current: side, proposed: side, noChange: true };
+  }
+
+  const basis = row.comparisonBasis ?? "as_displayed";
+  // Current = what the website shows, stated as a selling price + fee + total.
+  // Proposed = the reference on the same lines.
+  let current: PriceSide;
+  let proposed: PriceSide;
+  let basisNote: string | null = null;
+  if (basis === "fee_removed_from_website") {
+    current = { sellingPrice: row.websiteComparedPrice, docFee: fee, advertisedTotal: row.websitePrice };
+    proposed = { sellingPrice: row.referencePrice, docFee: fee, advertisedTotal: plus(row.referencePrice, fee) };
+    basisNote = `The website shows an advertised total of ${money(row.websitePrice)}; the crawl reads that as a selling price of ${money(row.websiteComparedPrice)} plus the ${money(fee)} doc fee.`;
+  } else if (basis === "fee_added_to_website") {
+    current = { sellingPrice: row.websitePrice, docFee: fee, advertisedTotal: row.websiteComparedPrice };
+    proposed = { sellingPrice: row.referencePrice - fee, docFee: fee, advertisedTotal: row.referencePrice };
+    basisNote = `The ${ref} of ${money(row.referencePrice)} appears to include the ${money(fee)} doc fee, so it is compared with the website's ${money(row.websitePrice)} plus that fee (${money(row.websiteComparedPrice)}).`;
+  } else {
+    current = { sellingPrice: row.websitePrice, docFee: fee, advertisedTotal: plus(row.websitePrice, fee) };
+    proposed = { sellingPrice: row.referencePrice, docFee: fee, advertisedTotal: plus(row.referencePrice, fee) };
+  }
+
+  const gap = Math.abs(row.difference);
+  const sameBasisLabel = basis === "fee_added_to_website" ? "advertised total (fee included)" : "selling price (before the doc fee)";
+  const summary = gap < PRICE_TOLERANCE
+    ? `On the ${sameBasisLabel} basis, the website and the ${ref} agree.`
+    : `On the ${sameBasisLabel} basis, the website shows ${money(row.websiteComparedPrice)} and the ${ref} is ${money(row.referencePrice)}: the website is ${money(gap)} ${row.difference < 0 ? "lower" : "higher"}.`;
+
+  const feeBasisQuestion = gap >= PRICE_TOLERANCE && fee > 0 && Math.abs(gap - fee) < PRICE_TOLERANCE
+    && Math.abs(row.referencePrice - row.websitePrice) < PRICE_TOLERANCE
+    ? `The ${ref} (${money(row.referencePrice)}) equals the website's displayed amount, and the gap equals the doc fee. If the ${ref} already includes the doc fee, the two agree and nothing should change. Confirm which basis the ${ref} uses before correcting either price.`
+    : null;
+
+  const noChange = current.sellingPrice === proposed.sellingPrice && current.advertisedTotal === proposed.advertisedTotal;
+  return { summary, basisNote, feeBasisQuestion, current, proposed, noChange };
+}
 
 export const buildPriceRows = (args: {
   listings: ListingRow[];
@@ -370,6 +469,8 @@ export const buildPriceRows = (args: {
     let state: PriceState;
     let difference: number | null = null;
     let matchedWithDocFee = false;
+    let websiteComparedPrice: number | null = null;
+    let comparisonBasis: PriceComparisonBasis | null = null;
     if (referencePrice == null) {
       state = "no_price";
     } else if (snaps.length === 0) {
@@ -389,6 +490,8 @@ export const buildPriceRows = (args: {
       );
       difference = gap.difference;
       matchedWithDocFee = gap.matchedWithDocFee;
+      websiteComparedPrice = gap.comparedWebsitePrice;
+      comparisonBasis = gap.basis;
       state = Math.abs(gap.difference) >= PRICE_TOLERANCE ? "differs" : "matched";
     }
 
@@ -397,7 +500,12 @@ export const buildPriceRows = (args: {
     let currentIssue: string | null = null;
     if (blocking) currentIssue = blocking.reason;
     else if (state === "differs" && difference != null) {
-      currentIssue = `Website price differs by ${money(Math.abs(difference))}`;
+      // Name the basis (L06): this is a selling-price gap, and when it equals
+      // the doc fee exactly the real question may be the fee basis.
+      const feeSized = docFee > 0 && Math.abs(Math.abs(difference) - docFee) < PRICE_TOLERANCE;
+      currentIssue = feeSized
+        ? `Website selling price differs by ${money(Math.abs(difference))}, the doc fee amount; confirm the fee basis`
+        : `Website selling price differs by ${money(Math.abs(difference))}`;
     } else if (openFlags.length > 0) currentIssue = openFlags[0].reason;
 
     const events: PriceEvent[] = [
@@ -435,6 +543,8 @@ export const buildPriceRows = (args: {
       docFee,
       difference,
       matchedWithDocFee,
+      websiteComparedPrice,
+      comparisonBasis,
       state,
       currentIssue,
       openFlags: openFlags.length,
@@ -574,7 +684,7 @@ export const buildIssueRows = (args: {
         severity: price.openFlags > 0 && price.state !== "differs" ? "attention" : "critical",
         label: price.currentIssue,
         detail: price.referenceLabel
-          ? `${price.referenceLabel} ${money(price.referencePrice)} vs website ${money(price.websitePrice)}`
+          ? comparePriceBases(price).summary
           : "No reference price on record.",
       });
     }

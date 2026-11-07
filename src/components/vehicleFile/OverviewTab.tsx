@@ -9,6 +9,9 @@ import { Card, EmptyNote, StatRow, btn, fmtWhen } from "./primitives";
 import { type LifecycleResult } from "./lifecycle";
 import DescriptionCard from "./DescriptionCard";
 import { type ReadinessSummary, type TabId, type VehicleRow } from "./types";
+import type { ComplianceBlockers } from "./complianceBlockers";
+import { useDealerSettings } from "@/contexts/DealerSettingsContext";
+import { listingScopeLine } from "./listingScope";
 
 interface Interest {
   lastView: string | null;
@@ -48,9 +51,11 @@ const useCustomerInterest = (vehicle: VehicleRow): Interest => {
   return state;
 };
 
-export const OverviewTab = ({ vehicle, ready, lifecycle, stockNumber, onTab, onReload }: {
+export const OverviewTab = ({ vehicle, ready, blockers, lifecycle, stockNumber, onTab, onReload }: {
   vehicle: VehicleRow;
   ready: ReadinessSummary;
+  /** The same compliance blocker rows the Compliance tab lists (L05). */
+  blockers: ComplianceBlockers;
   lifecycle: LifecycleResult;
   stockNumber: string | null;
   onTab: (t: TabId) => void;
@@ -58,6 +63,8 @@ export const OverviewTab = ({ vehicle, ready, lifecycle, stockNumber, onTab, onR
 }) => {
   const { tracked } = lifecycle;
   const interest = useCustomerInterest(vehicle);
+  const { settings } = useDealerSettings();
+  const listing = listingScopeLine(vehicle.status, settings.ingest_auto_publish);
   const [repulling, setRepulling] = useState(false);
   const gallery = listingGallery(vehicle);
   const videos = vehicle.videos || [];
@@ -146,26 +153,28 @@ export const OverviewTab = ({ vehicle, ready, lifecycle, stockNumber, onTab, onR
         </Card>
       </div>
 
-      <Card title={`Blockers (${ready.blockers.length})`}>
-        {ready.blockers.length === 0 ? (
+      <Card title={blockers.known ? `Compliance blockers (${blockers.rows.length})` : "Compliance blockers"}>
+        {/* Listing visibility is a separate scope from compliance (L05). */}
+        <p className="text-[14px] text-adm-ink"><span className="font-semibold">Listing:</span> {listing}</p>
+        {!blockers.known ? (
+          <p className="text-[14px] text-adm-muted" role="status">Checking compliance records…</p>
+        ) : blockers.rows.length === 0 ? (
           <p className="inline-flex items-center gap-1.5 text-[14px] text-adm-success">
-            <CheckCircle2 className="w-5 h-5" /> Nothing is blocking this vehicle from going live.
+            <CheckCircle2 className="w-5 h-5" /> No compliance blockers on this vehicle.
           </p>
         ) : (
           <ul className="space-y-1.5">
-            {ready.blockers.map((b) => (
-              <li key={b.label} className="inline-flex items-center gap-1.5 text-[14px] text-adm-warning">
-                <AlertTriangle className="w-5 h-5 shrink-0" /> {b.label}
+            {blockers.rows.map((b) => (
+              <li key={b.key} className="flex items-start gap-1.5 text-[14px] text-adm-warning">
+                <AlertTriangle className="w-5 h-5 shrink-0" /> <span>{b.item}</span>
               </li>
             ))}
           </ul>
         )}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[14px] font-semibold text-adm-primary">
-          {ready.remaining.length > ready.blockers.length && (
-            <button onClick={() => onTab("compliance")} className="inline-flex items-center gap-1 hover:underline">
-              {ready.remaining.length - ready.blockers.length} other open item{ready.remaining.length - ready.blockers.length === 1 ? "" : "s"} <ChevronRight className="w-5 h-5" />
-            </button>
-          )}
+          <button onClick={() => onTab("compliance")} className="inline-flex items-center gap-1 hover:underline">
+            Open Compliance <ChevronRight className="w-5 h-5" />
+          </button>
           {tracked && <Link to={`/get-ready-command/${vehicle.id}`} className="hover:underline">Open Get Ready Command</Link>}
         </div>
       </Card>

@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { Crumbs, DetailLayout, fmtDateTime } from "@/components/detail/parts";
 import { LinkButton, LocalTabs, PageBody, PageHeader, Panel, QueryState, StatusText, Td, Th, WorkTable, type Tone } from "@/components/product";
-import { PRICE_STATE_LABEL, money, type PriceRow, type PriceState } from "./complianceData";
+import { PRICE_STATE_LABEL, comparePriceBases, money, type PriceRow, type PriceState } from "./complianceData";
 import { useComplianceCenterData } from "./useComplianceCenterData";
 import { complianceVinParam } from "./childLinks";
 
@@ -28,12 +28,9 @@ const sum = (a: number | null, b: number): number | null => (a == null ? null : 
 const Evidence = ({ row }: { row: PriceRow }) => {
   const referenceTotal = sum(row.referencePrice, row.docFee);
   const differs = row.state === "differs" && row.difference != null;
-  const gapText =
-    row.difference == null
-      ? "No website price has been captured to compare."
-      : row.difference === 0
-        ? "Website price matches the reference price."
-        : `Website price is ${money(Math.abs(row.difference))} ${row.difference < 0 ? "lower" : "higher"} than the ${row.referenceLabel === "Feed" ? "feed" : "confirmed"} price${row.matchedWithDocFee ? " after the doc fee" : ""}.`;
+  // One structured comparison drives every sentence here and every cell in
+  // the Proposed change panel, on named bases (L06).
+  const cmp = comparePriceBases(row);
   return (
     <Panel title="Pricing evidence" flush inset="sm">
       <WorkTable caption="Pricing evidence" minWidth={560}>
@@ -59,7 +56,7 @@ const Evidence = ({ row }: { row: PriceRow }) => {
             <Td>Unknown</Td>
           </tr>
           <tr>
-            <Td>Website advertised price</Td>
+            <Td>Website price as displayed</Td>
             <Td className="tabular-nums">{money(row.websitePrice)}</Td>
             <Td className="max-w-[170px] truncate">{hostOf(row.websiteUrl)}</Td>
             <Td>{fmtDateTime(row.websiteAt)}</Td>
@@ -82,8 +79,14 @@ const Evidence = ({ row }: { row: PriceRow }) => {
       <div className={`flex flex-wrap items-center gap-3 border-t px-4 py-3 text-[14px] leading-[20px] ${differs ? "border-[#F3B4AE] bg-adm-danger-bg" : "border-adm-border bg-adm-workspace"}`}>
         <span className="font-semibold text-adm-ink">Comparison result</span>
         <StatusText tone={STATE_TONE[row.state]}>{PRICE_STATE_LABEL[row.state]}</StatusText>
-        <span className="text-adm-ink">{gapText}</span>
+        <span className="text-adm-ink">{cmp.summary}</span>
       </div>
+      {(cmp.basisNote || cmp.feeBasisQuestion) && (
+        <div className="space-y-1.5 border-t border-adm-border px-4 py-3 text-[13px] leading-[19px] text-adm-ink">
+          {cmp.basisNote && <p>{cmp.basisNote}</p>}
+          {cmp.feeBasisQuestion && <p className="font-semibold text-adm-warning">{cmp.feeBasisQuestion}</p>}
+        </div>
+      )}
     </Panel>
   );
 };
@@ -179,21 +182,28 @@ export default function PriceReviewPage() {
             ) : (
               <DetailLayout width="wide"
                 main={<Evidence row={row} />}
-                aside={
+                aside={(() => {
+                  const cmp = comparePriceBases(row);
+                  const refName = row.referenceLabel === "Dealer-confirmed" ? "dealer-confirmed price" : "feed price";
+                  return (
                   <Panel title="Proposed change" titleSize="md" inset="sm" flush>
                     <WorkTable caption="Current and proposed price" minWidth={300}>
                       <thead>
-                        <tr><Th>Field</Th><Th align="right">Current</Th><Th align="right">Proposed</Th></tr>
+                        <tr><Th>Field</Th><Th align="right">Website now</Th><Th align="right">Proposed</Th></tr>
                       </thead>
                       <tbody>
-                        <tr><Td>Selling price</Td><Td align="right" className="tabular-nums">{money(row.websitePrice)}</Td><Td align="right" className="tabular-nums">{money(row.referencePrice)}</Td></tr>
-                        <tr><Td>Doc fee</Td><Td align="right" className="tabular-nums">{money(row.docFee)}</Td><Td align="right" className="tabular-nums">{money(row.docFee)}</Td></tr>
-                        <tr className="font-semibold"><Td>Total</Td><Td align="right" className="tabular-nums">{money(sum(row.websitePrice, row.docFee))}</Td><Td align="right" className="tabular-nums">{money(sum(row.referencePrice, row.docFee))}</Td></tr>
+                        <tr><Td>Selling price (before doc fee)</Td><Td align="right" className="tabular-nums">{money(cmp.current.sellingPrice)}</Td><Td align="right" className="tabular-nums">{cmp.noChange ? "No change" : money(cmp.proposed.sellingPrice)}</Td></tr>
+                        <tr><Td>Doc fee</Td><Td align="right" className="tabular-nums">{money(cmp.current.docFee)}</Td><Td align="right" className="tabular-nums">{cmp.noChange ? "No change" : money(cmp.proposed.docFee)}</Td></tr>
+                        <tr className="font-semibold"><Td>Advertised total</Td><Td align="right" className="tabular-nums">{money(cmp.current.advertisedTotal)}</Td><Td align="right" className="tabular-nums">{cmp.noChange ? "No change" : money(cmp.proposed.advertisedTotal)}</Td></tr>
                       </tbody>
                     </WorkTable>
                     <div className="space-y-3 px-4 py-3">
                       <p className="rounded-md bg-[#EEF3FF] px-3 py-2.5 text-[13px] leading-[19px] text-adm-ink">
-                        {row.difference == null || row.difference === 0 ? "No change is proposed." : `Proposed is the ${row.referenceLabel === "Feed" ? "feed" : "confirmed"} price, ${money(Math.abs(row.difference))} ${row.difference > 0 ? "below" : "above"} the website. Correct it in the vehicle file; the nightly crawl then re-checks the website.`}
+                        {cmp.noChange
+                          ? "No change. The website and the reference already agree on these lines."
+                          : cmp.feeBasisQuestion
+                            ? `Not ready to correct: confirm whether the ${refName} includes the doc fee first. If it does, nothing changes; if it does not, set the website selling price to ${money(cmp.proposed.sellingPrice)} in the vehicle file.`
+                            : `Proposed: the ${refName}, ${money(cmp.proposed.sellingPrice)} before the doc fee (${money(cmp.proposed.advertisedTotal)} advertised total). Correct it in the vehicle file; the nightly crawl then re-checks the website. Nothing is changed from this page.`}
                       </p>
                       <div className="flex flex-wrap gap-2">
                         <LinkButton to={`/vehicle-file/${row.vehicleId}`} variant="primary">Open vehicle file</LinkButton>
@@ -201,7 +211,8 @@ export default function PriceReviewPage() {
                       </div>
                     </div>
                   </Panel>
-                }
+                  );
+                })()}
               />
             )}
           </>
