@@ -21,6 +21,8 @@ import type { ReadinessSummary, VehicleRow } from "./types";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { canDispatchGetReady } from "@/lib/commandCenter/dispatchAuthority";
 import { clearanceReasonLabel } from "@/lib/service/workspaceStatus";
+import { useDealerSettings } from "@/contexts/DealerSettingsContext";
+import { prepScopeCopy } from "./listingScope";
 
 interface PrepRow {
   id: string;
@@ -129,6 +131,7 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready, strip }: { vehicle: Veh
   const [draft, setDraft] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const { tenant } = useTenant();
+  const { settings: dealerSettings } = useDealerSettings();
 
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -220,6 +223,15 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready, strip }: { vehicle: Veh
   };
   const latestPrep = prep[0] ?? null;
   const unlocked = !!latestPrep?.listing_unlocked;
+  // Listing and retail preparation are separate scopes (L05): the store lists
+  // on intake and no server gate reads the prep sign-off.
+  const scope = prepScopeCopy({
+    published: String(vehicle.status ?? "").toLowerCase() === "published",
+    prepSignedOff: unlocked,
+    ingestAutoPublish: dealerSettings.ingest_auto_publish,
+    foremanName: latestPrep?.foreman_name ?? null,
+    signedAtLabel: fmtWhen(latestPrep?.signed_at) ?? null,
+  });
 
   const header = (
     <VehicleSubHeader
@@ -385,21 +397,15 @@ export const GetReadyTab = ({ vehicle, lifecycle, ready, strip }: { vehicle: Veh
       )}
 
       <Disclosure
-        title="Publishing gate"
-        summary={unlocked ? "Publishing unlocked" : "Publishing locked, prep sign-off required"}
-        defaultOpen={!unlocked}
+        title={scope.title}
+        summary={scope.summary}
+        defaultOpen={false}
       >
         <div className="flex items-start gap-3">
-          {unlocked ? <Unlock className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" /> : <Lock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />}
+          {unlocked ? <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" aria-hidden="true" /> : <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" aria-hidden="true" />}
           <div className="min-w-0">
-            <p className={`text-al-card ${unlocked ? "text-emerald-900" : "text-amber-900"}`}>
-              {unlocked ? "Publishing unlocked" : "Publishing locked — prep sign-off required"}
-            </p>
-            <p className={`text-al-body mt-0.5 ${unlocked ? "text-emerald-800" : "text-amber-800"}`}>
-              {unlocked
-                ? `Foreman ${latestPrep?.foreman_name || "sign-off"} recorded ${fmtWhen(latestPrep?.signed_at) ?? "on file"}.`
-                : "A signed prep record gates the public listing. The latest sign-off must have the inspection passed and the listing unlocked."}
-            </p>
+            <p className={`text-al-card ${unlocked ? "text-emerald-900" : "text-amber-900"}`}>{scope.summary}</p>
+            <p className="text-al-body mt-0.5 text-adm-ink">{scope.detail}</p>
           </div>
         </div>
       </Disclosure>

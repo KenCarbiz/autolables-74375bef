@@ -129,12 +129,16 @@ export interface RecallReviewState { task: { completed_at: string | null } | nul
 
 // Single readiness model used by the hero, the Overview status card and the
 // Compliance tab, so the three never disagree. `blocks` marks a check that
-// gates publishing to the shopper portal.
+// gates publishing to the shopper portal — today only the open-recall review.
 export const buildChecks = (v: VehicleRow, recall?: RecallReviewState): ReadyCheck[] => {
   const checks: ReadyCheck[] = [
     { ok: true, label: "Vehicle created", when: v.created_at },
     { ok: !!v.ymm, label: "VIN decoded", when: v.ymm ? v.updated_at : null },
-    { ok: v.status === "published", label: "Published to shopper portal", when: v.published_at, blocks: true },
+    // Listing visibility is its own scope, not a readiness blocker: the store
+    // lists on intake by policy, and the server's only publish gate is a
+    // do-not-drive recall (enforce_prep_gate). Counting "not published" as a
+    // blocker made an unlisted car "not retail ready" for the wrong reason (L05).
+    { ok: v.status === "published", label: "Listed on shopper portal", when: v.published_at },
     { ok: deriveRecallView(v).vin.checkComplete, label: "Recall verified for this VIN", when: v.recall_checked_at },
     { ok: !!v.prep_status?.foreman_signed_at, label: "Prep & install signed off", when: v.prep_status?.foreman_signed_at || null },
     { ok: (v.documents?.length || 0) > 0, label: "Documents attached", when: null },

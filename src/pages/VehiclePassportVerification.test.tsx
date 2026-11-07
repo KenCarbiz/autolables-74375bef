@@ -84,10 +84,11 @@ describe("VehiclePassportVerification — rendered report", () => {
     expect(within(region).queryByText("Open safety recalls")).not.toBeInTheDocument();
   });
 
-  it("reports 5 unique data-source families in the summary rail", () => {
+  it("reports 5 unique independent source families in the summary rail", () => {
     renderReport();
     const summary = screen.getByText("Report summary").closest("div") as HTMLElement;
-    const dataSourcesRow = within(summary).getByText("Data sources").closest("div") as HTMLElement;
+    // L02: the rail counts INDEPENDENT families; dealer statements are separate.
+    const dataSourcesRow = within(summary).getByText("Independent sources").closest("div") as HTMLElement;
     expect(dataSourcesRow).toHaveTextContent("5");
   });
 

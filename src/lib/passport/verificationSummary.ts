@@ -198,6 +198,47 @@ export interface ReportCheck {
   reviewNote: string | null;
   evidence: EvidenceField[];
   checkedAt: string | null;
+  /**
+   * Recall check only: WHICH recall answer this is. Status alone cannot carry
+   * it — a model-level campaign and a VIN-confirmed open campaign both warn
+   * (needs_attention), and "unavailable" and "never checked" both stay
+   * pending. Every heading and next step about a recall is worded from this,
+   * so an unavailable lookup can never be phrased as an open recall (L01).
+   */
+  recallOutcome?: RecallOutcome;
+}
+
+/**
+ * The exact recall answer behind the customer-facing recall check (L01).
+ *   do_not_drive   do-not-drive language on record (any scope)
+ *   conflict       one store reports clear while another reports a campaign
+ *   vin_open       a VIN-level source reports an open campaign on THIS VIN
+ *   model_context  a campaign is on record for the model line (or an unscoped
+ *                  count) but no VIN-level source has confirmed this VIN
+ *   vin_clear      a VIN-level source answered clear (vin.clearClaimAllowed)
+ *   stale          a VIN-level answer exists but is out of date
+ *   unavailable    a lookup was attempted and returned no usable VIN answer
+ *   not_checked    no recall lookup is on record at any scope
+ */
+export type RecallOutcome =
+  | "do_not_drive"
+  | "conflict"
+  | "vin_open"
+  | "model_context"
+  | "vin_clear"
+  | "stale"
+  | "unavailable"
+  | "not_checked";
+
+export function recallOutcomeOf(v: RecallView): RecallOutcome {
+  if (v.doNotDrive) return "do_not_drive";
+  if (v.conflict) return "conflict";
+  if (v.vin.state === "OPEN") return "vin_open";
+  if (v.riskSignalled) return "model_context";
+  if (v.vin.clearClaimAllowed) return "vin_clear";
+  if (v.vin.state === "STALE") return "stale";
+  if (v.vin.attemptedAt || v.vin.source || v.model) return "unavailable";
+  return "not_checked";
 }
 
 export interface VerificationSourceInfo {
@@ -231,7 +272,13 @@ export interface VerificationReport {
   needsConfirmationChecks: number;
   pendingChecks: number;
   unavailableChecks: number;
+  /**
+   * INDEPENDENT source families that returned anything. The dealer's own
+   * records are never counted here (L02) — see `dealerSourceUsed`.
+   */
   sourceCount: number;
+  /** True when at least one check rests on the dealer's own statement. */
+  dealerSourceUsed: boolean;
   checks: ReportCheck[];
   sources: VerificationSourceInfo[];
   banner: VerificationBanner;
@@ -411,7 +458,12 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
     const nmvtis = d.titleVerifiedSource === "nmvtis";
     const verifiedOn = nmvtis ? dateFmt(d.titleVerifiedAt) : null;
     return {
-      key: "title", name: "Title and brand", ...s, material: true, highSeverity: false,
+      key: "title", name: "Title and brand", ...s,
+      // A dealer statement is the dealer's record, not independent history:
+      // it is filed under the dealer family so it is never counted among the
+      // independent sources or listed under "Independent history" (L02).
+      ...(status === "dealer_attested" ? src("dealer") : {}),
+      material: true, highSeverity: false,
       status,
       finding: status === "verified"
         // Describe the DATA RESULT, not a guarantee — "no brands reported" is
@@ -457,6 +509,7 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
     else if (v.riskSignalled) status = "needs_attention";
     else if (v.vin.clearClaimAllowed) status = "verified";
     else status = "pending";
+    const outcome = recallOutcomeOf(v);
     const asOf = dateFmt(v.vin.checkedAt ?? model?.checkedAt ?? null);
     const modelContext = model
       ? `${model.label} — ${model.detail}`
@@ -468,12 +521,16 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
         status === "verified" ? `No open safety recalls were returned for this VIN${asOf ? ` as of ${asOf}` : ""}.`
         : status === "needs_confirmation" ? "AutoLabels found conflicting recall information across available sources."
         : status === "needs_attention" && highSeverity ? "This vehicle has a do-not-drive recall — do not drive it until the remedy is completed."
-        : status === "needs_attention" ? `A safety recall campaign is on record. ${modelContext} Ask the dealer whether the remedy has been completed or is available.`
+        : outcome === "vin_open" ? `An open safety recall is reported for this VIN. ${modelContext} Ask the dealer whether the remedy has been completed or is available.`
+        : status === "needs_attention" ? `Recall campaigns are on record for this model, but no source has confirmed whether this VIN is affected. ${modelContext}`
+        : outcome === "stale" ? `The last VIN-level recall check is out of date, so it no longer confirms this VIN's status. ${modelContext}`
+        : outcome === "not_checked" ? "No recall lookup has been run for this VIN yet."
         : `Recall verification is unavailable for this VIN. ${modelContext}`,
       reviewNote:
         status === "needs_confirmation" ? "confirm the recall status with the dealer"
         : status === "needs_attention" && highSeverity ? "a do-not-drive recall is reported"
-        : status === "needs_attention" ? "an open recall is reported"
+        : outcome === "vin_open" ? "an open recall is reported for this VIN"
+        : status === "needs_attention" ? "ask whether this VIN is part of the recall campaigns on its model"
         : status === "pending" ? "recall verification for this VIN is unavailable" : null,
       evidence: [
         { label: "Campaign number", value: recall.campaign.number },
@@ -487,6 +544,7 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
         { label: "Source", value: v.vin.source ?? model?.source ?? FAMILY_META.nhtsa.label },
       ],
       checkedAt: status !== "pending" ? (v.vin.checkedAt ?? model?.checkedAt ?? reportTime) : null,
+      recallOutcome: outcome,
     };
   })());
 
@@ -543,10 +601,15 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
   const totalChecks = checks.length;
   const completedChecks = verifiedChecks + dealerAttestedChecks + needsAttentionChecks + needsConfirmationChecks;
 
-  // sourceCount = unique FAMILIES that returned anything (not unavailable),
-  // never the number of checks.
-  const consultedFamilies = new Set(checks.filter((c) => c.status !== "unavailable").map((c) => c.family));
-  const sourceCount = consultedFamilies.size;
+  // sourceCount = unique INDEPENDENT families that returned anything (not
+  // unavailable), never the number of checks. A pending check consulted
+  // nothing, so it is not a source either. The dealer family is reported
+  // separately — the dealer is not an independent source (L02).
+  const consultedFamilies = new Set(
+    checks.filter((c) => c.status !== "unavailable" && c.status !== "pending").map((c) => c.family),
+  );
+  const dealerSourceUsed = consultedFamilies.has("dealer");
+  const sourceCount = [...consultedFamilies].filter((f) => f !== "dealer").length;
 
   const sources: VerificationSourceInfo[] = (Object.keys(FAMILY_META) as VerificationSourceFamily[])
     .filter((f) => consultedFamilies.has(f))
@@ -569,19 +632,19 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
   }
 
   const anyHighSeverity = checks.some((c) => c.highSeverity && (c.status === "needs_attention" || c.status === "needs_confirmation"));
-  const banner = buildBanner({ valid, completedChecks, verifiedChecks, needsConfirmationChecks, needsAttentionChecks, pendingChecks, anyHighSeverity, checks });
+  const banner = buildBanner({ valid, completedChecks, verifiedChecks, dealerAttestedChecks, needsConfirmationChecks, needsAttentionChecks, pendingChecks, unavailableChecks, anyHighSeverity, checks });
 
   return {
     valid,
     totalChecks, completedChecks, verifiedChecks, dealerAttestedChecks, needsAttentionChecks, needsConfirmationChecks,
-    pendingChecks, unavailableChecks, sourceCount, checks, sources, banner,
+    pendingChecks, unavailableChecks, sourceCount, dealerSourceUsed, checks, sources, banner,
     lastCheckedAt: latestDate(checks.map((c) => c.checkedAt)),
   };
 }
 
 function buildBanner(a: {
-  valid: boolean; completedChecks: number; verifiedChecks: number; needsConfirmationChecks: number;
-  needsAttentionChecks: number; pendingChecks: number; anyHighSeverity: boolean; checks: ReportCheck[];
+  valid: boolean; completedChecks: number; verifiedChecks: number; dealerAttestedChecks: number; needsConfirmationChecks: number;
+  needsAttentionChecks: number; pendingChecks: number; unavailableChecks: number; anyHighSeverity: boolean; checks: ReportCheck[];
 }): VerificationBanner {
   if (!a.valid) {
     return { tone: "neutral", heading: "Report data unavailable", body: "We could not assemble a complete verification report from the current sources. No verification conclusion has been made.", reviewCount: 0 };
@@ -590,11 +653,15 @@ function buildBanner(a: {
   if (a.completedChecks === 0) {
     return { tone: "neutral", heading: "Verification has not started", body: "No checks have returned a result yet for this vehicle. Check back soon or ask the dealer for the latest information.", reviewCount: 0 };
   }
-  // Counts line, e.g. "6 checks verified · 1 needs confirmation · 1 pending".
+  // Counts line, e.g. "3 checks verified · 1 dealer attested · 1 pending ·
+  // 3 not available" — every non-zero status, so the line always adds up to
+  // the total (L02).
   const parts: string[] = [`${a.verifiedChecks} ${a.verifiedChecks === 1 ? "check" : "checks"} verified`];
+  if (a.dealerAttestedChecks > 0) parts.push(`${a.dealerAttestedChecks} dealer attested`);
   if (a.needsConfirmationChecks > 0) parts.push(`${a.needsConfirmationChecks} needs confirmation`);
   if (a.needsAttentionChecks > 0) parts.push(`${a.needsAttentionChecks} needs attention`);
   if (a.pendingChecks > 0) parts.push(`${a.pendingChecks} pending`);
+  if (a.unavailableChecks > 0) parts.push(`${a.unavailableChecks} not available`);
   const countsLine = parts.join(" · ");
 
   // The headline counts items that genuinely need buyer action (attention +
@@ -604,7 +671,14 @@ function buildBanner(a: {
   const headlineCount = actionCount > 0 ? actionCount : a.pendingChecks;
 
   if (actionCount === 0 && a.pendingChecks === 0) {
-    return { tone: "green", heading: "Verification checks completed", body: `${countsLine}. Every check returned a result — no items need review before purchase.`, reviewCount: 0 };
+    return {
+      tone: "green",
+      heading: a.unavailableChecks > 0 ? "No items need review" : "Verification checks completed",
+      body: a.unavailableChecks > 0
+        ? `${countsLine}. Nothing needs review before purchase; checks marked not available had no source data.`
+        : `${countsLine}. Every check returned a result — no items need review before purchase.`,
+      reviewCount: 0,
+    };
   }
 
   // Actionable notes (imperative, verb-led — "confirm the recall...") are asked
@@ -682,6 +756,7 @@ export const VERIFICATION_CHECK_SHORT_LABEL: Record<string, string> = {
 export function summarizeVerificationExceptions(r: {
   totalChecks: number;
   verifiedChecks: number;
+  dealerAttestedChecks?: number;
   needsAttentionChecks: number;
   needsConfirmationChecks: number;
   pendingChecks: number;
@@ -689,9 +764,115 @@ export function summarizeVerificationExceptions(r: {
 }): string {
   if (r.totalChecks > 0 && r.verifiedChecks === r.totalChecks) return "All checks verified";
   const seg: string[] = [];
+  if ((r.dealerAttestedChecks ?? 0) > 0) seg.push(`${r.dealerAttestedChecks} dealer attested`);
   if (r.needsAttentionChecks > 0) seg.push(`${r.needsAttentionChecks} needs attention`);
   if (r.needsConfirmationChecks > 0) seg.push(`${r.needsConfirmationChecks} needs confirmation`);
   if (r.pendingChecks > 0) seg.push(`${r.pendingChecks} pending`);
   if (r.unavailableChecks > 0) seg.push(`${r.unavailableChecks} not available`);
   return seg.length ? seg.join(" · ") : "All checks verified";
+}
+
+// ── One status inventory for every summary surface (L02) ────────────────────
+// The hero card, the module subtitle, the report rail and the mobile tiles all
+// read these, so a dealer statement can never be counted as "verified" on one
+// surface and as "dealer attested" on another, and every surface adds up to
+// the same total.
+
+export interface StatusCount { status: VerificationStatus; count: number; label: string }
+
+const SEGMENT_ORDER: VerificationStatus[] = ["verified", "dealer_attested", "needs_attention", "needs_confirmation", "pending", "unavailable"];
+
+export function verificationStatusCounts(r: VerificationReport): StatusCount[] {
+  const n: Record<VerificationStatus, number> = {
+    verified: r.verifiedChecks,
+    dealer_attested: r.dealerAttestedChecks ?? 0,
+    needs_attention: r.needsAttentionChecks,
+    needs_confirmation: r.needsConfirmationChecks,
+    pending: r.pendingChecks,
+    unavailable: r.unavailableChecks,
+  };
+  return SEGMENT_ORDER.map((status) => ({ status, count: n[status], label: VERIFICATION_STATUS_LABEL[status] })).filter((s) => s.count > 0);
+}
+
+/** "3 verified · 1 dealer attested · 1 pending · 3 not available". */
+export function verificationCountsLine(r: VerificationReport): string {
+  return verificationStatusCounts(r)
+    .map((s) => `${s.count} ${s.status === "unavailable" ? "not available" : s.label.toLowerCase()}`)
+    .join(" · ");
+}
+
+/**
+ * The hero subtitle. Never "8 checks completed" when some have no result —
+ * it says how many checks ran and how many returned a result.
+ */
+export function verificationScopeLine(r: VerificationReport): string {
+  const total = r.totalChecks;
+  const returned = r.completedChecks;
+  if (returned === total) return `${total} data ${total === 1 ? "check" : "checks"}, all returned a result`;
+  return `${total} data ${total === 1 ? "check" : "checks"} · ${returned} returned a result`;
+}
+
+// ── Recall wording, one place (L01) ─────────────────────────────────────────
+
+/** Headline for the recall check on any customer surface. */
+export function recallHeadline(c: Pick<ReportCheck, "status" | "highSeverity" | "recallOutcome">): string {
+  if (c.status === "needs_confirmation") return "Recall status needs confirmation";
+  if (c.highSeverity) return "Do-not-drive recall reported";
+  switch (c.recallOutcome) {
+    case "vin_open": return "Open safety recall found";
+    case "model_context": return "Recall campaigns on this model";
+    case "vin_clear": return "No open recalls for this VIN";
+    case "stale": return "Recall check out of date";
+    case "not_checked": return "Recall check not run yet";
+    case "unavailable": return "Recall not verified for this VIN";
+    default:
+      // A report built before recallOutcome existed: status is all we have,
+      // and only needs_attention may ever be worded as an open recall.
+      return c.status === "needs_attention" ? "Open safety recall found" : c.status === "verified" ? "No open recalls for this VIN" : "Recall not verified for this VIN";
+  }
+}
+
+/** True only when a recall is CONFIRMED on this VIN (or do-not-drive). */
+export const recallConfirmedOpen = (c: Pick<ReportCheck, "status" | "highSeverity" | "recallOutcome"> | undefined): boolean =>
+  !!c && (c.highSeverity || c.recallOutcome === "vin_open" || (c.recallOutcome == null && c.status === "needs_attention"));
+
+/**
+ * The "What should I do next?" list, derived from the report alone and shared
+ * by the desktop page, the mobile page and the print document. Recall steps
+ * come from the exact recall outcome: an unavailable lookup asks for a VIN
+ * check; it never mentions "the open recall" or a remedy (L01).
+ */
+export function deriveNextSteps(report: VerificationReport): string[] {
+  const steps: string[] = [];
+  const recall = report.checks.find((c) => c.key === "recall");
+  if (recall && !isSettledCheck(recall.status)) {
+    const o = recall.recallOutcome;
+    if (recall.highSeverity || o === "do_not_drive") {
+      steps.push("Do not drive this vehicle until the dealer shows the recall remedy has been completed.");
+      steps.push("Ask the dealer for the recall repair record before you take delivery.");
+    } else if (recall.status === "needs_confirmation" || o === "conflict") {
+      steps.push("Ask the dealer to confirm this VIN's recall status — the available sources disagree.");
+    } else if (o === "vin_open" || (o == null && recall.status === "needs_attention")) {
+      steps.push("Ask the dealer about the open recall on this VIN and whether the remedy is available.");
+      steps.push("Confirm the recall remedy has been completed before you take delivery.");
+    } else if (o === "model_context") {
+      steps.push("Ask the dealer whether this VIN is included in the recall campaigns reported for its model.");
+    } else {
+      steps.push("Ask the dealer for a VIN-level recall check — no source has confirmed this VIN's recall status yet.");
+    }
+  }
+  const title = report.checks.find((c) => c.key === "title");
+  if (title?.status === "dealer_attested") {
+    steps.push("The title status is the dealer's own statement. Ask for the title record if you want it independently confirmed.");
+  }
+  report.checks
+    .filter((c) => !isSettledCheck(c.status) && c.status !== "unavailable" && c.key !== "recall")
+    .forEach((c) => {
+      if (c.key === "title") steps.push("Review the title and brand details with the dealer once that check completes.");
+      else steps.push(`Ask the dealer about ${c.name.toLowerCase()}.`);
+    });
+  if (report.checks.some((c) => c.status === "unavailable")) steps.push("Ask the dealer for the records behind any checks marked not available.");
+  if (steps.length === 0) steps.push("Review the verified checks above — every completed check returned a clear result.");
+  steps.push("Keep this report for your records. It reflects the source data as of the date shown.");
+  return steps;
 }

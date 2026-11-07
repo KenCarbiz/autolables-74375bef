@@ -1,5 +1,5 @@
 import { ShieldCheck, ShieldAlert, TriangleAlert, Clock, CircleMinus, CircleCheck, ArrowRight, ChevronRight } from "lucide-react";
-import { isSettledCheck } from "@/lib/passport/verificationSummary";
+import { isSettledCheck, recallHeadline, verificationScopeLine } from "@/lib/passport/verificationSummary";
 import type { VerificationReport, ReportCheck, VerificationStatus } from "@/lib/passport/verificationSummary";
 
 
@@ -50,12 +50,9 @@ const TONE_STYLE: Record<Tone, { bg: string; border: string; fg: string; Icon: R
 
 // One concise status line per attention item — evidence-derived, never alarmist.
 const attentionLine = (c: ReportCheck): string => {
-  if (c.key === "recall") {
-    if (c.status === "needs_confirmation") return "Needs confirmation";
-    if (c.highSeverity) return "Do-not-drive recall";
-    if (c.status === "needs_attention") return "Open recall found";
-    return "Recall check pending";
-  }
+  // Worded from the exact recall outcome: an unavailable lookup is never
+  // phrased as an open recall (L01).
+  if (c.key === "recall") return recallHeadline(c);
   switch (c.status) {
     case "needs_attention":
       return c.key === "title" ? "Title brand on record" : c.key === "history" ? "Reported accident history" : "Needs attention";
@@ -80,9 +77,14 @@ const CARD = "bg-white border border-[#E6EAF0] rounded-2xl shadow-[0_1px_2px_rgb
 
 const AutoLabelsVerifiedCard = ({ report, onOpenReport, onReview, className }: Props) => {
   const total = report.totalChecks;
+  // Settled = nothing asked of the shopper (verified OR dealer attested). The
+  // "Verified" number is independent verification ONLY; the dealer's own
+  // statements are counted and labeled separately so this card agrees with
+  // the report rail and the module subtitle (L02).
   const verified = report.checks.filter((c) => isSettledCheck(c.status));
-  const verifiedCount = verified.length;
-  const reviewCount = total - verifiedCount;
+  const verifiedCount = report.verifiedChecks;
+  const attestedCount = report.dealerAttestedChecks ?? 0;
+  const reviewCount = total - verified.length;
   const allClear = reviewCount === 0;
 
   const attention = report.checks
@@ -102,7 +104,7 @@ const AutoLabelsVerifiedCard = ({ report, onOpenReport, onReview, className }: P
           </span>
           <div className="min-w-0">
             <div className="text-[15px] font-extrabold leading-tight" style={{ color: C.navy }}>AutoLabels Verified</div>
-            <div className="text-[12px] leading-snug" style={{ color: C.muted }}>{total} data {total === 1 ? "check" : "checks"} completed</div>
+            <div className="text-[12px] leading-snug" style={{ color: C.muted }}>{verificationScopeLine(report)}</div>
           </div>
         </div>
         <span
@@ -118,6 +120,9 @@ const AutoLabelsVerifiedCard = ({ report, onOpenReport, onReview, className }: P
         <div className="px-4 py-3 text-center">
           <div className="text-[26px] font-extrabold tabular-nums leading-none" style={{ color: C.green }}>{verifiedCount}</div>
           <div className="text-[12px] font-semibold mt-1" style={{ color: C.muted }}>Verified</div>
+          {attestedCount > 0 && (
+            <div className="text-[11px] mt-0.5" style={{ color: C.muted }}>+{attestedCount} dealer attested</div>
+          )}
         </div>
         <div className="px-4 py-3 text-center border-l" style={{ borderColor: C.border }}>
           <div className="text-[26px] font-extrabold tabular-nums leading-none" style={{ color: allClear ? C.gray : C.amber }}>{reviewCount}</div>
@@ -151,8 +156,10 @@ const AutoLabelsVerifiedCard = ({ report, onOpenReport, onReview, className }: P
         <div className="mt-3 rounded-xl border px-3 py-2.5 grid grid-cols-2 max-[340px]:grid-cols-1 gap-x-3 gap-y-2" style={{ borderColor: C.border }}>
           {verified.map((c) => (
             <div key={c.key} className="flex items-center gap-2 min-w-0">
-              <CircleCheck className="w-[18px] h-[18px] shrink-0" style={{ color: C.green }} />
-              <span className="text-[13px] font-semibold truncate" style={{ color: C.navy }}>{labelFor(c)}</span>
+              {c.status === "dealer_attested"
+                ? <ShieldCheck className="w-[18px] h-[18px] shrink-0" style={{ color: "#0F766E" }} aria-label="Dealer attested" />
+                : <CircleCheck className="w-[18px] h-[18px] shrink-0" style={{ color: C.green }} aria-label="Verified" />}
+              <span className="text-[13px] font-semibold truncate" style={{ color: C.navy }}>{labelFor(c)}{c.status === "dealer_attested" ? " (dealer)" : ""}</span>
             </div>
           ))}
         </div>

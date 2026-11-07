@@ -135,7 +135,7 @@ describe("InventoryNetworkPage", () => {
     expect(screen.queryByText(/^free$/i)).not.toBeInTheDocument();
     cat.unmount();
     renderAdmin(<InventoryNetworkPage />, { route: "/admin/integrations/inventory-network?view=deliveries" });
-    expect(await screen.findByText("No open exceptions")).toBeInTheDocument();
+    expect(await screen.findByText("No open delivery exceptions")).toBeInTheDocument();
     expect(await screen.findByText(/No MarketCheck bulk feed is contracted/)).toBeInTheDocument();
     expect(functionCalls()).toEqual([]);
     expect(writeCalls().filter((c) => c.kind === "table")).toEqual([]);

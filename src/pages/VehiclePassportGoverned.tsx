@@ -713,7 +713,7 @@ export default function VehiclePassportGoverned() {
           d.ownerCount === 1 ? `One owner reported${d.historyReport ? ` (${historyReportName(d.historyReport.provider)})` : ""}` : d.ownerCount != null && d.ownerCount > 1 ? `${d.ownerCount} owners reported` : null,
           listing.mileage != null ? `${listing.mileage.toLocaleString()} reported miles` : null,
           listing.trim ? `${listing.trim} trim` : null,
-          recallVerified ? "No open recalls (NHTSA)" : null,
+          recallVerified ? "No open recalls for this VIN" : null,
           d.warrantyStr ? "Factory warranty terms found — remaining coverage requires confirmation" : null,
         ].filter(Boolean) as string[]);
 
@@ -1390,7 +1390,7 @@ export default function VehiclePassportGoverned() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="inline-flex items-center gap-2">
                       <span className="h-8 w-8 grid place-items-center rounded-full" style={{ background: vAllVerified ? "#DCFCE7" : "#FEF3C7" }}><CheckCircle2 className="w-4 h-4" style={{ color: vAllVerified ? GREEN : AMBER }} /></span>
-                      <div><div className="text-[14px] font-extrabold" style={{ color: NAVY }}>Verified Vehicle Data</div><div className="text-[12px]" style={{ color: SUB }}>{vAllVerified ? `All ${vTotal} checks verified` : `${vVerified} of ${vTotal} checks verified · ${vSummary}`}</div></div>
+                      <div><div className="text-[14px] font-extrabold" style={{ color: NAVY }}>Verified Vehicle Data</div><div className="text-[12px]" style={{ color: SUB }}>{vAllVerified ? `All ${vTotal} checks verified` : `${vVerified} of ${vTotal} checks independently verified · ${vSummary}`}</div></div>
                     </div>
                     <button onClick={() => openPanel("verification-categories")} className="text-[13px] font-bold inline-flex items-center gap-1 hover:underline" style={{ color: BLUE }}>View all categories <ChevronRight className="w-4 h-4" /></button>
                   </div>
@@ -1471,7 +1471,7 @@ export default function VehiclePassportGoverned() {
                           d.ownerCount === 1 ? `One owner reported${d.historyReport ? ` (${historyReportName(d.historyReport.provider)})` : ""}` : d.ownerCount != null && d.ownerCount > 1 ? `${d.ownerCount} owners reported` : null,
                           listing.mileage != null ? `${listing.mileage.toLocaleString()} reported miles` : null,
                           listing.trim ? `${listing.trim} trim` : null,
-                          recallVerified ? "No open recalls (NHTSA)" : null,
+                          recallVerified ? "No open recalls for this VIN" : null,
                           d.warrantyStr ? "Factory warranty terms found — remaining coverage requires confirmation" : null,
                         ].filter(Boolean) as string[];
                         return (strengths.length ? strengths : ["Details confirmed at the dealership"]).map((b, i) => (
