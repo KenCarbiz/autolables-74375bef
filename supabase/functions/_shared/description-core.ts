@@ -1,4 +1,5 @@
 import { decideWarrantyLanguage } from "./description-warranty-policy.ts";
+import { resolveReviewMode } from "./description-review-mode.ts";
 import { deriveRecallView, type RecallRowInput } from "./factorySticker/lib/vehicleTruth/recallView.ts";
 // ─────────────────────────────────────────────────────────────────────
 // Description Intelligence — server-side core.
@@ -1361,9 +1362,7 @@ export function decideEligibility(
   if (Number.isFinite(threshold) && typeof quality === "number" && quality < threshold) {
     return { eligibility: "review_required", reason: `quality ${quality} is below the dealer threshold of ${threshold}` };
   }
-  const cls = String(condition || "used").toLowerCase();
-  const byClass = (settings.review_mode_by_class || {}) as Record<string, string>;
-  const mode = byClass[cls] || settings.review_mode || "EXCEPTION_REVIEW";
+  const { mode } = resolveReviewMode(settings, condition);
   if (mode === "DRAFT_ONLY") return { eligibility: "review_required", reason: "dealer is in draft-only mode" };
   if (mode === "REQUIRE_APPROVAL_ALL") return { eligibility: "review_required", reason: "approval required for all vehicles" };
   // Cosmetic warnings (missing CTA, short copy, formatting) should not drag a

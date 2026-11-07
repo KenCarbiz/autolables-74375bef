@@ -2,6 +2,7 @@ import type { DealerSettings } from "@/contexts/DealerSettingsContext";
 import { getDealerDocumentRules, type DocumentRules } from "@/lib/documentRules";
 import { ADMIN_CHILD_ROUTES, adminTabHref } from "@/lib/admin/sections";
 import { type CountValue, countDisplay } from "@/lib/admin/health";
+import { resolveReviewMode } from "../../../supabase/functions/_shared/description-review-mode";
 import { diffFields, isUnchanged, type ImpactSnapshot } from "@/lib/admin/reviewApply";
 
 // The publishing policy in force, derived from the enforcers that actually
@@ -80,13 +81,13 @@ export interface PublishingInputs {
 
 const reviewModeFor = (d: DescriptionPolicy | null, cls: VehicleClass): string | null => {
   if (!d) return null;
-  const byClass = d.reviewModeByClass ?? {};
-  return byClass[cls] ?? byClass[cls === "cpo" ? "used" : cls] ?? d.reviewMode ?? null;
+  return resolveReviewMode({ review_mode: d.reviewMode, review_mode_by_class: d.reviewModeByClass }, cls).mode;
 };
 
 const describeReviewMode = (mode: string | null): string => {
   if (mode === null) return "unknown";
   const m = mode.toLowerCase();
+  if (m === "draft_only") return "draft only";
   if (m.includes("manual") || m.includes("review") || m.includes("approval")) return "manual review";
   if (m.includes("auto")) return "automatic";
   return m.replace(/_/g, " ");

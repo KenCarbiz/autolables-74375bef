@@ -19,6 +19,7 @@ import { AL97_05, AL97_06, AL97_06_PILOT, AL97_17, AL97_17_SWAP } from "./al97-b
 import { PAYMENT_ESTIMATOR_FIXTURES } from "./paymentEstimator";
 import { WAVE_B_BRAND_FIXTURES } from "./WaveBBrandFixtures";
 import { WAVE_B_FEEDS_FIXTURES } from "./WaveBFeedsFixtures";
+import { WAVE_C_PUBLISHING_FIXTURES } from "./WaveCPublishingFixtures";
 
 // Design fixtures for the parity harness. Each entry renders one reference
 // screen with synthetic data under /admin/design-fixture/:screen, a route that
@@ -75,4 +76,5 @@ export const ADMIN_FIXTURES: Record<string, AdminScreenFixture> = {
   ...PAYMENT_ESTIMATOR_FIXTURES,
   ...WAVE_B_BRAND_FIXTURES,
   ...WAVE_B_FEEDS_FIXTURES,
+  ...WAVE_C_PUBLISHING_FIXTURES,
 };
