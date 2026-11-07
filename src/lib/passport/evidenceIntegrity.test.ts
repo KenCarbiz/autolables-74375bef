@@ -194,7 +194,7 @@ describe("report fingerprint", () => {
 
   it("changed material evidence produces a new fingerprint even when the counts stay the same", () => {
     const a = deriveVerificationReport(dOf({ ownerCount: 1 }), base());
-    const b = deriveVerificationReport(dOf({ ownerCount: 2 }), base());
+    const b = deriveVerificationReport(dOf({ ownerCount: 2 }), L({ vin_decode_receipts: [receipt()], mc_attributes: { owner_count: 2 } }));
     expect(b.verifiedChecks).toBe(a.verifiedChecks);
     expect(b.checks.map((c) => c.status)).toEqual(a.checks.map((c) => c.status));
     expect(verificationEvidenceFingerprint(b, VIN)).not.toBe(verificationEvidenceFingerprint(a, VIN));
@@ -240,5 +240,37 @@ describe("decoded model names: body styles normalize, different models do not", 
     ["2021 Audi A5", "2021", "Audi", "A5 Sport"],
   ])("%s does not match %s %s %s", (ymm, year, make, model) => {
     expect(decodedIdentityMatches(ymm, { year, make, model })).toBe(false);
+  });
+});
+
+describe("ownership evidence", () => {
+  const own = (mc: Record<string, unknown>, extra: Record<string, unknown> = {}) => check(L({ mc_attributes: mc, ...extra }), "ownership");
+
+  it("an owner count from a history provider verifies", () => {
+    const c = own({ owner_count: 2 });
+    expect(c.status).toBe("verified");
+    expect(c.finding).toBe("2 owners on record.");
+  });
+
+  it("a CARFAX One-Owner badge in the dealer's listing is the dealer's statement", () => {
+    const c = own({ carfax_1_owner: true });
+    expect(c.status).toBe("dealer_attested");
+    expect(c.family).toBe("dealer");
+    expect(c.finding).toMatch(/dealer's listing \(as reported by MarketCheck inventory data\)/);
+    expect(c.finding).toMatch(/not an independently verified record/);
+  });
+
+  it("a badge read off the dealer's website says so", () => {
+    expect(own({ carfax_1_owner: true, one_owner_source: "dealer_vdp" }).finding).toMatch(/on the dealer's website/);
+  });
+
+  it("a listing-history owners estimate never counts as owners", () => {
+    expect(own({}, { history_payload: { owners: 12, entries: [] } }).status).toBe("unavailable");
+  });
+
+  it("no ownership data is unavailable, never 'one owner'", () => {
+    const c = own({});
+    expect(c.status).toBe("unavailable");
+    expect(c.finding).toBeNull();
   });
 });

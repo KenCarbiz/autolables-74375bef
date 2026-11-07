@@ -67,21 +67,25 @@ describe("the two live Passports: one status per check, totals reconcile", () =>
   // number) and title drops to not available (a store-wide no-branded-title
   // policy is not a review of this VIN). The VIN stays verified because a
   // NeoVIN snapshot for this exact VIN returned 2023 INFINITI Q50.
-  it("archived 2023 Q50 reads 2 verified, 6 not available", () => {
+  // Release review (Nov 7): ownership rests on the CARFAX One-Owner badge
+  // in the dealer's listing (mc.carfax_1_owner via MarketCheck); no history
+  // report was retrieved, so it is the dealer's statement.
+  it("archived 2023 Q50 reads 1 verified, 1 dealer attested, 6 not available", () => {
     const r = reportOf(archivedQ50());
     expect(statuses(r)).toEqual({
-      vin: "verified", history: "unavailable", ownership: "verified", odometer: "unavailable",
+      vin: "verified", history: "unavailable", ownership: "dealer_attested", odometer: "unavailable",
       // The Sept 11 market read is withheld by the tenant's invalid-claim
       // suppression, so the market check has no result to show.
       title: "unavailable", recall: "unavailable", market: "unavailable", warranty: "unavailable",
     });
     expect(r.totalChecks).toBe(8);
     expect(sum(r)).toBe(8);
-    expect(r.dealerAttestedChecks).toBe(0);
-    expect(verificationScopeLine(r)).toBe("2 of 8 checks verified");
-    expect(verificationCountsLine(r)).toBe("2 verified · 6 not available");
+    expect(r.dealerAttestedChecks).toBe(1);
+    expect(verificationScopeLine(r)).toBe("1 of 8 checks verified");
+    expect(verificationCountsLine(r)).toBe("1 verified · 1 dealer attested · 6 not available");
     expect(r.banner.reviewCount).toBe(0);
-    expect(r.banner.heading).toBe("2 of 8 checks verified");
+    expect(r.banner.heading).toBe("1 of 8 checks verified");
+    expect(r.checks.find((c) => c.key === "ownership")!.finding).toMatch(/CARFAX One-Owner badge appears on the dealer's listing/);
     expect(r.banner.tone).toBe("neutral");
     const odo = r.checks.find((c) => c.key === "odometer")!;
     expect(odo.finding).toBe("Reported mileage: 7,315 miles. Odometer history not independently verified.");
@@ -95,7 +99,7 @@ describe("the two live Passports: one status per check, totals reconcile", () =>
     const vin = r.checks.find((c) => c.key === "vin")!;
     expect(vin.status).toBe("unavailable");
     expect(vin.finding).toBe("VIN on record. Identity decode not verified.");
-    expect(verificationCountsLine(r)).toBe("1 verified · 7 not available");
+    expect(verificationCountsLine(r)).toBe("1 dealer attested · 7 not available");
   });
 
   // First round: 0 verified, 1 dealer attested, 1 pending, 6 not available.
@@ -159,8 +163,8 @@ describe("complete vs incomplete data, archived and active", () => {
     const l = archivedQ50();
     (l as unknown as Record<string, unknown>).title_verification = { status: "clean", verified_at: "2026-09-02T14:00:00.000Z", source: "nmvtis", report_generated_at: "2026-09-02T13:58:00.000Z", brand_note: null };
     const r = reportOf(l);
-    expect(r.verifiedChecks).toBe(2);
-    expect(r.dealerAttestedChecks).toBe(1);
+    expect(r.verifiedChecks).toBe(1);
+    expect(r.dealerAttestedChecks).toBe(2);
     const title = r.checks.find((c) => c.key === "title")!;
     expect(title.status).toBe("dealer_attested");
     expect(title.family).toBe("dealer");
@@ -319,7 +323,7 @@ describe("served Passport: archived photo treatment and badges", () => {
     current = archivedQ50();
     const { container } = renderPage(current.slug!);
     expect(container.textContent).not.toMatch(/Clean Title/);
-    expect(screen.queryAllByText("2 of 8 checks verified").length).toBeGreaterThan(0);
+    expect(screen.queryAllByText("1 of 8 checks verified").length).toBeGreaterThan(0);
   });
 });
 
@@ -354,7 +358,7 @@ describe("the report version is the same on desktop, mobile and the printed PDF"
       }
       expect(seen.length).toBeGreaterThanOrEqual(3);
       expect(new Set(seen)).toEqual(new Set([expected]));
-      expect(expected).toMatch(/^2026-11-07\.2\/[A-Z0-9]{17}\/[0-9a-f]{16}$/);
+      expect(expected).toMatch(/^2026-11-07\.3\/[A-Z0-9]{17}\/[0-9a-f]{16}$/);
     });
   }
 });

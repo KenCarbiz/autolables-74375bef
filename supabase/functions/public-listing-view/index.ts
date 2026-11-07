@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { normalizeReceiptVin, projectVinDecodeReceipts, VIN_DECODE_RECEIPT_LIMIT, VIN_DECODE_RECEIPT_SELECT } from "../_shared/vinDecodeReceipt.ts";
 import { resolveCustomerPassportRouting, type PassportAgent } from "../_shared/passport-routing.ts";
 import { matchIihsAward, type IihsAward } from "../_shared/iihs-awards.ts";
 import { resolvePassportVersion } from "../_shared/passport-version.ts";
@@ -919,28 +920,20 @@ serve(async (req) => {
 
     // ── VIN decode receipts. The Passport's identity check verifies only
     // against a decoder's own record of the VIN it decoded. Stored snapshots
-    // only: this never calls a decoder. The endpoint (it carries the masked
-    // API key) and the payload stay server side; a receipt is the decoded
-    // VIN, the provider, the HTTP outcome, the time, the identity fields and
-    // the payload hash.
+    // only: a read, never a decoder call and never a write. See
+    // _shared/vinDecodeReceipt.ts for what ships and what is dropped.
     try {
-      const vinKey = String(row.vin || "").trim().toUpperCase();
+      const vinKey = normalizeReceiptVin(row.vin);
       row.vin_decode_receipts = [];
-      if (/^[A-HJ-NPR-Z0-9]{17}$/.test(vinKey)) {
+      if (vinKey) {
         const { data: snaps } = await admin
           .from("neovin_snapshots")
-          .select("vin, endpoint, http_status, fetched_at, payload_hash, dvin:payload->>vin, year:payload->>year, make:payload->>make, model:payload->>model, trim:payload->>trim")
+          .select(VIN_DECODE_RECEIPT_SELECT)
           .eq("vin", vinKey)
+          .gte("http_status", 200).lt("http_status", 300)
           .order("fetched_at", { ascending: false })
-          .limit(5);
-        row.vin_decode_receipts = (snaps ?? []).map((sn: Record<string, unknown>) => ({
-          vin: String(sn.dvin || "").toUpperCase() || null,
-          provider: String(sn.endpoint || "").includes("/neovin/") ? "neovin" : "marketcheck",
-          http_status: sn.http_status ?? null,
-          fetched_at: sn.fetched_at ?? null,
-          year: sn.year ?? null, make: sn.make ?? null, model: sn.model ?? null, trim: sn.trim ?? null,
-          payload_hash: sn.payload_hash ?? null,
-        }));
+          .limit(VIN_DECODE_RECEIPT_LIMIT);
+        row.vin_decode_receipts = projectVinDecodeReceipts(snaps, vinKey);
       }
     } catch { row.vin_decode_receipts = []; }
 

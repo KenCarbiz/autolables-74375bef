@@ -738,27 +738,40 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
     };
   })());
 
-  // 3 — Ownership history (Vehicle history)
+  // 3 — Ownership history
+  // An owner count from a history provider verifies. A CARFAX One-Owner flag
+  // is the badge on the dealer's own advertisement: MarketCheck copies it
+  // from the listing, and the price crawler reads it off the dealer's page
+  // (one_owner_source = dealer_vdp). Nobody here has seen the report, so it
+  // is the dealer's statement about this VIN, attributed as such.
   checks.push((() => {
-    const s = src("vehicle_history");
-    const known = isNew || d.ownerCount != null;
-    const status: VerificationStatus = known ? "verified" : "unavailable";
-    const owners = d.ownerCount;
+    const mcO = bag((listing as unknown as { mc_attributes?: unknown }).mc_attributes);
+    const providerCount = typeof mcO.owner_count === "number" ? mcO.owner_count
+      : str(mcO.owner_count) != null && Number.isFinite(Number(mcO.owner_count)) ? Number(mcO.owner_count) : null;
+    const badge = mcO.carfax_1_owner === true;
+    const badgeOnly = !isNew && providerCount == null && badge;
+    const owners = isNew ? 0 : providerCount ?? (badgeOnly ? 1 : d.ownerCount);
+    const status: VerificationStatus = isNew || (owners != null && !badgeOnly) ? "verified" : badgeOnly ? "dealer_attested" : "unavailable";
+    const badgeWhere = mcO.one_owner_source === "dealer_vdp" ? "the dealer's website" : "the dealer's listing (as reported by MarketCheck inventory data)";
     return {
-      key: "ownership", name: "Ownership history", ...s, material: false, highSeverity: false,
+      key: "ownership", name: "Ownership history",
+      ...src(status === "dealer_attested" ? "dealer" : "vehicle_history"),
+      material: false, highSeverity: false,
       status,
-      finding: !known ? null
+      finding: status === "unavailable" ? null
         : isNew ? "New vehicle — no prior owners on record."
+        : status === "dealer_attested" ? `A CARFAX One-Owner badge appears on ${badgeWhere} for this VIN. AutoLabels has not retrieved the history report, so the owner count is the dealer's statement, not an independently verified record.`
         : owners === 1 ? "One owner on record."
         : owners === 0 ? "No prior owners on record."
         : `${owners} owners on record.`,
       reviewNote: null,
       evidence: [
-        { label: "Owners on record", value: known ? (isNew ? "0 (new vehicle)" : String(owners)) : null },
-        { label: "Source", value: FAMILY_META.vehicle_history.label },
+        { label: "Owners on record", value: status === "verified" ? (isNew ? "0 (new vehicle)" : String(owners)) : null },
+        { label: "Dealer statement", value: status === "dealer_attested" ? `CARFAX One-Owner badge on ${badgeWhere}` : null },
+        { label: "Source", value: status === "dealer_attested" ? "Dealer advertisement (not a retrieved history report)" : FAMILY_META.vehicle_history.label },
       ],
-      facts: { scope: "vin", ownerCount: d.ownerCount, isNew },
-      checkedAt: known ? reportTime : null,
+      facts: { scope: "vin", ownerCount: owners ?? null, isNew, providerCount, carfaxOneOwnerBadge: badge, badgeSource: str(mcO.one_owner_source) ?? (badge ? "marketcheck_listing" : null) },
+      checkedAt: status === "unavailable" ? null : reportTime,
     };
   })());
 
@@ -1056,7 +1069,7 @@ function buildBanner(a: {
     return {
       tone: "neutral",
       heading: progress,
-      body: `${countsLine}. No source reported a problem. Checks marked ${which} have no result and are not counted as verified.`,
+      body: `${countsLine}. Checks marked ${which} have no result: they are not counted as verified, and they establish neither a positive nor a negative finding.`,
       reviewCount: 0,
     };
   }
@@ -1200,7 +1213,7 @@ export function verificationScopeLine(r: VerificationReport): string {
  * built from; it never implies a live source was queried. No credentials,
  * report URLs or personal data are among the inputs.
  */
-export const VERIFICATION_REPORT_VERSION = "2026-11-07.2";
+export const VERIFICATION_REPORT_VERSION = "2026-11-07.3";
 
 export function verificationEvidenceSnapshot(r: VerificationReport, vin: string | null | undefined): Record<string, unknown> {
   return {
@@ -1215,7 +1228,7 @@ export function verificationEvidenceFingerprint(r: VerificationReport, vin: stri
   return sha256Hex(canonicalJson(verificationEvidenceSnapshot(r, vin)));
 }
 
-/** "2026-11-07.2/JN1EV7CR5PM543599/3f9a0c1d2e4b5a69": shown on the desktop
+/** "2026-11-07.3/JN1EV7CR5PM543599/33a0c3ca3b92e5e2": shown on the desktop
  *  and mobile report and the printed PDF. */
 export function verificationSnapshotKey(r: VerificationReport, vin: string | null | undefined): string {
   return `${VERIFICATION_REPORT_VERSION}/${(vin || "novin").toUpperCase()}/${verificationEvidenceFingerprint(r, vin).slice(0, 16)}`;

@@ -147,7 +147,7 @@ const ExceptionCard = ({ check, expanded, onToggleEvidence, onAskDealer }: Check
           <h3 className="text-[15.5px] font-bold text-[#0F172A] leading-snug mt-0.5">{exceptionHeadline(check)}</h3>
           {check.finding && <p className="text-[13px] text-[#475569] mt-1.5 leading-relaxed">{check.finding}</p>}
           {!check.finding && check.status === "pending" && (
-            <p className="text-[13px] text-[#475569] mt-1.5 leading-relaxed">This check has not completed. Pending does not mean a problem was found — it has simply not returned a result yet.</p>
+            <p className="text-[13px] text-[#475569] mt-1.5 leading-relaxed">This check has not completed. Pending is not a finding either way: it does not show a problem, and it does not rule one out.</p>
           )}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-[11.5px] text-[#94A3B8]">
             <span>Source: {sourceLabelFor(check)}</span>
@@ -425,9 +425,9 @@ const CheckSheetBody = ({ check, onAskDealer }: { check: ReportCheck; onAskDeale
   const ui = STATUS_UI[check.status];
   const meaning = check.finding
     ?? (check.status === "pending"
-      ? "This check has not returned a result yet. Pending does not mean a problem was found — it simply has no result yet."
+      ? "This check has not returned a result yet. Pending is not a finding either way: it does not show a problem, and it does not rule one out."
       : check.status === "unavailable"
-        ? "The records this check needs are not available for this vehicle. This is not a problem found — there is simply no data to verify."
+        ? "Not independently verified — the available records do not establish a result. Unavailable information is neither a positive nor a negative finding."
         : "");
   return (
     <div className="space-y-4 pb-1">
@@ -818,9 +818,9 @@ const PrintCheckCard = ({ check }: { check: ReportCheck }) => {
   const ui = STATUS_UI[check.status];
   const explanation = check.finding
     ?? (check.status === "pending"
-      ? "This check has not returned a result yet. Pending does not mean a problem was found."
+      ? "This check has not returned a result yet. Pending is not a finding either way."
       : check.status === "unavailable"
-        ? "The records this check needs are not available for this vehicle. This is not a problem found — there is simply no data to verify."
+        ? "Not independently verified — the available records do not establish a result. Unavailable information is neither a positive nor a negative finding."
         : "");
   const title = check.status === "verified" ? check.name : exceptionHeadline(check);
   return (
@@ -1311,8 +1311,8 @@ const VehiclePassportVerification = () => {
                 <div className="flex items-start gap-2.5">
                   <CircleMinus className="w-[18px] h-[18px] text-[#94A3B8] shrink-0 mt-0.5" aria-hidden="true" />
                   <div className="min-w-0">
-                    <p className="text-[13px] font-bold text-[#475569]">Not available <span className="font-medium text-[#94A3B8]">— not independently verified, and no problem was found</span></p>
-                    <p className="text-[12px] text-[#64748B] mt-0.5">{unavailable.map((c) => c.name).join(", ")} could not be verified because the records they need are not available for this vehicle.</p>
+                    <p className="text-[13px] font-bold text-[#475569]">Not available <span className="font-medium text-[#94A3B8]">— not independently verified; the available records do not establish a result</span></p>
+                    <p className="text-[12px] text-[#64748B] mt-0.5">{unavailable.map((c) => c.name).join(", ")} could not be verified because the records they need are not available for this vehicle. This is neither a positive nor a negative finding; the details below are shown as reported, not as verified results.</p>
                     {unavailable.some(unavailableNote) && (
                       <ul className="mt-1.5 space-y-0.5" data-unavailable-notes>
                         {unavailable.filter(unavailableNote).map((c) => (
