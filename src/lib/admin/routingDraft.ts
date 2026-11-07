@@ -100,7 +100,7 @@ export interface ChangeRow {
   after: string;
 }
 
-const describe = (field: string, value: unknown): string => {
+export const describeRoutingField = (field: string, value: unknown): string => {
   if (value === undefined || value === null) return "Not set";
   switch (field) {
     case "contactMode":
@@ -151,9 +151,9 @@ export function routingChangeRows(current: RoutingDraftSlice, draft: RoutingDraf
   const rows = diffFields(
     current.routing as unknown as Record<string, unknown>,
     draft.routing as unknown as Record<string, unknown>,
-  ).map((d) => ({ field: d.field, label: ROUTING_FIELD_LABELS[d.field] ?? d.field, before: describe(d.field, d.before), after: describe(d.field, d.after) }));
+  ).map((d) => ({ field: d.field, label: ROUTING_FIELD_LABELS[d.field] ?? d.field, before: describeRoutingField(d.field, d.before), after: describeRoutingField(d.field, d.after) }));
   if (!isUnchanged(namedAgents(current.agents), namedAgents(draft.agents))) {
-    rows.push({ field: "agents", label: ROUTING_FIELD_LABELS.agents, before: describe("agents", current.agents), after: describe("agents", draft.agents) });
+    rows.push({ field: "agents", label: ROUTING_FIELD_LABELS.agents, before: describeRoutingField("agents", current.agents), after: describeRoutingField("agents", draft.agents) });
   }
   return rows;
 }
