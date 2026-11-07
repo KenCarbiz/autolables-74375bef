@@ -33,6 +33,7 @@ export const ReviewChangesDialog = ({
   impact,
   applyLabel = "Apply changes",
   applying = false,
+  applyDisabled = false,
   error,
   onCancel,
   onApply,
@@ -47,6 +48,8 @@ export const ReviewChangesDialog = ({
   impact?: ReactNode;
   applyLabel?: string;
   applying?: boolean;
+  /** The draft cannot be written right now (read-only, blocked or invalid). Cancel stays available. */
+  applyDisabled?: boolean;
   error?: ReactNode;
   onCancel: () => void;
   onApply: () => void;
@@ -109,7 +112,7 @@ export const ReviewChangesDialog = ({
           </div>
           <footer className="px-5 sm:px-6 py-4 border-t border-adm-divider flex items-center justify-end gap-3 flex-wrap">
             <AdminButton variant="secondary" onClick={onCancel} disabled={applying}>Keep editing</AdminButton>
-            <AdminButton variant="primary" onClick={onApply} disabled={applying || changes.length === 0}>{applying ? "Applying" : applyLabel}</AdminButton>
+            <AdminButton variant="primary" onClick={onApply} disabled={applying || applyDisabled || changes.length === 0}>{applying ? "Applying" : applyLabel}</AdminButton>
           </footer>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

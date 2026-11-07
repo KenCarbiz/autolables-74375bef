@@ -100,7 +100,7 @@ export default function AdminDesignFixture() {
   const chrome = search.get("chrome") === "1" || (withDialogBackdrop && search.get("chrome") !== "0");
   // Administration V3: the settings directory (v3-home) and each category
   // page (v3-<category id>), drawn for an owner. Navigation only; no data.
-  const v3 = screen?.startsWith("v3-") ? screen.slice(3) : null;
+  const v3 = screen?.startsWith("v3-") && !(screen in ADMIN_FIXTURES) ? screen.slice(3) : null;
   if (v3) {
     const ownerCtx = { role: "owner", isAdmin: false } as const;
     const category = findCategory(v3);

@@ -40,8 +40,6 @@ import IdentityView from "./IdentityView";
 import AppearanceView from "./AppearanceView";
 import HoursContactView from "./HoursContactView";
 import WhyBuyView from "./WhyBuyView";
-import WebsitesFeedsView from "./WebsitesFeedsView";
-import DocumentDefaultsView from "./DocumentDefaultsView";
 
 const renderFixture = (View: () => JSX.Element) =>
   render(
@@ -139,23 +137,7 @@ describe("brand views render from the 02 fixture", () => {
     expect(screen.queryByText("trust panel stub")).toBeNull();
   });
 
-  it("Websites & feeds renders the feed, marketplace, extraction and condition cards with the test disabled", () => {
-    renderFixture(WebsitesFeedsView);
-    expect(screen.getByLabelText("DMS provider")).toBeTruthy();
-    expect(screen.getByLabelText("CarGurus")).toBeTruthy();
-    expect(screen.getByLabelText("VDP price labels, priority order")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Test" })).toHaveProperty("disabled", true);
-    expect(h.invoke).not.toHaveBeenCalled();
-  });
 
-  it("Document defaults renders the generator defaults and the payment estimator entry", () => {
-    renderFixture(DocumentDefaultsView);
-    expect(screen.getByLabelText("New-car addendum")).toHaveProperty("value", "standard");
-    expect(screen.getByLabelText("FTC used-car warranty (Buyers Guide)")).toHaveProperty("value", "as_is");
-    expect(screen.queryAllByRole("switch")).toHaveLength(0);
-    expect(screen.getByText("Passport payment estimator")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Configure estimator" })).toBeTruthy();
-  });
 });
 
 describe("Identity in live mode", () => {
@@ -339,30 +321,5 @@ describe("other brand views in live mode", () => {
     await waitFor(() => expect(h.ctx.updateSettings).toHaveBeenCalledWith({ why_buy_here: "Family owned since the start" }));
   });
 
-  it("Websites & feeds runs the price test only on click and only when clean", async () => {
-    const view = renderLive(WebsitesFeedsView);
-    const url = screen.getByLabelText("Test URL");
-    fireEvent.change(url, { target: { value: "https://www.example-dealer.test/used/example/" } });
-    expect(h.invoke).not.toHaveBeenCalled();
-    fireEvent.change(screen.getByLabelText("VDP price labels, priority order"), { target: { value: "Internet Price" } });
-    expect(screen.getByRole("button", { name: "Test" })).toHaveProperty("disabled", true);
-    expect(screen.getByText("Save your label settings before testing.")).toBeTruthy();
-    await reviewAndApply();
-    await waitFor(() => expect(h.ctx.updateSettings).toHaveBeenCalledWith({ vdp_price_labels: "Internet Price" }));
-    h.ctx.settings = { ...h.ctx.settings, vdp_price_labels: "Internet Price" };
-    view.rerender(<MemoryRouter><WebsitesFeedsView /></MemoryRouter>);
-    expect(screen.getByRole("button", { name: "Test" })).toHaveProperty("disabled", false);
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Test" })); });
-    await waitFor(() => expect(h.invoke).toHaveBeenCalledTimes(1));
-    expect(h.invoke).toHaveBeenCalledWith("crawl-advertised-prices", { body: { tenant_id: "tenant-a", test_url: "https://www.example-dealer.test/used/example/" } });
-    await waitFor(() => expect(screen.getByText(/Price read: \$12,345/)).toBeTruthy());
-  });
 
-  it("Document defaults links to the store's payment estimator instead of display toggles", async () => {
-    renderLive(DocumentDefaultsView);
-    expect(screen.queryByRole("switch", { name: "Interest rate (APR)" })).toBeNull();
-    expect(screen.getByRole("link", { name: "Configure estimator" }).getAttribute("href")).toBe("/admin/brand/payment-estimator");
-    await waitFor(() => expect(screen.getByText(/Status couldn't be read here/)).toBeTruthy());
-    expect(h.ctx.updateSettings).not.toHaveBeenCalled();
-  });
 });

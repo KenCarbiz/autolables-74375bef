@@ -12,6 +12,7 @@ export const ADMIN_VIEWS: Readonly<Record<string, LazyExoticComponent<ComponentT
   "why-buy": lazy(() => import("./views/brand/WhyBuyView")),
   "websites-feeds": lazy(() => import("./views/brand/WebsitesFeedsView")),
   "document-defaults": lazy(() => import("./views/brand/DocumentDefaultsView")),
+  "store-settings": lazy(() => import("./views/brand/StoreSettingsView")),
   team: lazy(() => import("./views/people/TeamView")),
   roles: lazy(() => import("./views/people/RolesView")),
   invitations: lazy(() => import("./views/people/InvitationsView")),
