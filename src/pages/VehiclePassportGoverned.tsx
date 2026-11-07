@@ -1579,10 +1579,9 @@ export default function VehiclePassportGoverned() {
                 <ModuleView onView={() => firePhaseE("fuel_economy_viewed", { module_id: "fuel-economy", module_position: 4, available: fuel.available })} dataModule="fuel-economy" className={`${CARD} p-5`}>
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-[14px] font-extrabold" style={{ color: NAVY }}>{FUEL_MODULE_HEADING}</div>
-                    {fuel.available && fuel.source && (() => {
-                      const epaChecked = (listing as unknown as { epa_checked_at?: string }).epa_checked_at;
-                      return <button onClick={() => firePhaseE("epa_methodology_opened")} className="text-[11px] font-semibold inline-flex items-center gap-1" style={{ color: SUB }}><Info className="w-3.5 h-3.5" /> {fuel.source}{epaChecked ? ` · checked ${epaChecked.slice(0, 10)}` : ""}</button>;
-                    })()}
+                    {fuel.available && fuel.source && (
+                      <button onClick={() => firePhaseE("epa_methodology_opened")} className="text-[11px] font-semibold inline-flex items-center gap-1" style={{ color: SUB }}><Info className="w-3.5 h-3.5" /> {fuel.source}{fuel.retrievedLabel ? ` · ${fuel.retrievedLabel}` : ""}</button>
+                    )}
                   </div>
                   {!fuel.available ? (
                     <p className="mt-3 text-[13px]" style={{ color: SUB }}>{fuel.note}</p>

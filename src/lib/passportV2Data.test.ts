@@ -206,7 +206,7 @@ describe("Market verdict basis governance", () => {
 });
 
 describe("EPA figures belong to this car", () => {
-  const lightning = { matchedOption: "2022 Ford F-150 Lightning 4WD — Auto (A1)", city: 76, highway: 61, combined: 68, fuelType: "Electricity", rangeMiles: 230 };
+  const lightning = { vehicleId: 44420, matchedOption: "2022 Ford F-150 Lightning 4WD — Auto (A1)", city: 76, highway: 61, combined: 68, fuelType: "Electricity", rangeMiles: 230 };
   const car = (mc: Record<string, unknown>, epa: unknown, trim = "XLT") =>
     ({ ymm: "2022 Ford F-150", trim, mc_attributes: mc, epa_economy: epa } as unknown as VehicleListing);
 
@@ -220,7 +220,12 @@ describe("EPA figures belong to this car", () => {
   });
 
   it("keeps figures that agree with the car", () => {
-    const ok = { matchedOption: "2022 Ford F150 Pickup 4WD — Auto 10-spd, 6 cyl, 2.7 L, Turbo", city: 19, highway: 24, combined: 21, fuelType: "Regular" };
+    const ok = { vehicleId: 44306, matchedOption: "2022 Ford F150 Pickup 4WD — Auto 10-spd, 6 cyl, 2.7 L, Turbo", city: 19, highway: 24, combined: 21, fuelType: "Regular" };
     expect(derivePassport(car({ powertrain_type: "Combustion", engine: "2.7L V6", drivetrain: "4WD" }, ok)).epa?.combined).toBe(21);
+  });
+
+  it("hides figures that do not name the EPA vehicle record they came from", () => {
+    const untraceable = { matchedOption: "2022 Ford F150 Pickup 4WD — Auto 10-spd, 6 cyl, 2.7 L, Turbo", city: 19, highway: 24, combined: 21, fuelType: "Regular" };
+    expect(derivePassport(car({ powertrain_type: "Combustion", engine: "2.7L V6", drivetrain: "4WD" }, untraceable)).epa).toBeNull();
   });
 });
