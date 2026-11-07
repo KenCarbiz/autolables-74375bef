@@ -62,14 +62,16 @@ export const V3Page = ({ children, className }: { children: ReactNode; className
 
 export const V3Breadcrumbs = ({ crumbs }: { crumbs: AdminCrumb[] }) => (
   <nav aria-label="Breadcrumb" className="text-[14px] leading-[20px] text-adm-muted">
-    <ol className="flex items-center gap-2 flex-wrap">
+    <ol className="flex items-center gap-2 flex-wrap max-sm:flex-nowrap max-sm:overflow-hidden">
       {crumbs.map((c, i) => {
         const last = i === crumbs.length - 1;
+        const hiddenOnMobile = i < crumbs.length - 2;
+        const firstVisibleOnMobile = i === Math.max(0, crumbs.length - 2);
         return (
-          <li key={`${c.label}-${i}`} className="flex items-center gap-2 min-w-0">
-            {i > 0 && <span aria-hidden="true" className="text-adm-muted">/</span>}
+          <li key={`${c.label}-${i}`} className={cn("flex items-center gap-2 min-w-0", hiddenOnMobile && "max-sm:hidden", last && "max-sm:flex-1")}>
+            {i > 0 && <span aria-hidden="true" className={cn("text-adm-muted", firstVisibleOnMobile && "max-sm:hidden")}>/</span>}
             {c.href && !last ? (
-              <Link to={c.href} className="max-sm:inline-flex max-sm:items-center max-sm:min-h-[44px] text-adm-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary rounded-sm">{c.label}</Link>
+              <Link to={c.href} className="max-sm:inline-flex max-sm:items-center max-sm:min-h-[44px] max-sm:max-w-[45vw] max-sm:truncate text-adm-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary rounded-sm">{c.label}</Link>
             ) : (
               <span aria-current={last ? "page" : undefined} className="truncate">{c.label}</span>
             )}

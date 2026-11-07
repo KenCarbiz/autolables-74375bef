@@ -19,7 +19,7 @@ export const BlockedFeatureNotice = ({ migrationId, feature, children, className
         <p className="text-[14px] leading-[20px] text-adm-ink">
           Not saved yet: needs database update <code className="rounded bg-adm-surface border border-adm-divider px-1.5 py-0.5 text-[13px] break-all">{migrationId}</code>
         </p>
-        <p className="text-[13px] leading-[18px] text-adm-muted">The controls below are read-only until that update is applied. Nothing you see here is stored.</p>
+        <p className="text-[13px] leading-[18px] text-adm-muted">Its controls stay read-only until that update is applied. Nothing shown for it is stored.</p>
         {children}
       </div>
     </div>

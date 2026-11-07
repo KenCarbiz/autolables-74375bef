@@ -5,14 +5,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { uploadPhoto } from "@/lib/storage";
 import { AdminButton } from "@/components/admin/v2/primitives";
 import {
-  AdminIcon, AdvancedDisclosure, BlockedFeatureNotice, ColorField, DetailDrawer, FieldRow, INPUT_CLASS, LogoSlot, PreviewOnlyNotice, SectionCard, SelectField, type ReviewChangeRow,
+  AdminIcon, AdvancedDisclosure, ColorField, DetailDrawer, FieldRow, INPUT_CLASS, LogoSlot, PreviewOnlyNotice, SectionCard, SelectField, type ReviewChangeRow,
 } from "@/components/admin/v3/editor";
 import { colorError, contrastRatio, normalizeHex, AA_NORMAL_TEXT, WHITE_HEX } from "@/lib/admin/color";
 import type { DraftErrors, EditorDraftChange } from "@/lib/admin/useEditorDraft";
 import { DEFAULT_ACCENT_HEX } from "./brandModel";
 import { BrandEditorFrame, LoadingState } from "./editor/BrandEditorFrame";
 import { settingsWriter, useBrandEditor, useBrandEditorContext } from "./editor/useBrandEditor";
-import { ConfirmDialog, PreviewFrame, Segmented, SourceLine } from "./editor/parts";
+import { BlockedCard, ConfirmDialog, PreviewFrame, Segmented, SourceLine } from "./editor/parts";
 
 interface AppearanceDraft extends Record<string, unknown> {
   primary_color: string;
@@ -89,7 +89,7 @@ const Surface = ({ dark, kind, accent, secondary, logo, name, logoNote }: { dark
 export default function AppearanceView() {
   const ctx = useBrandEditorContext();
   const { source, settings } = ctx;
-  const { tenant } = useTenant();
+  const { tenant, reload: reloadTenant } = useTenant();
   const [kind, setKind] = useState<Kind>("customer");
   const [fullPreview, setFullPreview] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -112,10 +112,20 @@ export default function AppearanceView() {
     buildPatch: (d, b, changes) => Object.fromEntries(changes.map((c) => [c.key, c.key === "dealer_logo_url" ? d.dealer_logo_url : norm(String(c.after ?? ""))])),
     write: async (patch) => {
       const { secondary_color, ...rest } = patch;
-      if (Object.keys(rest).length) await writeSettings(rest);
+      const hasRest = Object.keys(rest).length > 0;
       if (secondary_color !== undefined) {
         if (source.isFixture || !source.tenantId) throw new Error("This is a design fixture: nothing is saved.");
+        if (!ctx.canWriteProfile) throw new Error("Only an owner or admin can change the secondary colour. Nothing was saved.");
         await writeSecondary(source.tenantId, String(secondary_color));
+        await Promise.resolve(reloadTenant?.());
+      }
+      if (hasRest) {
+        try {
+          await writeSettings(rest);
+        } catch (e) {
+          const why = e instanceof Error ? e.message : "The server did not accept the change.";
+          throw new Error(secondary_color !== undefined ? `The secondary colour was saved, but the other changes were not. ${why}` : why);
+        }
       }
     },
   });
@@ -186,8 +196,9 @@ export default function AppearanceView() {
             <AdminButton variant="secondary" disabled={disabled || draft.primary_color === ""} onClick={() => editor.set("primary_color", "")}>Use the AutoLabels default</AdminButton>
           </div>
           <div className="space-y-2">
-            <ColorField name="Secondary colour" role="Supporting" optional value={draft.secondary_color} disabled={disabled} onChange={(v) => editor.set("secondary_color", v)} />
+            <ColorField name="Secondary colour" role="Supporting" optional value={draft.secondary_color} disabled={disabled || !ctx.canWriteProfile} onChange={(v) => editor.set("secondary_color", v)} />
             <SourceLine>Shared dealer profile (onboarding_profiles.secondary_color).</SourceLine>
+            {!ctx.canWriteProfile && <p className="text-[13px] leading-[18px] text-adm-ink">Read-only for your role. Only an owner or admin can change the shared dealer profile.</p>}
             <p className="text-[13px] leading-[18px] text-adm-muted">The AutoLabels application theme is not set here. Editing this colour does not recolour the application you are using.</p>
           </div>
         </div>
@@ -199,25 +210,25 @@ export default function AppearanceView() {
         </AdvancedDisclosure>
       </SectionCard>
 
-      <SectionCard icon="layers" title="Named palette" description="A list of named brand colours with roles, shared across the AutoLabels family.">
-        <BlockedFeatureNotice migrationId={PALETTE_MIGRATION} feature="Named palette">
-          <p className="text-[13px] leading-[18px] text-adm-muted">Add, edit, remove and reset become available when the update is applied. Until then the primary and secondary colours above are the saved palette.</p>
-        </BlockedFeatureNotice>
-        <fieldset disabled className="rounded-lg border border-adm-divider p-4 space-y-4 opacity-70" aria-label="Palette editor, not available yet">
-          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-start">
-            <FieldRow label="Colour name">{(p) => <input {...p} className={INPUT_CLASS} disabled placeholder="No named colours yet" />}</FieldRow>
+      <BlockedCard
+        icon="layers"
+        title="Named palette"
+        does="Name each brand colour, give it a role (primary, secondary or accent), and add, edit, remove or reset them. Until then the primary and secondary colours above are the saved palette."
+        migrationId={PALETTE_MIGRATION}
+        preview={
+          <>
+            <FieldRow label="Colour name">{(p) => <input {...p} className={INPUT_CLASS} disabled placeholder="Name" />}</FieldRow>
             <FieldRow label="Role">{(p) => <SelectField {...p} disabled><option>Primary, secondary or accent</option></SelectField>}</FieldRow>
-            <div className="flex gap-2 md:pt-7">
+            <div className="flex gap-2 flex-wrap">
               <AdminButton variant="secondary" disabled><AdminIcon name="plus" />Add colour</AdminButton>
               <AdminButton variant="secondary" disabled><AdminIcon name="rotate" />Reset palette</AdminButton>
             </div>
-          </div>
-          <ColorField name="Colour" value="" optional disabled showContrast={false} onChange={() => undefined} />
-        </fieldset>
-      </SectionCard>
+          </>
+        }
+      />
 
       <SectionCard icon="image" title="Logos" description="One logo for each kind of background. Logos are never cropped, stretched or recoloured.">
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2 items-stretch [&>*]:h-full">
           <LogoSlot
             label="Logo for light backgrounds"
             src={draft.dealer_logo_url || null}
@@ -232,10 +243,14 @@ export default function AppearanceView() {
           >
             <SourceLine>Dealer settings (dealer_logo_url), the same file the Identity summary shows.</SourceLine>
           </LogoSlot>
-          <LogoSlot label="Logo for dark backgrounds" surface="dark" disabled guidance="PNG or SVG with a transparent background, up to 2 MB." onSelectFile={() => undefined}>
-            <BlockedFeatureNotice migrationId={PALETTE_MIGRATION} feature="Dark-surface logo" />
-            <p className="text-[13px] leading-[18px] text-adm-muted">Fallback when this is empty: the light-background logo is shown unmodified.</p>
-          </LogoSlot>
+          <BlockedCard
+            icon="moon"
+            title="Logo for dark backgrounds"
+            does="A separate logo for dark surfaces. Until then the light-background logo is shown unmodified as the fallback."
+            migrationId={PALETTE_MIGRATION}
+            className="h-full"
+            preview={<LogoSlot label="Logo for dark backgrounds" surface="dark" disabled guidance="PNG or SVG with a transparent background, up to 2 MB." onSelectFile={() => undefined} />}
+          />
         </div>
       </SectionCard>
 

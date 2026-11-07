@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { ReactNode } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { hasAnyDealerCapability, type DealerRole } from "@/lib/permissions/dealerRoleCapabilities";
 import { useViewFixture } from "@/lib/admin/dataSource";
@@ -25,6 +26,10 @@ export interface BrandEditorContext {
   fixture: BrandBFixture | null;
   fixtureState: FixtureState;
   canEdit: boolean;
+  /** Owner or admin: the roles the shared dealer profile (onboarding_profiles) accepts writes from. */
+  canWriteProfile: boolean;
+  /** Re-reads the dealer settings row from the server. */
+  reload: () => void;
   /** True when the person may change values right now: allowed by role and the settings row was read. */
   editable: boolean;
   /** Why the page cannot save at all, whatever the draft holds. */
@@ -43,12 +48,14 @@ export function useBrandEditorContext(): BrandEditorContext {
   const [search] = useSearchParams();
   const { isAdmin } = useAuth();
   const { member } = useEntitlements();
+  const { reload: reloadSettings } = useDealerSettings();
   const raw = search.get("state") as FixtureState | null;
   const fixtureState: FixtureState = fixture && raw && STATES.includes(raw) ? raw : "default";
   const variant = fixture?.variants?.[fixtureState];
   const settings = useMemo(() => (variant?.settings ? { ...source.settings, ...variant.settings } : source.settings), [source.settings, variant]);
   const role = member?.role as DealerRole | undefined;
   const canEdit = fixture ? fixtureState !== "readonly" : isAdmin || (!!role && hasAnyDealerCapability(role, ["can_manage_settings"]));
+  const canWriteProfile = fixture ? fixtureState !== "readonly" : isAdmin || role === ("owner" as DealerRole) || role === ("admin" as DealerRole);
   const blockedReason = fixture
     ? fixtureState === "error"
       ? "Settings could not be read from the server, so nothing can be saved until they load."
@@ -64,6 +71,8 @@ export function useBrandEditorContext(): BrandEditorContext {
     fixture,
     fixtureState,
     canEdit,
+    canWriteProfile,
+    reload: () => { if (!fixture) void reloadSettings?.(); },
     editable: canEdit && !blockedReason,
     blockedReason,
     settings,
@@ -84,7 +93,9 @@ export interface UseBrandEditorOptions<T extends Record<string, unknown>> {
 }
 
 export function useBrandEditor<T extends Record<string, unknown>>({ ctx, baseline, validate, buildPatch, write, describe }: UseBrandEditorOptions<T>) {
-  const d = useEditorDraft<T>({ scopeKey: ctx.scopeKey, baseline, validate });
+  const [pinned, setPinned] = useState<T | null>(null);
+  const d = useEditorDraft<T>({ scopeKey: ctx.scopeKey, baseline: pinned ?? baseline, validate });
+  useEffect(() => { setPinned(null); }, [ctx.scopeKey]);
   const flow = useSaveFlow(ctx.scopeKey);
   const guard = useLeaveGuard(d.dirty);
   const retry = useRef<{ patch: Record<string, unknown>; draft: T } | null>(null);
@@ -105,18 +116,24 @@ export function useBrandEditor<T extends Record<string, unknown>>({ ctx, baselin
   const barState = deriveDraftBarState({ phase: flow.phase, dirty: d.dirty, changeCount: d.changes.length, firstError, message: flow.message });
   const rows = useMemo(() => d.changes.map(describe), [d.changes, describe]);
 
+  // updateSettings sets local state before the server answers and keeps it when the write is refused. Pinning the
+  // baseline while a write is outstanding keeps the draft dirty, and Discard re-reads the server value.
   const apply = useCallback(
-    (again = false) =>
-      flow.run(async () => {
-        if (!d.draft || !d.baseline) return;
+    async (again = false) => {
+      if (!d.draft || !d.baseline) return false;
+      setPinned((p) => p ?? d.baseline ?? null);
+      const ok = await flow.run(async () => {
         if (!again || !retry.current) {
-          const patch = buildPatch ? buildPatch(d.draft, d.baseline, d.changes) : Object.fromEntries(d.changes.map((c) => [c.key, c.after]));
-          retry.current = { patch, draft: d.draft };
+          const patch = buildPatch ? buildPatch(d.draft as T, d.baseline as T, d.changes) : Object.fromEntries(d.changes.map((c) => [c.key, c.after]));
+          retry.current = { patch, draft: d.draft as T };
         }
         await write(retry.current.patch, retry.current.draft);
         d.markSaved(retry.current.draft);
         retry.current = null;
-      }),
+      });
+      if (ok) setPinned(null);
+      return ok;
+    },
     [flow, d, buildPatch, write],
   );
 
@@ -124,7 +141,11 @@ export function useBrandEditor<T extends Record<string, unknown>>({ ctx, baselin
     retry.current = null;
     d.reset();
     flow.dismiss();
-  }, [d, flow]);
+    if (pinned) {
+      setPinned(null);
+      ctx.reload();
+    }
+  }, [d, flow, pinned, ctx]);
 
   const reviewOpen = flow.phase === "reviewing" || flow.phase === "saving";
   return { ...d, flow, guard, barState, rows, firstError, apply, discard, reviewOpen };

@@ -1,17 +1,30 @@
 import { useId } from "react";
-import { colorError, contrastRatio, DARK_SURFACE_HEX, formatRatio, normalizeHex, AA_NORMAL_TEXT, WHITE_HEX } from "@/lib/admin/color";
+import { colorError, contrastRatio, DARK_SURFACE_HEX, formatRatio, normalizeHex, suggestAccessible, AA_NORMAL_TEXT, WHITE_HEX } from "@/lib/admin/color";
 import { cn } from "@/lib/utils";
 import { AdminIcon } from "./AdminIcon";
 import { INPUT_CLASS } from "./EditorLayout";
 
-const Contrast = ({ hex, against, label }: { hex: string; against: string; label: string }) => {
+const Contrast = ({ hex, against, label, onApply }: { hex: string; against: string; label: string; onApply?: (next: string) => void }) => {
   const ratio = contrastRatio(hex, against);
   const pass = ratio >= AA_NORMAL_TEXT;
+  const suggestion = pass ? null : suggestAccessible(hex, against);
   return (
-    <li className="flex items-center gap-2 text-[13px] leading-[18px]">
-      <AdminIcon name={pass ? "check-circle" : "alert"} size="inline" className={pass ? "text-adm-success" : "text-adm-warning"} />
-      <span className="text-adm-ink">{label}: <span className="tabular-nums">{formatRatio(ratio)}</span></span>
-      <span className={cn("font-semibold", pass ? "text-adm-success" : "text-adm-warning")}>{pass ? "Passes AA" : "Fails AA for body text"}</span>
+    <li className="space-y-1">
+      <div className="flex items-center gap-2 text-[13px] leading-[18px] flex-wrap">
+        <AdminIcon name={pass ? "check-circle" : "alert"} size="inline" className={pass ? "text-adm-success" : "text-adm-warning"} />
+        <span className="text-adm-ink">{label}: <span className="tabular-nums">{formatRatio(ratio)}</span></span>
+        <span className={cn("font-semibold", pass ? "text-adm-success" : "text-adm-warning")}>{pass ? "Passes AA" : "Fails AA for body text"}</span>
+      </div>
+      {suggestion && onApply && (
+        <button
+          type="button"
+          onClick={() => onApply(suggestion)}
+          className="inline-flex items-center gap-2 min-h-[44px] sm:min-h-[32px] rounded-md border border-adm-border bg-adm-surface px-2.5 text-[13px] leading-[18px] font-semibold text-adm-ink hover:bg-adm-workspace focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-adm-primary"
+        >
+          <span aria-hidden="true" className="w-4 h-4 rounded border border-adm-border" style={{ backgroundColor: suggestion }} />
+          Use {suggestion} ({formatRatio(contrastRatio(suggestion, against))} {label.toLowerCase()})
+        </button>
+      )}
     </li>
   );
 };
@@ -86,8 +99,8 @@ export const ColorField = ({
       )}
       {showContrast && normalized && (
         <ul aria-label={`${name} contrast`} className="space-y-0.5">
-          <Contrast hex={normalized} against={WHITE_HEX} label="On white" />
-          <Contrast hex={normalized} against={DARK_SURFACE_HEX} label="On dark surface" />
+          <Contrast hex={normalized} against={WHITE_HEX} label="On white" onApply={disabled ? undefined : onChange} />
+          <Contrast hex={normalized} against={DARK_SURFACE_HEX} label="On dark surface" onApply={disabled ? undefined : onChange} />
         </ul>
       )}
     </div>

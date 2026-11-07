@@ -39,6 +39,8 @@ export const PhotoField = ({
       label={label}
       src={src || null}
       alt={label}
+      emptyLabel="No photo uploaded"
+      plain
       allowedTypes={["image/png", "image/jpeg", "image/webp"]}
       uploading={uploading}
       error={error}
@@ -156,3 +158,38 @@ export function WhyBuyPreview({ draft, dealerName }: { draft: WhyBuyDraft; deale
   );
 }
 
+
+export interface GroupTab { id: string; label: string; count: number | null; issue: boolean }
+
+/** Category navigation: a select on mobile, a sticky tab list from 1024px. */
+export function GroupNav({ tabs, value, onChange }: { tabs: GroupTab[]; value: string; onChange: (id: string) => void }) {
+  return (
+    <div className="lg:sticky lg:top-0 z-10 bg-adm-workspace/95 backdrop-blur lg:py-2 -mx-1 px-1">
+      <div className="lg:hidden">
+        <FieldRow label="Section" htmlFor="why-buy-section">
+          <SelectField id="why-buy-section" value={value} onChange={(e) => onChange(e.target.value)}>
+            {tabs.map((t) => <option key={t.id} value={t.id}>{t.label}{t.count !== null ? ` (${t.count})` : ""}{t.issue ? " - needs attention" : ""}</option>)}
+          </SelectField>
+        </FieldRow>
+      </div>
+      <div role="tablist" aria-label="Why buy sections" className="hidden lg:flex flex-wrap gap-2">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            id={`why-buy-tab-${t.id}`}
+            aria-selected={value === t.id}
+            aria-controls={`why-buy-panel-${t.id}`}
+            onClick={() => onChange(t.id)}
+            className={`inline-flex items-center gap-2 min-h-[40px] px-3.5 rounded-lg border text-[14px] leading-[20px] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary ${value === t.id ? "bg-adm-surface border-adm-primary text-adm-primary" : "bg-adm-surface border-adm-divider text-adm-ink hover:bg-adm-workspace"}`}
+          >
+            {t.label}
+            {t.count !== null && <span className="rounded-full bg-adm-workspace px-2 text-[13px] leading-[20px] text-adm-muted">{t.count}</span>}
+            {t.issue && <AdminIcon name="alert" size="inline" className="text-adm-danger" label="Needs attention" />}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}

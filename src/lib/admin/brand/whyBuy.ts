@@ -48,8 +48,9 @@ export const FLAT_KEYS = [
 
 export const EMPTY_REPUTATION: Reputation = { googleAsOf: "", bbbAsOf: "", satisfactionSource: "", satisfactionAsOf: "" };
 
-type Settings = Pick<DealerSettings, (typeof FLAT_KEYS)[number] | "dealer_review_sources" | "dealer_certifications" | "dealer_amenities" | "dealer_services" | "iihs_awards_enabled" | "iihs_awards"> & { why_buy_profile?: unknown };
+type Settings = Pick<DealerSettings, (typeof FLAT_KEYS)[number] | "dealer_review_sources" | "dealer_certifications" | "dealer_amenities" | "dealer_services" | "iihs_awards_enabled" | "iihs_awards"> & { why_buy_profile?: unknown; google_rating_synced_at?: unknown };
 
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const str = (v: unknown): string => (typeof v === "string" ? v : "");
 const list = (raw: string): string[] => raw.split(",").map((s) => s.trim()).filter(Boolean);
 
@@ -100,13 +101,15 @@ export function readWhyBuy(settings: Settings): WhyBuyDraft {
     return { id: hit?.id ?? `award-${i + 1}`, name, issuer: hit?.issuer ?? "" };
   });
   const rep = profile?.reputation ?? EMPTY_REPUTATION;
+  const synced = str(settings.google_rating_synced_at).slice(0, 10);
+  const googleAsOf = DATE.test(synced) && synced > rep.googleAsOf ? synced : rep.googleAsOf;
   const draft = {
     reviews,
     awards,
     services: list(str(settings.dealer_services)),
     amenities: list(str(settings.dealer_amenities)),
     reputation: {
-      googleAsOf: str(settings.dealer_google_rating) || str(settings.dealer_google_count) ? rep.googleAsOf : "",
+      googleAsOf: str(settings.dealer_google_rating) || str(settings.dealer_google_count) ? googleAsOf : "",
       bbbAsOf: str(settings.dealer_bbb_rating) ? rep.bbbAsOf : "",
       satisfactionSource: str(settings.dealer_satisfaction) ? rep.satisfactionSource : "",
       satisfactionAsOf: str(settings.dealer_satisfaction) ? rep.satisfactionAsOf : "",
@@ -142,7 +145,6 @@ export function buildWhyBuyPatch(draft: WhyBuyDraft, baseline: WhyBuyDraft): Rec
   return patch;
 }
 
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const URLISH = /^https?:\/\/[^\s]+\.[^\s]+$/i;
 
 export function isPastOrToday(iso: string, today: string): boolean {

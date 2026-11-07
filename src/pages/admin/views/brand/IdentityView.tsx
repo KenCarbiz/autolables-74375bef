@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AdminIcon, BlockedFeatureNotice, FieldRow, INPUT_CLASS, SectionCard, SelectField, StatusBadge, type ReviewChangeRow } from "@/components/admin/v3/editor";
+import { AdminIcon, FieldRow, INPUT_CLASS, SectionCard, SelectField, StatusBadge, type ReviewChangeRow } from "@/components/admin/v3/editor";
 import { adminTabHref } from "@/lib/admin/sections";
 import type { EditorDraftChange } from "@/lib/admin/useEditorDraft";
 import type { DraftErrors } from "@/lib/admin/useEditorDraft";
@@ -10,7 +10,7 @@ import wordmarkReverse from "@/assets/admin-v2/brand/wordmark-reverse.svg";
 import { US_STATES, contactReadiness, fieldLabel, headerPreview } from "./brandModel";
 import { BrandEditorFrame, LoadingState } from "./editor/BrandEditorFrame";
 import { settingsWriter, useBrandEditor, useBrandEditorContext } from "./editor/useBrandEditor";
-import { EditLink, OwnedValue, PreviewFrame, ReadinessList, Segmented, SourceLine, type ReadinessItem } from "./editor/parts";
+import { BlockedCard, EditLink, OwnedValue, PreviewFrame, ReadinessList, Segmented, SourceLine, type ReadinessItem } from "./editor/parts";
 import { useRooftops } from "./editor/useRooftops";
 
 interface IdentityDraft extends Record<string, unknown> {
@@ -93,11 +93,10 @@ export default function IdentityView() {
             <Segmented label="Preview surface" value={kind} onChange={setKind} options={[{ value: "header", label: "App header" }, { value: "document", label: "Document" }, { value: "passport", label: "Passport" }]} />
             {kind === "header" && (
               <div>
-                <div className="rounded-lg bg-adm-sidebar px-5 py-4 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-5 min-h-[88px]" aria-label="Application header preview">
+                <div className="rounded-lg bg-adm-sidebar px-5 py-4 flex flex-col items-start gap-2 min-h-[88px]" aria-label="Application header preview">
                   <img src={wordmarkReverse} alt="AutoLabels" className="h-[21px] w-auto flex-shrink-0" />
-                  <span className="h-px w-10 sm:h-10 sm:w-px bg-white/25 flex-shrink-0" aria-hidden="true" />
-                  <div className="min-w-0 text-white">
-                    <p className="text-[18px] leading-[24px] font-semibold break-words" data-parity="dealer-identity">{preview.name || "Dealership name"}</p>
+                  <div className="min-w-0 w-full text-white">
+                    <p className="text-[18px] leading-[24px] font-semibold break-words" title={preview.name} data-parity="dealer-identity">{preview.name || "Dealership name"}</p>
                     <p className="text-[14px] leading-[20px] text-white/80 break-words" data-parity="dealer-identity">{preview.location || "City, State"}</p>
                   </div>
                 </div>
@@ -144,13 +143,16 @@ export default function IdentityView() {
       }
     >
       <SectionCard icon="building" title="Names" description="The legal name and the public name are different values with different owners.">
-        <FieldRow label="Legal name" help={<SourceLine>Shared dealer profile (onboarding_profiles.legal_name). Used on legal and compliance documents once stored.</SourceLine>}>
-          {(p) => <input {...p} className={INPUT_CLASS} value="" placeholder="Not stored yet" disabled readOnly />}
-        </FieldRow>
-        <BlockedFeatureNotice migrationId={LEGAL_NAME_MIGRATION} feature="Legal name" />
         <FieldRow label="Public display name" required error={errors.dealer_name} help={<SourceLine>Dealer settings (dealer_name), saved once for the account. Printed on documents, stickers and the Passport header.</SourceLine>}>
           {(p) => <input {...p} className={INPUT_CLASS} value={draft.dealer_name} disabled={disabled} autoComplete="organization" onChange={(e) => editor.set("dealer_name", e.target.value)} />}
         </FieldRow>
+        <BlockedCard
+          icon="shield"
+          title="Legal name"
+          does="Stores the registered business name separately from the public name, for legal and compliance documents. It lives in the shared dealer profile."
+          migrationId={LEGAL_NAME_MIGRATION}
+          preview={<FieldRow label="Legal name">{(p) => <input {...p} className={INPUT_CLASS} value="" placeholder="Not stored yet" disabled readOnly />}</FieldRow>}
+        />
       </SectionCard>
 
       <SectionCard icon="layers" title="Group and rooftop" description="These come from the account and Store settings. They are shown here so you can see what each surface reads, and they are not edited on this page.">
@@ -204,10 +206,10 @@ export default function IdentityView() {
             </SelectField>
           )}
         </FieldRow>
-        <p className="text-[14px] leading-[20px] text-adm-muted">
-          Street address, ZIP, phone and website are edited on <EditLink to={adminTabHref("hours-contact")}>Hours & Contact</EditLink>
-          {draft.dealer_state ? <> The state shown on documents is {STATE_NAME(draft.dealer_state)}.</> : null}
-        </p>
+        <div className="space-y-1">
+          <p className="text-[14px] leading-[20px] text-adm-muted">Street address, ZIP, phone and website are edited on one page.{draft.dealer_state ? ` The state shown on documents is ${STATE_NAME(draft.dealer_state)}.` : ""}</p>
+          <EditLink to={adminTabHref("hours-contact")}>Open Hours & Contact</EditLink>
+        </div>
       </SectionCard>
 
       <SectionCard icon="image" title="Logo and colours" description="A summary only. Logos and colours have one editor, on Appearance.">
