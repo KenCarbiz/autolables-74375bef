@@ -84,8 +84,9 @@ describe("ServicePolicyView", () => {
     renderView();
     expect(screen.getByRole("button", { name: "Review policy changes" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Discard changes" })).toBeDisabled();
-    expect(screen.getByDisplayValue("Example Reconditioning")).toBeInTheDocument();
-    expect(screen.getAllByText("Saves automatically")).toHaveLength(2);
+    expect(screen.getByText(/1 service configured/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open service catalog" })).toHaveAttribute("href", "/admin/documents/service-catalog");
+    expect(screen.getAllByText("Saves automatically")).toHaveLength(1);
     expect(mocks.updateSettings).not.toHaveBeenCalled();
     expect(mocks.log).not.toHaveBeenCalled();
   });

@@ -50,6 +50,7 @@ const StickerTestLabel = () => {
   }, [payload, cal]);
 
   if (!payload) return null;
+  const manualPrint = payload.autoprint === false;
   const paper = PAPER[payload.size];
   const dark = cal.labelMode === "black";
   const ink = dark ? "#f5f7fa" : "#0f172a";
@@ -59,6 +60,13 @@ const StickerTestLabel = () => {
 
   return (
     <div className="min-h-screen flex items-start justify-center p-0" style={{ background: dark ? "#1f2937" : "#ffffff" }}>
+      {manualPrint && (
+        <div className="print:hidden fixed top-3 right-3 z-10 max-w-xs rounded-lg border border-slate-300 bg-white p-3 text-slate-900 shadow-lg" style={{ fontSize: 14, lineHeight: "20px" }}>
+          <p style={{ fontWeight: 600 }}>Test sheet</p>
+          <p style={{ marginTop: 4 }}>In the print dialog choose the same printer, set Scale to Actual size (100%), and turn off Headers and footers.</p>
+          <button type="button" onClick={() => window.print()} className="mt-3 min-h-[44px] w-full rounded-md bg-blue-700 px-4 font-semibold text-white">Print this sheet</button>
+        </div>
+      )}
       <div
         className="sticker-print-sheet"
         style={{ position: "relative", width: `${paper.widthIn}in`, height: `${paper.heightIn}in`, background: sheetBg, color: ink }}

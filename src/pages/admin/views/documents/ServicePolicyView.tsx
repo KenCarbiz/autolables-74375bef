@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
-import { Plus, X } from "lucide-react";
-import { useDealerSettings, type DealerSettings, type GetReadyService } from "@/contexts/DealerSettingsContext";
+import { useDealerSettings, type DealerSettings } from "@/contexts/DealerSettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
+import { ADMIN_CHILD_ROUTES } from "@/lib/admin/sections";
 import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import { useViewFixture } from "@/lib/admin/dataSource";
 import {
@@ -15,23 +15,20 @@ import {
   type ServicePolicy,
   type ServicePolicyKey,
 } from "@/lib/admin/documentPolicy";
-import { AdminButton, AdminCard, InlineNote } from "@/components/admin/v2/primitives";
+import { AdminButton, AdminCard, AdminLinkButton, InlineNote } from "@/components/admin/v2/primitives";
 import { cn } from "@/lib/utils";
 import { PendingChip, SettingsReviewDialog, useSettingsReview, type ImpactFixture } from "./SettingsReviewApply";
 import { FIELD_LABEL, INPUT_CLASS, SaveStatus, TEXTAREA_CLASS, ToggleRow, useInstantSettings, usePanelAnchor } from "./controls";
 
 // Service policy: the customer-signing gates, technician sign-off rules and
 // recon approval go through one Review & Apply over merge_dealer_settings
-// (the server protects the K-208 keys by role and audits them). The service
-// catalog and title/MCO routing are operational copy and save instantly with
-// a visible status.
+// (the server protects the K-208 keys by role and audits them). Title/MCO routing is operational copy and saves instantly with a visible
+// status. The service catalog moved to its own child view.
 
 export interface ServicePolicyFixture {
   policy: ServicePolicy;
   impact: ImpactFixture;
 }
-
-const emptyService = (): GetReadyService => ({ name: "", responsible_name: "", responsible_email: "", cost: "" });
 
 export default function ServicePolicyView() {
   const fixture = useViewFixture<ServicePolicyFixture>("service-policy");
@@ -55,9 +52,7 @@ export default function ServicePolicyView() {
   const d = review.draft;
   const set = <K extends ServicePolicyKey>(key: K, value: ServicePolicy[K]) => review.edit((x) => ({ ...x, [key]: value }));
 
-  const catalog = useInstantSettings((s) => ({ get_ready_services: (s.get_ready_services ?? []).map((x) => ({ ...x })) }), { toastId: "getready-services" });
-  const services = catalog.draft.get_ready_services ?? [];
-  const setServices = (next: GetReadyService[]) => catalog.patch({ get_ready_services: next });
+  const services = settings.get_ready_services ?? [];
 
   const title = useInstantSettings(
     (s) => ({
@@ -190,29 +185,11 @@ export default function ServicePolicyView() {
             id="getready-catalog"
             title="Get-Ready service catalog"
             description="Internal services you can add to any Get-Ready, routed to a responsible party. Never billed to the buyer."
-            action={<SaveStatus status={catalog.status} />}
+            action={<AdminLinkButton to={ADMIN_CHILD_ROUTES.serviceCatalog} variant="outline">Open service catalog</AdminLinkButton>}
           >
-            {services.length === 0 ? (
-              <p className="text-[13px] leading-[18px] text-adm-muted">No services configured. Add reconditioning, emissions, key cut and similar work.</p>
-            ) : (
-              <div className="space-y-2">
-                {services.map((s, i) => (
-                  <div key={i} className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr_1.4fr_0.7fr_auto] gap-2">
-                    <input aria-label={`Service ${i + 1} name`} value={s.name} disabled={!canEditOps} onChange={(e) => setServices(services.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} placeholder="Service (e.g. Reconditioning)" className={INPUT_CLASS} />
-                    <input aria-label={`Service ${i + 1} responsible`} value={s.responsible_name} disabled={!canEditOps} onChange={(e) => setServices(services.map((x, j) => (j === i ? { ...x, responsible_name: e.target.value } : x)))} placeholder="Responsible (Service Dept.)" className={INPUT_CLASS} />
-                    <input aria-label={`Service ${i + 1} email`} type="email" value={s.responsible_email} disabled={!canEditOps} onChange={(e) => setServices(services.map((x, j) => (j === i ? { ...x, responsible_email: e.target.value } : x)))} placeholder="responsible@dealership.example" className={INPUT_CLASS} />
-                    <input aria-label={`Service ${i + 1} cost`} value={s.cost} disabled={!canEditOps} onChange={(e) => setServices(services.map((x, j) => (j === i ? { ...x, cost: e.target.value } : x)))} placeholder="$ cost" className={INPUT_CLASS} />
-                    <AdminButton size="sm" aria-label={`Remove service ${i + 1}`} disabled={!canEditOps} onClick={() => setServices(services.filter((_, j) => j !== i))}>
-                      <X className="w-4 h-4" aria-hidden="true" />
-                    </AdminButton>
-                  </div>
-                ))}
-              </div>
-            )}
-            <AdminButton size="sm" className="mt-3" disabled={!canEditOps} onClick={() => setServices([...services, emptyService()])}>
-              <Plus className="w-4 h-4" aria-hidden="true" />
-              Add service
-            </AdminButton>
+            <p className="text-[13px] leading-[18px] text-adm-muted">
+              {services.length === 0 ? "No services configured." : services.length === 1 ? "1 service configured." : `${services.length} services configured.`} Add, edit or remove services, and see who each is assigned to, in the catalog.
+            </p>
           </AdminCard>
         </div>
 
