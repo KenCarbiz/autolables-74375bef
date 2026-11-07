@@ -676,6 +676,14 @@ async function orchestrateVehicle(
       };
     }
     const { appliedOverride, canonicalOemId, profileFamily, theme, reconciliation } = genPlan;
+    const templateRouting = genPlan.templateRouting;
+    if (templateRouting.flags.length) {
+      await audit(admin, tenantId, "factory_sticker.template_routing_flag", record.id, {
+        vin, flags: templateRouting.flags, status: templateRouting.status,
+        candidates: templateRouting.candidates, reasons: templateRouting.reasons,
+        matched_template: templateRouting.template?.id ?? null,
+      });
+    }
     if (genPlan.overrideDiscarded) {
       await audit(admin, tenantId, "factory_sticker.template_override_discarded", record.id, {
         vin, requested: genPlan.overrideDiscarded.requested, reason: genPlan.overrideDiscarded.reason,

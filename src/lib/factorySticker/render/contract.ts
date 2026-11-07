@@ -22,7 +22,12 @@ import {
   type ClassifiedItem, type EquipmentLine, type EquipmentSelectionBase,
 } from "../equipmentSelection.ts";
 import { resolveReferenceVariant } from "../oem/referenceVariants.ts";
-import { VARIANT_LAYOUTS, type VariantLayoutBuilder, type VariantRenderInput } from "./variants/index.ts";
+import { withCatalogEquipment } from "./catalogEquipment.ts";
+import { withCatalogEpaGuard, withCatalogNeovin } from "./catalogNeovin.ts";
+import { CATALOG_LAYOUTS, VARIANT_LAYOUTS, type VariantLayoutBuilder, type VariantRenderInput } from "./variants/index.ts";
+import {
+  getCatalogTemplate, resolveCatalogTemplate, type CatalogResolution, type CatalogTemplate,
+} from "../oem/templateCatalog.ts";
 import { getTheme, type OemStickerTheme } from "../oem/themes.ts";
 import { resolveThemeProfile, type ResolvedThemeProfile } from "../oem/profiles.ts";
 import {
@@ -138,6 +143,8 @@ export interface FactoryStickerRenderData {
     portOptionsTotal?: number | null;
     /** Federal gas-guzzler tax; only when applicable and on the source record. */
     gasGuzzlerTax?: number | null;
+    /** Manufacturer-labeled import costs; only when on the source price record. */
+    importCharge?: number | null;
   };
   packages: Array<{ name: string; code: string | null; msrp: number | null; contents: string[] }>;
   options: Array<{
@@ -161,6 +168,8 @@ export interface FactoryStickerRenderData {
   /** Powertrain identity for the spec grid; optional for older payloads. */
   mechanical?: { engine: string | null; transmission: string | null; drivetrain: string | null };
   stockNumber?: string | null;
+  /** Body style from the record (mc_attributes.body_type); used only to match catalog templates. */
+  bodyClass?: string | null;
   transportMethod?: string | null;
   /** Factory administrative codes for the Monroney top strip. */
   factoryCodes?: {
@@ -180,6 +189,11 @@ export interface FactoryStickerRenderData {
     fuelType: string | null;
     smogScore?: number | null;
     gasCombinedMpg?: number | null;
+    combinedMpge?: number | null;
+    kwhPer100Miles?: number | null;
+    chargeTimeHours?: number | null;
+    electricRangeMiles?: number | null;
+    totalRangeMiles?: number | null;
     gallonsPer100Miles?: number | null;
     co2TailpipeGpm?: number | null;
     /** Positive = saves vs average new vehicle over 5 years; negative = spends more. */
@@ -194,10 +208,20 @@ export interface FactoryStickerRenderData {
     sideFront: number | null;
     sideRear: number | null;
     rollover: number | null;
+    /** Combined category values when the source gives one frontal and one side rating. */
+    frontal?: number | null;
+    side?: number | null;
+    /** Ratings read from NHTSA rows in the NeoVIN decode: an absent category is Not Available. */
+    fromDecode?: boolean;
   } | null;
   /** Tested-but-unrated / not-applicable NHTSA state. Renders the honest
    *  not-rated panel; stars are never fabricated to fill it. */
   nhtsaNotRated?: boolean;
+  /**
+   * NeoVIN decode facts that only catalog templates read (see catalogNeovin.ts).
+   * Set only for makes that have catalog templates, so other makes' data is unchanged.
+   */
+  neovin?: { ratingMetadata: string[]; madeIn: string | null; /** Present only when the decode states a diesel fuel; the catalog matcher's fuel evidence when there is no EPA match. */ fuelType?: string; /** Set only when the saved EPA match contradicts the decode: "powertrain", "drivetrain" or "engine" (storedEpaConflict). */ epaConflict?: string; /** Set only when the decode states a full hybrid powertrain (HEV); a hybrid saved under a gasoline EPA fuel name is never plain gasoline for catalog matching. */ hybridDecode?: true };
   /** Which dealer the block describes. Only a proven original selling or
    *  delivery dealer may print; the current listing rooftop never does. */
   dealerRole?: "original_delivery" | null;
@@ -307,7 +331,7 @@ function reconcile(pricing: FactoryStickerRenderData["pricing"]): {
   if (pricing.baseMsrp === null) return { calculated: undefined, status: "INSUFFICIENT_DATA" };
   const calculated = pricing.baseMsrp + (pricing.optionsTotal ?? 0) +
     (pricing.portOptionsTotal ?? 0) + (pricing.destinationCharge ?? 0) +
-    (pricing.gasGuzzlerTax ?? 0);
+    (pricing.gasGuzzlerTax ?? 0) + (pricing.importCharge ?? 0);
   if (pricing.totalMsrp === null) return { calculated, status: "INSUFFICIENT_DATA" };
   const diff = Math.abs(calculated - pricing.totalMsrp);
   const status: ReconciliationStatus =
@@ -359,7 +383,7 @@ export function adaptRenderData(d: FactoryStickerRenderData): StickerLayoutInput
       ...opt("exteriorColorCode", d.colors.exterior.code),
       ...opt("interiorColor", d.colors.interior.name),
       ...opt("interiorColorCode", d.colors.interior.code),
-      ...opt("fuelType", d.epa?.fuelType ?? null),
+      ...opt("fuelType", d.epa?.fuelType ?? d.neovin?.fuelType ?? null),
       ...opt("engine", d.mechanical?.engine ?? null),
       ...opt("transmission", d.mechanical?.transmission ?? null),
       ...opt("drivetrain", d.mechanical?.drivetrain ?? null),
@@ -377,6 +401,7 @@ export function adaptRenderData(d: FactoryStickerRenderData): StickerLayoutInput
       ...opt("factoryInstalledTotal", d.pricing.optionsTotal),
       ...opt("portOptionsTotal", d.pricing.portOptionsTotal ?? null),
       ...opt("gasGuzzlerTax", d.pricing.gasGuzzlerTax ?? null),
+      ...opt("importCharge", d.pricing.importCharge ?? null),
       ...opt("destinationCharge", d.pricing.destinationCharge),
       ...opt("calculatedTotalMsrp", calculated),
       ...opt("sourceReportedTotalMsrp", d.pricing.totalMsrp),
@@ -394,6 +419,11 @@ export function adaptRenderData(d: FactoryStickerRenderData): StickerLayoutInput
             ...opt("smogRating", d.epa.smogScore ?? null),
             ...opt("evRangeMiles", d.epa.rangeMiles),
             ...opt("gasolineCombinedMpg", d.epa.gasCombinedMpg ?? null),
+            ...opt("combinedMpge", d.epa.combinedMpge ?? null),
+            ...opt("kwhPer100Miles", d.epa.kwhPer100Miles ?? null),
+            ...opt("chargeTimeHours", d.epa.chargeTimeHours ?? null),
+            ...opt("electricRangeMiles", d.epa.electricRangeMiles ?? null),
+            ...opt("totalRangeMiles", d.epa.totalRangeMiles ?? null),
             ...opt("gallonsPer100Miles", d.epa.gallonsPer100Miles ?? null),
             ...opt("co2TailpipeGpm", d.epa.co2TailpipeGpm ?? null),
             ...opt("fiveYearCostDifference", d.epa.fiveYearCostDifference ?? null),
@@ -409,6 +439,9 @@ export function adaptRenderData(d: FactoryStickerRenderData): StickerLayoutInput
             ...opt("sideFrontRating", d.safety.sideFront),
             ...opt("sideRearRating", d.safety.sideRear),
             ...opt("rolloverRating", d.safety.rollover),
+            ...opt("frontalRating", d.safety.frontal ?? null),
+            ...opt("sideRating", d.safety.side ?? null),
+            ...(d.safety.fromDecode ? { nhtsaDecodeOnly: true } : {}),
           }
         : d.nhtsaNotRated
           ? { nhtsaStatus: "NOT_RATED" as const }
@@ -583,13 +616,26 @@ function withLines(input: StickerLayoutInput, lines: EquipmentLine[], note: bool
 const masterGroups = (groups: StandardEquipmentGroup[]): Array<{ hint: string; items: string[] }> =>
   groups.map((g) => ({ hint: CATEGORY_MASTER_HINT[g.category], items: g.items }));
 
+export interface BuildRenderOptions {
+  /**
+   * Explicit sample render of one catalog template, for owner review and
+   * tests. It ignores approval but never production routing: the automatic
+   * path never passes it.
+   */
+  sampleTemplateId?: string;
+}
+
 export function buildRenderLayout(
   data: FactoryStickerRenderData,
   theme: FactoryStickerTheme,
   policy: EquipmentScopePolicy = EQUIPMENT_SCOPE_POLICY,
+  options: BuildRenderOptions = {},
 ): LayoutModel {
-  const input = adaptRenderData(data);
-  const route = resolveVariantRoute(data, theme, input);
+  const baseInput = adaptRenderData(data);
+  const route = resolveVariantRoute(data, theme, baseInput, options.sampleTemplateId ?? null);
+  const isCatalog = !!route && !!CATALOG_LAYOUTS[route.variantKey];
+  if (isCatalog) data = withCatalogEpaGuard(withCatalogNeovin(withCatalogEquipment(data, route!.variantKey)));
+  const input = isCatalog ? adaptRenderData(data) : baseInput;
   const genericTheme = resolveRenderTheme(data, theme);
   const base = equipmentBase(data);
   const displayMake = data.identity.make.trim().toUpperCase() === "INFINITI" ? "INFINITI" : titleCase(data.identity.make);
@@ -681,7 +727,17 @@ function resolveVariantRoute(
   data: FactoryStickerRenderData,
   theme: FactoryStickerTheme,
   input: StickerLayoutInput,
+  sampleTemplateId: string | null = null,
 ): VariantRoute | null {
+  if (sampleTemplateId) {
+    const build = CATALOG_LAYOUTS[sampleTemplateId];
+    const masterKey = getCatalogTemplate(sampleTemplateId)?.existingMasterKey;
+    if (masterKey && build) {
+      const production = resolveVariantRoute(data, theme, input);
+      return { variantKey: masterKey, masterRouted: production?.variantKey === masterKey ? production.masterRouted : true, build };
+    }
+    return build && getCatalogTemplate(sampleTemplateId) ? { variantKey: sampleTemplateId, masterRouted: true, build } : null;
+  }
   if (String(theme.templateOverrideKey ?? "").trim()) return null;
   const year = Number(data.identity.year);
   const match = resolveReferenceVariant({
@@ -695,12 +751,72 @@ function resolveVariantRoute(
   const exact = match.status === "matched" && match.rendering === "variant_layout" && !!match.variant;
   const master = exact ? null : masterFor(data);
   if (exact && MASTER_APPROVAL[match.variant!.key] !== "approved") return null;
+  if (!exact && !master && !input.generic) {
+    const resolved = catalogResolutionFor(data);
+    const build = resolved.template ? CATALOG_LAYOUTS[resolved.template.id] : undefined;
+    return resolved.status === "approved_match" && resolved.template && build
+      ? { variantKey: resolved.template.id, masterRouted: true, build } : null;
+  }
   if (!exact && (!master || input.generic)) return null;
   const variantKey = exact ? match.variant!.key : master!.variantKey;
   const build = VARIANT_LAYOUTS[variantKey];
   if (!build) return null;
   return { variantKey, masterRouted: !exact, build };
 }
+
+/** The layout production routing picks for this record: a variant or catalog key, or null for the generic layout. */
+export function productionLayoutKey(data: FactoryStickerRenderData, theme: FactoryStickerTheme): string | null {
+  return resolveVariantRoute(data, theme, adaptRenderData(data))?.variantKey ?? null;
+}
+
+export function catalogResolutionFor(data: FactoryStickerRenderData): CatalogResolution {
+  const year = Number(data.identity.year);
+  return resolveCatalogTemplate({
+    make: data.identity.make,
+    modelYear: Number.isFinite(year) ? year : null,
+    model: data.identity.model,
+    trim: data.identity.trim,
+    bodyClass: data.bodyClass ?? null,
+    fuelClass: catalogFuelClass(data),
+    drivetrain: data.mechanical?.drivetrain ?? null,
+  });
+}
+
+function catalogFuelClass(data: FactoryStickerRenderData): ReturnType<typeof fuelClassOf> {
+  const base = catalogFuelClassOf((data.neovin?.epaConflict ? null : data.epa?.fuelType) ?? data.neovin?.fuelType);
+  return data.neovin?.hybridDecode && (base === "gasoline" || base === null) ? "hybrid" : base;
+}
+
+/** EPA names a plug-in hybrid "Gasoline and Electricity"; for catalog matching that is never plain gasoline. */
+function catalogFuelClassOf(fuelType: string | null | undefined): ReturnType<typeof fuelClassOf> {
+  const text = String(fuelType ?? "");
+  if (/electric/i.test(text) && /gas|premium|regular|unleaded|e85|petrol|diesel/i.test(text) && !/hybrid/i.test(text)) return "phev";
+  return fuelClassOf(fuelType);
+}
+
+/**
+ * Recorded template-routing facts for one vehicle: which catalog template
+ * (if any) matches, and the flags to persist. A vehicle already served by an
+ * approved master or reference variant carries no flag: its routing is
+ * unchanged and complete. Rendering never depends on the flags.
+ */
+export function templateRoutingFacts(data: FactoryStickerRenderData): CatalogResolution & { servedByApprovedMaster: boolean } {
+  const catalog = catalogResolutionFor(data);
+  const year = Number(data.identity.year);
+  const exact = resolveReferenceVariant({
+    make: data.identity.make, modelYear: Number.isFinite(year) ? year : null, model: data.identity.model,
+    trim: data.identity.trim, drivetrain: data.mechanical?.drivetrain ?? null, fuelType: data.epa?.fuelType ?? null,
+  });
+  const servedByApprovedMaster = !data.generic && (
+    (exact.status === "matched" && exact.rendering === "variant_layout" && !!exact.variant &&
+      MASTER_APPROVAL[exact.variant.key] === "approved") || masterFor(data) !== null
+  );
+  if (servedByApprovedMaster) return { ...catalog, flags: [], servedByApprovedMaster };
+  const conflict = data.neovin?.epaConflict && catalog.status !== "no_catalog_for_make";
+  return { ...catalog, flags: conflict ? [...catalog.flags, "epa_match_conflict"] : catalog.flags, servedByApprovedMaster };
+}
+
+export type { CatalogTemplate };
 
 function titleCase(s: string): string {
   return s.trim().toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase());

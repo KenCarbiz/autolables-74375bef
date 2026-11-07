@@ -16,7 +16,10 @@ import {
   type OemTemplateSelectionResult, type TemplateOverrideOption,
 } from "./oem/selection.ts";
 import { resolveReferenceVariant, type ReferenceVariantResolution } from "./oem/referenceVariants.ts";
-import { resolveRenderProfile, type FactoryStickerRenderData, type FactoryStickerTheme } from "./render/contract.ts";
+import { resolveRenderProfile, templateRoutingFacts, type FactoryStickerRenderData, type FactoryStickerTheme } from "./render/contract.ts";
+import { withCatalogEquipment } from "./render/catalogEquipment.ts";
+import { withCatalogEpaGuard } from "./render/catalogNeovin.ts";
+import type { CatalogResolution } from "./oem/templateCatalog.ts";
 import { fitOk } from "./render/layout.ts";
 import { checkRenderedCompleteness, type CompletenessReport } from "./render/completeness.ts";
 import type { ResolvedThemeProfile } from "./oem/profiles.ts";
@@ -29,6 +32,8 @@ export interface NormalizedForPlan {
   destinationCharge: number | null;
   optionsTotal: number | null;
   statedTotalMsrp: number | null;
+  /** Decoded options not proven on this VIN; any one holds the document for review. */
+  unverifiedOptions?: string[];
 }
 
 export interface StoredTemplateOverride {
@@ -81,6 +86,8 @@ export type GenerationPlan =
     profileFamily: string;
     theme: FactoryStickerTheme;
     reconciliation: MsrpReconciliation;
+    /** Catalog template match and flags for the audit trail; rendering never reads it. */
+    templateRouting: CatalogResolution & { servedByApprovedMaster: boolean };
   };
 
 export function planGeneration(input: GenerationPlanInput): GenerationPlan {
@@ -170,6 +177,7 @@ export function planGeneration(input: GenerationPlanInput): GenerationPlan {
     kind: "ready", eligibility, selection, referenceVariant, storedOverride,
     overrideDiscarded, appliedOverride, make, canonicalOemId, profile,
     profileFamily, theme, reconciliation,
+    templateRouting: templateRoutingFacts(normalized.data),
   };
 }
 
@@ -216,7 +224,9 @@ export function assessRenderedSticker(input: {
     : { pass: true, code: "OK" as const, reasons: [] };
   // Fit is never trusted. The manifest states everything the document is
   // required to print and the render is checked against it.
-  const completeness = checkRenderedCompleteness(normalized.data, {
+  const completenessData = plan.templateRouting.status === "approved_match" && !plan.templateRouting.servedByApprovedMaster
+    ? withCatalogEpaGuard(withCatalogEquipment(normalized.data)) : normalized.data;
+  const completeness = checkRenderedCompleteness(completenessData, {
     width: Number(layout.widthPt ?? 0),
     height: Number(layout.heightPt ?? 0),
     mode: "STANDARD",
@@ -257,6 +267,9 @@ export function assessRenderedSticker(input: {
     completeness,
     geometry,
     onePageFit: layout.fit ? { ok: layout.fit.ok, detail: layout.fit.detail ?? "" } : { ok: true, detail: "" },
+    unverifiedOptions: normalized.unverifiedOptions ?? [],
+    epaAvailable: completenessData.epa != null,
+    epaConflict: normalized.data.neovin?.epaConflict ?? null,
   });
   return {
     qaChecks,

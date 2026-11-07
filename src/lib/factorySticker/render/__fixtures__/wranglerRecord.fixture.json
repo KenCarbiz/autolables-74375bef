@@ -1,0 +1,336 @@
+{
+ "note": "Read-only extract of one saved production vehicle_listings row (SELECT 2026-11-04). 2023 Jeep Wrangler, used: an off-year layout stress test record, not a production candidate.",
+ "vin": "1C4HJXDN4PW657311",
+ "slug": "2023-jeep-wrangler-4-door-657311",
+ "ymm": "2023 Jeep Wrangler 4-Door",
+ "trim": "Altitude",
+ "condition": "used",
+ "body_type": "SUV",
+ "build_sheet": {
+  "colors": {
+   "exterior": {
+    "code": "PBJ",
+    "msrp": 595,
+    "name": "Hydro Blue Pearl Coat"
+   },
+   "interior": {
+    "code": "E7X9",
+    "name": "Black Cloth"
+   }
+  },
+  "decoded_at": "2026-08-28T03:07:10.206Z",
+  "generic": false,
+  "key_features": {
+   "AAN": [
+    "Smart Card / Smart Key"
+   ],
+   "ADC": [
+    "Coming Home Device",
+    "Keyless Start/Remote Engine Start"
+   ],
+   "ADE": [
+    "Heated Seats"
+   ],
+   "APA": [
+    "Upgrade Paint"
+   ],
+   "DFT": [
+    "Automatic Transmission"
+   ],
+   "EC1": [
+    "Turbo Boost"
+   ],
+   "RSD": [
+    "Satellite Radio"
+   ],
+   "STANDARD": [
+    "Smart Card / Smart Key",
+    "Keyless Start/Remote Engine Start",
+    "Fog Lights",
+    "Upgrade Paint",
+    "Bluetooth",
+    "Premium Speakers",
+    "Touch Screen Audio",
+    "Premium Audio",
+    "Steering Wheel Controls",
+    "Upgraded Tire Type",
+    "Convertible Roof",
+    "Small SUV",
+    "Rear Parking Device",
+    "Heated Door Mirrors",
+    "Premium Wheels",
+    "Upgraded Wheel Size",
+    "Brake Assist",
+    "Voice Recognition",
+    "Trailer Assist",
+    "Upgraded Aux Jack Input",
+    "Upgraded USB Connection",
+    "Parking Assistance System",
+    "Parking Distance System",
+    "Phone Integration",
+    "Apple CarPlay",
+    "Android Auto"
+   ]
+  },
+  "options": [
+   {
+    "code": "AAN",
+    "msrp": 1095,
+    "name": "Technology Group"
+   },
+   {
+    "code": "ADA",
+    "msrp": 1495,
+    "name": "LED Headlamp and Fog Lamp Group"
+   },
+   {
+    "code": "ADC",
+    "msrp": 995,
+    "name": "Convenience Group"
+   },
+   {
+    "code": "ADE",
+    "msrp": 1395,
+    "name": "Cold Weather Group"
+   },
+   {
+    "code": "MRK",
+    "msrp": 695,
+    "name": "Side Steps"
+   },
+   {
+    "code": "APA",
+    "msrp": 595,
+    "name": "Monotone Paint"
+   },
+   {
+    "code": "CWA",
+    "msrp": 170,
+    "name": "Mopar All Weather Floor Mats (Dealer)"
+   },
+   {
+    "code": "DFT",
+    "msrp": 2000,
+    "name": "8-Speed Automatic Transmission (850RE)"
+   },
+   {
+    "code": "EC1",
+    "name": "2.0L I4 DOHC DI Turbo Engine w/ESS"
+   },
+   {
+    "code": "RSD",
+    "msrp": 295,
+    "name": "SiriusXM Satellite Radio"
+   }
+  ],
+  "packages": [],
+  "pricing": {
+   "base_msrp": 41490,
+   "destination_charge": 1795,
+   "total_msrp": 51225
+  },
+  "source": "neovin",
+  "standard": {
+   "AAN": [
+    "Micro Filter",
+    "Single Zone Air Conditioning",
+    "Automatic Air Conditioning",
+    "Automatic Smart Card / Smart Key",
+    "Display Screen-Instrument Cluster 1 (7 in)"
+   ],
+   "ADA": [
+    "LED Headlights-Low Beam",
+    "LED Headlights-High Beam",
+    "Front LED Fog Lights"
+   ],
+   "ADC": [
+    "Garage Door Opener",
+    "Coming Home Device",
+    "Remote Engine Starter"
+   ],
+   "ADE": [
+    "Heated Driver Seat",
+    "Heated Passenger Seat",
+    "Heated Steering Wheel"
+   ],
+   "APA": [
+    "Two-Tone Paint"
+   ],
+   "DFT": [
+    "Automatic Transmission",
+    "8 Speed Transmission",
+    "Manual Mode",
+    "Automatic With Manual Mode Trans"
+   ],
+   "EC1": [
+    "Engine Displacement (2.0 Liters)",
+    "4-Cyl",
+    "In-Line",
+    "Engine Compressor",
+    "Turbo"
+   ],
+   "MRK": [
+    "Running Boards"
+   ],
+   "RSD": [
+    "Satellite Radio"
+   ],
+   "STANDARD": [
+    "Card Key Power Locks",
+    "Power Locks Automatic Locking",
+    "Touch Screen Controls",
+    "Engine Heater",
+    "Smart Card / Smart Key",
+    "Remote Keyless Entry",
+    "Keyless Start",
+    "Instrument Cluster",
+    "Instrument Cluster Analog & TFT",
+    "Complex Surface Headlights",
+    "Halogen Headlights-Low Beam",
+    "Halogen Headlights-High Beam",
+    "Front Fog Lights",
+    "Height Adjustment Steering Wheel",
+    "Steering Wheel Telescopic Adjustment",
+    "Multi Function Steering Wheel",
+    "Paint-Metallic",
+    "Color Screen Audio System",
+    "Bluetooth Connection",
+    "8 Speakers",
+    "Dusk Sensor",
+    "Touch Screen Audio",
+    "Premium Brand Audio",
+    "Center High Mount Stop Light",
+    "Remote Audio Controls",
+    "Steering Wheel Mounted Audio Controls",
+    "All Season Tires",
+    "Load Restraint-Hooks",
+    "Anti-Theft Protection",
+    "Hard Top Convertible Roof",
+    "Convertible Roof Rollover Protection",
+    "Driver Airbag",
+    "Passenger Airbag",
+    "Front Side Airbag",
+    "Front Seats Head Restraints",
+    "Rear Seats Head Restraints",
+    "Front Seats Height Adjustable Head Restraints",
+    "Rear Seats Height Adjustable Head Restraints",
+    "Front Seats Head Restraints-2",
+    "Rear Seats Head Restraints-3",
+    "Front Seat belts Pre-Tensioners",
+    "Front Seat Belts Height Adjustable",
+    "Fuel Tank Skid Plate",
+    "Transfer Case Skid Plate",
+    "Large SUV",
+    "Cloth Seats",
+    "Small SUV",
+    "Driver Bucket Seat",
+    "Passenger Bucket Seat",
+    "Reclining Manual Driver Seat",
+    "Passenger Seat Manual Reclining",
+    "Rear Seats Bench",
+    "Folding Rear Seats",
+    "Leather Steering Wheel",
+    "Power Steering",
+    "12 Volt Power Outlet",
+    "12 Volt Rear Power Outlet",
+    "Beam Suspension-Front",
+    "Beam Suspension-Rear",
+    "Coil Suspension-Front",
+    "Coil Suspension-Rear",
+    "Front Stabilizer Bar",
+    "Rear Stabilizer Bar",
+    "Rigid Suspension-Front",
+    "Rigid Suspension-Rear",
+    "Heavy Duty Suspension",
+    "Rear View Mirror/Camera",
+    "Driver-Electrically Adjustable",
+    "Passenger-Electrically Adjustable",
+    "Heated Door Mirrors",
+    "Rear Window Defogger",
+    "Rear Windshield Wipers",
+    "Variable Intermittent Wipe",
+    "Front Power Windows",
+    "Rear Power Windows",
+    "Front Express Power Windows",
+    "Front Aluminum/Alloy Wheels",
+    "Rear Aluminum/Alloy Wheels",
+    "Front Wheel Diameter (18 in)",
+    "Rear Wheel Diameter (18 in)",
+    "Front Wheel Width (7.5 in)",
+    "Rear Wheel Width (7.5 in)",
+    "Spare Wheel",
+    "Fullsize Spare Wheel",
+    "Alloy Spare Wheel",
+    "Compass",
+    "Disc Brakes",
+    "Disc Brakes-4",
+    "Ventilated Disc Brakes-2",
+    "ABS Brakes",
+    "Brake Assist",
+    "Low Tire Pressure Monitor",
+    "Isofix Preparation",
+    "Voice Recognition",
+    "Text To Speech / Speech To Text",
+    "Includes Audio Player",
+    "Includes Phone",
+    "Includes Navigation System",
+    "Standard-IIHS",
+    "Standard-NHTSA",
+    "Rollover Rating-3",
+    "Frontal Crash Rating-4",
+    "Hill Holder Assist",
+    "Passenger Door-Front Hinged",
+    "Rear Driver Door-Front Hinged",
+    "Rear Passenger Door-Front Hinged",
+    "Rear Door-Single Hinged",
+    "Roll Stability Control",
+    "Engine Start/Stop",
+    "Vehicle Start Button",
+    "Cruise Control",
+    "Trailer Stability Program",
+    "AUX Jack Front",
+    "Front USB Connection",
+    "Number Of USB Connections Front-2",
+    "Front USB Charging Port",
+    "Rear Automated Parking Assistance",
+    "Rear Parking Distance System",
+    "Rear Parking Camera",
+    "Parking Assistance-Rear",
+    "Guidance Display Parking Assistance-Rear",
+    "Interior Illuminated Entry System",
+    "Cargo Area Light",
+    "Illuminated Driver Vanity Mirror",
+    "Illuminated Passenger Vanity Mirror",
+    "Front Tow/Recovery Hooks",
+    "Apps Control",
+    "Mobile Integration",
+    "Apple Carplay",
+    "Android Auto",
+    "4 Airbags",
+    "Long Wheelbase",
+    "Black Exterior Door Handles",
+    "4WD",
+    "Four Wheel Drive Type-Part-Time",
+    "Drive Selection-Manual",
+    "Accident Data Recorder",
+    "Electronic Traction Control",
+    "4 Person Seating Capacity",
+    "Unleaded"
+   ]
+  }
+ },
+ "epa_economy": {
+  "annualFuelCost": 2800,
+  "checkedAt": "2026-10-28T04:45:14.479Z",
+  "city": 22,
+  "co2TailpipeGpm": 388,
+  "combined": 23,
+  "fuelType": "Regular",
+  "ghgScore": 5,
+  "highway": 24,
+  "matchedOption": "2023 Jeep Wrangler 2dr 4WD — Auto 8-spd, 4 cyl, 2.0 L, Turbo, SIDI",
+  "rangeMiles": null,
+  "source": "fueleconomy.gov",
+  "vehicleId": 45691
+ }
+}
