@@ -16,6 +16,7 @@ import {
   deriveNextSteps, recallHeadline, verificationCountsLine,
   type VerificationReport, type ReportCheck, type VerificationStatus, type EvidenceProvenance,
   isSettledCheck,
+  verificationSnapshotKey,
 } from "@/lib/passport/verificationSummary";
 import { resolvePassportBack } from "@/lib/passportReturn";
 import { subjectIcon, incompleteIcon, rankActionable, resolveFinding } from "@/lib/passport/verificationFindings";
@@ -81,7 +82,7 @@ const HERO_TONE: Record<string, { bg: string; border: string; icon: React.Elemen
   green:   { bg: "bg-emerald-50", border: "border-emerald-200", icon: CircleCheck,   iconCls: "text-[#16A34A]", chip: "bg-emerald-100 text-[#15803D]", eyebrow: "Verification complete" },
   amber:   { bg: "bg-amber-50",   border: "border-amber-200",   icon: TriangleAlert, iconCls: "text-[#D97706]", chip: "bg-amber-100 text-[#B45309]", eyebrow: "Review before purchase" },
   red:     { bg: "bg-red-50",     border: "border-red-200",     icon: CircleAlert,   iconCls: "text-[#DC2626]", chip: "bg-red-100 text-[#B91C1C]", eyebrow: "Review before purchase" },
-  neutral: { bg: "bg-slate-50",   border: "border-slate-200",   icon: ShieldCheck,   iconCls: "text-[#64748B]", chip: "bg-slate-200 text-[#475569]", eyebrow: "Verification in progress" },
+  neutral: { bg: "bg-slate-50",   border: "border-slate-200",   icon: ShieldCheck,   iconCls: "text-[#64748B]", chip: "bg-slate-200 text-[#475569]", eyebrow: "Verification status" },
 };
 
 const dateLabel = (iso: string | null | undefined): string | null =>
@@ -146,7 +147,7 @@ const ExceptionCard = ({ check, expanded, onToggleEvidence, onAskDealer }: Check
           <h3 className="text-[15.5px] font-bold text-[#0F172A] leading-snug mt-0.5">{exceptionHeadline(check)}</h3>
           {check.finding && <p className="text-[13px] text-[#475569] mt-1.5 leading-relaxed">{check.finding}</p>}
           {!check.finding && check.status === "pending" && (
-            <p className="text-[13px] text-[#475569] mt-1.5 leading-relaxed">This check has not completed. Pending does not mean a problem was found — it has simply not returned a result yet.</p>
+            <p className="text-[13px] text-[#475569] mt-1.5 leading-relaxed">This check has not completed. Pending is not a finding either way: it does not show a problem, and it does not rule one out.</p>
           )}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-[11.5px] text-[#94A3B8]">
             <span>Source: {sourceLabelFor(check)}</span>
@@ -250,14 +251,32 @@ const ProvenanceTag = ({ provenance }: { provenance: EvidenceProvenance }) => (
   <span className="text-[10.5px] font-semibold text-[#64748B] bg-slate-100 rounded-md px-2 py-0.5">{PROVENANCE_LABEL[provenance]}</span>
 );
 
+// What IS on record for a check that could not be verified: the reported
+// mileage, the VIN, or the dealership's general title policy. Shown as the
+// dealer's or listing's own data, never as a verified result.
+const unavailableNote = (c: ReportCheck): string | null =>
+  c.finding ?? (c.key === "title" ? c.evidence.find((e) => e.label === "Dealer policy")?.value ?? null : null);
+
 const exceptionHeadline = (check: ReportCheck): string => {
   switch (check.key) {
     case "recall":
       return recallHeadline(check);
     case "title":
-      return check.status === "needs_attention" ? "Title brand on record" : "Title and brand check pending";
+      return check.status === "needs_attention" ? "Title brand on record"
+        : check.status === "unavailable" ? "Title record not available"
+        : check.status === "dealer_attested" ? "Title reviewed by the dealer"
+        : "Title and brand check pending";
+    case "vin":
+      return check.status === "needs_confirmation" ? "Vehicle identity needs confirmation"
+        : check.status === "pending" ? "VIN decode pending" : "VIN on record, identity decode not verified";
+    case "odometer":
+      return check.status === "needs_attention" ? "Possible odometer rollback reported"
+        : check.status === "needs_confirmation" ? "Mileage records require review"
+        : "Odometer history not independently verified";
     case "history": return "Reported accident history";
-    default: return check.status === "pending" ? `${check.name} pending` : `${check.name} needs review`;
+    default: return check.status === "pending" ? `${check.name} pending`
+      : check.status === "unavailable" ? `${check.name} not available`
+      : check.status === "needs_confirmation" ? `${check.name} needs confirmation` : `${check.name} needs review`;
   }
 };
 
@@ -346,8 +365,8 @@ const outcomeLabel = (c: ReportCheck): string =>
   c.status === "verified" ? (OUTCOME_LABEL[c.key] ?? "Verified") : VERIFICATION_STATUS_LABEL[c.status];
 
 const supportingLine = (c: ReportCheck): string =>
-  c.status === "pending" ? "Still processing · No result yet"
-  : c.status === "unavailable" ? "Source data unavailable · Not verified"
+  c.status === "pending" ? "Pending · No result returned yet"
+  : c.status === "unavailable" ? "Not available · Not independently verified"
   : c.status === "needs_confirmation" ? "Sources disagree · Confirm with dealer"
   : c.status === "needs_attention" ? "Needs your attention"
   : "Checked";
@@ -406,9 +425,9 @@ const CheckSheetBody = ({ check, onAskDealer }: { check: ReportCheck; onAskDeale
   const ui = STATUS_UI[check.status];
   const meaning = check.finding
     ?? (check.status === "pending"
-      ? "This check has not returned a result yet. Pending does not mean a problem was found — it simply has no result yet."
+      ? "This check has not returned a result yet. Pending is not a finding either way: it does not show a problem, and it does not rule one out."
       : check.status === "unavailable"
-        ? "The records this check needs are not available for this vehicle. This is not a problem found — there is simply no data to verify."
+        ? "Not independently verified — the available records do not establish a result. Unavailable information is neither a positive nor a negative finding."
         : "");
   return (
     <div className="space-y-4 pb-1">
@@ -491,10 +510,11 @@ const MobileVerification = ({
 
   const bannerHeading = attentionCount > 0
     ? `${attentionCount} item${attentionCount === 1 ? "" : "s"} need${attentionCount === 1 ? "s" : ""} your attention`
-    : report.pendingChecks > 0
-      ? `${report.pendingChecks} check${report.pendingChecks === 1 ? "" : "s"} still processing`
-      : "Verification checks completed";
-  const bannerCalm = attentionCount === 0 && report.pendingChecks === 0;
+    : report.banner.heading;
+  // Green only when the canonical banner is green (every check settled); a
+  // report with unavailable or pending checks and nothing to act on is neutral.
+  const bannerCalm = report.banner.tone === "green";
+  const bannerNeutral = report.banner.tone === "neutral";
   // Verdict breakdown reads the SAME terms and counts as the status grid, so the
   // two can never conflict — completed · attention · pending · unavailable.
   // One status inventory (L02): every non-zero status, dealer attestation
@@ -565,9 +585,9 @@ const MobileVerification = ({
         </section>
 
         {/* Overall-result banner */}
-        <section className={`rounded-2xl bg-white border border-[#E6EAF0] ${bannerCalm ? "border-l-4 border-l-[#16A34A]" : "border-l-4 border-l-[#D97706]"} p-4 flex items-center gap-3.5`} aria-live="polite">
-          <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${bannerCalm ? "bg-emerald-50" : "bg-amber-50"}`}>
-            {bannerCalm ? <ShieldCheck className="w-6 h-6 text-[#16A34A]" strokeWidth={1.9} /> : <ShieldAlert className="w-6 h-6 text-[#D97706]" strokeWidth={1.9} />}
+        <section className={`rounded-2xl bg-white border border-[#E6EAF0] ${bannerCalm ? "border-l-4 border-l-[#16A34A]" : bannerNeutral ? "border-l-4 border-l-[#94A3B8]" : "border-l-4 border-l-[#D97706]"} p-4 flex items-center gap-3.5`} aria-live="polite">
+          <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${bannerCalm ? "bg-emerald-50" : bannerNeutral ? "bg-slate-100" : "bg-amber-50"}`}>
+            {bannerCalm ? <ShieldCheck className="w-6 h-6 text-[#16A34A]" strokeWidth={1.9} /> : bannerNeutral ? <ShieldCheck className="w-6 h-6 text-[#64748B]" strokeWidth={1.9} /> : <ShieldAlert className="w-6 h-6 text-[#D97706]" strokeWidth={1.9} />}
           </span>
           <div className="min-w-0">
             <p className="text-[18px] font-bold leading-snug">{bannerHeading}</p>
@@ -638,7 +658,7 @@ const MobileVerification = ({
         {/* Checks completed */}
         {completedRows.length > 0 && (
           <section>
-            <h2 className="text-[17px] font-semibold px-1 mb-2">Checks completed</h2>
+            <h2 className="text-[17px] font-semibold px-1 mb-2">{(report.dealerAttestedChecks ?? 0) > 0 ? "Verified and dealer attested" : "Verified"}</h2>
             <div className="rounded-2xl bg-white border border-[#E6EAF0] divide-y divide-[#EEF1F4] overflow-hidden">
               {completedRows.map((c) => {
                 const Icon = subjectIcon(c);
@@ -646,7 +666,7 @@ const MobileVerification = ({
                   <button key={c.key} onClick={() => openCheck(c)} className="w-full min-h-[58px] px-4 py-3 flex items-center gap-3 text-left active:bg-slate-50">
                     <span className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0"><Icon className="w-[25px] h-[25px] text-[#16A34A]" strokeWidth={1.9} aria-hidden="true" /></span>
                     <p className="text-[15px] font-semibold text-[#0F172A] leading-snug min-w-0 flex-1">{c.name}</p>
-                    <span className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-[#16A34A] shrink-0"><CircleCheck className="w-[18px] h-[18px]" aria-hidden="true" />{outcomeLabel(c)}</span>
+                    <span className={`inline-flex items-center gap-1.5 text-[13.5px] font-semibold shrink-0 ${c.status === "dealer_attested" ? "text-[#0F766E]" : "text-[#16A34A]"}`}>{c.status === "dealer_attested" ? <ShieldCheck className="w-[18px] h-[18px]" aria-hidden="true" /> : <CircleCheck className="w-[18px] h-[18px]" aria-hidden="true" />}{outcomeLabel(c)}</span>
                     <ChevronRight className="w-[19px] h-[19px] text-[#94A3B8] shrink-0" aria-hidden="true" />
                   </button>
                 );
@@ -756,11 +776,13 @@ const MobileVerification = ({
       <BottomSheet open={traceOpen} title="Report traceability" onClose={() => setTraceOpen(false)}>
         <div className="space-y-4 pb-1">
           <p className="text-[14px] text-[#334155] leading-relaxed">
-            This report is traceable to the live verification record. The saved PDF and this page reflect the same checks, statuses, sources and dates.
+            This report was built from the stored source records listed here, not from a live lookup at the moment you opened it. The saved PDF and this page carry the same report version, checks, statuses, sources and dates.
           </p>
           <div className="rounded-xl border border-[#E6EAF0] bg-[#FAFBFC] divide-y divide-[#F1F5F9] px-4">
             {[
               { label: "Report ID", value: reportId },
+              { label: "Report version", value: verificationSnapshotKey(report, listing.vin) },
+              { label: "Evidence basis", value: "Stored source records" },
               { label: "Generated", value: reportGenerated },
               { label: "Source data through", value: lastChecked },
               { label: "VIN", value: listing.vin || null },
@@ -768,7 +790,7 @@ const MobileVerification = ({
             ].map((r) => (
               <div key={r.label} className="flex items-start justify-between gap-4 py-2.5 text-[13px]">
                 <span className="text-[#64748B] shrink-0">{r.label}</span>
-                <span className={`text-right ${r.value ? "text-[#0F172A] font-medium" : "text-[#94A3B8] italic"}`}>{r.value ?? "Not available"}</span>
+                <span className={`text-right break-all ${r.value ? "text-[#0F172A] font-medium" : "text-[#94A3B8] italic"}`} data-report-version={r.label === "Report version" ? r.value ?? undefined : undefined}>{r.value ?? "Not available"}</span>
               </div>
             ))}
           </div>
@@ -796,9 +818,9 @@ const PrintCheckCard = ({ check }: { check: ReportCheck }) => {
   const ui = STATUS_UI[check.status];
   const explanation = check.finding
     ?? (check.status === "pending"
-      ? "This check has not returned a result yet. Pending does not mean a problem was found."
+      ? "This check has not returned a result yet. Pending is not a finding either way."
       : check.status === "unavailable"
-        ? "The records this check needs are not available for this vehicle. This is not a problem found — there is simply no data to verify."
+        ? "Not independently verified — the available records do not establish a result. Unavailable information is neither a positive nor a negative finding."
         : "");
   const title = check.status === "verified" ? check.name : exceptionHeadline(check);
   return (
@@ -862,6 +884,7 @@ const VerificationPrintDoc = ({ report, listing, slug }: { report: VerificationR
           <p className="text-[14px] font-bold mt-2">AutoLabels Data-Verified Report</p>
           <p className="text-[10.5px] text-neutral-600 mt-0.5">Report generated {reportGenerated}{lastChecked ? ` · Source data last checked ${lastChecked}` : ""}</p>
           <p className="text-[10.5px] text-neutral-500">Report {reportId}</p>
+          <p className="text-[9.5px] text-neutral-400" data-report-version={verificationSnapshotKey(report, listing.vin)}>Version {verificationSnapshotKey(report, listing.vin)} · stored source records</p>
         </div>
         <div className="text-right shrink-0">
           <p className="text-[14px] font-bold">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}{condition ? ` · ${condition}` : ""}</p>
@@ -898,7 +921,7 @@ const VerificationPrintDoc = ({ report, listing, slug }: { report: VerificationR
       {/* Verified checks */}
       {verified.length > 0 && (
         <section className="mb-4">
-          <H2>Verified checks ({verified.length})</H2>
+          <H2>{`Verified checks (${report.verifiedChecks})${(report.dealerAttestedChecks ?? 0) > 0 ? ` and dealer attested (${report.dealerAttestedChecks})` : ""}`}</H2>
           {verified.map((c) => <PrintCheckCard key={c.key} check={c} />)}
         </section>
       )}
@@ -1288,8 +1311,15 @@ const VehiclePassportVerification = () => {
                 <div className="flex items-start gap-2.5">
                   <CircleMinus className="w-[18px] h-[18px] text-[#94A3B8] shrink-0 mt-0.5" aria-hidden="true" />
                   <div className="min-w-0">
-                    <p className="text-[13px] font-bold text-[#475569]">Awaiting source data <span className="font-medium text-[#94A3B8]">— no result, not a problem found</span></p>
-                    <p className="text-[12px] text-[#64748B] mt-0.5">{unavailable.map((c) => c.name).join(", ")} could not run because the underlying records are not available for this vehicle.</p>
+                    <p className="text-[13px] font-bold text-[#475569]">Not available <span className="font-medium text-[#94A3B8]">— not independently verified; the available records do not establish a result</span></p>
+                    <p className="text-[12px] text-[#64748B] mt-0.5">{unavailable.map((c) => c.name).join(", ")} could not be verified because the records they need are not available for this vehicle. This is neither a positive nor a negative finding; the details below are shown as reported, not as verified results.</p>
+                    {unavailable.some(unavailableNote) && (
+                      <ul className="mt-1.5 space-y-0.5" data-unavailable-notes>
+                        {unavailable.filter(unavailableNote).map((c) => (
+                          <li key={c.key} className="text-[12px] text-[#475569]">{unavailableNote(c)}</li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1304,7 +1334,7 @@ const VehiclePassportVerification = () => {
           <section id="v-verified" className="scroll-mt-6">
             <div className="flex items-baseline justify-between gap-3">
               <h2 className="text-[17px] font-bold">What checked out</h2>
-              <span className="text-[12.5px] text-[#94A3B8]">{verified.length} verified {verified.length === 1 ? "check" : "checks"}</span>
+              <span className="text-[12.5px] text-[#94A3B8]">{report.verifiedChecks} verified {report.verifiedChecks === 1 ? "check" : "checks"}{(report.dealerAttestedChecks ?? 0) > 0 ? ` · ${report.dealerAttestedChecks} dealer attested` : ""}</span>
             </div>
             {verified.length === 0 ? (
               <div className={`${CARD} p-5 mt-3`}><p className="text-[13.5px] text-[#64748B]">No checks have returned a verified result yet.</p></div>
@@ -1410,6 +1440,7 @@ const VehiclePassportVerification = () => {
               <button onClick={() => scrollTo("sources")} className="mt-1.5 text-[12.5px] font-semibold text-[#2563EB] hover:underline inline-flex items-center gap-1 print:hidden">View sources <ArrowRight className="w-3.5 h-3.5" /></button>
             </div>
             {lastChecked && <p className="text-[11.5px] text-[#94A3B8] mt-3">Source data last checked {lastChecked}</p>}
+            <p className="text-[11px] text-[#94A3B8] mt-1 break-all" data-report-version={verificationSnapshotKey(report, listing.vin)}>Report version {verificationSnapshotKey(report, listing.vin)} · stored source records</p>
             <div className="mt-4 print:hidden"><RailActions /></div>
             {pdfState === "error" && <p className="text-[12px] text-[#DC2626] mt-2 print:hidden">We could not generate the PDF. Please try Print instead.</p>}
           </div>

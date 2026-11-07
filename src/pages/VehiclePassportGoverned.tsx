@@ -472,6 +472,12 @@ export default function VehiclePassportGoverned() {
   // says it's verified — never on the lenient d.recallClear, which stays true even
   // under a cross-source conflict and would contradict the verified card.
   const recallVerified = report.checks.find((c) => c.key === "recall")?.status === "verified";
+  // Badges read the canonical report too. A market badge needs a verified
+  // market check, and a "Clean Title" badge needs an independent title
+  // result: a dealer's own no-branded-title policy is not one.
+  const marketVerified = report.checks.find((c) => c.key === "market")?.status === "verified";
+  const titleVerified = report.checks.find((c) => c.key === "title")?.status === "verified";
+  const historyOnRecord = report.checks.some((c) => (c.key === "history" || c.key === "ownership") && c.status !== "pending" && c.status !== "unavailable");
   // Phase E analytics — the specific event name rides in metadata.event on the
   // existing engagement pipeline (no new enum); ModuleView dedupes views. No PII.
   const firePhaseE = (event: string, extra: Record<string, unknown> = {}) =>
@@ -537,6 +543,14 @@ export default function VehiclePassportGoverned() {
   const availAsOf = avail.as_of && Number.isFinite(Date.parse(avail.as_of))
     ? new Date(avail.as_of).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
     : null;
+  // The dealer's own photos can carry sale artwork baked into the image (the
+  // feed ships them as-is; AutoLabels adds no overlay). On a car that is no
+  // longer offered, the source photo is kept untouched and labeled instead.
+  const archivedPhotoNote = !purchasable ? (
+    <div data-archived-photo-note className="px-3 py-2 text-[11.5px] leading-snug border-t" style={{ background: "#F8FAFC", color: SUB, borderColor: BORDER }}>
+      Dealer photos from when this vehicle was advertised. Any sale or promotion shown in them is not a current offer.
+    </div>
+  ) : null;
   const availNotice = availCopy ? (
     <div className={`${CARD} px-4 py-3.5`} data-module="availability" data-availability={avail.disposition} role="status">
       <span className="inline-flex items-center h-6 px-2.5 rounded-full text-[12px] font-bold" style={{ background: "#F1F5F9", color: NAVY }}>{availCopy.label}</span>
@@ -573,11 +587,10 @@ export default function VehiclePassportGoverned() {
   type Chip = { label: string; tone: "green" | "blue" | "amber"; icon: React.ElementType };
   const intelChips: Chip[] = [];
   if (purchasable && d.belowMarket != null && d.belowMarket > 250) intelChips.push({ label: `${fmt$(d.belowMarket)} Below Market`, tone: "green", icon: TrendingUp });
-  if (d.dealerVerified || (d.verifiedBy && d.verifiedBy.length > 0)) intelChips.push({ label: "Dealer Verified", tone: "blue", icon: ShieldCheck });
   if (d.warrantyStr && !d.warrantyExpired) intelChips.push({ label: `Factory Warranty · ${d.warrantyStr}`, tone: "blue", icon: Award });
   if (intelChips.length < 3 && d.ownerCount === 1) intelChips.push({ label: "1-Owner", tone: "blue", icon: BadgeCheck });
   if (intelChips.length < 3 && recallVerified) intelChips.push({ label: "No Open Recalls", tone: "green", icon: CheckCircle2 });
-  if (intelChips.length < 3 && d.cleanTitle) intelChips.push({ label: "Clean Title", tone: "green", icon: CheckCircle2 });
+  if (intelChips.length < 3 && titleVerified) intelChips.push({ label: "Clean Title", tone: "green", icon: CheckCircle2 });
   if (intelChips.length < 3 && d.serviceCount > 0) intelChips.push({ label: `${d.serviceCount} Service Records`, tone: "blue", icon: Award });
   const chips = intelChips.slice(0, 3);
 
@@ -707,12 +720,11 @@ export default function VehiclePassportGoverned() {
         const titleCheckStatus = report.checks.find((c) => c.key === "title")?.status;
         const trustBadges = [
           d.ownerCount === 1 ? "One Owner" : null,
-          titleCheckStatus === "verified" || titleCheckStatus === "dealer_attested" ? "Clean Title" : null,
+          titleCheckStatus === "verified" ? "Clean Title" : null,
           condition === "cpo" ? "CPO Certified" : null,
         ].filter(Boolean) as string[];
         for (const fallback of [
-          (d.dealerVerified || (d.verifiedBy && d.verifiedBy.length > 0)) ? "Dealer Verified" : null,
-          d.marketAvg != null ? "Market Data Verified" : null,
+          marketVerified ? "Market Data Verified" : null,
         ]) {
           if (fallback && trustBadges.length < 3) trustBadges.push(fallback);
         }
@@ -731,7 +743,6 @@ export default function VehiclePassportGoverned() {
         ].filter(Boolean) as { t: string; s: string }[];
 
         const strengths = ([
-          (d.dealerVerified || d.verifiedBy.length > 0) ? "Dealer-verified listing" : null,
           d.ownerCount === 1 ? `One owner reported${d.historyReport ? ` (${historyReportName(d.historyReport.provider)})` : ""}` : d.ownerCount != null && d.ownerCount > 1 ? `${d.ownerCount} owners reported` : null,
           listing.mileage != null ? `${listing.mileage.toLocaleString()} reported miles` : null,
           listing.trim ? `${listing.trim} trim` : null,
@@ -836,6 +847,7 @@ export default function VehiclePassportGoverned() {
                 </button>
                 <button data-gallery-nav aria-label={`View all ${gallery.length} photos`} onClick={(e) => { e.stopPropagation(); setGalleryOpen(true); }} className="absolute bottom-3 left-3 h-9 px-3 rounded-full bg-black/60 text-white text-[12px] font-bold inline-flex items-center gap-1.5"><Eye className="w-4 h-4" /> All Photos</button>
               </div>
+              {archivedPhotoNote}
             </div>
             {/* 3 — thumbnail strip */}
             {gallery.length > 1 && (
@@ -1282,8 +1294,7 @@ export default function VehiclePassportGoverned() {
         // ── Hero trust badges — each shown only when its governed signal is real.
         const trustBadges = [
           d.ownerCount === 1 ? "One Owner" : null,
-          (d.dealerVerified || (d.verifiedBy && d.verifiedBy.length > 0)) ? "Dealer Verified" : null,
-          d.marketAvg != null ? "Market Data Verified" : null,
+          marketVerified ? "Market Data Verified" : null,
         ].filter(Boolean) as string[];
 
         // ── Fixed conversion action hierarchy (goal-locked). Each opens the
@@ -1367,6 +1378,7 @@ export default function VehiclePassportGoverned() {
                         <button type="button" data-gallery-nav aria-label="Next photo" onClick={(e) => { e.preventDefault(); e.stopPropagation(); swipeHero(1); }} className="absolute right-2 top-1/2 -translate-y-1/2 z-20 h-11 w-11 grid place-items-center rounded-full bg-white/90 shadow hover:bg-white"><ChevronRight className="w-[22px] h-[22px]" style={{ color: NAVY }} /></button>
                       </>}
                     </div>
+                    {archivedPhotoNote && <div className="mt-2 rounded-lg overflow-hidden border border-t-0" style={{ borderColor: BORDER }}>{archivedPhotoNote}</div>}
                     {gallery.length > 1 && (
                       <div className="mt-2.5 flex gap-2">
                         {gallery.slice(0, 6).map((src, i) => (
@@ -1470,7 +1482,7 @@ export default function VehiclePassportGoverned() {
                   {[
                     { key: "factory-warranty" as const, icon: ShieldCheck, title: "Warranty", head: d.warrantyExpired ? "Coverage ended" : warrantyHead, sub: warrantySub },
                     { key: "equipment" as const, icon: Sparkles, title: "Features & Equipment", head: "Equipment analyzed", sub: "Premium, safety, tech & more" },
-                    { key: "ownership-timeline" as const, icon: FileText, title: "History & Ownership", head: d.cleanTitle ? "Clean title on record" : "History checked", sub: d.ownerCount != null ? `${d.ownerCount === 1 ? "One owner" : `${d.ownerCount} owners`} on record` : "View reported results" },
+                    { key: "ownership-timeline" as const, icon: FileText, title: "History & Ownership", head: titleVerified ? "Clean title on record" : historyOnRecord ? "History records found" : "No history report on file", sub: d.ownerCount != null ? `${d.ownerCount === 1 ? "One owner" : `${d.ownerCount} owners`} on record` : "View reported results" },
                     { key: "key-specs" as const, icon: Wrench, title: "Specifications", head: "Detailed specs", sub: "Engine, dimensions, capacity" },
                   ].map((m) => (
                     <button key={m.key} onClick={() => openPanel(m.key)} className={`${CARD} p-4 text-left hover:border-[#2563EB] transition-colors`} data-module={m.key === "factory-warranty" ? "warranty" : m.key === "equipment" ? "equipment" : m.key === "ownership-timeline" ? "history" : "specs"}>
@@ -1492,8 +1504,7 @@ export default function VehiclePassportGoverned() {
                         // Governed, exact-outcome strengths — sourced where the record
                         // names a provider; warranty/coverage stays "requires confirmation".
                         const strengths = [
-                          (d.dealerVerified || d.verifiedBy.length > 0) ? "Dealer-verified listing" : null,
-                          d.ownerCount === 1 ? `One owner reported${d.historyReport ? ` (${historyReportName(d.historyReport.provider)})` : ""}` : d.ownerCount != null && d.ownerCount > 1 ? `${d.ownerCount} owners reported` : null,
+                                          d.ownerCount === 1 ? `One owner reported${d.historyReport ? ` (${historyReportName(d.historyReport.provider)})` : ""}` : d.ownerCount != null && d.ownerCount > 1 ? `${d.ownerCount} owners reported` : null,
                           listing.mileage != null ? `${listing.mileage.toLocaleString()} reported miles` : null,
                           listing.trim ? `${listing.trim} trim` : null,
                           recallVerified ? "No open recalls for this VIN" : null,

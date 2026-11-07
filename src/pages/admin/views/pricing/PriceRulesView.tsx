@@ -608,7 +608,7 @@ export default function PriceRulesView() {
           <div className="flex items-start justify-between gap-4 rounded-md border border-adm-border px-3 py-2.5">
             <div className="min-w-0">
               <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">We do not retail branded-title vehicles</p>
-              <p className="text-[12px] leading-[18px] text-adm-muted">Shown on the Passport as your own attestation, never as a verified title check, and never over a brand a source reports.</p>
+              <p className="text-[12px] leading-[18px] text-adm-muted">Shown on the Passport as your dealership's policy. It does not count as a title check for any vehicle; record a title review on the vehicle for that.</p>
             </div>
             <Switch checked={!!settings.title_policy_no_branded} onCheckedChange={(v) => updateSettings({ title_policy_no_branded: v })} aria-label="We do not retail branded-title vehicles" />
           </div>
