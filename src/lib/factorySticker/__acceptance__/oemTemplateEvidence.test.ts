@@ -839,7 +839,7 @@ const EV_DOCS: Record<string, EvDoc> = {
     title: "Cadillac 2026 Escalade IQL Premium Sport (electric)", mode: "electric", logo: "Cadillac logo",
     page: "the reference PDF is 1224x792pt (17x11in landscape); the render is the same size and exactly one page.",
     sample: "- stress record: a saved 2026 Tesla Model Y (other make), not a production candidate. Production has no Cadillac record. The standard-equipment list is trimmed to about 100 items.",
-    extra: ["Shared General Motors layout family (gmTruckCommon.ts) with a Cadillac wordmark header and the CARB panel. As an electricity-only vehicle it prints A+ for both ratings, the value CARB fixes for zero-emission vehicles, never an estimate."],
+    extra: ["Shared General Motors layout family (gmTruckCommon.ts) with a Cadillac wordmark header and the CARB panel. CARB's medium-duty label specification (section 6) fixes both ratings at A+ for a 2021+ medium-duty vehicle whose only fuel is electricity. The reference-match render prints A+ because the OEM label itself is the evidence of that class; a saved record prints \"Not Available\" because no saved data establishes GVWR or medium-duty certification (carb_mdv_class_unverified)."],
   },
   fiat: {
     title: "Fiat 2025 500e Giorgio Armani (electric)", mode: "electric", logo: "Fiat logo",

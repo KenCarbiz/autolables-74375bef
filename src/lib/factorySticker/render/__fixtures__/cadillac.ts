@@ -87,6 +87,7 @@ export function cadillacReferenceMatchData(base: FactoryStickerRenderData): Fact
     transportMethod: null,
     factoryCodes: { dealer: null, emissions: null },
     epa: { city: null, highway: null, combined: null, annualFuelCost: null, ghgScore: null, rangeMiles: null, fuelType: "Electricity" },
+    carbMediumDutyEvidence: "OEM reference label: GM printed the CARB medium-duty Environmental Performance Label (Electric Vehicle) and no EPA fuel economy label",
     safety: null,
     nhtsaNotRated: true,
     dealerRole: "original_delivery",

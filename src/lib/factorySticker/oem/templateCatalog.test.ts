@@ -10,11 +10,12 @@ const tucson = (over: Partial<CatalogVehicleInput> = {}): CatalogVehicleInput =>
 });
 
 describe("template catalog", () => {
-  it("holds the 28 handoff templates, all pending owner approval", () => {
+  it("holds the 28 handoff templates: 26 pending owner approval, 2 superseded by approved masters, none approved", () => {
     expect(TEMPLATE_CATALOG).toHaveLength(28);
     expect(new Set(TEMPLATE_CATALOG.map((t) => t.id)).size).toBe(28);
     for (const t of TEMPLATE_CATALOG) {
-      expect(t.approval).toBe("pending_owner_approval");
+      const superseded = t.id === "infiniti_2026_qx60_sport" || t.id === "nissan_2026_pathfinder_platinum";
+      expect(t.approval).toBe(superseded ? "superseded_by_approved_master" : "pending_owner_approval");
       expect(isRoutable(t)).toBe(false);
       expect(t.blockers).toContain("owner_exact_match_not_approved");
       expect(t.design.fileKey).toMatch(/^[A-Za-z0-9]{22}$/);
@@ -35,6 +36,9 @@ describe("template catalog", () => {
     expect(getCatalogTemplate("toyota_2026_4runner_trd_sport")!.blockers).toContain("marked_online_copy");
     expect(getCatalogTemplate("ram_2026_2500_limited")!.blockers).toContain("carb_panel_pending");
     expect(getCatalogTemplate("cadillac_2026_escalade_iql_premium_sport")!.blockers).not.toContain("carb_panel_pending");
+    expect(getCatalogTemplate("cadillac_2026_escalade_iql_premium_sport")!.blockers).toContain("carb_mdv_class_unverified");
+    expect(getCatalogTemplate("maserati_2026_granturismo_trofeo")!.blockers).toContain("reference_msrp_unreconciled");
+    expect(getCatalogTemplate("rolls-royce_2026_spectre")!.blockers).toContain("reference_msrp_unreconciled");
     expect(getCatalogTemplate("hyundai_2026_tucson_se_awd")!.blockers).not.toContain("reference_is_2025");
   });
 

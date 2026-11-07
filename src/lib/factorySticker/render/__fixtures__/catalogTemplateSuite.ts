@@ -122,8 +122,8 @@ export function describeCatalogTemplate(c: CatalogSuiteConfig): void {
           const all = s.join(" ");
           expect(all).toContain("California Air Resources Board");
           expect(all).toContain("Environmental Performance");
-          if (/^\s*electricity\s*$/i.test(real.epa?.fuelType ?? "")) {
-            // CARB fixes both ratings at A+ for a vehicle whose only fuel is electricity.
+          if (/^\s*electricity\s*$/i.test(real.epa?.fuelType ?? "") && real.carbMediumDutyEvidence) {
+            // CARB fixes both ratings at A+ for a verified medium-duty vehicle whose only fuel is electricity.
             expect(s.filter((x) => x === "A+").length).toBe(4);
             expect(all).toContain("Does not include emissions from producing electricity.");
           } else {
@@ -283,7 +283,7 @@ export function describeCatalogTemplate(c: CatalogSuiteConfig): void {
         if (c.carb) {
           for (const score of [1, 5, 10]) {
             const model = sample({ ...ref, epa: { ...(ref.epa ?? { city: null, highway: null, combined: null, annualFuelCost: null, rangeMiles: null, fuelType: null }), ghgScore: score, smogScore: score } as typeof ref.epa });
-            if (/^\s*electricity\s*$/i.test(ref.epa?.fuelType ?? "")) expect(model.drawnStrings.filter((x) => x === "A+")).toHaveLength(4);
+            if (/^\s*electricity\s*$/i.test(ref.epa?.fuelType ?? "") && ref.carbMediumDutyEvidence) expect(model.drawnStrings.filter((x) => x === "A+")).toHaveLength(4);
             else expect(model.drawnStrings.filter((x) => x === "Not Available").length).toBeGreaterThanOrEqual(2);
             expect(texts(model).filter((t) => t.str === String(score) && t.color === "#ffffff" && t.align === "center")).toHaveLength(0);
           }

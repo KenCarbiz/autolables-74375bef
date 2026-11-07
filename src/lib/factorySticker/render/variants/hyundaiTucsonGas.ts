@@ -90,7 +90,7 @@ export function paintScale(p: Painter, x: number, y: number, w: number, state: S
 
 function paintHeader(p: Painter, d: FactoryStickerData): void {
   const logo = VARIANT_LOGOS.hyundai;
-  p.image(logo.png, logo.assetId, 27, Y(51.35), 259.2, 35.65);
+  p.image(logo.png, logo.assetId, 27, Y(51.35), 259.2, 35.65, "HYUNDAI");
   const v = d.vehicle;
   const title = [v.year > 0 ? String(v.year) : "", v.model, v.trim ?? "", v.drivetrain ?? ""].filter(Boolean).join(" ").toUpperCase();
   T(p, title, 335.9, Y(60.6), 20, "bold");

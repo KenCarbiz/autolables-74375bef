@@ -26,7 +26,12 @@
 
 export const TEMPLATE_CATALOG_VERSION = "1.0.0";
 
-export type CatalogApproval = "pending_owner_approval" | "approved";
+/**
+ * superseded_by_approved_master: an owner classification (Nov 7 2026) for an
+ * entry whose vehicles an approved master already serves. It is never
+ * routable, and it changes nothing about the master's routing or priority.
+ */
+export type CatalogApproval = "pending_owner_approval" | "approved" | "superseded_by_approved_master";
 export type CatalogLayoutStatus = "not_started" | "in_progress" | "sample_ready" | "approved";
 export type CatalogFuelClass = "gasoline" | "hybrid" | "phev" | "ev" | "diesel";
 export type CatalogBodyClass =
@@ -45,6 +50,8 @@ export type CatalogBlockerCode =
   | "no_text_layer_in_reference"
   | "range_chart_pending"
   | "carb_panel_pending"
+  | "carb_mdv_class_unverified"
+  | "reference_msrp_unreconciled"
   | "powertrain_rule_unverified"
   | "page_size_nonstandard"
   | "reference_stored_rotated"
@@ -161,7 +168,7 @@ export const TEMPLATE_CATALOG: readonly CatalogTemplate[] = [
     match: { modelYears: [2026], modelPattern: "^escaladeiq", bodyClasses: ["SUV"], fuelClasses: ["ev"], },
     approval: "pending_owner_approval",
     layoutStatus: "sample_ready",
-    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "missing_source_artwork", "parts_content_not_wired", "warranty_terms_not_wired"],
+    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "missing_source_artwork", "parts_content_not_wired", "warranty_terms_not_wired", "carb_mdv_class_unverified"],
   },
   {
     id: "chevrolet_2026_silverado_2500_high_country",
@@ -343,7 +350,7 @@ export const TEMPLATE_CATALOG: readonly CatalogTemplate[] = [
     match: { modelYears: [2026], modelPattern: "^granturismo$", bodyClasses: ["COUPE"], fuelClasses: ["gasoline"], },
     approval: "pending_owner_approval",
     layoutStatus: "sample_ready",
-    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "parts_content_not_wired", "warranty_terms_not_wired"],
+    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "parts_content_not_wired", "warranty_terms_not_wired", "reference_msrp_unreconciled"],
   },
   {
     id: "mitsubishi_2026_outlander_sport_s",
@@ -385,7 +392,7 @@ export const TEMPLATE_CATALOG: readonly CatalogTemplate[] = [
     match: { modelYears: [2026], modelPattern: "^spectre$", bodyClasses: ["COUPE"], fuelClasses: ["ev"], },
     approval: "pending_owner_approval",
     layoutStatus: "sample_ready",
-    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "reference_stored_rotated", "no_text_layer_in_reference", "missing_source_artwork", "ev_figures_not_wired", "parts_content_not_wired", "warranty_terms_not_wired"],
+    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "reference_stored_rotated", "no_text_layer_in_reference", "missing_source_artwork", "ev_figures_not_wired", "parts_content_not_wired", "warranty_terms_not_wired", "reference_msrp_unreconciled"],
   },
   {
     id: "subaru_2026_forester_wilderness",
@@ -411,7 +418,7 @@ export const TEMPLATE_CATALOG: readonly CatalogTemplate[] = [
     referencePdf: "Infiniti_2026_QX60_Sport.pdf",
     design: { fileKey: "J3SqYGgMhIDclzOxxb7wRO", masterNodeId: "1:822" },
     match: { modelYears: [2026], modelPattern: "^qx60$", bodyClasses: ["SUV"], fuelClasses: ["gasoline"], },
-    approval: "pending_owner_approval",
+    approval: "superseded_by_approved_master",
     layoutStatus: "sample_ready", existingMasterKey: "infiniti-2026-qx60-sport-awd",
     blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "marked_online_copy", "page_size_nonstandard", "served_by_approved_master"],
   },
@@ -439,7 +446,7 @@ export const TEMPLATE_CATALOG: readonly CatalogTemplate[] = [
     referencePdf: "Nissan_2026_Pathfinder_Platinum.pdf",
     design: { fileKey: "wqUIPGVY4aHERMX0QmxzFl", masterNodeId: "1:822" },
     match: { modelYears: [2026], modelPattern: "^pathfinder$", bodyClasses: ["SUV"], fuelClasses: ["gasoline"], },
-    approval: "pending_owner_approval",
+    approval: "superseded_by_approved_master",
     layoutStatus: "sample_ready", existingMasterKey: "nissan-2026-pathfinder-platinum-4wd",
     blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "marked_online_copy", "page_size_nonstandard", "served_by_approved_master"],
   },

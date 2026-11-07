@@ -106,6 +106,9 @@ describe("automatic and manual generation produce the same document for the same
     expect(manual).toEqual(auto);
     expect(auto.layout).toBe(TUCSON_ID);
     expect(auto.flags).toEqual([]);
+    // Checked against the template's own 17x11 page, and the wordmark logo counts as the printed make.
+    expect(auto.blockers).toEqual([]);
+    expect(auto.autoPublish).toBe(true);
     expect(auto.pdfSha).not.toBe(pending.auto.pdfSha);
   });
 

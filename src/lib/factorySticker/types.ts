@@ -18,6 +18,8 @@ export interface StickerVehicle {
   transmission?: string;
   drivetrain?: string;
   fuelType?: string;
+  /** Verified evidence of CARB medium-duty class (see FactoryStickerRenderData.carbMediumDutyEvidence). */
+  carbMediumDutyEvidence?: string;
 }
 
 export type EquipmentCategory =

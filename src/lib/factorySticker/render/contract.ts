@@ -179,6 +179,13 @@ export interface FactoryStickerRenderData {
     order?: string | null;
     dealer?: string | null;
   };
+  /**
+   * Evidence that this vehicle is a California-certified 2021+ medium-duty
+   * vehicle (8,501-14,000 lb GVWR, not a medium-duty passenger vehicle), the
+   * class CARB's medium-duty Environmental Performance Label covers. Set only
+   * from a verified source; the normalizer never infers it.
+   */
+  carbMediumDutyEvidence?: string | null;
   epa: {
     city: number | null;
     highway: number | null;
@@ -384,6 +391,7 @@ export function adaptRenderData(d: FactoryStickerRenderData): StickerLayoutInput
       ...opt("interiorColor", d.colors.interior.name),
       ...opt("interiorColorCode", d.colors.interior.code),
       ...opt("fuelType", d.epa?.fuelType ?? d.neovin?.fuelType ?? null),
+      ...opt("carbMediumDutyEvidence", d.carbMediumDutyEvidence ?? null),
       ...opt("engine", d.mechanical?.engine ?? null),
       ...opt("transmission", d.mechanical?.transmission ?? null),
       ...opt("drivetrain", d.mechanical?.drivetrain ?? null),

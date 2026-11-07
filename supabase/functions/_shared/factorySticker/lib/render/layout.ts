@@ -565,8 +565,10 @@ export class Painter {
     });
   }
 
-  image(png: string, assetId: string, x: number, y: number, w: number, h: number): void {
+  /** `printedText` records the words a wordmark image prints (a logo that reads "HYUNDAI"), so content checks can find them. */
+  image(png: string, assetId: string, x: number, y: number, w: number, h: number, printedText?: string): void {
     this.primitives.push({ kind: "image", png, assetId, x, y, w, h });
+    if (printedText && this.drawn) this.drawn.push(printedText);
   }
 }
 

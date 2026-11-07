@@ -33,9 +33,9 @@ const text = (m: LayoutModel): string[] => m.pages[0].primitives.flatMap((p) => 
 describe.each(cases)("$id served by the approved master", (c) => {
   const t = getCatalogTemplate(c.id)!;
 
-  it("is sample_ready, pending owner approval, never routable, and says why", () => {
+  it("is sample_ready, superseded by the approved master (owner decision Nov 7 2026), never routable, and says why", () => {
     expect(t.layoutStatus).toBe("sample_ready");
-    expect(t.approval).toBe("pending_owner_approval");
+    expect(t.approval).toBe("superseded_by_approved_master");
     expect(isRoutable(t)).toBe(false);
     expect(t.existingMasterKey).toBe(c.masterKey);
     expect(t.blockers).toContain("served_by_approved_master");

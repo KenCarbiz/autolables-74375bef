@@ -3,11 +3,16 @@
 // 700 x 452 px panel (100 dpi) and scaled to the rectangle it is given.
 //
 // The data model carries no CARB letter grades, so both rating scales print an
-// explicit "Not Available" in place of the grade and pointer, except for a
-// vehicle whose only fuel is electricity: CARB's label specification exempts
-// those from testing and fixes both ratings at A+ (California Environmental
-// Performance Label Specifications for 2021+ MDVs, section on zero-emission
-// vehicles), with the note that upstream electricity emissions are excluded. The fuel-type tag
+// explicit "Not Available" in place of the grade and pointer. The one exception
+// is fixed by rule: "California Environmental Performance Label Specifications
+// for 2021 and Subsequent Model Year Medium-Duty Vehicles, Except Medium-Duty
+// Passenger Vehicles" (amended Sept 9 2021), section 6, exempts vehicles whose
+// only fuel is electricity or hydrogen from testing and fixes both ratings at
+// A+, with the section 9 note that electricity production is excluded. It
+// applies only to California-certified 2021+ MDVs of 8,501-14,000 lb GVWR that
+// are not MDPVs (section 1(a)), so A+ prints only when the record carries
+// verified evidence of that class, the model year is 2021 or later and the
+// verified fuel type is electricity alone. The fuel-type tag
 // is drawn only when the record states a fuel type (EPA match or engine text).
 // The California Air Resources Board emblem is not reproduced; its name is
 // printed as a plain wordmark.
@@ -26,9 +31,11 @@ export function carbFuelTag(d: FactoryStickerData): string | null {
   return /diesel/i.test(d.vehicle.engine ?? "") ? "Diesel Vehicle" : null;
 }
 
-/** Grades fixed by rule, never estimated: A+/A+ only when the verified EPA fuel type is electricity alone. */
+/** Grades fixed by rule, never estimated: A+/A+ only for a verified 2021+ medium-duty vehicle whose only fuel is electricity. */
 export function carbGrades(d: FactoryStickerData): { ghg: "A+"; smog: "A+" } | null {
-  return /^\s*electricity\s*$/i.test(d.vehicle.fuelType ?? "") ? { ghg: "A+", smog: "A+" } : null;
+  const eligible = !!d.vehicle.carbMediumDutyEvidence && d.vehicle.year >= 2021
+    && /^\s*electricity\s*$/i.test(d.vehicle.fuelType ?? "");
+  return eligible ? { ghg: "A+", smog: "A+" } : null;
 }
 
 export function paintCarbPanel(p: Painter, d: FactoryStickerData, x: number, y: number, w: number, h: number): void {

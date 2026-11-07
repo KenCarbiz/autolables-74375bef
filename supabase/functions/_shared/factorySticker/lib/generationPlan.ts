@@ -215,8 +215,18 @@ export function assessRenderedSticker(input: {
   // Page geometry is checked against the template's own declared format, not
   // a shared assumption: a portrait template must never pass because the
   // landscape one would have.
-  const geometry = selection.definition
-    ? validatePageGeometry(selection.definition.pageFormat, {
+  // An approved catalog template declares its own page (the OEM reference's
+  // size), so it is checked against that, never against the brand default.
+  const catalogTemplate = plan.templateRouting.status === "approved_match" && !plan.templateRouting.servedByApprovedMaster
+    ? plan.templateRouting.template : null;
+  const pageFormat = catalogTemplate
+    ? {
+      widthInches: catalogTemplate.page.widthPt / 72, heightInches: catalogTemplate.page.heightPt / 72,
+      orientation: catalogTemplate.page.orientation, expectedPageCount: 1,
+    }
+    : selection.definition?.pageFormat ?? null;
+  const geometry = pageFormat
+    ? validatePageGeometry(pageFormat, {
       widthPt: Number(layout.widthPt ?? 0),
       heightPt: Number(layout.heightPt ?? 0),
       pageCount: Number(layout.pages ?? 0),
