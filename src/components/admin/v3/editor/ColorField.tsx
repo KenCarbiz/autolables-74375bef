@@ -27,6 +27,7 @@ export const ColorField = ({
   role,
   disabled,
   showContrast = true,
+  optional = false,
 }: {
   name: string;
   value: string;
@@ -34,10 +35,12 @@ export const ColorField = ({
   role?: string;
   disabled?: boolean;
   showContrast?: boolean;
+  /** An empty value is valid (it means "use the default") instead of an error. */
+  optional?: boolean;
 }) => {
   const id = useId();
   const normalized = normalizeHex(value);
-  const error = colorError(value);
+  const error = colorError(value, !optional);
   return (
     <div className="min-w-0 space-y-2">
       <label htmlFor={`${id}-hex`} className="block text-[14px] leading-[20px] font-medium text-adm-ink">

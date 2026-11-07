@@ -1,67 +1,259 @@
-import { useMemo } from "react";
-import { AdminButton, AdminCard } from "@/components/admin/v2/primitives";
-import wordmarkPrimary from "@/assets/admin-v2/brand/wordmark-primary.svg";
-import wordmarkReverse from "@/assets/admin-v2/brand/wordmark-reverse.svg";
-import { APPEARANCE_KEYS, DEFAULT_ACCENT_HEX, isHexColor, normalizeHex, validateAppearance } from "./brandModel";
-import { useBrandForm } from "./useBrandForm";
-import { BrandSaveBar } from "./BrandSaveBar";
-import { AppearanceCard } from "./cards";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
+import { useTenant } from "@/contexts/TenantContext";
+import { supabase } from "@/integrations/supabase/client";
+import { uploadPhoto } from "@/lib/storage";
+import { AdminButton } from "@/components/admin/v2/primitives";
+import {
+  AdminIcon, AdvancedDisclosure, BlockedFeatureNotice, ColorField, DetailDrawer, FieldRow, INPUT_CLASS, LogoSlot, PreviewOnlyNotice, SectionCard, SelectField, type ReviewChangeRow,
+} from "@/components/admin/v3/editor";
+import { colorError, contrastRatio, normalizeHex, AA_NORMAL_TEXT, WHITE_HEX } from "@/lib/admin/color";
+import type { DraftErrors, EditorDraftChange } from "@/lib/admin/useEditorDraft";
+import { DEFAULT_ACCENT_HEX } from "./brandModel";
+import { BrandEditorFrame, LoadingState } from "./editor/BrandEditorFrame";
+import { settingsWriter, useBrandEditor, useBrandEditorContext } from "./editor/useBrandEditor";
+import { ConfirmDialog, PreviewFrame, Segmented, SourceLine } from "./editor/parts";
 
-// The one editor for the dealer accent colour (settings key primary_color).
-// Identity shows the same card read-only and links here.
+interface AppearanceDraft extends Record<string, unknown> {
+  primary_color: string;
+  secondary_color: string;
+  dealer_logo_url: string;
+}
 
-export default function AppearanceView() {
-  const form = useBrandForm(APPEARANCE_KEYS, validateAppearance);
-  const { draft, set, source } = form;
-  const accent = isHexColor(draft.primary_color) ? normalizeHex(draft.primary_color) : DEFAULT_ACCENT_HEX;
-  const logo = source.settings.dealer_logo_url;
-  const isDefault = useMemo(() => !(draft.primary_color || "").trim(), [draft.primary_color]);
+const PALETTE_MIGRATION = "20261114000000";
+const WORKSPACE_SECONDARY = "#0B2041";
 
+const validate = (d: AppearanceDraft): DraftErrors<AppearanceDraft> => {
+  const e: DraftErrors<AppearanceDraft> = {};
+  const p = colorError(d.primary_color, false);
+  if (p) e.primary_color = `Primary colour: ${p}`;
+  const s = colorError(d.secondary_color, false);
+  if (s) e.secondary_color = `Secondary colour: ${s}`;
+  return e;
+};
+
+const norm = (v: string) => (v.trim() === "" ? "" : normalizeHex(v) ?? v.trim());
+const fileName = (url: string) => { try { return decodeURIComponent(new URL(url).pathname.split("/").pop() || url); } catch { return url; } };
+
+const LABELS: Record<string, string> = { primary_color: "Primary colour", secondary_color: "Secondary colour", dealer_logo_url: "Logo for light backgrounds" };
+const describe = (c: EditorDraftChange<AppearanceDraft>): ReviewChangeRow => {
+  const logo = c.key === "dealer_logo_url";
+  const show = (v: unknown) => (logo ? (v ? fileName(String(v)) : "No logo (documents use the dealership name)") : v ? norm(String(v)) : "AutoLabels default");
+  return { id: c.key, label: LABELS[c.key] ?? c.key, before: show(c.before), after: show(c.after) };
+};
+
+async function writeSecondary(tenantId: string, hex: string): Promise<void> {
+  const res = (await (supabase as unknown as { from: (t: string) => { update: (v: Record<string, unknown>) => { eq: (c: string, v: string) => { select: (c: string) => PromiseLike<{ data: unknown[] | null; error: { message?: string } | null }> } } } })
+    .from("onboarding_profiles").update({ secondary_color: hex || null }).eq("tenant_id", tenantId).select("tenant_id"));
+  if (res.error || !res.data?.length) throw new Error("The secondary colour was not accepted by the server. It is kept in your draft.");
+}
+
+const readableOn = (hex: string) => (contrastRatio(hex, WHITE_HEX) >= AA_NORMAL_TEXT || contrastRatio(hex, "#0B1526") < contrastRatio(hex, WHITE_HEX) ? "#FFFFFF" : "#0B1526");
+
+type Kind = "customer" | "document";
+
+const Surface = ({ dark, kind, accent, secondary, logo, name, logoNote }: { dark: boolean; kind: Kind; accent: string; secondary: string; logo: string; name: string; logoNote?: string }) => {
+  const bg = dark ? "#162638" : "#FFFFFF";
+  const ink = dark ? "#FFFFFF" : "#142338";
+  const muted = dark ? "#C3CEDB" : "#475569";
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-4 items-start">
-        <div className="space-y-4">
-          <AppearanceCard accent={draft.primary_color} onChange={(hex) => set("primary_color", hex)} error={form.errors[0] ?? null} />
-
-          <AdminCard title="Logo on dark and light surfaces" description="Your logo is never stretched; it is fitted inside the space the surface allows.">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="rounded-[6px] bg-adm-sidebar h-[96px] flex items-center justify-center px-6">
-                {logo ? <img src={logo} alt="Dealership logo on a dark surface" className="max-h-10 max-w-full object-contain" /> : <img src={wordmarkReverse} alt="AutoLabels wordmark placeholder on a dark surface" className="h-6" />}
-              </div>
-              <div className="rounded-[6px] border border-adm-border bg-adm-surface h-[96px] flex items-center justify-center px-6">
-                {logo ? <img src={logo} alt="Dealership logo on a light surface" className="max-h-10 max-w-full object-contain" /> : <img src={wordmarkPrimary} alt="AutoLabels wordmark placeholder on a light surface" className="h-6" />}
-              </div>
-            </div>
-            <p className="mt-3 text-[12px] leading-[18px] text-adm-muted">{logo ? "Change the logo on the Identity tab." : "No dealership logo is uploaded. Documents fall back to the dealership name, never to the AutoLabels mark."}</p>
-          </AdminCard>
+    <figure className="m-0 min-w-0" aria-label={`${kind === "customer" ? "Customer Passport" : "Document"} on a ${dark ? "dark" : "light"} surface`}>
+      <div className="rounded-lg border border-adm-border overflow-hidden" style={{ backgroundColor: bg, color: ink }} data-surface={dark ? "dark" : "light"}>
+        <div className="px-4 py-3 flex flex-col items-start gap-1.5 border-b" style={{ borderColor: dark ? "#2C4058" : "#E2E8F0" }}>
+          {logo ? <img src={logo} alt="" className="h-8 w-auto max-w-[120px] object-contain" /> : <span className="text-[14px] leading-[20px] font-bold break-words">{name || "Dealership name"}</span>}
+          {logo && <span className="text-[14px] leading-[20px] font-semibold break-words min-w-0">{name}</span>}
         </div>
-
-        <div className="space-y-4">
-          <AdminCard title="Where the accent is used">
-            <ul className="space-y-2 text-[14px] leading-[20px] text-adm-ink">
-              <li className="flex items-center gap-3"><span className="w-4 h-4 rounded-full border border-adm-border flex-shrink-0" style={{ backgroundColor: accent }} aria-hidden="true" />Dealer-coloured elements on generated documents</li>
-              <li className="flex items-center gap-3"><span className="w-4 h-4 rounded-full border border-adm-border flex-shrink-0" style={{ backgroundColor: accent }} aria-hidden="true" />Accent on the customer Vehicle Passport where a dealer colour applies</li>
-            </ul>
-            <p className="mt-3 text-[12px] leading-[18px] text-adm-muted">The application chrome keeps the AutoLabels navy and blue; the accent never restyles it.</p>
-          </AdminCard>
-
-          <AdminCard title="Reset">
-            <p className="text-[13px] leading-[18px] text-adm-muted">Clear the dealer accent so the AutoLabels default applies again. Identity, logo and contact details are not touched.</p>
-            <AdminButton
-              variant="danger"
-              className="mt-3"
-              disabled={isDefault || !!form.blockedReason}
-              onClick={() => {
-                if (window.confirm("Reset the accent colour to the AutoLabels default? You can still save or discard afterwards.")) set("primary_color", "");
-              }}
-            >
-              Reset accent to default
-            </AdminButton>
-          </AdminCard>
+        <div className="p-4 space-y-3">
+          {kind === "customer" ? (
+            <>
+              <p className="text-[18px] leading-[24px] font-bold">Today's sale price</p>
+              <p className="text-[14px] leading-[20px]" style={{ color: muted }}>Fee-inclusive. Your savings appear only when positive.</p>
+              <span className="inline-flex items-center justify-center min-h-[40px] px-4 rounded-md text-[14px] leading-[20px] font-semibold" style={{ backgroundColor: accent, color: readableOn(accent) }}>See my price</span>
+              <span className="block h-1 rounded" style={{ backgroundColor: secondary }} aria-hidden="true" />
+            </>
+          ) : (
+            <>
+              <p className="text-[18px] leading-[24px] font-bold">Dealer addendum</p>
+              <div className="h-1.5 rounded" style={{ backgroundColor: accent }} aria-hidden="true" />
+              <p className="text-[14px] leading-[20px]" style={{ color: muted }}>Installed products and totals print below this rule.</p>
+              <p className="text-[14px] leading-[20px] font-semibold" style={{ color: accent === bg ? ink : accent }}>Accent text sample</p>
+            </>
+          )}
         </div>
       </div>
+      <figcaption className="mt-1.5 text-[13px] leading-[18px] text-adm-muted">{dark ? "Dark surface" : "Light surface"}{logoNote ? `. ${logoNote}` : ""}</figcaption>
+    </figure>
+  );
+};
 
-      <BrandSaveBar form={form} />
-    </div>
+export default function AppearanceView() {
+  const ctx = useBrandEditorContext();
+  const { source, settings } = ctx;
+  const { tenant } = useTenant();
+  const [kind, setKind] = useState<Kind>("customer");
+  const [fullPreview, setFullPreview] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+
+  const savedSecondary = ctx.fixture
+    ? (ctx.fixture.variants?.[ctx.fixtureState]?.secondaryColor ?? ctx.fixture.secondaryColor ?? "")
+    : tenant?.secondary_color && tenant.secondary_color.toUpperCase() !== WORKSPACE_SECONDARY ? tenant.secondary_color : "";
+  const baseline = useMemo<AppearanceDraft | undefined>(
+    () => (source.loading && !ctx.fixture ? undefined : { primary_color: norm(settings.primary_color || ""), secondary_color: norm(savedSecondary), dealer_logo_url: settings.dealer_logo_url || "" }),
+    [source.loading, ctx.fixture, settings.primary_color, settings.dealer_logo_url, savedSecondary],
+  );
+  const writeSettings = useMemo(() => settingsWriter(source), [source]);
+  const editor = useBrandEditor<AppearanceDraft>({
+    ctx,
+    baseline,
+    validate,
+    describe,
+    buildPatch: (d, b, changes) => Object.fromEntries(changes.map((c) => [c.key, c.key === "dealer_logo_url" ? d.dealer_logo_url : norm(String(c.after ?? ""))])),
+    write: async (patch) => {
+      const { secondary_color, ...rest } = patch;
+      if (Object.keys(rest).length) await writeSettings(rest);
+      if (secondary_color !== undefined) {
+        if (source.isFixture || !source.tenantId) throw new Error("This is a design fixture: nothing is saved.");
+        await writeSecondary(source.tenantId, String(secondary_color));
+      }
+    },
+  });
+  const draft = editor.draft;
+  if (!draft) return <LoadingState />;
+
+  const disabled = !ctx.editable;
+  const errors = editor.errors as Record<string, string | undefined>;
+  const accentOk = !colorError(draft.primary_color, false) && draft.primary_color.trim() !== "";
+  const accent = accentOk ? (normalizeHex(draft.primary_color) as string) : DEFAULT_ACCENT_HEX;
+  const secondaryOk = !colorError(draft.secondary_color, false) && draft.secondary_color.trim() !== "";
+  const secondary = secondaryOk ? (normalizeHex(draft.secondary_color) as string) : "#0B2041";
+  const name = settings.dealer_name || "";
+  const hasLogo = !!draft.dealer_logo_url;
+  const dirtyPreview = editor.dirty;
+
+  const pickLogo = async (file: File) => {
+    if (!source.tenantId || source.isFixture) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const result = await uploadPhoto("dealer-logos", file, { tenantId: source.tenantId, storeId: source.activeStoreId ?? undefined, vin: "brand-logo" });
+      if (!result?.url) { setUploadError("The upload did not return a file address."); return; }
+      editor.set("dealer_logo_url", result.url);
+      toast.success("Logo uploaded. Review and apply to use it.");
+    } catch (e) {
+      setUploadError(`Upload failed: ${e instanceof Error ? e.message : "unknown error"}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const previews = (
+    <>
+      <Segmented label="Preview surface" value={kind} onChange={setKind} options={[{ value: "customer", label: "Customer" }, { value: "document", label: "Document" }]} />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+        <Surface dark={false} kind={kind} accent={accent} secondary={secondary} logo={draft.dealer_logo_url} name={name} />
+        <Surface dark kind={kind} accent={accent} secondary={secondary} logo={draft.dealer_logo_url} name={name} logoNote={hasLogo ? "No dark-surface logo yet, so the light logo is shown as uploaded" : undefined} />
+      </div>
+    </>
+  );
+
+  return (
+    <BrandEditorFrame
+      ctx={ctx}
+      editor={editor}
+      scopeNote="Colours and the logo apply to customer pages and documents, never to the AutoLabels application."
+      impact="Documents and the customer Passport pick up the new colours and logo the next time they are generated or opened. The AutoLabels application keeps its navy and blue."
+      previewLabel="Customer and document preview"
+      preview={
+        <>
+          <PreviewFrame title="Customer and document preview" draft={dirtyPreview} caption="Both surfaces use the same draft colours and logo.">
+            <PreviewOnlyNotice>This preview shows draft values on sample content. It does not change what customers see and sends nothing.</PreviewOnlyNotice>
+            {previews}
+            <AdminButton variant="secondary" className="w-full" onClick={() => setFullPreview(true)}>
+              <AdminIcon name="maximize" />
+              Open larger preview
+            </AdminButton>
+          </PreviewFrame>
+        </>
+      }
+    >
+      <SectionCard icon="palette" title="Brand colours" description="The colours used on customer pages and documents for this dealership.">
+        <div className="grid gap-6 md:grid-cols-2">
+          <div className="space-y-2">
+            <ColorField name="Primary colour" role="Accent" optional value={draft.primary_color} disabled={disabled} onChange={(v) => editor.set("primary_color", v)} />
+            <SourceLine>Dealer settings (primary_color). Customer and document accent.</SourceLine>
+            <AdminButton variant="secondary" disabled={disabled || draft.primary_color === ""} onClick={() => editor.set("primary_color", "")}>Use the AutoLabels default</AdminButton>
+          </div>
+          <div className="space-y-2">
+            <ColorField name="Secondary colour" role="Supporting" optional value={draft.secondary_color} disabled={disabled} onChange={(v) => editor.set("secondary_color", v)} />
+            <SourceLine>Shared dealer profile (onboarding_profiles.secondary_color).</SourceLine>
+            <p className="text-[13px] leading-[18px] text-adm-muted">The AutoLabels application theme is not set here. Editing this colour does not recolour the application you are using.</p>
+          </div>
+        </div>
+        <AdvancedDisclosure title="Where each colour is used">
+          <ul className="space-y-2 text-[14px] leading-[20px] text-adm-ink">
+            <li className="flex items-start gap-3"><span aria-hidden="true" className="mt-1 w-4 h-4 rounded-full border border-adm-border flex-shrink-0" style={{ backgroundColor: accent }} />Primary: dealer-coloured rules and highlights on generated documents, and the accent on the customer Vehicle Passport where a dealer colour applies.</li>
+            <li className="flex items-start gap-3"><span aria-hidden="true" className="mt-1 w-4 h-4 rounded-full border border-adm-border flex-shrink-0" style={{ backgroundColor: secondary }} />Secondary: supporting colour stored in the shared dealer profile that the other apps in the AutoLabels family read.</li>
+          </ul>
+        </AdvancedDisclosure>
+      </SectionCard>
+
+      <SectionCard icon="layers" title="Named palette" description="A list of named brand colours with roles, shared across the AutoLabels family.">
+        <BlockedFeatureNotice migrationId={PALETTE_MIGRATION} feature="Named palette">
+          <p className="text-[13px] leading-[18px] text-adm-muted">Add, edit, remove and reset become available when the update is applied. Until then the primary and secondary colours above are the saved palette.</p>
+        </BlockedFeatureNotice>
+        <fieldset disabled className="rounded-lg border border-adm-divider p-4 space-y-4 opacity-70" aria-label="Palette editor, not available yet">
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-start">
+            <FieldRow label="Colour name">{(p) => <input {...p} className={INPUT_CLASS} disabled placeholder="No named colours yet" />}</FieldRow>
+            <FieldRow label="Role">{(p) => <SelectField {...p} disabled><option>Primary, secondary or accent</option></SelectField>}</FieldRow>
+            <div className="flex gap-2 md:pt-7">
+              <AdminButton variant="secondary" disabled><AdminIcon name="plus" />Add colour</AdminButton>
+              <AdminButton variant="secondary" disabled><AdminIcon name="rotate" />Reset palette</AdminButton>
+            </div>
+          </div>
+          <ColorField name="Colour" value="" optional disabled showContrast={false} onChange={() => undefined} />
+        </fieldset>
+      </SectionCard>
+
+      <SectionCard icon="image" title="Logos" description="One logo for each kind of background. Logos are never cropped, stretched or recoloured.">
+        <div className="grid gap-4 lg:grid-cols-2">
+          <LogoSlot
+            label="Logo for light backgrounds"
+            src={draft.dealer_logo_url || null}
+            alt="Dealership logo for light backgrounds"
+            surface="light"
+            uploading={uploading}
+            error={uploadError}
+            disabled={disabled || source.isFixture}
+            guidance={source.isFixture ? "Uploading is off in the design fixture. PNG, JPEG, SVG or WebP, up to 2 MB." : "PNG, JPEG, SVG or WebP, up to 2 MB. A transparent PNG or SVG works best."}
+            onSelectFile={(f) => void pickLogo(f)}
+            onRemove={() => setConfirmRemove(true)}
+          >
+            <SourceLine>Dealer settings (dealer_logo_url), the same file the Identity summary shows.</SourceLine>
+          </LogoSlot>
+          <LogoSlot label="Logo for dark backgrounds" surface="dark" disabled guidance="PNG or SVG with a transparent background, up to 2 MB." onSelectFile={() => undefined}>
+            <BlockedFeatureNotice migrationId={PALETTE_MIGRATION} feature="Dark-surface logo" />
+            <p className="text-[13px] leading-[18px] text-adm-muted">Fallback when this is empty: the light-background logo is shown unmodified.</p>
+          </LogoSlot>
+        </div>
+      </SectionCard>
+
+      <ConfirmDialog
+        open={confirmRemove}
+        title="Remove the logo for light backgrounds?"
+        confirmLabel="Remove logo"
+        onCancel={() => setConfirmRemove(false)}
+        onConfirm={() => { setConfirmRemove(false); editor.set("dealer_logo_url", ""); }}
+      >
+        <p>This clears the logo used on documents and customer pages once you review and apply it. The file is not deleted.</p>
+        <p>Fallback after removal: documents print the dealership name. The AutoLabels mark is never used in its place.</p>
+      </ConfirmDialog>
+
+      <DetailDrawer open={fullPreview} onClose={() => setFullPreview(false)} title="Customer and document preview" description="Draft values on sample content.">
+        <PreviewOnlyNotice />
+        {previews}
+      </DetailDrawer>
+    </BrandEditorFrame>
   );
 }

@@ -174,6 +174,9 @@ export interface DealerSettings {
   // Marketing assets shown to shoppers (packet / stickers / portal).
   why_buy_here: string;            // dealership value prop / why buy here
   warranty_programs: string;       // warranty programs offered (free text)
+  // Admin 96 Why Buy metadata (rating dates and sources, item ids, award issuers). The flat dealer_* strings stay
+  // the values the Passport reads; this key only carries what they cannot.
+  why_buy_profile: unknown;
   // Structured dealer value-proposition programs (10yr/100k powertrain,
   // lifetime powertrain, free maintenance, …) with FTC-style value/offer/
   // benefit/disclosure, optional finance requirement, and placement toggles.
@@ -430,6 +433,7 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   vdp_strip_finance_params: true,
   why_buy_here: "",
   warranty_programs: "",
+  why_buy_profile: null,
   dealer_programs: [],
   oem_factory_warranties: [],
   cpo_programs: [],
