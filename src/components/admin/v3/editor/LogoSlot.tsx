@@ -1,4 +1,4 @@
-import { useId, useRef, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import { AdminButton } from "@/components/admin/v2/primitives";
 import { cn } from "@/lib/utils";
 import { AdminIcon } from "./AdminIcon";
@@ -6,6 +6,16 @@ import { EditorArtwork } from "./EditorArtwork";
 
 const CHECKERBOARD =
   "bg-[length:16px_16px] bg-[linear-gradient(45deg,#E4E9E3_25%,transparent_25%,transparent_75%,#E4E9E3_75%),linear-gradient(45deg,#E4E9E3_25%,#FFFFFF_25%,#FFFFFF_75%,#E4E9E3_75%)] [background-position:0_0,8px_8px]";
+
+export const LOGO_TYPES = ["image/png", "image/jpeg", "image/svg+xml", "image/webp"] as const;
+export const LOGO_MAX_BYTES = 2 * 1024 * 1024;
+
+export function validateLogoFile(file: { type: string; size: number }, allowed: readonly string[], maxBytes: number): string | null {
+  if (!allowed.includes(file.type)) return "Use a PNG, JPEG, SVG or WebP file.";
+  if (file.size > maxBytes) return `File is too large. The limit is ${Math.round((maxBytes / (1024 * 1024)) * 10) / 10} MB.`;
+  if (file.size === 0) return "File is empty.";
+  return null;
+}
 
 /**
  * Preview and controls for one logo variant. Uploading is the caller's job: this component only reports the chosen
@@ -15,7 +25,8 @@ export const LogoSlot = ({
   label,
   src,
   alt,
-  accept = "image/png,image/svg+xml,image/webp,image/jpeg",
+  allowedTypes = LOGO_TYPES,
+  maxBytes = LOGO_MAX_BYTES,
   guidance,
   uploading,
   progress,
@@ -29,7 +40,9 @@ export const LogoSlot = ({
   label: string;
   src?: string | null;
   alt?: string;
-  accept?: string;
+  allowedTypes?: readonly string[];
+  /** Largest file accepted before onSelectFile is called. Defaults to 2 MB. */
+  maxBytes?: number;
   guidance?: ReactNode;
   uploading?: boolean;
   /** 0 to 100 */
@@ -44,6 +57,8 @@ export const LogoSlot = ({
   const input = useRef<HTMLInputElement>(null);
   const id = useId();
   const has = Boolean(src);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const shownError = fileError ?? error;
   return (
     <div className="rounded-xl border border-adm-divider bg-adm-surface p-4 min-w-0 space-y-3">
       <p id={`${id}-label`} className="text-[14px] leading-[20px] font-semibold text-adm-ink">{label}</p>
@@ -56,7 +71,7 @@ export const LogoSlot = ({
           <img src={src ?? undefined} alt={alt ?? `${label} preview`} className="max-w-full max-h-full w-auto h-auto object-contain" />
         ) : (
           <div className="flex flex-col items-center text-center gap-1">
-            <EditorArtwork name="upload-logo" className="w-[96px]" />
+            <EditorArtwork name="upload-logo" className="h-[56px] w-[90px]" />
             <span className={cn("text-[13px]", surface === "dark" ? "text-white/80" : "text-adm-muted")}>No logo uploaded</span>
           </div>
         )}
@@ -69,10 +84,10 @@ export const LogoSlot = ({
           <p className="text-[13px] text-adm-muted">Uploading{progress !== undefined ? ` ${Math.round(progress)} percent` : ""}</p>
         </div>
       )}
-      {error && (
+      {shownError && (
         <p role="alert" className="flex items-start gap-1.5 text-[13px] leading-[18px] font-medium text-adm-danger">
-          <AdminIcon name="alert" size="compact" className="mt-px" />
-          {error}
+          <AdminIcon name="alert" size="inline" className="mt-px" />
+          {shownError}
         </p>
       )}
       {guidance && <p className="text-[13px] leading-[18px] text-adm-muted">{guidance}</p>}
@@ -80,13 +95,16 @@ export const LogoSlot = ({
         <input
           ref={input}
           type="file"
-          accept={accept}
+          accept={allowedTypes.join(",")}
           className="sr-only"
           tabIndex={-1}
           aria-labelledby={`${id}-label`}
           onChange={(e) => {
             const file = e.target.files?.[0];
-            if (file) onSelectFile(file);
+            if (!file) return;
+            const problem = validateLogoFile(file, allowedTypes, maxBytes);
+            setFileError(problem);
+            if (!problem) onSelectFile(file);
             e.target.value = "";
           }}
         />

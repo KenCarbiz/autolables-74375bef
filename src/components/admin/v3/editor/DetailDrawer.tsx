@@ -42,7 +42,7 @@ export const DetailDrawer = ({
               <IconButton name="close" label="Close details" />
             </DialogPrimitive.Close>
           </header>
-          <div className="flex-1 min-h-0 overflow-y-auto px-5 py-5 space-y-5">{children}</div>
+          <div tabIndex={0} role="region" aria-label="Details" className="flex-1 min-h-0 overflow-y-auto px-5 py-5 space-y-5 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-adm-primary">{children}</div>
           {footer && <footer className="px-5 py-4 border-t border-adm-divider flex items-center justify-end gap-3 flex-wrap">{footer}</footer>}
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

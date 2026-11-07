@@ -69,7 +69,7 @@ export const V3Breadcrumbs = ({ crumbs }: { crumbs: AdminCrumb[] }) => (
           <li key={`${c.label}-${i}`} className="flex items-center gap-2 min-w-0">
             {i > 0 && <span aria-hidden="true" className="text-adm-muted">/</span>}
             {c.href && !last ? (
-              <Link to={c.href} className="text-adm-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary rounded-sm">{c.label}</Link>
+              <Link to={c.href} className="max-sm:inline-flex max-sm:items-center max-sm:min-h-[44px] text-adm-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary rounded-sm">{c.label}</Link>
             ) : (
               <span aria-current={last ? "page" : undefined} className="truncate">{c.label}</span>
             )}

@@ -10,7 +10,7 @@ export const ScopeLabel = ({ scope, rooftopName, source, className }: { scope: S
   const how = source === "inherited" ? "Inherited from group" : source === "custom" ? "Custom for this rooftop" : null;
   return (
     <span data-scope={scope} className={cn("inline-flex items-center gap-1.5 flex-wrap text-[13px] leading-[18px] text-adm-muted", className)}>
-      <AdminIcon name={scope === "all_rooftops" ? "grid" : "building"} size="compact" />
+      <AdminIcon name={scope === "all_rooftops" ? "grid" : "building"} size="inline" />
       <span className="font-medium text-adm-ink">{where}</span>
       {how && (<><span aria-hidden="true">.</span><span>{how}</span></>)}
     </span>

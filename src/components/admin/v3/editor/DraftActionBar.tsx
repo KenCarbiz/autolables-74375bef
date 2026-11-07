@@ -56,6 +56,7 @@ export const DraftActionBar = ({
   onReview,
   onRetry,
   onRefresh,
+  retryDisabled = false,
   reviewLabel = "Review changes",
   extra,
   className,
@@ -66,6 +67,8 @@ export const DraftActionBar = ({
   onRetry?: () => void;
   /** Conflict recovery: reload the latest saved values so the user can review again. */
   onRefresh?: () => void;
+  /** The draft is invalid now (for example after further edits following a failure): Retry and Review stay off. */
+  retryDisabled?: boolean;
   reviewLabel?: string;
   extra?: ReactNode;
   className?: string;
@@ -84,10 +87,12 @@ export const DraftActionBar = ({
         </p>
         <div className="flex items-center gap-2 flex-wrap">
           {extra}
-          {kind === "failed" && onRetry && <AdminButton variant="primary" onClick={onRetry}>Retry save</AdminButton>}
+          {kind === "failed" && onRetry && <AdminButton variant="primary" onClick={onRetry} disabled={retryDisabled}>Retry save</AdminButton>}
           {kind === "conflict" && onRefresh && <AdminButton variant="primary" onClick={onRefresh}>Refresh and review</AdminButton>}
           <AdminButton variant="secondary" onClick={onDiscard} disabled={!hasChanges || busy}>Discard</AdminButton>
-          {kind !== "failed" && kind !== "conflict" && (
+          {kind === "failed" && <AdminButton variant="secondary" onClick={onReview} disabled={retryDisabled}>{reviewLabel}</AdminButton>}
+          {kind === "reviewing" && <AdminButton variant="outline" disabled aria-label="Reviewing changes"><AdminIcon name="eye" />Reviewing</AdminButton>}
+          {kind !== "failed" && kind !== "conflict" && kind !== "reviewing" && (
             <AdminButton variant="primary" onClick={onReview} disabled={kind !== "dirty"}>{reviewLabel}</AdminButton>
           )}
         </div>

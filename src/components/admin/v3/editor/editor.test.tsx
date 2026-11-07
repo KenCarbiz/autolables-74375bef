@@ -1,11 +1,14 @@
 import { useState } from "react";
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, within, fireEvent, waitFor } from "@testing-library/react";
+import { act, render, screen, within, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import {
   ColorField, DataTable, DraftActionBar, ReviewChangesDialog, SortableList, StatusBadge, deriveDraftBarState, draftBarText,
-  BlockedFeatureNotice, MetricCard, ScopeLabel, ADMIN_ICON_NAMES, type DataColumn, type SortableItem, type StatusState,
+  BlockedFeatureNotice, LogoSlot, MetricCard, WeekScheduleEditor, WEEK_DAYS, dayError, weekErrors, closesNextDay, type WeekSchedule, ScopeLabel, ADMIN_ICON_NAMES, type DataColumn, type SortableItem, type StatusState,
 } from ".";
+import { deepEqual } from "@/lib/admin/useEditorDraft";
+import { renderHook } from "@testing-library/react";
+import { useSaveFlow } from "@/lib/admin/useSaveFlow";
 import { STATUS_META } from "./StatusBadge";
 
 describe("StatusBadge", () => {
@@ -167,5 +170,74 @@ describe("misc", () => {
   });
   it("exposes all 84 semantic icons", () => {
     expect(ADMIN_ICON_NAMES).toHaveLength(84);
+  });
+});
+
+describe("round 2 fixes", () => {
+  it("retry and review are disabled when the draft is invalid after a failure", () => {
+    render(<DraftActionBar state={{ kind: "failed" }} onDiscard={() => {}} onReview={() => {}} onRetry={() => {}} retryDisabled />);
+    expect(screen.getByRole("button", { name: "Retry save" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Review changes" })).toBeDisabled();
+  });
+  it("useSaveFlow resets when the scope key changes", async () => {
+    const { result, rerender } = renderHook(({ k }) => useSaveFlow(k), { initialProps: { k: "a" } });
+    await act(async () => { await result.current.run(async () => { throw new Error("nope"); }); });
+    expect(result.current.phase).toBe("failed");
+    rerender({ k: "b" });
+    expect(result.current.phase).toBe("idle");
+  });
+  it("deepEqual handles Set, Map and Date", () => {
+    expect(deepEqual(new Set([1, 2]), new Set([2, 1]))).toBe(true);
+    expect(deepEqual(new Set([1]), new Set([2]))).toBe(false);
+    expect(deepEqual(new Map([["a", 1]]), new Map([["a", 1]]))).toBe(true);
+    expect(deepEqual(new Map([["a", 1]]), new Map([["a", 2]]))).toBe(false);
+    expect(deepEqual(new Date(1), new Date(1))).toBe(true);
+    expect(deepEqual(new Date(1), new Date(2))).toBe(false);
+  });
+  it("LogoSlot rejects wrong type and oversize files before calling onSelectFile", () => {
+    const onSelect = vi.fn();
+    const { container } = render(<LogoSlot label="Logo" onSelectFile={onSelect} maxBytes={100} />);
+    const input = container.querySelector("input[type=file]") as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(["x"], "a.gif", { type: "image/gif" })] } });
+    expect(screen.getByRole("alert")).toHaveTextContent("PNG, JPEG, SVG or WebP");
+    fireEvent.change(input, { target: { files: [new File(["x".repeat(200)], "a.png", { type: "image/png" })] } });
+    expect(screen.getByRole("alert")).toHaveTextContent("too large");
+    expect(onSelect).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { files: [new File(["x"], "a.png", { type: "image/png" })] } });
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+  it("week schedule: midnight close, 24 hours and overnight are valid; zero length is not", () => {
+    expect(dayError({ open: true, from: "09:00", to: "24:00" })).toBeNull();
+    expect(dayError({ open: true, from: "00:00", to: "00:00", allDay: true })).toBeNull();
+    expect(dayError({ open: true, from: "20:00", to: "02:00" })).toBeNull();
+    expect(closesNextDay({ open: true, from: "20:00", to: "02:00" })).toBe(true);
+    expect(dayError({ open: true, from: "09:00", to: "09:00" })).toMatch(/must differ/);
+    expect(dayError({ open: false, from: "09:00", to: "09:00" })).toBeNull();
+    const week = Object.fromEntries(WEEK_DAYS.map((d) => [d, { open: true, from: "09:00", to: "17:00" }])) as WeekSchedule;
+    week.Monday = { open: true, from: "10:00", to: "10:00" };
+    expect(Object.keys(weekErrors(week))).toEqual(["Monday"]);
+  });
+  it("week schedule shows 'closes next day' and an Open switch on every day", () => {
+    const week = Object.fromEntries(WEEK_DAYS.map((d) => [d, { open: d !== "Sunday", from: "20:00", to: "02:00" }])) as WeekSchedule;
+    render(<WeekScheduleEditor value={week} onChange={() => {}} />);
+    expect(screen.getAllByText("closes next day")).toHaveLength(6);
+    expect(screen.getByRole("switch", { name: "Sunday open" })).not.toBeChecked();
+    expect(screen.getByRole("switch", { name: "Monday open" })).toBeChecked();
+  });
+  it("desktop rows open by keyboard even when no column is primary", () => {
+    const open = vi.fn();
+    const plain: DataColumn<R>[] = [{ id: "n", header: "Name", cell: (r) => r.name }];
+    render(<DataTable caption="Fixtures" columns={plain} rows={rows} rowKey={(r) => r.id} onOpenRow={open} rowLabel={(r) => r.name} />);
+    fireEvent.click(screen.getByRole("button", { name: "Open details for Fixture 1" }));
+    expect(open).toHaveBeenCalledWith(rows[0]);
+  });
+  it("review dialog shows a swatch for colors and a focusable scroll region", async () => {
+    render(<ReviewChangesDialog open scope="Fixture" changes={[{ id: "c", label: "Primary color", before: "#2457D6", after: "#1D46AE" }]} onCancel={() => {}} onApply={() => {}} />);
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog.querySelectorAll("[data-swatch]")).toHaveLength(2);
+    const region = within(dialog).getByRole("region", { name: "Changes to review" });
+    expect(region).toHaveAttribute("tabindex", "0");
+    await waitFor(() => expect(region).toHaveFocus());
   });
 });

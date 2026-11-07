@@ -3,19 +3,22 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AdminButton } from "@/components/admin/v2/primitives";
 import { useReturnFocus } from "@/components/admin/v2/useReturnFocus";
+import { registerLeaveGuard } from "@/lib/admin/leaveGuardRegistry";
 
-type Pending = { kind: "href"; href: string } | { kind: "back" };
+type Pending = { kind: "href"; href: string } | { kind: "back"; replay: () => void };
 
 /**
- * Guards unsaved work. The app uses a classic BrowserRouter, which has no blocker API, so in-app link clicks and
- * Back are intercepted here and tab close or reload uses beforeunload. Render the returned `dialog` once.
+ * Guards unsaved work. In-app link clicks are intercepted here; Back and Forward go through the module-level
+ * registry in leaveGuardRegistry.ts because the router unmounts the editor before a component listener could
+ * run. Tab close and reload use beforeunload. Render LeaveGuardDialog once with the returned state.
  */
 export function useLeaveGuard(dirty: boolean) {
   const navigate = useNavigate();
   const location = useLocation();
   const [pending, setPending] = useState<Pending | null>(null);
   const bypass = useRef(false);
-  const ignorePop = useRef(false);
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
   const here = useRef(location.pathname + location.search);
   here.current = location.pathname + location.search;
 
@@ -29,6 +32,8 @@ export function useLeaveGuard(dirty: boolean) {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [dirty]);
 
+  useEffect(() => registerLeaveGuard({ isDirty: () => dirtyRef.current, onBlocked: (replay) => setPending({ kind: "back", replay }) }), []);
+
   useEffect(() => {
     if (!dirty) return;
     const onClick = (e: MouseEvent) => {
@@ -37,24 +42,13 @@ export function useLeaveGuard(dirty: boolean) {
       if (!anchor || (anchor.target && anchor.target !== "_self") || anchor.hasAttribute("download")) return;
       const url = new URL(anchor.href, window.location.href);
       if (url.origin !== window.location.origin) return;
-      const next = url.pathname + url.search + url.hash;
       if (url.pathname + url.search === here.current) return;
       e.preventDefault();
       e.stopPropagation();
-      setPending({ kind: "href", href: next });
-    };
-    const onPop = () => {
-      if (ignorePop.current) { ignorePop.current = false; return; }
-      ignorePop.current = true;
-      window.history.go(1);
-      setPending({ kind: "back" });
+      setPending({ kind: "href", href: url.pathname + url.search + url.hash });
     };
     document.addEventListener("click", onClick, true);
-    window.addEventListener("popstate", onPop);
-    return () => {
-      document.removeEventListener("click", onClick, true);
-      window.removeEventListener("popstate", onPop);
-    };
+    return () => document.removeEventListener("click", onClick, true);
   }, [dirty]);
 
   const stay = useCallback(() => setPending(null), []);
@@ -64,7 +58,7 @@ export function useLeaveGuard(dirty: boolean) {
     if (!target) return;
     bypass.current = true;
     if (target.kind === "href") navigate(target.href);
-    else { ignorePop.current = true; window.history.go(-1); }
+    else target.replay();
     window.setTimeout(() => { bypass.current = false; }, 0);
   }, [pending, navigate]);
 
@@ -73,12 +67,15 @@ export function useLeaveGuard(dirty: boolean) {
 
 export const LeaveGuardDialog = ({ open, onStay, onLeave }: { open: boolean; onStay: () => void; onLeave: () => void }) => {
   const returnFocus = useReturnFocus(open);
+  const keep = useRef<HTMLButtonElement>(null);
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(next) => { if (!next) onStay(); }}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-[60] bg-[#0B1526]/50" />
         <DialogPrimitive.Content
           role="alertdialog"
+          data-admin-v3=""
+          onOpenAutoFocus={(e) => { e.preventDefault(); keep.current?.focus(); }}
           onCloseAutoFocus={returnFocus}
           className="fixed z-[60] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-24px)] sm:w-full max-w-[440px] rounded-xl bg-adm-surface border border-adm-border shadow-xl text-adm-ink p-6 space-y-4"
         >
@@ -88,7 +85,7 @@ export const LeaveGuardDialog = ({ open, onStay, onLeave }: { open: boolean; onS
           </DialogPrimitive.Description>
           <div className="flex justify-end gap-3 flex-wrap">
             <AdminButton variant="danger" onClick={onLeave}>Discard and leave</AdminButton>
-            <AdminButton variant="primary" onClick={onStay}>Keep editing</AdminButton>
+            <AdminButton ref={keep} variant="primary" onClick={onStay}>Keep editing</AdminButton>
           </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

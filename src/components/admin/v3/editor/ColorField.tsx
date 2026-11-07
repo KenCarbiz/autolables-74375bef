@@ -9,7 +9,7 @@ const Contrast = ({ hex, against, label }: { hex: string; against: string; label
   const pass = ratio >= AA_NORMAL_TEXT;
   return (
     <li className="flex items-center gap-2 text-[13px] leading-[18px]">
-      <AdminIcon name={pass ? "check-circle" : "alert"} size="compact" className={pass ? "text-adm-success" : "text-adm-warning"} />
+      <AdminIcon name={pass ? "check-circle" : "alert"} size="inline" className={pass ? "text-adm-success" : "text-adm-warning"} />
       <span className="text-adm-ink">{label}: <span className="tabular-nums">{formatRatio(ratio)}</span></span>
       <span className={cn("font-semibold", pass ? "text-adm-success" : "text-adm-warning")}>{pass ? "Passes AA" : "Fails AA for body text"}</span>
     </li>
@@ -77,7 +77,7 @@ export const ColorField = ({
       </div>
       {error && (
         <p id={`${id}-err`} role="alert" className="flex items-start gap-1.5 text-[13px] leading-[18px] font-medium text-adm-danger">
-          <AdminIcon name="alert" size="compact" className="mt-px" />
+          <AdminIcon name="alert" size="inline" className="mt-px" />
           {error}
         </p>
       )}

@@ -88,8 +88,8 @@ export const ICON_TILE = {
 } as const;
 
 /** Soft tinted square that holds a 20 to 24px glyph (handoff: stable 40px container). */
-export const AdminIconTile = ({ name, tile = "md", tone = "primary", className }: { name: AdminIconName; tile?: keyof typeof ICON_TILE; tone?: "primary" | "neutral"; className?: string }) => (
-  <span aria-hidden="true" className={cn("inline-grid place-items-center flex-shrink-0", ICON_TILE[tile], tone === "primary" ? "bg-adm-selected text-adm-primary" : "bg-adm-workspace text-adm-muted", className)}>
+export const AdminIconTile = ({ name, tile = "md", tone = "primary", className }: { name: AdminIconName; tile?: keyof typeof ICON_TILE; tone?: "primary" | "neutral" | "danger"; className?: string }) => (
+  <span aria-hidden="true" className={cn("inline-grid place-items-center flex-shrink-0", ICON_TILE[tile], tone === "primary" ? "bg-adm-selected text-adm-primary" : tone === "danger" ? "bg-adm-danger-bg text-adm-danger" : "bg-adm-workspace text-adm-muted", className)}>
     <AdminIcon name={name} size="card" />
   </span>
 );

@@ -108,7 +108,7 @@ export const FieldRow = ({
       {help && <p id={helpId} className="mt-1.5 text-[13px] leading-[18px] text-adm-muted">{help}</p>}
       {error && (
         <p id={errorId} role="alert" className="mt-1.5 flex items-start gap-1.5 text-[13px] leading-[18px] font-medium text-adm-danger">
-          <AdminIcon name="alert" size="compact" className="mt-px" />
+          <AdminIcon name="alert" size="inline" className="mt-px" />
           <span>{error}</span>
         </p>
       )}

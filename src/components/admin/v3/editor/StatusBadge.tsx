@@ -39,7 +39,7 @@ export const StatusBadge = ({ state, label, className }: { state: StatusState; l
   const meta = STATUS_META[state];
   return (
     <span data-status={state} className={cn("inline-flex items-center gap-1.5 rounded-md px-2 py-[3px] text-[13px] leading-[18px] font-semibold whitespace-nowrap", TONE_CLASS[meta.tone], className)}>
-      <AdminIcon name={meta.icon} size="compact" />
+      <AdminIcon name={meta.icon} size="inline" />
       {label ?? meta.label}
     </span>
   );

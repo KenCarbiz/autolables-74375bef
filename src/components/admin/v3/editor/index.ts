@@ -15,3 +15,4 @@ export * from "./ChipInput";
 export * from "./WeekScheduleEditor";
 export * from "./EditorArtwork";
 export * from "./ScopeLabel";
+export * from "./FormControls";

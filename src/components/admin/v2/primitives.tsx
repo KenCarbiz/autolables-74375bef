@@ -1,4 +1,4 @@
-import type { ReactNode, ButtonHTMLAttributes, AnchorHTMLAttributes, CSSProperties } from "react";
+import { forwardRef, type ReactNode, type ButtonHTMLAttributes, type AnchorHTMLAttributes, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { AlertTriangle, CheckCircle2, Info, XCircle, ChevronRight } from "lucide-react";
 import { HEALTH_META, type HealthState, type HealthTone, type HealthVerdict, needsAttention } from "@/lib/admin/health";
@@ -224,9 +224,10 @@ const BUTTON_VARIANT: Record<NonNullable<ButtonProps["variant"]>, string> = {
 // A caller's min-h-* class must win through tailwind-merge, so the desktop height carries no variant prefix.
 const BUTTON_SIZE = { sm: "min-h-[32px] px-3 text-[13px]", md: "min-h-[36px] px-3.5 max-sm:min-h-[44px]" };
 
-export const AdminButton = ({ variant = "secondary", size = "md", className, type = "button", ...rest }: ButtonProps) => (
-  <button type={type} className={cn(BUTTON_BASE, BUTTON_VARIANT[variant], BUTTON_SIZE[size], className)} {...rest} />
-);
+export const AdminButton = forwardRef<HTMLButtonElement, ButtonProps>(({ variant = "secondary", size = "md", className, type = "button", ...rest }, ref) => (
+  <button ref={ref} type={type} className={cn(BUTTON_BASE, BUTTON_VARIANT[variant], BUTTON_SIZE[size], className)} {...rest} />
+));
+AdminButton.displayName = "AdminButton";
 
 export const AdminLinkButton = ({ variant = "secondary", size = "md", className, to, ...rest }: AnchorHTMLAttributes<HTMLAnchorElement> & { to: string; variant?: ButtonProps["variant"]; size?: ButtonProps["size"] }) => (
   <Link to={to} className={cn(BUTTON_BASE, BUTTON_VARIANT[variant], BUTTON_SIZE[size], className)} {...rest} />

@@ -42,16 +42,16 @@ export const ChipInput = ({
       {values.length > 0 && (
         <ul aria-label={`${label} entries`} className="flex flex-wrap gap-2">
           {values.map((v) => (
-            <li key={v} className="inline-flex items-center gap-1 rounded-full bg-adm-selected text-adm-primary pl-3 pr-1 min-h-[32px] text-[14px] font-medium max-w-full">
+            <li key={v} className="inline-flex items-center gap-1 rounded-full bg-adm-selected text-adm-primary pl-3 pr-1 min-h-[32px] max-sm:min-h-[44px] text-[14px] font-medium max-w-full">
               <span className="break-all">{v}</span>
               <button
                 type="button"
                 disabled={disabled}
                 aria-label={`Remove ${v}`}
                 onClick={() => { onChange(values.filter((x) => x !== v)); setAnnounce(`${v} removed`); }}
-                className="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-adm-surface disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary"
+                className="inline-flex items-center justify-center w-8 h-8 max-sm:w-11 max-sm:h-11 rounded-full hover:bg-adm-surface disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary"
               >
-                <AdminIcon name="close" size="compact" />
+                <AdminIcon name="close" size="inline" />
               </button>
             </li>
           ))}

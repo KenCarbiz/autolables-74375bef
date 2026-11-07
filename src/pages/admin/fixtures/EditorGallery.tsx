@@ -1,11 +1,12 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { useSearchParams } from "react-router-dom";
 import { V3Header, V3Page } from "@/components/admin/v3/AdminV3";
 import { AdminButton } from "@/components/admin/v2/primitives";
 import {
   AdminIcon, ADMIN_ICON_NAMES, AdvancedDisclosure, BlockedFeatureNotice, ChipInput, ColorField, DataTable, DetailDrawer, DraftActionBar,
   EditorEmpty, EditorLayout, FieldGroup, FieldRow, INPUT_CLASS, LogoSlot, MetricCard, PreviewOnlyNotice, ReviewChangesDialog,
-  ScopeLabel, SectionCard, SortableList, StatusBadge, WeekScheduleEditor, type DaySchedule, type StatusState, type WeekSchedule, WEEK_DAYS,
+  LeaveGuardDialog, ScopeLabel, SelectField, useLeaveGuard, SectionCard, SortableList, StatusBadge, WeekScheduleEditor, type DaySchedule, type StatusState, type WeekSchedule, WEEK_DAYS,
   type DataColumn, type SortableItem,
 } from "@/components/admin/v3/editor";
 import { STATUS_META } from "@/components/admin/v3/editor/StatusBadge";
@@ -29,7 +30,8 @@ const COLUMNS: DataColumn<Row>[] = [
 ];
 
 const OPEN: DaySchedule = { open: true, from: "09:00", to: "18:00" };
-const INITIAL_WEEK = Object.fromEntries(WEEK_DAYS.map((d) => [d, d === "Sunday" ? { open: false, from: "10:00", to: "16:00" } : d === "Saturday" ? { open: true, from: "09:00", to: "08:00" } : OPEN])) as WeekSchedule;
+const OVERNIGHT: DaySchedule = { open: true, from: "20:00", to: "02:00" };
+const INITIAL_WEEK = Object.fromEntries(WEEK_DAYS.map((d) => [d, d === "Sunday" ? { open: false, from: "10:00", to: "16:00" } : d === "Saturday" ? { open: true, from: "09:00", to: "09:00" } : d === "Friday" ? OVERNIGHT : d === "Thursday" ? { open: true, from: "09:00", to: "24:00" } : d === "Wednesday" ? { open: true, from: "00:00", to: "00:00", allDay: true } : OPEN])) as WeekSchedule;
 
 const Block = ({ title, children }: { title: string; children: ReactNode }) => (
   <section aria-label={title} className="space-y-3">
@@ -37,6 +39,17 @@ const Block = ({ title, children }: { title: string; children: ReactNode }) => (
     {children}
   </section>
 );
+
+const GuardDemo = () => {
+  const guard = useLeaveGuard(true);
+  return (
+    <>
+      <p className="text-[14px] text-adm-muted">Guard is armed on this page (?guard=1). Follow the link, or press Back, to see the dialog.</p>
+      <Link to="/admin" className="inline-flex items-center min-h-[44px] text-[14px] font-semibold text-adm-primary hover:underline">Go to Administration</Link>
+      <LeaveGuardDialog open={guard.pending} onStay={guard.stay} onLeave={guard.leave} />
+    </>
+  );
+};
 
 export default function EditorGallery() {
   const [search, setSearch] = useSearchParams();
@@ -51,6 +64,7 @@ export default function EditorGallery() {
   const [color, setColor] = useState("#2457D6");
   const [badColor, setBadColor] = useState("#24G7");
   const [lightLogo, setLightLogo] = useState<string | null>(null);
+  useEffect(() => () => { if (lightLogo) URL.revokeObjectURL(lightLogo); }, [lightLogo]);
   const [items, setItems] = useState<SortableItem[]>([{ id: "a", label: "Fixture module A" }, { id: "b", label: "Fixture module B" }, { id: "c", label: "Fixture module C" }]);
   const [chips, setChips] = useState(["fixture-one", "fixture-two"]);
   const [week, setWeek] = useState<WeekSchedule>(INITIAL_WEEK);
@@ -93,6 +107,8 @@ export default function EditorGallery() {
           </div>
         </Block>
 
+        {search.get("guard") === "1" && <Block title="Leave guard"><GuardDemo /></Block>}
+
         <Block title="Status vocabulary">
           <div className="flex flex-wrap gap-2">{stateList.map((s) => <StatusBadge key={s} state={s} />)}</div>
         </Block>
@@ -130,7 +146,7 @@ export default function EditorGallery() {
         </Block>
 
         <Block title="Inputs">
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2 items-start">
             <SectionCard title="Colors" icon="palette">
               <ColorField name="Fixture primary" role="Primary" value={color} onChange={setColor} />
               <ColorField name="Fixture invalid" role="Accent" value={badColor} onChange={setBadColor} />
@@ -146,18 +162,18 @@ export default function EditorGallery() {
               <SortableList label="Fixture modules" items={items} onChange={setItems} />
               <ChipInput label="Fixture tags" values={chips} onChange={setChips} />
             </SectionCard>
-            <SectionCard title="Weekly hours" icon="clock" description="Saturday shows an invalid range.">
+            <SectionCard title="Weekly hours" icon="clock" description="Saturday shows a zero-length range. Friday is overnight, Thursday closes at midnight, Wednesday is open 24 hours.">
               <WeekScheduleEditor
                 value={week}
                 onChange={setWeek}
-                timezoneSlot={<FieldRow label="Time zone">{(p) => <select {...p} className={INPUT_CLASS}><option>Fixture / Zone</option></select>}</FieldRow>}
+                timezoneSlot={<FieldRow label="Time zone">{(p) => <SelectField {...p}><option>Fixture / Zone</option></SelectField>}</FieldRow>}
               />
             </SectionCard>
           </div>
         </Block>
 
         <Block title="Table with 60 rows, plus empty, error and loading">
-          <DataTable caption="Fixture items" columns={COLUMNS} rows={ROWS} rowKey={(r) => r.id} searchText={(r) => `${r.name} ${r.kind}`} rowLabel={(r) => r.name} onOpenRow={(r) => { setDetail(r); setFlag("drawer", true); }} filters={<select aria-label="Filter by type" className={INPUT_CLASS + " w-auto"}><option>All types</option></select>} />
+          <DataTable caption="Fixture items" columns={COLUMNS} rows={ROWS} rowKey={(r) => r.id} searchText={(r) => `${r.name} ${r.kind}`} rowLabel={(r) => r.name} onOpenRow={(r) => { setDetail(r); setFlag("drawer", true); }} filters={<SelectField aria-label="Filter by type" wrapperClassName="w-auto"><option>All types</option></SelectField>} />
           <div className="grid gap-4 lg:grid-cols-3">
             <DataTable caption="Empty fixtures" columns={COLUMNS} rows={[]} rowKey={(r) => r.id} searchText={() => ""} emptyTitle="No fixtures yet" emptyDescription="Add the first fixture to see it here." />
             <DataTable caption="Failing fixtures" columns={COLUMNS} rows={undefined} error={{ message: "The fixture service did not answer.", onRetry: () => {} }} rowKey={(r) => r.id} />
@@ -185,12 +201,14 @@ export default function EditorGallery() {
         </Block>
       </div>
 
-      <DetailDrawer open={drawerOpen && detail !== null} onClose={() => setFlag("drawer", false)} title={detail?.name ?? "Details"} description="Fixture detail drawer">
+      <DetailDrawer open={drawerOpen && detail !== null} onClose={() => setFlag("drawer", false)} title={detail?.name ?? "Details"} description="Fixture detail drawer" footer={<><AdminButton onClick={() => setFlag("drawer", false)}>Close</AdminButton><AdminButton variant="primary">Fixture action</AdminButton></>}>
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-[14px]">
           <dt className="text-adm-muted">Type</dt><dd>{detail?.kind}</dd>
           <dt className="text-adm-muted">Updated</dt><dd>{detail?.updated}</dd>
           <dt className="text-adm-muted">Status</dt><dd>{detail && <StatusBadge state={detail.status} />}</dd>
         </dl>
+        <hr className="border-adm-divider" />
+        <p className="text-[14px] text-adm-muted">Fixture notes appear here. Long content scrolls inside the drawer body.</p>
       </DetailDrawer>
 
       <ReviewChangesDialog

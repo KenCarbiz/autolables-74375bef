@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export type SavePhase = "idle" | "reviewing" | "saving" | "saved" | "failed" | "conflict";
 
@@ -13,10 +13,15 @@ export class SaveConflictError extends Error {
  * Tracks the review and save lifecycle. "saved" is set only after the persist callback resolves, so the UI
  * never claims success before the server confirmed. A rejection keeps the draft with the caller.
  */
-export function useSaveFlow() {
+export function useSaveFlow(resetKey?: string) {
   const [phase, setPhase] = useState<SavePhase>("idle");
   const [message, setMessage] = useState<string | null>(null);
   const inFlight = useRef(false);
+
+  useEffect(() => {
+    setPhase("idle");
+    setMessage(null);
+  }, [resetKey]);
 
   const openReview = useCallback(() => setPhase("reviewing"), []);
   const closeReview = useCallback(() => setPhase((p) => (p === "reviewing" ? "idle" : p)), []);

@@ -19,6 +19,7 @@ import { ScrollRegion } from "@/components/admin/v2/ScrollRegion";
 import { cn } from "@/lib/utils";
 import { AdminIcon } from "./AdminIcon";
 import { INPUT_CLASS } from "./EditorLayout";
+import { SelectField } from "./FormControls";
 import { EditorEmpty } from "./EditorArtwork";
 
 export const PAGE_SIZES = [25, 50, 100] as const;
@@ -76,13 +77,14 @@ export function DataTable<T>({
   const start = page * pageSize;
   const visible = filtered.slice(start, start + pageSize);
 
+  const primaryColumn = columns.find((c) => c.primary) ?? columns[0];
   const state: "loading" | "error" | "empty" | "no-results" | "ready" = loading ? "loading" : error ? "error" : !rows || rows.length === 0 ? "empty" : filtered.length === 0 ? "no-results" : "ready";
 
   return (
     <div data-table-state={state} className="rounded-xl bg-adm-surface border border-adm-divider shadow-[0_1px_2px_rgba(27,43,59,0.06)]">
-      {(searchText || filters) && (
+      {((searchText && state !== "empty") || filters) && (
         <div className="flex flex-wrap items-end gap-3 px-4 py-3 border-b border-adm-divider">
-          {searchText && (
+          {searchText && state !== "empty" && (
             <div className="relative flex-1 basis-[220px] max-w-md">
               <label htmlFor={`${id}-search`} className="sr-only">{searchLabel}</label>
               <AdminIcon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-adm-muted pointer-events-none" />
@@ -120,7 +122,7 @@ export function DataTable<T>({
           {narrow ? (
             <ul aria-label={caption} className="divide-y divide-adm-divider">
               {visible.map((row) => {
-                const primary = columns.find((c) => c.primary) ?? columns[0];
+                const primary = primaryColumn;
                 const rest = columns.filter((c) => c !== primary);
                 return (
                   <li key={rowKey(row)} className="px-4 py-3 space-y-2">
@@ -156,7 +158,7 @@ export function DataTable<T>({
                   >
                     {columns.map((c) => (
                       <td key={c.id} className={cn("px-4 py-3 align-middle", c.align === "right" && "text-right tabular-nums", c.className)}>
-                        {c.primary && onOpenRow ? (
+                        {onOpenRow && c === primaryColumn ? (
                           <button type="button" aria-label={rowLabel ? `Open details for ${rowLabel(row)}` : undefined} onClick={() => onOpenRow(row)} className="text-left font-semibold text-adm-primary hover:underline rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary">
                             {c.cell(row)}
                           </button>
@@ -174,9 +176,9 @@ export function DataTable<T>({
             <div className="flex items-center gap-3 flex-wrap">
               <label className="flex items-center gap-2">
                 <span>Rows per page</span>
-                <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value) as PageSize); setPage(0); }} className={cn(INPUT_CLASS, "w-auto")}>
+                <SelectField value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value) as PageSize); setPage(0); }} wrapperClassName="w-auto">
                   {PAGE_SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
-                </select>
+                </SelectField>
               </label>
               <nav aria-label={`${caption} pages`} className="flex items-center gap-2">
                 <AdminButton variant="secondary" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}>
