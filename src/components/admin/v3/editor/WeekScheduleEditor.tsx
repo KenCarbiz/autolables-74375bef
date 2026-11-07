@@ -31,7 +31,7 @@ export function timeOptions(stepMinutes = 30, includeEndOfDay = false): string[]
 }
 
 export function formatTime(value: string): string {
-  if (value === END_OF_DAY) return "12:00 AM (midnight)";
+  if (value === END_OF_DAY) return "Midnight";
   const [h, m] = value.split(":").map(Number);
   const suffix = h >= 12 ? "PM" : "AM";
   return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, "0")} ${suffix}`;
@@ -80,8 +80,8 @@ export const TimeRangeRow = ({
         disabled={disabled}
         value={value[which]}
         onChange={(e) => onChange({ ...value, [which]: e.target.value })}
-        wrapperClassName="w-auto"
-        className="min-w-[112px]"
+        wrapperClassName="flex-1 min-w-0 md:flex-none md:w-auto"
+        className="w-full md:min-w-[112px]"
       >
         {!options.includes(value[which]) && <option value={value[which]}>{formatTime(value[which])}</option>}
         {options.map((o) => <option key={o} value={o}>{formatTime(o)}</option>)}
@@ -93,18 +93,18 @@ export const TimeRangeRow = ({
       role="group"
       aria-label={day}
       data-day={day}
-      className="grid grid-cols-[1fr_auto_auto] items-center gap-x-3 gap-y-1 py-2 md:grid-cols-[96px_104px_minmax(0,1fr)_176px] md:gap-x-4 md:min-h-[60px]"
+      className="grid grid-cols-[88px_minmax(0,1fr)] items-center gap-x-3 gap-y-2 py-3 md:py-2 md:gap-y-1 md:grid-cols-[96px_104px_minmax(0,1fr)_176px] md:gap-x-4 md:min-h-[60px]"
     >
       <span className="text-[14px] leading-[20px] font-medium text-adm-ink">{day}</span>
       <SwitchField label="Open" ariaLabel={`${day} open`} checked={value.open} disabled={disabled} onChange={(open) => onChange({ ...value, open })} />
-      <div className="order-last col-span-3 md:order-none md:col-span-1 min-w-0">
+      <div className="col-span-2 md:col-span-1 min-w-0">
         {value.open ? (
           !value.allDay ? (
-            <span className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            <span className="flex items-center gap-2 flex-wrap md:flex-nowrap">
               {select("from")}
-              <span aria-hidden="true" className="text-adm-muted">to</span>
+              <span aria-hidden="true" className="shrink-0 text-adm-muted">to</span>
               {select("to")}
-              {closesNextDay(value) && <span className="text-[13px] leading-[18px] text-adm-muted whitespace-nowrap">closes next day</span>}
+              {closesNextDay(value) && <span className="basis-full md:basis-auto text-[13px] leading-[18px] text-adm-muted whitespace-nowrap">closes next day</span>}
             </span>
           ) : (
             <span className="text-[14px] text-adm-muted">Open around the clock</span>
@@ -113,10 +113,10 @@ export const TimeRangeRow = ({
           <span className="text-[14px] text-adm-muted">Closed</span>
         )}
       </div>
-      <div className="md:col-start-4 md:row-start-1 justify-self-end md:justify-self-start">
+      <div className="col-span-2 md:col-span-1 md:col-start-4 md:row-start-1 justify-self-start whitespace-nowrap empty:hidden">
         {value.open && <SwitchField label="Open 24 hours" ariaLabel={`${day} open 24 hours`} checked={Boolean(value.allDay)} disabled={disabled} onChange={(allDay) => onChange({ ...value, allDay })} />}
       </div>
-      {error && <p id={`${id}-err`} role="alert" className="col-span-3 md:col-span-4 order-last text-[13px] leading-[18px] font-medium text-adm-danger">{error}</p>}
+      {error && <p id={`${id}-err`} role="alert" className="col-span-2 md:col-span-4 text-[13px] leading-[18px] font-medium text-adm-danger">{error}</p>}
     </div>
   );
 };

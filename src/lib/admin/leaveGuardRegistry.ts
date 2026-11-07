@@ -113,8 +113,6 @@ export function installLeaveGuardListener(): () => void {
 
 export function registerLeaveGuard(entry: LeaveGuardEntry): () => void {
   installLeaveGuardListener();
-
-import.meta.hot?.dispose(() => uninstall?.());
   syncLeaveGuardLocation();
   entries.add(entry);
   return () => { entries.delete(entry); };

@@ -164,7 +164,7 @@ export function DataTable<T>({
               <label className="flex items-center gap-2">
                 <span>Rows per page</span>
                 <SelectField value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value) as PageSize); setPage(0); }} wrapperClassName="w-auto">
-                  {(narrow ? [10, ...PAGE_SIZES] : PAGE_SIZES).map((n) => <option key={n} value={n}>{n}</option>)}
+                  {Array.from(new Set<number>([...(narrow ? [10] : []), ...PAGE_SIZES, pageSize])).sort((a, b) => a - b).map((n) => <option key={n} value={n}>{n}</option>)}
                 </SelectField>
               </label>
               <nav aria-label={`${caption} pages`} className="flex items-center gap-2">
