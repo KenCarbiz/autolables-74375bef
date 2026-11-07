@@ -5,6 +5,7 @@ import { ADMIN_SECTIONS, resolveAdminTab } from "@/lib/admin/sections";
 import { AdminShell } from "@/components/admin/v2/AdminShell";
 import { AdminCategoryPage, AdminDirectory } from "@/components/admin/v3/AdminV3";
 import { findCategory } from "@/lib/admin/categories";
+import EditorGallery from "@/pages/admin/fixtures/EditorGallery";
 import { ADMIN_VIEWS } from "@/pages/admin/views";
 import { ADMIN_FIXTURES } from "@/pages/admin/fixtures";
 import { ADMIN_CHILD_ROUTE_ELEMENTS } from "@/pages/admin/childRoutes";
@@ -103,7 +104,7 @@ export default function AdminDesignFixture() {
   if (v3) {
     const ownerCtx = { role: "owner", isAdmin: false } as const;
     const category = findCategory(v3);
-    const page = v3 === "home" ? <AdminDirectory ctx={ownerCtx} canSeeOverview /> : category ? <AdminCategoryPage category={category} ctx={ownerCtx} /> : <p className="p-8 text-sm">Unknown category {v3}.</p>;
+    const page = v3 === "components" ? <EditorGallery /> : v3 === "home" ? <AdminDirectory ctx={ownerCtx} canSeeOverview /> : category ? <AdminCategoryPage category={category} ctx={ownerCtx} /> : <p className="p-8 text-sm">Unknown category {v3}.</p>;
     return (
       <div data-admin-fixture={screen} data-product-surface="dealer" className="min-h-screen bg-adm-workspace flex">
         <FixtureChrome railWidth={railWidth}>{page}</FixtureChrome>
