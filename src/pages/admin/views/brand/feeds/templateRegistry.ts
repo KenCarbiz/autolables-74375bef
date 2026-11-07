@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useViewFixture } from "@/lib/admin/dataSource";
 import { useStickerCatalog } from "@/lib/stickerStudio/useStickerCatalog";
 import { useStickerPrefs } from "@/lib/stickerStudio/useStickerPrefs";
 import type { StudioTemplate, StickerBranding, StickerData } from "@/lib/stickerStudio/templates";
@@ -160,7 +159,7 @@ export interface RegistryState {
   legacyByKind: Record<string, string>;
 }
 
-export interface RegistryFixture { archive?: ArchiveRow[] | null; registryLoading?: boolean }
+export interface RegistryFixture { archive?: ArchiveRow[] | null; registryLoading?: boolean; templates?: StudioTemplate[] }
 
 async function readArchive(): Promise<ArchiveRow[] | null> {
   try {
@@ -174,13 +173,16 @@ async function readArchive(): Promise<ArchiveRow[] | null> {
 }
 
 export function useTemplateRegistry(): RegistryState {
-  const fixture = useViewFixture<RegistryFixture>("document-defaults");
   const { templates, loading } = useStickerCatalog();
   const { defaults: legacyByKind } = useStickerPrefs();
-  const archive = useQuery({ queryKey: ["admin-v3", "template-archive"], enabled: !fixture, queryFn: readArchive, staleTime: 60_000 });
-  const rows = fixture ? fixture.archive ?? null : archive.data ?? null;
-  const entries = buildEntries(templates, rows);
-  return { entries, loading: fixture ? !!fixture.registryLoading : loading, archiveReadable: rows !== null, legacyByKind: (legacyByKind as Record<string, string>) ?? {} };
+  const archive = useQuery({ queryKey: ["admin-v3", "template-archive"], queryFn: readArchive, staleTime: 60_000 });
+  const rows = archive.data ?? null;
+  return { entries: buildEntries(templates, rows), loading, archiveReadable: rows !== null, legacyByKind: (legacyByKind as Record<string, string>) ?? {} };
+}
+
+/** Design fixtures inject the catalog, so a fixture render makes no network read. */
+export function fixtureRegistry(fx: RegistryFixture): RegistryState {
+  return { entries: buildEntries(fx.templates ?? [], fx.archive ?? null), loading: !!fx.registryLoading, archiveReadable: fx.archive != null, legacyByKind: {} };
 }
 
 export interface OemRegistryRow {

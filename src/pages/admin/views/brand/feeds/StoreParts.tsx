@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { AdminButton } from "@/components/admin/v2/primitives";
 import InstallerContactsCard from "@/components/admin/InstallerContactsCard";
-import { AdminIcon, AdminIconTile, DetailDrawer, FieldRow, INPUT_CLASS, StatusBadge, SwitchField } from "@/components/admin/v3/editor";
+import { AdminIcon, AdminIconTile, DetailDrawer, FieldRow, INPUT_CLASS, StatusBadge, SwitchField, useIsNarrow } from "@/components/admin/v3/editor";
 import { Link } from "react-router-dom";
 import type { DealerSettings } from "@/contexts/DealerSettingsContext";
 import { CHOICE_LABEL, emailProblem, summarize, type Group, type Item, type StoreDraft } from "./storeSettingsModel";
@@ -14,16 +14,19 @@ const OnOff = ({ on }: { on: boolean }) => (
 );
 
 export const GroupCard = ({ group, draft, settings, changes, canEdit, onOpen }: { group: Group; draft: StoreDraft; settings: DealerSettings; changes: number; canEdit: boolean; onOpen: () => void }) => {
+  const narrow = useIsNarrow();
   const sum = summarize(group, draft, settings);
   const rows = group.items.filter((i): i is Extract<Item, { kind: "switch" | "linked" | "status" }> => i.kind === "switch" || i.kind === "linked" || i.kind === "status");
-  const shown = rows.slice(0, 4);
+  const lines = narrow ? sum.lines.slice(0, 1) : sum.lines.slice(0, 2);
+  const shown = narrow ? (lines.length ? [] : rows.slice(0, 1)) : rows.slice(0, 4);
+  const more = narrow ? rows.length + sum.lines.length - lines.length - shown.length : rows.length - shown.length;
   return (
-    <li className={cn("rounded-xl border bg-adm-surface p-4 sm:p-5 flex flex-col gap-4 min-w-0", changes ? "border-adm-primary ring-1 ring-adm-primary/30" : "border-adm-divider")} data-group={group.id}>
+    <li className={cn("rounded-xl border bg-adm-surface p-4 sm:p-5 flex flex-col gap-3 sm:gap-4 min-w-0 h-full", changes ? "border-adm-primary ring-1 ring-adm-primary/30" : "border-adm-divider")} data-group={group.id}>
       <div className="flex items-start gap-3">
         <AdminIconTile name={group.icon} />
         <div className="min-w-0 flex-1">
-          <h3 className="text-[16px] leading-[22px] font-semibold text-adm-ink">{group.title}</h3>
-          <p className="text-[13px] leading-[18px] text-adm-muted">{group.blurb}</p>
+          <h2 className="text-[16px] leading-[22px] font-semibold text-adm-ink">{group.title}</h2>
+          <p className="hidden sm:block text-[13px] leading-[18px] text-adm-muted">{group.blurb}</p>
         </div>
       </div>
       <div className="flex items-center gap-2 flex-wrap">
@@ -31,7 +34,7 @@ export const GroupCard = ({ group, draft, settings, changes, canEdit, onOpen }: 
         {changes > 0 && <StatusBadge state="overridden" label={changes === 1 ? "1 change" : `${changes} changes`} />}
       </div>
       <ul className="space-y-1.5 flex-1" aria-label={`${group.title} summary`}>
-        {sum.lines.slice(0, 2).map((l) => <li key={l} className="text-[14px] leading-[20px] text-adm-ink">{l}</li>)}
+        {lines.map((l) => <li key={l} className="text-[14px] leading-[20px] text-adm-ink">{l}</li>)}
         {shown.map((r) => {
           const on = r.kind === "switch" ? draft[r.key] : r.read(settings);
           return (
@@ -41,10 +44,10 @@ export const GroupCard = ({ group, draft, settings, changes, canEdit, onOpen }: 
             </li>
           );
         })}
-        {rows.length > shown.length && <li className="text-[13px] leading-[18px] text-adm-muted">and {rows.length - shown.length} more</li>}
+        {more > 0 && <li className="text-[13px] leading-[18px] text-adm-muted">and {more} more</li>}
       </ul>
-      <div>
-        <AdminButton variant={canEdit && group.id !== "integrations" ? "primary" : "secondary"} onClick={onOpen} aria-label={`${group.id === "integrations" || !canEdit ? "View" : "Configure"} ${group.title}`}>
+      <div className="mt-auto">
+        <AdminButton variant={canEdit && group.id !== "integrations" ? "primary" : "secondary"} onClick={onOpen} aria-label={`${group.id === "integrations" || !canEdit ? "View details" : "Configure"}: ${group.title}`}>
           {group.id === "integrations" || !canEdit ? "View details" : "Configure"} <AdminIcon name="chevron-right" />
         </AdminButton>
       </div>
@@ -83,7 +86,7 @@ export const GroupDrawer = ({ group, draft, settings, canEdit, errors, onSet, on
           const blocked = it.requires ? !draft[it.requires] : false;
           return (
             <div key={it.key} className="border-b border-adm-divider pb-4 last:border-0 last:pb-0">
-              {canEdit ? <SwitchField label={it.label} checked={draft[it.key]} disabled={blocked} onChange={(v) => set(it.key, v)} /> : <div className="flex items-center justify-between gap-3"><span className="text-[14px] font-medium text-adm-ink">{it.label}</span><OnOff on={draft[it.key]} /></div>}
+              {canEdit ? <SwitchField label={it.label} checked={draft[it.key]} disabled={blocked && !draft[it.key]} onChange={(v) => set(it.key, v)} /> : <div className="flex items-center justify-between gap-3"><span className="text-[14px] font-medium text-adm-ink">{it.label}</span><OnOff on={draft[it.key]} /></div>}
               {it.beta && <span className="ml-1 align-middle"><StatusBadge state="setup_required" label="Beta" /></span>}
               <p className="mt-1 text-[13px] leading-[18px] text-adm-muted">{it.description}{blocked ? ` ${it.requiresText}` : ""}</p>
             </div>

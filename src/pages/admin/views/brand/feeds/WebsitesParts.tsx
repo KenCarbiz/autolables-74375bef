@@ -57,12 +57,12 @@ export const ProviderCard = ({ provider, value, onChange, error, canEdit, onDeta
   const check = checkUrl(value, provider.hosts, provider.name);
   return (
     <li className="rounded-xl border border-adm-divider bg-adm-surface p-4 flex flex-col gap-3 min-w-0" data-provider={provider.id}>
-      <div className="flex items-center gap-3">
-        <span aria-hidden="true" className="inline-flex items-center justify-center gap-1.5 w-[92px] h-10 rounded-md border border-adm-divider bg-adm-workspace text-adm-muted flex-shrink-0">
+      <div className="space-y-2">
+        <span aria-hidden="true" data-logo-slot="" className="flex items-center justify-center w-[144px] h-12 rounded-md border border-adm-divider bg-adm-workspace text-adm-muted">
           <AdminIcon name="link" />
         </span>
-        <div className="min-w-0 flex-1">
-          <h3 className="text-[16px] leading-[22px] font-semibold text-adm-ink truncate">{provider.name}</h3>
+        <div className="flex items-center gap-x-3 gap-y-1 flex-wrap">
+          <h3 className="text-[16px] leading-[22px] font-semibold text-adm-ink">{provider.name}</h3>
           <UrlStatus value={value} hosts={provider.hosts} name={provider.name} />
         </div>
       </div>
@@ -117,7 +117,7 @@ export const LabelList = ({ labels, onChange, canEdit, error }: { labels: string
     setText("");
     setProblem(null);
   };
-  const items = labels.map((l) => ({ id: l.toLowerCase(), label: l }));
+  const items = labels.map((l, i) => ({ id: `${i}:${l.toLowerCase()}`, label: l }));
   return (
     <div className="space-y-3">
       {labels.length === 0 ? (
@@ -125,10 +125,10 @@ export const LabelList = ({ labels, onChange, canEdit, error }: { labels: string
       ) : canEdit ? (
         <SortableList label="Price labels in priority order" items={items} onChange={(next) => onChange(next.map((i) => i.label))}
           renderItem={(i) => (
-            <span className="flex items-center gap-2 flex-wrap">
-              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-adm-selected text-adm-primary text-[13px] font-semibold" aria-hidden="true">{items.findIndex((x) => x.id === i.id) + 1}</span>
-              <span className="font-medium">{i.label}</span>
-              <button type="button" onClick={() => onChange(labels.filter((l) => l.toLowerCase() !== i.id))} aria-label={`Remove ${i.label}`} className="ml-auto inline-flex items-center justify-center w-10 h-10 max-sm:w-11 max-sm:h-11 rounded-md text-adm-muted hover:bg-adm-workspace hover:text-adm-danger focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary">
+            <span className="flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-6 h-6 flex-shrink-0 rounded-full bg-adm-selected text-adm-primary text-[13px] font-semibold" aria-hidden="true">{items.findIndex((x) => x.id === i.id) + 1}</span>
+              <span className="font-medium min-w-0 flex-1 break-words">{i.label}</span>
+              <button type="button" onClick={() => onChange(labels.filter((_, idx) => idx !== items.findIndex((x) => x.id === i.id)))} aria-label={`Remove ${i.label}`} className="inline-flex flex-shrink-0 items-center justify-center w-10 h-10 max-sm:w-11 max-sm:h-11 rounded-md text-adm-muted hover:bg-adm-workspace hover:text-adm-danger focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary">
                 <AdminIcon name="close" />
               </button>
             </span>
@@ -145,7 +145,7 @@ export const LabelList = ({ labels, onChange, canEdit, error }: { labels: string
           {(p) => (
             <div className="flex flex-col sm:flex-row gap-2">
               <input {...p} value={text} placeholder="Internet Price" onChange={(e) => { setText(e.target.value); setProblem(null); }} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} className={INPUT_CLASS} />
-              <AdminButton variant="secondary" onClick={add} disabled={!text.trim()} className="sm:w-auto"><AdminIcon name="plus" />Add label</AdminButton>
+              <AdminButton variant="secondary" onClick={add} disabled={!text.trim()} className="sm:w-auto whitespace-nowrap shrink-0 sm:min-w-[132px]"><AdminIcon name="plus" />Add label</AdminButton>
             </div>
           )}
         </FieldRow>
@@ -221,8 +221,8 @@ export const ConditionMapping = ({ terms, onChange, canEdit }: { terms: string[]
           <div role="row" className="hidden md:grid grid-cols-[minmax(0,180px)_minmax(0,160px)_minmax(0,1fr)] gap-4 bg-adm-workspace px-4 py-2 text-[13px] font-semibold text-adm-muted">
             <span role="columnheader">Your term</span><span role="columnheader">Stored as</span><span role="columnheader">What happens</span>
           </div>
-          {rows.map((r) => (
-            <div role="row" key={r.term} className="grid md:grid-cols-[minmax(0,180px)_minmax(0,160px)_minmax(0,1fr)] gap-x-4 gap-y-1 px-4 py-3 items-center">
+          {rows.map((r, i) => (
+            <div role="row" key={`${i}:${r.term}`} className="grid md:grid-cols-[minmax(0,180px)_minmax(0,160px)_minmax(0,1fr)] gap-x-4 gap-y-1 px-4 py-3 items-center">
               <span role="cell" className="text-[14px] font-semibold text-adm-ink break-words">{r.term}</span>
               <span role="cell">{r.canonical ? <StatusBadge state={r.canonical === "new" ? "visible_with_data" : "enabled"} label={r.canonical === "cpo" ? "CPO (used)" : r.canonical === "new" ? "New" : "Used"} /> : <StatusBadge state="failed" label="Not mapped" />}</span>
               <span role="cell" className="text-[14px] leading-[20px] text-adm-muted">{r.note}</span>

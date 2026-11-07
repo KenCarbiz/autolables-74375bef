@@ -44,18 +44,25 @@ export const NoPreview = ({ label = "No preview for this option", compact }: { l
   </div>
 );
 
-/** Real layout, true paper ratio, never cropped: the frame is sized from the template's own paper size. */
-export const Thumb = ({ entry, branding, boxHeight = 220, scale = 0.2 }: { entry: TemplateEntry; branding: StickerBranding; boxHeight?: number; scale?: number }) => (
-  <div className="rounded-lg border border-adm-divider bg-adm-workspace overflow-hidden flex items-center justify-center flex-shrink-0 w-full" style={{ height: boxHeight }} data-preview={entry.template ? "renderer" : "none"}>
-    {entry.template ? (
-      <PreviewBoundary name={entry.name}>
-        <div aria-hidden="true" className="pointer-events-none"><TemplateRenderer template={entry.template} data={SAMPLE_DATA} branding={branding} scale={scale} /></div>
-      </PreviewBoundary>
-    ) : (
-      <NoPreview label="Builder: no stored preview" compact />
-    )}
-  </div>
-);
+/**
+ * Real layout at true paper ratio inside a fixed-size frame, never cropped. The frame is an image of the layout
+ * with sample data, so it is exposed as one labelled image and its inner sample text is presentational.
+ */
+export const Thumb = ({ entry, branding, size = "card" }: { entry: TemplateEntry; branding: StickerBranding; size?: "card" | "small" | "mini" }) => {
+  const dims = size === "card" ? { w: 168, h: 224, scale: 0.2 } : size === "small" ? { w: 120, h: 160, scale: 0.14 } : { w: 144, h: 192, scale: 0.17 };
+  return (
+    <div className="rounded-lg border border-adm-divider bg-adm-workspace overflow-hidden flex items-center justify-center flex-shrink-0 mx-auto" style={{ width: dims.w, height: dims.h }} data-preview={entry.template ? "renderer" : "none"}
+      {...(entry.template ? { role: "img", "aria-label": `Layout preview of ${entry.name}, drawn with sample data` } : {})}>
+      {entry.template ? (
+        <PreviewBoundary name={entry.name}>
+          <div className="pointer-events-none" aria-hidden="true" {...{ inert: "" }}><TemplateRenderer template={entry.template} data={SAMPLE_DATA} branding={branding} scale={dims.scale} /></div>
+        </PreviewBoundary>
+      ) : (
+        <NoPreview label="Builder: no stored preview" compact />
+      )}
+    </div>
+  );
+};
 
 const Fact = ({ label, children }: { label: string; children: ReactNode }) => (
   <div className="flex justify-between gap-3 py-1.5 border-b border-adm-divider last:border-0">
@@ -88,32 +95,34 @@ export const SlotCard = ({ resolved, slot, entry, branding, canEdit, onChange, o
         </div>
         {changed && <StatusBadge state="overridden" label="Changed" />}
       </header>
-      <div className="p-4 grid grid-cols-1 min-[520px]:grid-cols-[168px_minmax(0,1fr)] gap-4 flex-1">
-        {entry ? <Thumb entry={entry} branding={branding} /> : (
-          <div className="rounded-lg border border-dashed border-adm-border bg-adm-workspace h-[220px]"><NoPreview label={resolved.state === "missing" ? "Saved template not found" : "No default chosen"} /></div>
-        )}
-        <div className="min-w-0 flex flex-col gap-3">
-          {entry ? (
-            <>
-              <div>
-                <p className="text-[16px] leading-[22px] font-semibold text-adm-ink break-words">{entry.name}</p>
-                <div className="mt-1.5 flex flex-wrap gap-1.5"><OriginBadge origin={entry.origin} /></div>
-              </div>
-              <EntryFacts entry={entry} />
-              <p className="text-[13px] leading-[18px] text-adm-muted">{SOURCE_TEXT[resolved.source]}.{entry.note ? ` ${entry.note}` : ""}</p>
-            </>
-          ) : resolved.state === "missing" ? (
-            <div role="alert" className="rounded-lg bg-adm-danger-bg px-3 py-2 text-[14px] leading-[20px] text-adm-danger">
-              <p className="font-semibold">The saved default is not in the registry</p>
-              <p className="text-adm-ink/80">Saved value <code className="text-[13px] break-all">{resolved.ref}</code>. Documents made earlier are unchanged. Choose a template to replace it.</p>
-            </div>
-          ) : (
-            <p className="text-[14px] leading-[20px] text-adm-muted">No default is set for this slot, so the generator asks each time.</p>
+      <div className="p-4 grid grid-cols-[120px_minmax(0,1fr)] min-[520px]:grid-cols-[168px_minmax(0,1fr)] min-[520px]:grid-rows-[auto_auto_1fr] gap-x-4 gap-y-3 flex-1">
+        <div className="min-[520px]:row-span-3">
+          {entry ? <><div className="hidden min-[520px]:block"><Thumb entry={entry} branding={branding} size="card" /></div><div className="min-[520px]:hidden"><Thumb entry={entry} branding={branding} size="small" /></div></> : (
+            <div className="rounded-lg border border-dashed border-adm-border bg-adm-workspace mx-auto w-[120px] h-[160px] min-[520px]:w-[168px] min-[520px]:h-[224px]"><NoPreview label={resolved.state === "missing" ? "Saved template not found" : "No default chosen"} compact /></div>
           )}
-          <div className="mt-auto flex flex-wrap gap-2">
-            {canEdit && <AdminButton variant="primary" onClick={onChange}>Change template</AdminButton>}
-            {entry && <AdminButton variant="secondary" onClick={onPreview}><AdminIcon name="eye" />Preview</AdminButton>}
+        </div>
+        {entry ? (
+          <>
+            <div className="min-w-0">
+              <p className="text-[16px] leading-[22px] font-semibold text-adm-ink break-words">{entry.name}</p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5"><OriginBadge origin={entry.origin} /></div>
+            </div>
+            <div className="col-span-2 min-[520px]:col-span-1 min-w-0">
+              <EntryFacts entry={entry} />
+              <p className="mt-2 text-[13px] leading-[18px] text-adm-muted">{SOURCE_TEXT[resolved.source]}.{entry.note ? ` ${entry.note}` : ""}</p>
+            </div>
+          </>
+        ) : resolved.state === "missing" ? (
+          <div role="alert" className="col-span-2 min-[520px]:col-span-1 rounded-lg bg-adm-danger-bg px-3 py-2 text-[14px] leading-[20px] text-adm-danger">
+            <p className="font-semibold">The saved default is not in the registry</p>
+            <p className="text-adm-ink/80">Saved value <code className="text-[13px] break-all">{resolved.ref}</code>. Documents made earlier are unchanged. Choose a template to replace it.</p>
           </div>
+        ) : (
+          <p className="col-span-2 min-[520px]:col-span-1 text-[14px] leading-[20px] text-adm-muted">No default is set for this slot, so the generator asks each time.</p>
+        )}
+        <div className="col-span-2 min-[520px]:col-span-1 flex flex-wrap gap-2 self-end">
+          {canEdit && <AdminButton variant="primary" onClick={onChange}>Change template</AdminButton>}
+          {entry && <AdminButton variant="secondary" onClick={onPreview}><AdminIcon name="eye" />Preview</AdminButton>}
         </div>
       </div>
     </li>
@@ -189,7 +198,7 @@ export const PickerDialog = ({ slot, open, onClose, entries, current, onPick, br
           onClick={() => { if (!reason) setChoice(e.ref); }}
           className={cn("w-full text-left rounded-xl border p-3 flex flex-col gap-2 min-h-[44px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary",
             reason ? "border-adm-divider bg-adm-workspace opacity-80 cursor-not-allowed" : on ? "border-adm-primary ring-2 ring-adm-primary/30 bg-adm-selected" : "border-adm-divider bg-adm-surface hover:border-adm-primary")}>
-          <Thumb entry={e} branding={branding} boxHeight={170} scale={0.15} />
+          <Thumb entry={e} branding={branding} size="mini" />
           <span className="flex items-start gap-2">
             <span className="min-w-0 flex-1">
               <span className="block text-[14px] leading-[20px] font-semibold text-adm-ink break-words">{e.name}</span>

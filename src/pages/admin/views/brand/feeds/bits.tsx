@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { AdminIcon, AdminIconTile, StatusBadge, type AdminIconName, type StatusState } from "@/components/admin/v3/editor";
+import { AdminIcon, AdminIconTile, ScopeLabel, StatusBadge, type AdminIconName, type StatusState } from "@/components/admin/v3/editor";
 
 export const Banner = ({ tone = "info", icon, title, children, action, className }: { tone?: "info" | "warning" | "danger" | "neutral"; icon?: AdminIconName; title: string; children?: ReactNode; action?: ReactNode; className?: string }) => (
   <div role={tone === "danger" ? "alert" : "note"} className={cn(
@@ -42,4 +42,11 @@ export const LinkRow = ({ to, icon, title, description, external }: { to: string
     </span>
     <AdminIcon name="chevron-right" className="text-adm-muted flex-shrink-0 group-hover:text-adm-ink" />
   </Link>
+);
+
+export const TenantScope = ({ summary }: { summary?: ReactNode }) => (
+  <div className="flex items-start sm:items-center justify-between gap-x-4 gap-y-1 flex-wrap">
+    <ScopeLabel scope="all_rooftops" />
+    <p className="text-[13px] leading-[18px] text-adm-muted">Saved once for the whole dealer group. Switching rooftop does not change these values.{summary ? <> {summary}</> : null}</p>
+  </div>
 );

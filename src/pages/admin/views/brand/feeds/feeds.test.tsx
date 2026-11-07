@@ -110,7 +110,7 @@ describe("views", () => {
   });
   it("store settings: groups with enabled counts and a linked auto-publish", async () => {
     mount("v3-store-settings", <StoreSettingsView />);
-    expect(await screen.findByRole("button", { name: "Configure Feed automation on intake" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Configure: Feed automation on intake" })).toBeTruthy();
     expect(screen.getAllByText(/\d of \d on/).length).toBeGreaterThan(4);
   });
 });
@@ -137,18 +137,20 @@ describe("live mode", () => {
   it("the price test needs acknowledgement and runs only on click", async () => {
     live(<WebsitesFeedsView />);
     fireEvent.change(screen.getByLabelText("Vehicle page address"), { target: { value: "https://dealer.example/used/car" } });
-    const run = screen.getByRole("button", { name: "Run test" }) as HTMLButtonElement;
+    const run = screen.getByRole("button", { name: /Run one test/ }) as HTMLButtonElement;
     expect(run.disabled).toBe(true);
     fireEvent.click(screen.getByRole("checkbox"));
     expect(run.disabled).toBe(false);
     await act(async () => { fireEvent.click(run); });
     expect(h.invoke).toHaveBeenCalledTimes(1);
     expect(await screen.findByText(/Price read/)).toBeTruthy();
+    expect((screen.getByRole("checkbox") as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByRole("button", { name: /Run one test/ }) as HTMLButtonElement).disabled).toBe(true);
   });
   it("a refused write keeps the draft and reports failure", async () => {
     h.ctx.updateSettings.mockResolvedValueOnce(false);
     live(<StoreSettingsView />);
-    fireEvent.click(screen.getByRole("button", { name: "Configure Signing and printing" }));
+    fireEvent.click(screen.getByRole("button", { name: "Configure: Signing and printing" }));
     fireEvent.click(screen.getByRole("switch", { name: "Ink-saving mode" }));
     fireEvent.click(screen.getByRole("button", { name: "Done" }));
     fireEvent.click(screen.getByRole("button", { name: "Review changes" }));
@@ -167,6 +169,22 @@ describe("live mode", () => {
     const patch = h.ctx.updateSettings.mock.calls[0][0] as { label_defaults: Record<string, string> };
     expect(Object.keys(patch)).toEqual(["label_defaults"]);
     expect(patch.label_defaults.addendum_new).toMatch(/^studio:addendum-/);
+  });
+  it("Spanish Buyers Guide can still be switched off while Buyers Guide is off", () => {
+    h.ctx.settings = { ...DEFAULT_SETTINGS, feature_buyers_guide: false, feature_spanish_buyers_guide: true, feature_multilang_buyers_guide: false };
+    live(<StoreSettingsView />);
+    fireEvent.click(screen.getByRole("button", { name: "Configure: Buyers Guide" }));
+    expect((screen.getByRole("switch", { name: "Spanish Buyers Guide" }) as HTMLInputElement).disabled).toBe(false);
+    expect((screen.getByRole("switch", { name: "Multilingual Buyers Guide" }) as HTMLInputElement).disabled).toBe(true);
+  });
+  it("group buttons start their accessible name with the visible text", () => {
+    live(<StoreSettingsView />);
+    for (const b of screen.getAllByRole("button", { name: /^Configure|^View details/ })) expect(b.getAttribute("aria-label")).toMatch(/^(Configure|View details)/);
+  });
+  it("fixtures inject the template catalog and read nothing from the network", async () => {
+    mount("v3-document-defaults", <DocumentDefaultsView />);
+    expect(await screen.findAllByText("Registry ID")).toBeTruthy();
+    expect(screen.getAllByRole("img", { name: /Layout preview of/ }).length).toBeGreaterThan(0);
   });
   it("read-only members get a summary and no save bar", () => {
     h.role = "viewer";

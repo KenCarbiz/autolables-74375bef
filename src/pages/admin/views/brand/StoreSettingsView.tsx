@@ -4,7 +4,7 @@ import { AdvancedDisclosure, DraftActionBar, LeaveGuardDialog, ReviewChangesDial
 import { adminTabHref } from "@/lib/admin/sections";
 import { GROUPS, HIDDEN_KEYS, readStore, storePatch, STORE_LABELS, validateStore, type Group, type StoreDraft } from "./feeds/storeSettingsModel";
 import { useSettingsEditor } from "./feeds/useSettingsEditor";
-import { Banner, LinkRow } from "./feeds/bits";
+import { Banner, LinkRow, TenantScope } from "./feeds/bits";
 import { GroupCard, GroupDrawer } from "./feeds/StoreParts";
 
 const CHOICE_TEXT: Record<string, string> = {
@@ -40,7 +40,6 @@ export default function StoreSettingsView() {
   });
   const draft = edit.draft;
   const open = useMemo(() => GROUPS.find((g) => g.id === openId) ?? null, [openId]);
-  const rooftop = source.stores.find((s) => s.id === source.activeStoreId)?.name;
 
   if (!draft) return <div className="h-48 rounded-xl border border-adm-divider bg-adm-surface animate-pulse" aria-busy="true" aria-label="Loading store settings" />;
 
@@ -50,15 +49,12 @@ export default function StoreSettingsView() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <ScopeLabel scope="all_rooftops" />
-        <p className="text-[13px] leading-[18px] text-adm-muted">{totalOn} of {totalSwitches} switches are on. Saved once for the dealer group{rooftop ? `; you are viewing ${rooftop}` : ""}.</p>
-      </div>
+      <TenantScope summary={`${totalOn} of ${totalSwitches} switches are on.`} />
 
       {!canEdit && <Banner tone="neutral" icon="lock" title="You can view these settings but not change them">Changing store settings needs the manage settings permission. Ask an owner or manager to make the change.</Banner>}
       {ed.unreadable && <Banner tone="danger" title="Settings could not be read">Switches are not shown as saved and nothing can be applied until the settings load.</Banner>}
 
-      <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" aria-label="Setting groups">
+      <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 auto-rows-fr" aria-label="Setting groups">
         {GROUPS.map((g) => (
           <GroupCard key={g.id} group={g} draft={draft} settings={ed.settings} changes={changeCount(g)} canEdit={canEdit} onOpen={() => setOpenId(g.id)} />
         ))}

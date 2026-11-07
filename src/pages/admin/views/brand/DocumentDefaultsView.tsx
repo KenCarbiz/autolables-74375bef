@@ -5,12 +5,13 @@ import {
 } from "@/components/admin/v3/editor";
 import { adminTabHref } from "@/lib/admin/sections";
 import type { DealerSettings } from "@/contexts/DealerSettingsContext";
+import { useViewFixture } from "@/lib/admin/dataSource";
 import type { LabelDefaults, LabelSlot } from "@/lib/labelDefaults";
 import { useEstimatorSummary } from "./paymentEstimator/summary";
 import { directPatch, useSettingsEditor } from "./feeds/useSettingsEditor";
-import { Banner, LinkRow } from "./feeds/bits";
+import { Banner, LinkRow, TenantScope } from "./feeds/bits";
 import { BuyersGuideChoice, EstimatorCard, PickerDialog, PreviewDialog, SlotCard } from "./feeds/DocParts";
-import { ORIGIN_LABEL, resolveSlot, sampleBranding, SLOT_ORDER, useTemplateRegistry, type TemplateEntry } from "./feeds/templateRegistry";
+import { ORIGIN_LABEL, fixtureRegistry, resolveSlot, sampleBranding, SLOT_ORDER, useTemplateRegistry, type RegistryFixture, type RegistryState, type TemplateEntry } from "./feeds/templateRegistry";
 
 const OemReference = lazy(() => import("./feeds/OemReference"));
 
@@ -95,16 +96,24 @@ const OPTIONS = {
 };
 
 export default function DocumentDefaultsView() {
+  const fixture = useViewFixture<RegistryFixture>("document-defaults");
+  const injected = useMemo(() => (fixture ? fixtureRegistry(fixture) : null), [fixture]);
+  return injected ? <DocumentDefaultsBody registry={injected} /> : <LiveDocumentDefaults />;
+}
+
+function LiveDocumentDefaults() {
+  return <DocumentDefaultsBody registry={useTemplateRegistry()} />;
+}
+
+function DocumentDefaultsBody({ registry }: { registry: RegistryState }) {
   const ed = useSettingsEditor<DocDraft>(OPTIONS);
   const { source, edit, canEdit } = ed;
-  const registry = useTemplateRegistry();
   const estimatorLive = useEstimatorSummary();
   const estimatorSummary = source.isFixture && ed.variant === "none" ? { kind: "none" as const } : source.isFixture && ed.variant === "partial" ? { kind: "saved" as const, enabled: true, ranges: 1, complete: false, updatedAt: null } : estimatorLive.summary;
   const [picking, setPicking] = useState<LabelSlot | null>(null);
   const [previewing, setPreviewing] = useState<TemplateEntry | null>(null);
   const draft = edit.draft;
   const branding = useMemo(() => sampleBranding(ed.settings), [ed.settings]);
-  const rooftop = source.stores.find((s) => s.id === source.activeStoreId)?.name;
 
   const explicit: LabelDefaults = useMemo(() => {
     if (!draft) return {};
@@ -124,10 +133,7 @@ export default function DocumentDefaultsView() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <ScopeLabel scope="all_rooftops" />
-        <p className="text-[13px] leading-[18px] text-adm-muted">Template defaults are saved once for the dealer group.{rooftop ? ` The payment estimator below is per store (${rooftop}).` : ""}</p>
-      </div>
+      <TenantScope summary="The payment estimator below is the one per-store setting." />
 
       {!canEdit && <Banner tone="neutral" icon="lock" title="You can view these defaults but not change them">Changing document defaults needs the manage settings permission. Ask an owner or manager to make the change.</Banner>}
       {ed.unreadable && <Banner tone="danger" title="Settings could not be read">Nothing is shown as saved and nothing can be applied until the settings load.</Banner>}
@@ -147,8 +153,8 @@ export default function DocumentDefaultsView() {
         ))}
       </div>
 
-      <SectionCard icon="layers" title="Default templates" description="What each generator starts with for a new or used vehicle. Existing documents keep the template they were made with."
-        actions={<Link to="/sticker-studio" className="inline-flex items-center gap-1.5 min-h-[40px] max-sm:min-h-[44px] px-2 text-[14px] font-semibold text-adm-primary hover:underline">Open Sticker Studio <AdminIcon name="external-link" size="inline" /></Link>}>
+      <SectionCard icon="layers" title="Default templates" description="What each generator starts with for a new or used vehicle. Existing documents keep the template they were made with.">
+        <Link to="/sticker-studio" className="inline-flex items-center gap-1.5 min-h-[44px] -my-2 text-[14px] font-semibold text-adm-primary hover:underline">Open Sticker Studio <AdminIcon name="external-link" size="inline" /></Link>
         {registry.loading ? (
           <ul className="grid grid-cols-1 xl:grid-cols-2 gap-4" aria-busy="true" aria-label="Loading templates">{[0, 1, 2, 3].map((i) => <li key={i} className="h-[320px] rounded-xl border border-adm-divider bg-adm-workspace animate-pulse" />)}</ul>
         ) : (
@@ -159,7 +165,7 @@ export default function DocumentDefaultsView() {
             ))}
           </ul>
         )}
-        <p className="text-[13px] leading-[18px] text-adm-muted">Thumbnails are drawn by the live template renderer with sample vehicle data. A builder with no stored preview shows a placeholder, never a made-up image. The same default is also editable under <Link to={adminTabHref("templates")} className="font-semibold text-adm-primary hover:underline">Documents &amp; Service, Templates</Link>; both write the same stored setting.</p>
+        <p className="text-[13px] leading-[18px] text-adm-muted">Thumbnails are drawn by the live template renderer with sample vehicle data. A builder with no stored preview shows a placeholder, never a made-up image. The same default is also editable under Documents &amp; Service, Templates (linked below); both write the same stored setting.</p>
       </SectionCard>
 
       <SectionCard icon="book" title="Buyers Guide default" description="The FTC Used Car Rule form has one prescribed layout, so only its default warranty designation is chosen here.">

@@ -2,6 +2,8 @@ import type { AdminFixture } from "@/lib/admin/dataSource";
 import type { DealerSettings } from "@/contexts/DealerSettingsContext";
 import type { PriceTestResult } from "@/pages/admin/views/brand/feeds/priceTest";
 import type { ArchiveRow } from "@/pages/admin/views/brand/feeds/templateRegistry";
+import { STUDIO_TEMPLATES } from "@/lib/stickerStudio/templates";
+import { STUDIO_SATURDAY_TEMPLATES } from "@/lib/stickerStudio/saturdayTemplates";
 import { PE_PUBLISHED } from "./paymentEstimator";
 import { FIXTURE_02 } from "./02";
 import type { AdminScreenFixture } from "./index";
@@ -79,6 +81,7 @@ const docsFixture = (label: string): AdminFixture => ({
     },
     "document-defaults": {
       archive: ARCHIVE,
+      templates: [...STUDIO_TEMPLATES, ...STUDIO_SATURDAY_TEMPLATES],
       paymentEstimator: { storeName: "Example INFINITI", storeId: "store-example-1", otherStores: [], published: { config: PE_PUBLISHED, version: 3, updatedAt: "2026-10-28T15:42:00Z" }, vehicles: [], canManage: true, priceContext: {} },
       seeds: {
         none: { label_defaults: {}, default_ftc_warranty: "as_is" },
