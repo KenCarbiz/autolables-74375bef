@@ -17,7 +17,7 @@ const SAVE_META: Record<SaveState, { tone: "neutral" | "info" | "success" | "dan
 };
 
 export const SaveStatus = ({ status }: { status: SaveState }) => (
-  <StatusChip tone={SAVE_META[status].tone} icon={status !== "idle"}>
+  <StatusChip tone={SAVE_META[status].tone} icon={status !== "idle"} className="text-[13px]">
     {SAVE_META[status].label}
   </StatusChip>
 );
@@ -41,7 +41,7 @@ export const ToggleRow = ({ label, detail, checked, onChange, disabled, children
     <div className="flex items-start justify-between gap-4">
       <div className="min-w-0">
         <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{label}</p>
-        {detail && <p className="mt-0.5 text-[12px] leading-[18px] text-adm-muted">{detail}</p>}
+        {detail && <p className="mt-0.5 text-[13px] leading-[18px] text-adm-muted">{detail}</p>}
       </div>
       <PolicySwitch checked={checked} onChange={onChange} label={label} disabled={disabled} />
     </div>
@@ -49,9 +49,9 @@ export const ToggleRow = ({ label, detail, checked, onChange, disabled, children
   </div>
 );
 
-export const INPUT_CLASS = "w-full min-h-[36px] px-3 rounded-md border border-adm-border bg-adm-surface text-[14px] leading-[20px] text-adm-ink outline-none focus:border-adm-primary disabled:opacity-50";
+export const INPUT_CLASS = "w-full min-h-[44px] sm:min-h-[36px] px-3 rounded-md border border-adm-border bg-adm-surface text-[14px] leading-[20px] text-adm-ink outline-none focus:border-adm-primary disabled:opacity-50";
 export const TEXTAREA_CLASS = `${INPUT_CLASS} py-2 resize-none`;
-export const FIELD_LABEL = "block text-[12px] leading-[18px] font-semibold text-adm-muted mb-1";
+export const FIELD_LABEL = "block text-[13px] leading-[18px] font-semibold text-adm-muted mb-1";
 
 /** Legacy `&panel=` deep links scroll to the card with that id; nothing is read or written. */
 export function usePanelAnchor() {

@@ -28,6 +28,7 @@ export const ADMIN_CHILD_ROUTE_ELEMENTS: AdminChildRoute[] = [
   { path: PRODUCT_APPLICABILITY_PATH, element: lazyElement(() => import("./children/ProductApplicabilityPage")) },
   { path: ADMIN_CHILD_ROUTES.customerPreview, element: lazyElement(() => import("./children/CustomerPreviewPage")) },
   { path: ADMIN_CHILD_ROUTES.printCalibration, element: lazyElement(() => import("./children/PrintCalibrationPage")) },
+  { path: ADMIN_CHILD_ROUTES.serviceCatalog, element: lazyElement(() => import("./children/ServiceCatalogPage")) },
   { path: ADMIN_CHILD_ROUTES.paymentEstimator, element: lazyElement(() => import("./children/PaymentEstimatorAl97Page")) },
   { path: ADMIN_CHILD_ROUTES.storeIdentity, element: lazyElement(() => import("./children/StoreIdentityPage")) },
   { path: ADMIN_CHILD_ROUTES.storeInventory, element: lazyElement(() => import("./children/StoreInventoryPage")) },

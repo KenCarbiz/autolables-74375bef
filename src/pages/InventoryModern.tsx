@@ -156,7 +156,10 @@ const InventoryModern = () => {
   const [lastSync, setLastSync] = useState<{ at: string | null; status: Record<string, unknown> | null }>({ at: null, status: null });
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
-  const [status, setStatus] = useState<StatusFilter>("all");
+  const [status, setStatus] = useState<StatusFilter>(() => {
+    const v = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("status");
+    return v === "published" || v === "draft" || v === "archived" ? v : "all";
+  });
   const [derived, setDerived] = useState<DerivedFilter>("all");
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(PAGE_SIZE);

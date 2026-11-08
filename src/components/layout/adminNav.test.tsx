@@ -254,8 +254,8 @@ describe("rail groups", () => {
     expect(litAt("/prep")).toEqual(["getready"]);
     expect(litAt("/recon")).toEqual(["getready"]);
     expect(litAt("/invoices")).toEqual(["getready"]);
-    expect(litAt("/window-sticker-studio")).toEqual(["vehicles"]);
-    expect(litAt("/description-operations")).toEqual(["vehicles"]);
+    expect(litAt("/window-sticker-studio")).toEqual(["merchandising"]);
+    expect(litAt("/description-operations")).toEqual(["merchandising"]);
     expect(litAt("/leads")).toEqual(["customers"]);
   });
 

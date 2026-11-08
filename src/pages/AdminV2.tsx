@@ -3,13 +3,17 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   ADMIN_SECTIONS,
+  canSeeTab,
   firstVisibleTab,
+  resolveAdminTab,
   resolveAdminLocation,
   visibleSections,
   visibleTabs,
   type AdminChildTab,
   type AdminVisibilityContext,
 } from "@/lib/admin/sections";
+import { AdminCategoryPage, AdminDirectory } from "@/components/admin/v3/AdminV3";
+import { findCategory, visibleCategories } from "@/lib/admin/categories";
 import { AdminShell, AdminPageContainer } from "@/components/admin/v2/AdminShell";
 import { useAdminVisibility } from "@/components/admin/v2/useAdminVisibility";
 import { AdminCard, EmptyState, SkeletonBlock } from "@/components/admin/v2/primitives";
@@ -47,13 +51,29 @@ const Assembling = ({ tab }: { tab: AdminChildTab }) => (
   </AdminCard>
 );
 
+const NoAccess = () => (
+  <AdminPageContainer>
+    <AdminCard>
+      <EmptyState
+        artwork={accessRestricted}
+        title="Administration is not available for your role"
+        detail="Settings, pricing and publishing policy are managed by your store's administrators. If you need a change, ask a manager."
+      />
+    </AdminCard>
+  </AdminPageContainer>
+);
+
 export default function AdminV2() {
   const { user } = useAuth();
   const { ctx, ready } = useAdminVisibility();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const param = searchParams.get("tab");
-  const location = useMemo(() => (ready ? resolveAdminLocation(param, ctx) : null), [ready, param, ctx]);
+  const categoryParam = searchParams.get("category");
+  // V3: bare /admin is the settings directory; ?category= is a category page;
+  // ?tab= (canonical or legacy alias) is a setting page, exactly as before.
+  const directory = !param;
+  const location = useMemo(() => (ready && !directory ? resolveAdminLocation(param, ctx) : null), [ready, directory, param, ctx]);
 
   useEffect(() => {
     if (!ready) return;
@@ -61,21 +81,24 @@ export default function AdminV2() {
     if (location?.kind === "redirect") navigate(location.to, { replace: true });
   }, [ready, user, location, navigate]);
 
-  if (!ready || !location || location.kind === "redirect") return <Skeleton />;
+  if (!ready) return <Skeleton />;
 
-  if (location.kind === "none") {
-    return (
-      <AdminPageContainer>
-        <AdminCard>
-          <EmptyState
-            artwork={accessRestricted}
-            title="Administration is not available for your role"
-            detail="Settings, pricing and publishing policy are managed by your store's administrators. If you need a change, ask a manager."
-          />
-        </AdminCard>
-      </AdminPageContainer>
-    );
+  if (directory) {
+    const anyCategory = visibleCategories(ctx).length > 0;
+    const overview = resolveAdminTab("overview");
+    if (anyCategory) {
+      const category = findCategory(categoryParam);
+      if (category && visibleCategories(ctx).some((c) => c.id === category.id)) return <AdminCategoryPage category={category} ctx={ctx} />;
+      return <AdminDirectory ctx={ctx} canSeeOverview={!!overview && canSeeTab(overview.tab, ctx)} />;
+    }
   }
+
+  if (!location || location.kind === "redirect") {
+    if (directory) return <NoAccess />;
+    return <Skeleton />;
+  }
+
+  if (location.kind === "none") return <NoAccess />;
 
   const { section, tab } = location.resolved;
   const sections = visibleSections(ctx);

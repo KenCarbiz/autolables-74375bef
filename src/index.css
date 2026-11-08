@@ -619,3 +619,38 @@
 .addn-print-mode .addn-divider { border-color: rgba(14, 31, 61, 0.35) !important; }
 .addn-print-mode .addn-legalstrip { background: transparent !important; border-color: rgba(14, 31, 61, 0.2) !important; }
 .addn-print-mode .addn-vehicle { background: #ffffff !important; }
+
+:root {
+    /* Administration surface channels (tailwind `adm-*`). V2 values here
+     * serve the whole dealer app; [data-admin-v3] below re-points them for
+     * Administration only (Admin consolidation handoff, V3 tokens). */
+    --adm-sidebar: 20 35 56;
+    --adm-workspace: 245 246 248;
+    --adm-surface: 255 255 255;
+    --adm-primary: 36 87 214;
+    --adm-primary-hover: 29 70 174;
+    --adm-ink: 23 38 60;
+    --adm-muted: 89 106 128;
+    --adm-border: 214 223 234;
+    --adm-divider: 214 223 234;
+    --adm-preview: 233 238 234;
+    --adm-selected: 234 240 255;
+    --adm-success: 22 115 71;
+    --adm-success-bg: 232 245 238;
+    --adm-warning: 148 96 0;
+    --adm-warning-bg: 255 244 216;
+    --adm-danger: 180 35 24;
+    --adm-danger-bg: 254 236 236;
+}
+
+/* Administration V3: warmer workspace, AA secondary text (#5F706B on
+ * #F6F6F3 is 4.9:1), quiet dividers. Scoped to Administration screens. */
+[data-admin-v3] {
+  --adm-sidebar: 22 38 56;
+  --adm-workspace: 246 246 243;
+  --adm-ink: 27 43 59;
+  --adm-muted: 95 112 107;
+  --adm-border: 211 218 212;
+  --adm-divider: 228 233 227;
+  --adm-preview: 233 238 234;
+}

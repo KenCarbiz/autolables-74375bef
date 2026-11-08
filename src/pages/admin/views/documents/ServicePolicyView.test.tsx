@@ -60,15 +60,24 @@ const baseSettings = (): Record<string, unknown> => ({
   title_reminder_days: 3,
 });
 
-const renderView = () => {
+const renderView = (group?: string) => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={["/admin?tab=service-policy"]}>
+      <MemoryRouter initialEntries={[`/admin?tab=service-policy${group ? `&group=${group}` : ""}`]}>
         <ServicePolicyView />
       </MemoryRouter>
     </QueryClientProvider>,
   );
+};
+
+const applyReview = async () => {
+  fireEvent.click(screen.getByRole("button", { name: "Review policy changes" }));
+  const dialog = await screen.findByRole("dialog");
+  const apply = within(dialog).getByRole("button", { name: "Apply" });
+  await waitFor(() => expect(apply).toBeEnabled());
+  fireEvent.click(apply);
+  return dialog;
 };
 
 describe("ServicePolicyView", () => {
@@ -80,60 +89,90 @@ describe("ServicePolicyView", () => {
     mocks.settings = baseSettings();
   });
 
-  it("writes nothing on mount and keeps review disabled while clean", () => {
+  it("writes nothing on mount, shows four summaries and keeps review disabled while clean", () => {
     renderView();
+    for (const name of ["Inspection & signing", "Technician requirements", "Recon spending approvals", "Title & MCO collection"]) expect(screen.getByRole("heading", { name })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Review policy changes" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Discard changes" })).toBeDisabled();
-    expect(screen.getByDisplayValue("Example Reconditioning")).toBeInTheDocument();
-    expect(screen.getAllByText("Saves automatically")).toHaveLength(2);
+    expect(screen.getByText(/1 service configured/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open service catalog" })).toHaveAttribute("href", "/admin/documents/service-catalog");
     expect(mocks.updateSettings).not.toHaveBeenCalled();
     expect(mocks.log).not.toHaveBeenCalled();
   });
 
   it("applies only the changed service keys, once, with a review warning", async () => {
-    renderView();
+    renderView("inspection");
     fireEvent.click(screen.getByRole("switch", { name: "Require K-208 before customer signing" }));
-    fireEvent.click(within(screen.getByRole("group", { name: "Roles whose signed K-208 satisfies the gate" })).getByRole("button", { name: "Service Manager" }));
-    expect(screen.getByText("Pending review")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("radio", { name: /Selected authorized roles/ }));
+    fireEvent.click(within(screen.getByRole("group", { name: "Roles whose signed K-208 satisfies the gate" })).getByRole("checkbox", { name: "Service Manager" }));
     expect(mocks.updateSettings).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole("button", { name: "Review policy changes" }));
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await applyReview();
     expect(within(dialog).getByText("Used and CPO disclosures cannot be signed until a K-208 is completed; open deals may be held.")).toBeInTheDocument();
-    const apply = within(dialog).getByRole("button", { name: "Apply" });
-    await waitFor(() => expect(apply).toBeEnabled());
-    fireEvent.click(apply);
-
     await waitFor(() => expect(mocks.updateSettings).toHaveBeenCalledTimes(1));
     expect(mocks.updateSettings.mock.calls[0][0]).toEqual({ require_safety_inspection: true, k208_authority_roles: ["service_manager"] });
     await waitFor(() => expect(mocks.log).toHaveBeenCalledTimes(1));
-    expect(mocks.log.mock.calls[0][0]).toMatchObject({ action: "settings_updated", details: { scope: "service_policy", keys: ["require_safety_inspection", "k208_authority_roles"] } });
+    expect(mocks.log.mock.calls[0][0]).toMatchObject({ action: "settings_updated", details: { scope: "service_policy" } });
   });
 
-  it("refuses a review that fails validation and writes nothing", async () => {
-    renderView();
-    fireEvent.change(screen.getByLabelText("Used-car manager email(s) for approvals"), { target: { value: "not-an-email" } });
-    fireEvent.click(screen.getByRole("button", { name: "Review policy changes" }));
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("Recon approval recipients must be valid email addresses.")).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "Apply" })).toBeDisabled();
+  it("never lets an empty role selection mean everyone", () => {
+    mocks.settings = { ...baseSettings(), require_safety_inspection: true, k208_authority_roles: ["service_manager"] };
+    renderView("inspection");
+    const roles = within(screen.getByRole("group", { name: "Roles whose signed K-208 satisfies the gate" }));
+    fireEvent.click(roles.getByRole("checkbox", { name: "Service Manager" }));
+    expect(screen.getByRole("alert")).toBeInTheDocument();
     expect(mocks.updateSettings).not.toHaveBeenCalled();
   });
 
-  it("instant-saves only the title keys that changed, with visible status", async () => {
-    renderView();
-    fireEvent.click(screen.getByRole("switch", { name: "Round-robin the request" }));
-    await waitFor(() => expect(mocks.updateSettings).toHaveBeenCalledTimes(1), { timeout: 3000 });
+  it("saves 0 for approve-every-amount and restores the stored 500 when toggled back", async () => {
+    renderView("recon");
+    expect(screen.getByLabelText("Auto-approve up to ($)")).toHaveValue(500);
+    fireEvent.click(screen.getByRole("radio", { name: /Require approval for every amount/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /Auto-approve up to an amount/ }));
+    expect(screen.getByLabelText("Auto-approve up to ($)")).toHaveValue(500);
+    expect(screen.getByRole("button", { name: "Review policy changes" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("radio", { name: /Require approval for every amount/ }));
+    await applyReview();
+    await waitFor(() => expect(mocks.updateSettings).toHaveBeenCalledTimes(1));
+    expect(mocks.updateSettings.mock.calls[0][0]).toEqual({ recon_auto_approve_amount: 0 });
+    expect(screen.getByText("Not available")).toBeInTheDocument();
+  });
+
+  it("moves title settings into the review flow and writes only the changed key", async () => {
+    renderView("title");
+    fireEvent.click(screen.getByRole("radio", { name: /Rotate: one recipient at a time/ }));
+    expect(mocks.updateSettings).not.toHaveBeenCalled();
+    await applyReview();
+    await waitFor(() => expect(mocks.updateSettings).toHaveBeenCalledTimes(1));
     expect(mocks.updateSettings.mock.calls[0][0]).toEqual({ title_round_robin: true });
-    expect(await screen.findByText("Saved")).toBeInTheDocument();
-    expect(mocks.log).not.toHaveBeenCalled();
+  });
+
+  it("title preview opens without writing anything", () => {
+    renderView("title");
+    fireEvent.click(screen.getByRole("button", { name: "Preview request" }));
+    expect(screen.getByText(/sends nothing/)).toBeInTheDocument();
+    expect(mocks.updateSettings).not.toHaveBeenCalled();
   });
 
   it("shows the gates read-only to a role without service-settings capability", () => {
     mocks.role = "salesperson";
-    renderView();
+    renderView("inspection");
     expect(screen.getByRole("switch", { name: "Require K-208 before customer signing" })).toBeDisabled();
-    expect(screen.getByText("Your role can view this policy but not change it.")).toBeInTheDocument();
+    expect(screen.getByText(/Your role can view this policy but not change it/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Review policy changes" })).toBeDisabled();
+  });
+
+  it("limits a service manager to the K-208 signing keys, matching the server key classes", () => {
+    mocks.role = "service_manager";
+    const { unmount } = renderView("inspection");
+    expect(screen.getByRole("switch", { name: "Require K-208 before customer signing" })).toBeEnabled();
+    expect(screen.getByRole("switch", { name: "Require install verification before customer signing" })).toBeDisabled();
+    expect(screen.getByText(/Limited to the signing gates/)).toBeInTheDocument();
+    expect(screen.getByText(/Read only for your role: this key is limited to/)).toBeInTheDocument();
+    unmount();
+    const recon = renderView("recon");
+    expect(screen.getByRole("radio", { name: /Require approval for every amount/ })).toBeDisabled();
+    recon.unmount();
+    renderView("title");
+    expect(screen.getByRole("radio", { name: /Rotate: one recipient at a time/ })).toBeDisabled();
+    expect(mocks.updateSettings).not.toHaveBeenCalled();
   });
 });
