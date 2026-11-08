@@ -89,10 +89,10 @@ export default function WebsitesFeedsView() {
               <FieldRow label="DMS provider" htmlFor="dms-provider" help="For example CDK, Reynolds, Dealertrack or Tekion.">
                 {(p) => <input {...p} value={draft.dms_provider ?? ""} disabled={!canEdit} onChange={(e) => set("dms_provider", e.target.value)} className={INPUT_CLASS} placeholder="Your DMS name" />}
               </FieldRow>
-              <div className="rounded-lg bg-adm-workspace border border-adm-divider px-4 py-3 text-[14px] leading-[20px]">
+              <div className="rounded-lg bg-adm-workspace border border-adm-divider px-4 py-3 max-sm:py-2 text-[14px] leading-[20px]">
                 <p className="font-medium text-adm-ink">Public website <span className="sm:hidden font-normal text-adm-muted">(edited under Hours &amp; Contact)</span></p>
                 <p className="text-adm-muted max-sm:hidden">Edited under Hours &amp; Contact, so it is not saved twice.</p>
-                <Link to={adminTabHref("hours-contact")} className="mt-1 inline-flex items-center gap-1 min-h-[40px] max-sm:min-h-[44px] items-center font-semibold text-adm-primary hover:underline">Open Hours &amp; Contact <AdminIcon name="chevron-right" size="inline" /></Link>
+                <Link to={adminTabHref("hours-contact")} className="mt-1 inline-flex items-center gap-1 min-h-[40px] max-sm:min-h-[44px] items-center font-semibold text-adm-primary hover:underline max-sm:mt-0">Open Hours &amp; Contact <AdminIcon name="chevron-right" size="inline" /></Link>
               </div>
               <div className="md:col-span-2 space-y-5">
               <UrlField id="new-inventory" label="New inventory page" value={draft.new_inventory_url ?? ""} onChange={(v) => set("new_inventory_url", v)} error={err("new_inventory_url")} disabled={!canEdit} placeholder="https://your-dealer-site.example/new-inventory" />
@@ -130,7 +130,7 @@ export default function WebsitesFeedsView() {
           <SectionCard icon="link" title="Marketplace listing pages" description={narrow ? undefined : "Where your inventory is advertised. The price crawler compares these pages with your sticker price."}
 >
             {!narrow && <div><StatusBadge state={savedProviders > 0 ? "enabled" : "setup_required"} label={`${savedProviders} of ${PROVIDERS.length} saved`} /></div>}
-            <Banner tone="neutral" icon="info" title="A saved address is not a connected account">{narrow ? "No login or live link. No price is verified until a crawler run." : "Each card lists what the address does today. AutoLabels holds no login or live link to any marketplace, and no price is marked verified until a crawler run or test reads it."}</Banner>
+            {narrow ? <p className="text-[13px] leading-[18px] text-adm-muted">A saved address is not a connected account. No login or live link, and no price is verified until a crawler run.</p> : <Banner tone="neutral" icon="info" title="A saved address is not a connected account">{narrow ? "No login or live link. No price is verified until a crawler run." : "Each card lists what the address does today. AutoLabels holds no login or live link to any marketplace, and no price is marked verified until a crawler run or test reads it."}</Banner>}
             <ul className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-3 sm:gap-4" aria-label="Marketplace providers">
               {PROVIDERS.map((p) => (
                 <ProviderCard key={p.id} provider={p} value={(draft[p.key] as string) ?? ""} onChange={(v) => set(p.key, v)} error={err(p.key)} canEdit={canEdit} onDetails={() => setDrawer(p)} />
@@ -144,9 +144,16 @@ export default function WebsitesFeedsView() {
             <LabelList labels={labels} onChange={(next) => set("vdp_price_labels", joinLabels(next))} canEdit={canEdit} error={err("vdp_price_labels")} />
             <div className="rounded-lg border border-adm-divider p-4 space-y-2">
               <SwitchField label="Strip finance and lease URL parameters" checked={draft.vdp_strip_finance_params !== false} disabled={!canEdit} onChange={(v) => set("vdp_strip_finance_params", v)} />
-              <p className="text-[13px] leading-[18px] text-adm-muted">Removes ?type=finance and ?type=lease from a vehicle page address before reading it, so the page shows the standard price instead of a payment.</p>
+              <p className="text-[13px] leading-[18px] text-adm-muted">{narrow ? "Removes ?type=finance and ?type=lease before reading the page." : "Removes ?type=finance and ?type=lease from a vehicle page address before reading it, so the page shows the standard price instead of a payment."}</p>
             </div>
-
+            {!narrow && (          <SectionCard icon="info" title="What this page does not claim">
+            <ul className="space-y-2 text-[14px] leading-[20px] text-adm-ink list-disc pl-5">
+              <li>A valid address is only well formed. It may still be the wrong page.</li>
+              <li>No marketplace price is called verified here. Only a crawler run that reads the page can do that.</li>
+              <li>Your feed data is never changed by the condition list.</li>
+            </ul>
+          </SectionCard>
+          )}
             </div>
             {narrow ? (
               <AdvancedDisclosure title="Test one vehicle page" className="min-w-0">
@@ -219,25 +226,13 @@ export default function WebsitesFeedsView() {
             {err("vehicle_conditions") && <p role="alert" className="text-adm-danger text-[13px]">{err("vehicle_conditions")}</p>}
           </SectionCard>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-{narrow ? (
-            <AdvancedDisclosure title="What this page does not claim">
-              <ul className="space-y-2 text-[14px] leading-[20px] text-adm-ink list-disc pl-5">
+          <div>
+          <AdvancedDisclosure title={narrow ? "Notes and storage" : "Advanced: how these settings are stored"}>
+            {narrow && <ul className="space-y-2 text-[14px] leading-[20px] text-adm-ink list-disc pl-5">
               <li>A valid address is only well formed. It may still be the wrong page.</li>
               <li>No marketplace price is called verified here. Only a crawler run that reads the page can do that.</li>
               <li>Your feed data is never changed by the condition list.</li>
-            </ul>
-            </AdvancedDisclosure>
-          ) : (
-          <SectionCard icon="info" title="What this page does not claim">
-            <ul className="space-y-2 text-[14px] leading-[20px] text-adm-ink list-disc pl-5">
-              <li>A valid address is only well formed. It may still be the wrong page.</li>
-              <li>No marketplace price is called verified here. Only a crawler run that reads the page can do that.</li>
-              <li>Your feed data is never changed by the condition list.</li>
-            </ul>
-          </SectionCard>
-          )}
-          <AdvancedDisclosure title="Advanced: how these settings are stored">
+            </ul>}
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-[14px] leading-[20px]">
               {WEBSITES_FEED_KEYS.map((k) => (
                 <div key={k} className="flex justify-between gap-3 border-b border-adm-divider py-1.5"><dt className="text-adm-muted">{WEBSITES_FEED_LABELS[k]}</dt><dd><code className="text-[13px]">{k}</code></dd></div>

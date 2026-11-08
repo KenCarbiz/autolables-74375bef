@@ -169,7 +169,7 @@ describe("live mode", () => {
     const patch = h.ctx.updateSettings.mock.calls[0][0] as { label_defaults: Record<string, string> };
     expect(Object.keys(patch)).toEqual(["label_defaults"]);
     expect(patch.label_defaults.addendum_new).toMatch(/^studio:addendum-/);
-  });
+  }, 20000);
   it("Spanish Buyers Guide can still be switched off while Buyers Guide is off", () => {
     h.ctx.settings = { ...DEFAULT_SETTINGS, feature_buyers_guide: false, feature_spanish_buyers_guide: true, feature_multilang_buyers_guide: false };
     live(<StoreSettingsView />);

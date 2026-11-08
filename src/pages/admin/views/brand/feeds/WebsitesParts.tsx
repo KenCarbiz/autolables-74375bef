@@ -23,7 +23,7 @@ export const UrlField = ({ id, label, value, onChange, error, disabled, placehol
       {(p) => (
         <>
           {narrow ? (
-            <textarea {...p} rows={2} inputMode="url" autoComplete="off" spellCheck={false} value={value} disabled={disabled} placeholder={placeholder} onChange={(e) => onChange(e.target.value.replace(/\s+/g, ""))} className={cn(INPUT_CLASS, "h-auto min-h-[56px] py-2 break-all resize-none")} />
+            <textarea {...p} rows={value.length > 34 ? 2 : 1} inputMode="url" autoComplete="off" spellCheck={false} value={value} disabled={disabled} placeholder={placeholder} onChange={(e) => onChange(e.target.value.replace(/\s+/g, ""))} className={cn(INPUT_CLASS, "h-auto min-h-[44px] py-2 break-all resize-none")} />
           ) : (
             <input {...p} type="text" inputMode="url" autoComplete="off" value={value} disabled={disabled} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className={INPUT_CLASS} />
           )}
@@ -61,6 +61,20 @@ export const ProviderCapabilities = ({ provider, value }: { provider: ProviderSp
 export const ProviderCard = ({ provider, value, onChange, error, canEdit, onDetails }: { provider: ProviderSpec; value: string; onChange: (v: string) => void; error?: string; canEdit: boolean; onDetails: () => void }) => {
   const check = checkUrl(value, provider.hosts, provider.name);
   const narrow = useIsNarrow();
+  if (narrow) {
+    return (
+      <li data-provider={provider.id}>
+        <button type="button" onClick={onDetails} aria-label={`${provider.name}: ${check.state === "empty" ? "no address saved" : check.state === "invalid" ? "address not valid" : check.mismatch ? "check the address" : "format valid"}. Open details`} className="w-full flex items-center gap-3 rounded-xl border border-adm-divider bg-adm-surface px-3 py-1.5 min-h-[56px] text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary">
+          <span aria-hidden="true" data-logo-slot="" className="flex flex-shrink-0 items-center justify-center w-16 h-10 rounded-md border border-adm-divider bg-adm-workspace text-adm-muted"><AdminIcon name="link" /></span>
+          <span className="min-w-0 flex-1 flex flex-col items-start gap-1">
+            <span className="text-[15px] leading-[20px] font-semibold text-adm-ink">{provider.name}</span>
+            <UrlStatus value={value} hosts={provider.hosts} name={provider.name} />
+          </span>
+          <AdminIcon name="chevron-right" className="text-adm-muted flex-shrink-0" />
+        </button>
+      </li>
+    );
+  }
   const actions = (
     <div className="flex items-center gap-2 flex-wrap">
       <AdminButton variant="secondary" onClick={onDetails}>Capabilities</AdminButton>
@@ -90,18 +104,8 @@ export const ProviderCard = ({ provider, value, onChange, error, canEdit, onDeta
           <p className="mt-1 text-[14px] break-all text-adm-ink">{value.trim() || <span className="italic text-adm-muted">Not set</span>}</p>
         </div>
       )}
-      {narrow ? (
-        <details className="group border-t border-adm-divider">
-          <summary className="flex items-center justify-between min-h-[44px] cursor-pointer text-[14px] font-semibold text-adm-primary list-none">Details<AdminIcon name="chevron-down" className="group-open:rotate-180" /></summary>
-          <ProviderCapabilities provider={provider} value={value} />
-          <div className="pt-2">{actions}</div>
-        </details>
-      ) : (
-        <>
-          <ProviderCapabilities provider={provider} value={value} />
-          <div className="mt-auto">{actions}</div>
-        </>
-      )}
+      <ProviderCapabilities provider={provider} value={value} />
+      <div className="mt-auto">{actions}</div>
     </li>
   );
 };
@@ -169,7 +173,7 @@ export const LabelList = ({ labels, onChange, canEdit, error }: { labels: string
           )}
         </FieldRow>
       )}
-      <p className="text-[13px] leading-[18px] text-adm-muted">The crawler reads the first label that has a dollar amount beside it, so put the label for your selling price first. Matching ignores capital letters.</p>
+      <p className="max-sm:hidden text-[13px] leading-[18px] text-adm-muted">The crawler reads the first label that has a dollar amount beside it, so put the label for your selling price first. Matching ignores capital letters.</p>
     </div>
   );
 };
@@ -237,10 +241,10 @@ export const ConditionMapping = ({ terms, onChange, canEdit }: { terms: string[]
       {rows.length === 0 ? (
         <p className="rounded-lg border border-dashed border-adm-border bg-adm-workspace px-4 py-4 text-[14px] text-adm-muted">No terms saved. AutoLabels falls back to New, Demo, Used and CPO when this list is empty.</p>
       ) : narrow ? (
-        <ul aria-label="Condition term mapping" className="grid grid-cols-1 gap-2">
+        <ul aria-label="Condition term mapping" className="grid grid-cols-2 gap-2">
           {rows.map((r, i) => (
             <li key={`${i}:${r.term}`} className="rounded-lg border border-adm-divider px-3 py-2.5">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-col items-start gap-1">
                 <span className="text-[14px] font-semibold text-adm-ink break-words min-w-0">{r.term}</span>
                 {r.canonical ? <StatusBadge state={r.canonical === "new" ? "visible_with_data" : "enabled"} label={r.canonical === "cpo" ? "CPO (used)" : r.canonical === "new" ? "New" : "Used"} /> : <StatusBadge state="failed" label="Not mapped" />}
               </div>

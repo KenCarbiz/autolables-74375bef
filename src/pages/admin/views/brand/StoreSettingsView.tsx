@@ -54,7 +54,7 @@ export default function StoreSettingsView() {
       {!canEdit && <Banner tone="neutral" icon="lock" title="You can view these settings but not change them">Changing store settings needs the manage settings permission. Ask an owner or manager to make the change.</Banner>}
       {ed.unreadable && <Banner tone="danger" title="Settings could not be read">Switches are not shown as saved and nothing can be applied until the settings load.</Banner>}
 
-      <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 auto-rows-fr" aria-label="Setting groups">
+      <ul className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 items-start" aria-label="Setting groups">
         {GROUPS.map((g) => (
           <GroupCard key={g.id} group={g} draft={draft} settings={ed.settings} changes={changeCount(g)} canEdit={canEdit} onOpen={() => setOpenId(g.id)} />
         ))}

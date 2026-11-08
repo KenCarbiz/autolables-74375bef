@@ -3,7 +3,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { cn } from "@/lib/utils";
 import { AdminButton, AdminLinkButton } from "@/components/admin/v2/primitives";
 import { useReturnFocus } from "@/components/admin/v2/useReturnFocus";
-import { AdminIcon, AdminIconTile, EditorArtwork, IconButton, StatusBadge, useIsNarrow } from "@/components/admin/v3/editor";
+import { AdminIcon, AdminIconTile, DetailDrawer, EditorArtwork, IconButton, StatusBadge, useIsNarrow } from "@/components/admin/v3/editor";
 import { TemplateRenderer, type StickerBranding } from "@/lib/stickerStudio/templates";
 import { ADMIN_CHILD_ROUTES } from "@/lib/admin/sections";
 import type { EstimatorSummary } from "../paymentEstimator/summary";
@@ -48,8 +48,8 @@ export const NoPreview = ({ label = "No preview for this option", compact }: { l
  * Real layout at true paper ratio inside a fixed-size frame, never cropped. The frame is an image of the layout
  * with sample data, so it is exposed as one labelled image and its inner sample text is presentational.
  */
-export const Thumb = ({ entry, branding, size = "card" }: { entry: TemplateEntry; branding: StickerBranding; size?: "card" | "small" | "mini" }) => {
-  const dims = size === "card" ? { w: 168, h: 224, scale: 0.2 } : size === "small" ? { w: 120, h: 160, scale: 0.14 } : { w: 144, h: 192, scale: 0.17 };
+export const Thumb = ({ entry, branding, size = "card" }: { entry: TemplateEntry; branding: StickerBranding; size?: "card" | "small" | "mini" | "tiny" }) => {
+  const dims = size === "tiny" ? { w: 64, h: 84, scale: 0.075 } : size === "card" ? { w: 168, h: 224, scale: 0.2 } : size === "small" ? { w: 120, h: 160, scale: 0.14 } : { w: 144, h: 192, scale: 0.17 };
   return (
     <div className="rounded-lg border border-adm-divider bg-adm-workspace overflow-hidden flex items-center justify-center flex-shrink-0 mx-auto" style={{ width: dims.w, height: dims.h }} data-preview={entry.template ? "renderer" : "none"}
       {...(entry.template ? { role: "img", "aria-label": `Layout preview of ${entry.name}, drawn with sample data` } : {})}>
@@ -86,6 +86,38 @@ export const SlotCard = ({ resolved, slot, entry, branding, canEdit, onChange, o
 }) => {
   const def = slotDef(slot);
   const narrow = useIsNarrow();
+  const [open, setOpen] = useState(false);
+  if (narrow) {
+    return (
+      <li className={cn("rounded-xl border bg-adm-surface p-3 min-w-0", changed ? "border-adm-primary ring-1 ring-adm-primary/30" : "border-adm-divider")} data-slot={slot}>
+        <div className="flex items-start gap-3">
+          {entry ? <Thumb entry={entry} branding={branding} size="tiny" /> : <div className="flex-shrink-0 w-16 h-[84px] rounded-lg border border-dashed border-adm-border bg-adm-workspace" aria-hidden="true" />}
+          <div className="min-w-0 flex-1">
+            <h3 className="text-[14px] leading-[20px] font-semibold text-adm-ink">{SLOT_TITLE[slot]}{changed && <span className="ml-2 align-middle"><StatusBadge state="overridden" label="Changed" /></span>}</h3>
+            {entry ? (
+              <p className="text-[14px] leading-[20px] text-adm-ink break-words">{entry.name}</p>
+            ) : resolved.state === "missing" ? (
+              <p role="alert" className="text-[13px] leading-[18px] text-adm-danger">Saved default <code className="break-all">{resolved.ref}</code> is not in the registry.</p>
+            ) : (
+              <p className="text-[13px] leading-[18px] text-adm-muted">No default set. The generator asks each time.</p>
+            )}
+            <div className="mt-1 flex items-center gap-2 flex-wrap">
+              {canEdit && <AdminButton variant="primary" onClick={onChange}>Change</AdminButton>}
+              {entry && <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-1 min-h-[44px] px-2 text-[14px] font-semibold text-adm-primary rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary">Details<AdminIcon name="chevron-right" size="inline" /></button>}
+            </div>
+          </div>
+        </div>
+        {entry && (
+          <DetailDrawer open={open} onClose={() => setOpen(false)} title={SLOT_TITLE[slot]} description={entry.name}
+            footer={<AdminButton variant="secondary" onClick={() => { setOpen(false); onPreview(); }}><AdminIcon name="eye" />Preview</AdminButton>}>
+            <div className="flex flex-wrap gap-1.5"><OriginBadge origin={entry.origin} /></div>
+            <EntryFacts entry={entry} />
+            <p className="text-[13px] leading-[18px] text-adm-muted">{SOURCE_TEXT[resolved.source]}.{entry.note ? ` ${entry.note}` : ""}</p>
+          </DetailDrawer>
+        )}
+      </li>
+    );
+  }
   return (
     <li className={cn("rounded-xl border bg-adm-surface flex flex-col min-w-0", changed ? "border-adm-primary ring-1 ring-adm-primary/30" : "border-adm-divider")} data-slot={slot}>
       <header className="flex items-start gap-3 px-4 pt-4">
@@ -257,6 +289,7 @@ export const PickerDialog = ({ slot, open, onClose, entries, current, onPick, br
 
 export const BuyersGuideChoice = ({ value, onChange, canEdit, options }: { value: string; onChange: (v: string) => void; canEdit: boolean; options: { value: string; label: string; detail: string }[] }) => {
   const group = useId();
+  const narrow = useIsNarrow();
   return (
     <div role="radiogroup" aria-label="FTC Buyers Guide warranty designation" className="grid grid-cols-1 md:grid-cols-3 gap-3">
       {options.map((o) => {
@@ -266,7 +299,7 @@ export const BuyersGuideChoice = ({ value, onChange, canEdit, options }: { value
             <input type="radio" name={group} value={o.value} checked={on} disabled={!canEdit} onChange={() => onChange(o.value)} className="mt-1 h-5 w-5 flex-shrink-0 accent-[rgb(var(--adm-primary))]" />
             <span className="min-w-0">
               <span className="block text-[14px] leading-[20px] font-semibold text-adm-ink">{o.label}</span>
-              <span className="block text-[13px] leading-[18px] text-adm-muted">{o.detail}</span>
+              {(!narrow || on) && <span className="block text-[13px] leading-[18px] text-adm-muted">{o.detail}</span>}
             </span>
           </label>
         );
