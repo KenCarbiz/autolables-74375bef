@@ -1,7 +1,8 @@
 // pdf-lib realization of a LayoutModel. Written against a structural
 // PdfLibModule so the identical code runs with the npm package (vitest /
 // browser) and the esm.sh build (Deno edge). Output is deterministic:
-// fixed metadata dates, vector-only drawing, no randomness.
+// fixed metadata dates, vector drawing (plus authorized logo rasters), no
+// randomness.
 
 import { encodeCode128 } from "./code128.ts";
 import { encodeQrMatrix } from "./qrMatrix.ts";
@@ -42,11 +43,15 @@ export interface PdfPageLike {
     borderColor?: PdfColor;
     borderWidth?: number;
   }): void;
+  drawImage(image: PdfImageLike, options: { x: number; y: number; width: number; height: number }): void;
 }
+
+export type PdfImageLike = object;
 
 export interface PdfDocumentLike {
   addPage(size: [number, number]): PdfPageLike;
   embedFont(font: string): Promise<PdfFontLike>;
+  embedPng(png: Uint8Array): Promise<PdfImageLike>;
   setTitle(title: string): void;
   setProducer(producer: string): void;
   setCreator(creator: string): void;
@@ -66,6 +71,13 @@ function hexToRgb(hex: string): [number, number, number] {
   if (!m) return [0, 0, 0];
   const n = parseInt(m[1], 16);
   return [((n >> 16) & 0xff) / 255, ((n >> 8) & 0xff) / 255, (n & 0xff) / 255];
+}
+
+function base64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
 }
 
 export async function realizePdf(model: LayoutModel, lib: PdfLibModule): Promise<Uint8Array> {
@@ -98,6 +110,15 @@ export async function realizePdf(model: LayoutModel, lib: PdfLibModule): Promise
       page.drawText(t.str, { x: x0, y, size: t.size, font, color: fill });
     }
   };
+
+  const images = new Map<string, PdfImageLike>();
+  for (const layoutPage of model.pages) {
+    for (const prim of layoutPage.primitives) {
+      if (prim.kind === "image" && !images.has(prim.png)) {
+        images.set(prim.png, await doc.embedPng(base64ToBytes(prim.png)));
+      }
+    }
+  }
 
   for (const layoutPage of model.pages) {
     const page = doc.addPage([model.width, model.height]);
@@ -132,6 +153,13 @@ export async function realizePdf(model: LayoutModel, lib: PdfLibModule): Promise
           ...(prim.stroke !== undefined
             ? { borderColor: color(prim.stroke), borderWidth: prim.strokeWidth ?? 0.75 }
             : {}),
+        });
+      } else if (prim.kind === "image") {
+        page.drawImage(images.get(prim.png)!, {
+          x: prim.x,
+          y: model.height - prim.y - prim.h,
+          width: prim.w,
+          height: prim.h,
         });
       } else if (prim.kind === "barcode") {
         const encoding = encodeCode128(prim.payload);

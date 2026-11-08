@@ -1,7 +1,7 @@
 {
   "pages": 1,
   "geometry": "792x612",
-  "mode": "STANDARD",
+  "mode": "DENSE",
   "fonts": "\"Roboto Condensed\", \"Arial Narrow\", \"Helvetica Neue\", Arial, sans-serif | \"Roboto Condensed\", \"Arial Narrow\", Arial, sans-serif | \"Roboto Condensed\", \"Arial Narrow\", Arial, sans-serif",
   "primitivesByKind": {
     "barcode": 1,
@@ -9,7 +9,7 @@
     "qr": 2,
     "rect": 31,
     "rule": 11,
-    "text": 205
+    "text": 206
   },
   "fills": [
     "#002c5f",
@@ -51,7 +51,6 @@
     7.2,
     7.5,
     7.6,
-    7.8,
     8,
     8.5,
     9,
@@ -67,8 +66,8 @@
   ],
   "regions": {
     "barcode": "21,517.5 227.15x23",
-    "qr": "755.5,198.4 17",
-    "qr2": "596.05,376.9 91.9",
+    "qr": "755.5,202.9 17",
+    "qr2": "594,381.8 96",
     "totalMsrp": "481,585 @18"
   },
   "headings": [
@@ -99,6 +98,6 @@
   ],
   "totalBand": "$55,805.00",
   "svgDigest": [
-    "540414ef"
+    "fab46a15"
   ]
 }

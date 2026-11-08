@@ -16,13 +16,20 @@ import type {
   VehicleCondition,
 } from "../types.ts";
 import { resolveOem } from "../oem/identity.ts";
+import { resolveReferenceVariant } from "../oem/referenceVariants.ts";
+import { VARIANT_LAYOUTS } from "./variants/index.ts";
 import { getTheme, type OemStickerTheme } from "../oem/themes.ts";
 import { resolveThemeProfile, type ResolvedThemeProfile } from "../oem/profiles.ts";
 import { buildStickerLayout, type LayoutModel, type StickerLayoutInput } from "./layout.ts";
+import type { FactoryBuildProvenance } from "../reproduction.ts";
 import { realizePdf, type PdfLibModule } from "./toPdf.ts";
 import { layoutToSvg } from "./previewSvg.ts";
 
-export const RENDERER_VERSION = "1.0.0";
+// 1.1.0: mandatory reproduction banner + disclosure on every page
+// (reproduction.ts DISCLOSURE_VERSION), no federal-label notice, unlimited
+// continuation pages, proven-original-dealer-only ship-to block. Part of the
+// generation fingerprint, so existing documents regenerate as new versions.
+export const RENDERER_VERSION = "1.1.0";
 
 export interface FactoryStickerTheme {
   oemThemeId: string;
@@ -109,6 +116,9 @@ export interface FactoryStickerRenderData {
   /** Tested-but-unrated / not-applicable NHTSA state. Renders the honest
    *  not-rated panel; stars are never fabricated to fill it. */
   nhtsaNotRated?: boolean;
+  /** Which dealer the block describes. Only a proven original selling or
+   *  delivery dealer may print; the current listing rooftop never does. */
+  dealerRole?: "original_delivery" | null;
   dealer: {
     name: string | null;
     address: string | null;
@@ -134,6 +144,9 @@ export interface FactoryStickerRenderData {
   /** Generic (typical-for-trim) decode: the sticker must label, never assert. */
   generic: boolean;
   disclaimers: string[];
+  /** Authenticated original factory-build evidence. Absent or unverified
+   *  prints "Original factory build specifications have not been verified." */
+  factoryBuild?: FactoryBuildProvenance | null;
 }
 
 export interface FactoryStickerRenderResult {
@@ -218,6 +231,9 @@ export function adaptRenderData(d: FactoryStickerRenderData): StickerLayoutInput
   const year = Number(d.identity.year);
   const confidence: ConfidenceLevel = d.generic ? "LOW" : d.pricing.baseMsrp !== null ? "HIGH" : "MEDIUM";
   const { calculated, status } = reconcile(d.pricing);
+  const dealer = d.dealerRole === "original_delivery"
+    ? d.dealer
+    : { name: null, address: null, city: null, state: null, zip: null, phone: null };
 
   const packages: StickerPackage[] = d.packages.map((p) => ({
     ...(p.code !== null ? { code: p.code } : {}),
@@ -342,12 +358,12 @@ export function adaptRenderData(d: FactoryStickerRenderData): StickerLayoutInput
       : {}),
     dealer: {
       tenantId: "",
-      name: d.dealer.name ?? "",
-      ...opt("address", d.dealer.address),
-      ...opt("city", d.dealer.city),
-      ...opt("state", d.dealer.state),
-      ...opt("postalCode", d.dealer.zip),
-      ...opt("phone", d.dealer.phone),
+      name: dealer.name ?? "",
+      ...opt("address", dealer.address),
+      ...opt("city", dealer.city),
+      ...opt("state", dealer.state),
+      ...opt("postalCode", dealer.zip),
+      ...opt("phone", dealer.phone),
     },
     document: {
       vehicleId: "",
@@ -370,6 +386,7 @@ export function adaptRenderData(d: FactoryStickerRenderData): StickerLayoutInput
     disclaimers: d.disclaimers,
     barcodePayload: d.barcodePayload,
     generic: d.generic,
+    factoryBuild: d.factoryBuild ?? null,
   };
 }
 
@@ -410,7 +427,44 @@ export function buildRenderLayout(
   data: FactoryStickerRenderData,
   theme: FactoryStickerTheme,
 ): LayoutModel {
-  return buildStickerLayout(adaptRenderData(data), resolveRenderTheme(data, theme));
+  const input = adaptRenderData(data);
+  const variant = resolveVariantLayout(data, theme, input);
+  return variant ?? buildStickerLayout(input, resolveRenderTheme(data, theme));
+}
+
+/**
+ * Dedicated reference layout, used only for an exact registry match whose
+ * layout is implemented and only when no template override is in force.
+ * Anything else, or content the variant cannot hold faithfully, renders
+ * on the generic reproduction layout.
+ */
+function resolveVariantLayout(
+  data: FactoryStickerRenderData,
+  theme: FactoryStickerTheme,
+  input: StickerLayoutInput,
+): LayoutModel | null {
+  if (String(theme.templateOverrideKey ?? "").trim()) return null;
+  const year = Number(data.identity.year);
+  const match = resolveReferenceVariant({
+    make: data.identity.make,
+    modelYear: Number.isFinite(year) ? year : null,
+    model: data.identity.model,
+    trim: data.identity.trim,
+    drivetrain: data.mechanical?.drivetrain ?? null,
+    fuelType: data.epa?.fuelType ?? null,
+  });
+  if (match.status !== "matched" || match.rendering !== "variant_layout" || !match.variant) return null;
+  const build = VARIANT_LAYOUTS[match.variant.key];
+  if (!build) return null;
+  return build({
+    layout: input,
+    equipmentGroups: Object.entries(data.standardEquipment).map(([hint, items]) => ({ hint, items })),
+    displayMake: data.identity.make.trim().toUpperCase() === "INFINITI" ? "INFINITI" : titleCase(data.identity.make),
+  });
+}
+
+function titleCase(s: string): string {
+  return s.trim().toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase());
 }
 
 export async function runRenderPipeline(

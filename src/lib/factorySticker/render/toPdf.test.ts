@@ -31,10 +31,10 @@ describe("toPdf", () => {
     expect(height).toBe(612);
   });
 
-  it("realizes the continuation model as a two-page PDF", async () => {
+  it("realizes every continuation page in the PDF", async () => {
     const bytes = await realizePdf(buildRenderLayout(longEquipmentFixture(), themeFor("infiniti")), lib);
     const doc = await PDFDocument.load(bytes);
-    expect(doc.getPageCount()).toBe(2);
+    expect(doc.getPageCount()).toBe(3);
     for (const page of doc.getPages()) {
       const { width, height } = page.getSize();
       expect(width).toBe(792);

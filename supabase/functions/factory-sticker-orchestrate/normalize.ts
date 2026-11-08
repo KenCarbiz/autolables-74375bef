@@ -152,11 +152,8 @@ export function normalizeForSticker(
 
   const generic = Boolean(sheet?.generic);
   const disclaimers: string[] = [];
-  if (condition !== "new") {
-    disclaimers.push(
-      "AutoLabels-generated Factory Build & Original MSRP Record created from VIN-specific vehicle data. This is not the original manufacturer Monroney label and is not a replacement for any federally required label on a new motor vehicle.",
-    );
-  }
+  // The reproduction banner and disclosure are painted by the renderer on
+  // every page for every condition; only situational notes belong here.
   if (generic) {
     disclaimers.push("Equipment shown is typical for this trim; VIN-specific decode was not available.");
   }

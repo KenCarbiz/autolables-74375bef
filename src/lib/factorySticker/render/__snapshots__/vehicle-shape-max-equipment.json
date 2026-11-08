@@ -1,5 +1,5 @@
 {
-  "pages": 2,
+  "pages": 3,
   "geometry": "792x612",
   "mode": "CONTINUATION_REQUIRED",
   "fonts": "\"Roboto Condensed\", \"Arial Narrow\", \"Helvetica Neue\", Arial, sans-serif | \"Roboto Condensed\", \"Arial Narrow\", Arial, sans-serif | \"Roboto Condensed\", \"Arial Narrow\", Arial, sans-serif",
@@ -7,9 +7,9 @@
     "barcode": 1,
     "path": 59,
     "qr": 2,
-    "rect": 27,
+    "rect": 28,
     "rule": 11,
-    "text": 257
+    "text": 261
   },
   "fills": [
     "#0d0d0d",
@@ -59,9 +59,9 @@
   ],
   "regions": {
     "barcode": "21,560 227.15x23",
-    "qr": "755.5,204.8 17",
-    "qr2": "592,373.3 100",
-    "totalMsrp": "493,484.9 @11.5"
+    "qr": "755.5,209.3 17",
+    "qr2": "592,377.8 100",
+    "totalMsrp": "493,489.4 @11.5"
   },
   "headings": [
     "2025 INFINITI QX80",
@@ -91,7 +91,8 @@
   ],
   "totalBand": "$95,695.00",
   "svgDigest": [
-    "9f96319b",
-    "c8981f7e"
+    "8030d1ba",
+    "4bc59acd",
+    "5c704d40"
   ]
 }

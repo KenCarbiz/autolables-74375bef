@@ -16,7 +16,7 @@ const sha256 = (bytes: Uint8Array): string => createHash("sha256").update(bytes)
 
 describe("renderFactorySticker (orchestrator contract)", () => {
   it("exports renderer version 1.0.0", () => {
-    expect(FACTORY_STICKER_RENDERER_VERSION).toBe("1.0.0");
+    expect(FACTORY_STICKER_RENDERER_VERSION).toBe("1.1.0");
   });
 
   it("satisfies the orchestrator QA invariants", async () => {
@@ -39,15 +39,15 @@ describe("renderFactorySticker (orchestrator contract)", () => {
     expect(a.layout).toEqual(b.layout);
   });
 
-  it("reports two pages for the long-equipment fixture", async () => {
+  it("reports every continuation page for the long-equipment fixture", async () => {
     const result = await renderFactorySticker(longEquipmentFixture(), themeFor("infiniti"));
-    expect(result.layout.pages).toBe(2);
+    expect(result.layout.pages).toBe(3);
   });
 
   it("labels generic decodes instead of asserting them", async () => {
     const result = await renderFactorySticker(genericDecodeFixture(), themeFor("infiniti"));
     expect(result.layout.drawnStrings.some((s) => s.includes("TYPICAL FACTORY CONFIGURATION"))).toBe(true);
-    expect(result.layout.drawnStrings.some((s) => s.includes("saved VIN-specific factory-build data"))).toBe(false);
+    expect(result.layout.drawnStrings.some((s) => s.includes("saved VIN-specific vehicle data"))).toBe(false);
     expect(result.layout.drawnStrings.some((s) => s.includes("typical factory-configuration data"))).toBe(true);
   });
 
@@ -55,7 +55,7 @@ describe("renderFactorySticker (orchestrator contract)", () => {
     const data = { ...infinitiBenchmark(), identity: { year: "2026", make: "Zoomcar", model: "Roadster", trim: null } };
     const result = await renderFactorySticker(data, themeFor(null));
     expect(result.layout.drawnStrings.some((s) => s.includes("AUTOLABELS"))).toBe(true);
-    expect(result.layout.pages).toBe(1);
+    expect(result.layout.pages).toBe(2);
   });
 });
 
