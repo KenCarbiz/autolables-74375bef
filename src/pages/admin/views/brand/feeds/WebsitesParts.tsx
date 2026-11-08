@@ -64,12 +64,13 @@ export const ProviderCard = ({ provider, value, onChange, error, canEdit, onDeta
   if (narrow) {
     return (
       <li data-provider={provider.id}>
-        <button type="button" onClick={onDetails} aria-label={`${provider.name}: ${check.state === "empty" ? "no address saved" : check.state === "invalid" ? "address not valid" : check.mismatch ? "check the address" : "format valid"}. Open details`} className="w-full flex items-center gap-3 rounded-xl border border-adm-divider bg-adm-surface px-3 py-1.5 min-h-[56px] text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary">
+        <button type="button" onClick={onDetails} className="w-full flex items-center gap-3 rounded-xl border border-adm-divider bg-adm-surface px-3 py-1.5 min-h-[56px] text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary">
           <span aria-hidden="true" data-logo-slot="" className="flex flex-shrink-0 items-center justify-center w-16 h-10 rounded-md border border-adm-divider bg-adm-workspace text-adm-muted"><AdminIcon name="link" /></span>
           <span className="min-w-0 flex-1 flex flex-col items-start gap-1">
             <span className="text-[15px] leading-[20px] font-semibold text-adm-ink">{provider.name}</span>
             <UrlStatus value={value} hosts={provider.hosts} name={provider.name} />
           </span>
+          <span className="sr-only">, open details</span>
           <AdminIcon name="chevron-right" className="text-adm-muted flex-shrink-0" />
         </button>
       </li>
