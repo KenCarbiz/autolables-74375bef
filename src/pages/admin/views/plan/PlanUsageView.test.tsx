@@ -63,6 +63,7 @@ describe("Plan & Usage from the fixture", () => {
     open("&state=suspended");
     expect(screen.getAllByText("Suspended").length).toBeGreaterThan(0);
     expect(screen.getByText("This plan is suspended")).toBeTruthy();
+    expect(screen.getByText("Shown for reference; the plan is suspended.")).toBeTruthy();
   });
 
   it("shows five metrics with month, timezone, scope and last updated, and no percent for unlimited", () => {
@@ -71,7 +72,7 @@ describe("Plan & Usage from the fixture", () => {
     const meta = container.querySelector("[data-usage-meta]") as HTMLElement;
     expect(meta.textContent).toContain("November 2026 (America/New_York)");
     expect(meta.textContent).toContain("All rooftops in this account");
-    expect(meta.textContent).toMatch(/Last updated/);
+    expect(meta.textContent).toMatch(/Updated/);
     const stickers = container.querySelector('[data-metric="stickers_generated"]') as HTMLElement;
     expect(stickers.textContent).toContain("3,921");
     expect(stickers.textContent).toContain("Unlimited on this plan.");
@@ -85,7 +86,7 @@ describe("Plan & Usage from the fixture", () => {
     const batch = container.querySelector('[data-metric="batch_jobs"]') as HTMLElement;
     expect(batch.getAttribute("data-metric-state")).toBe("unavailable");
     expect(batch.textContent).toContain("Unavailable");
-    expect(batch.textContent).toMatch(/not recorded by the app yet/);
+    expect(batch.textContent).toMatch(/Not recorded by the app yet/);
     const docs = container.querySelector('[data-metric="documents_published"]') as HTMLElement;
     expect(docs.textContent).toContain("No monthly limit is set");
   });
@@ -110,7 +111,7 @@ describe("Plan & Usage from the fixture", () => {
     expect(status("window_stickers")).toBe("included");
     expect(status("template_customization")).toBe("setup_required");
     expect(status("evidence_packet_export")).toBe("requires_upgrade");
-    expect(status("team_permissions")).toBe("unavailable");
+    expect(status("team_permissions")).toBe("platform_only");
     const locked = container.querySelector('[data-feature="evidence_packet_export"]') as HTMLElement;
     expect(locked.querySelector("svg.lucide-lock")).toBeTruthy();
     expect(locked.querySelector("svg.lucide-circle-check-big, svg.lucide-check-circle-2, svg.lucide-circle-check")).toBeNull();
@@ -119,8 +120,8 @@ describe("Plan & Usage from the fixture", () => {
 
   it("separates provider quotas and links the provider usage pages", () => {
     open();
-    expect(screen.getByRole("link", { name: "Provider usage and budgets" })).toHaveAttribute("href", "/admin/integrations/inventory-network?view=marketcheck");
-    expect(screen.getByRole("link", { name: "Providers" })).toHaveAttribute("href", adminTabHref("providers"));
+    expect(screen.getByRole("link", { name: "Usage for MarketCheck" })).toHaveAttribute("href", "/admin/integrations/inventory-network?view=marketcheck");
+    expect(screen.getByRole("link", { name: "Provider settings for Firecrawl" })).toHaveAttribute("href", adminTabHref("providers"));
     expect(screen.getByText("MarketCheck")).toBeTruthy();
   });
 

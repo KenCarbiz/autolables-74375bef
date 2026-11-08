@@ -29,8 +29,7 @@ export function CurrentPlanCard({ plan, unreadable, loading, canManageBilling, c
     <SectionCard
       title="Current plan"
       icon="credit-card"
-      description="Plan, status and dates come from the entitlement record on this account."
-      actions={<AdminButton variant="secondary" onClick={onCompare}>Compare plans</AdminButton>}
+      description={<span className="max-sm:hidden">Plan, status and dates come from the entitlement record on this account.</span>}
     >
       {loading ? (
         <p role="status" className="text-[14px] text-adm-muted">Loading the plan.</p>
@@ -50,15 +49,16 @@ export function CurrentPlanCard({ plan, unreadable, loading, canManageBilling, c
             <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-[14px] leading-[20px]">
               {plan.lines.map((l) => (<div key={l.label} className="contents"><dt className="text-adm-muted">{l.label}</dt><dd className="text-adm-ink font-medium">{l.value}</dd></div>))}
               <dt className="text-adm-muted">Billing source</dt><dd className="text-adm-ink font-medium">{plan.source}</dd>
-              <dt className="text-adm-muted">Scope</dt><dd className="text-adm-ink font-medium">All rooftops in this account</dd>
-              <dt className="text-adm-muted">Dates shown in</dt><dd className="text-adm-ink font-medium">{timeZone}</dd>
+              <dt className="text-adm-muted max-sm:hidden">Scope</dt><dd className="text-adm-ink font-medium max-sm:hidden">All rooftops in this account</dd>
+              <dt className="text-adm-muted max-sm:hidden">Dates shown in</dt><dd className="text-adm-ink font-medium max-sm:hidden">{timeZone}</dd>
             </dl>
           </div>
           {plan.status === "past_due" && <Banner tone="warning" title="Payment is past due">{plan.headline}</Banner>}
           {plan.status === "paused" && <Banner tone="danger" title="This plan is suspended">{plan.headline} Features marked unavailable below are locked for that reason.</Banner>}
           {(plan.status === "canceled" || plan.status === "expired" || plan.status === "none") && <Banner tone="warning" title={plan.status === "none" ? "No plan on record" : "This plan is not active"}>{plan.headline}</Banner>}
           {plan.status === "trial" && <Banner tone="info" title="This account is on a trial">{plan.headline}</Banner>}
-          <div className="flex items-center gap-x-5 gap-y-2 flex-wrap pt-1">
+          <div className="flex items-center gap-x-4 gap-y-2 flex-wrap pt-1 max-sm:flex-col max-sm:items-stretch">
+            <AdminButton variant="secondary" onClick={onCompare} className="max-sm:w-full justify-center min-h-[44px]">Compare plans</AdminButton>
             {canManageBilling ? (
               <a href={AUTOCURB_BILLING_URL} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 min-h-[44px] px-4 rounded-md bg-adm-primary text-white text-[14px] font-semibold hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary max-sm:w-full">
                 Manage billing <AdminIcon name="external-link" size="inline" />
@@ -77,34 +77,35 @@ export function CurrentPlanCard({ plan, unreadable, loading, canManageBilling, c
 
 const QUOTA_TEXT: Record<string, string> = { near: "Close to the monthly limit", over_soft: "Over the recommended monthly amount", blocked: "Monthly limit reached" };
 
-export function MetricCards({ metrics, usage, onOpen }: { metrics: MetricModel[]; usage: UsageState; onOpen: (key: string) => void }) {
+export function MetricCards({ metrics, usage, plan, onOpen }: { metrics: MetricModel[]; usage: UsageState; plan: PlanSummary; onOpen: (key: string) => void }) {
   const ready = usage.kind === "ready" ? usage.snapshot : null;
   return (
     <SectionCard
       title="Usage this month"
       icon="chart"
-      description="What this account used under its plan. Provider quotas are separate and listed below."
+      description={<span className="max-sm:hidden">What this account used under its plan. Provider quotas are separate and listed below.</span>}
     >
-      <dl className="flex flex-wrap gap-x-8 gap-y-1 text-[14px] leading-[20px]" data-usage-meta>
-        <div className="flex gap-2"><dt className="text-adm-muted">Reporting month</dt><dd className="font-medium text-adm-ink">{ready ? `${ready.monthLabel} (${ready.timeZone})` : "Not available"}</dd></div>
-        <div className="flex gap-2"><dt className="text-adm-muted">Scope</dt><dd className="font-medium text-adm-ink">{ready ? ready.scope : "All rooftops in this account"}</dd></div>
-        <div className="flex gap-2"><dt className="text-adm-muted">Last updated</dt><dd className="font-medium text-adm-ink">{ready ? formatDateTime(ready.updatedAt, { timeZone: ready.timeZone, withYear: true, withZone: true }) : "Not available"}</dd></div>
+      <dl className="flex flex-wrap gap-x-5 gap-y-0.5 text-[14px] leading-[20px]" data-usage-meta>
+        <div className="flex gap-1.5"><dt className="text-adm-muted">Period</dt><dd className="font-medium text-adm-ink">{ready ? `${ready.monthLabel} (${ready.timeZone})` : "Not available"}</dd></div>
+        <div className="flex gap-1.5"><dt className="text-adm-muted">Scope</dt><dd className="font-medium text-adm-ink">{ready ? ready.scope : "All rooftops in this account"}</dd></div>
+        <div className="flex gap-1.5"><dt className="text-adm-muted">Updated</dt><dd className="font-medium text-adm-ink">{ready ? formatDateTime(ready.updatedAt, { timeZone: ready.timeZone, withZone: true }) : "Not available"}</dd></div>
       </dl>
+      {ready && !plan.accessActive && <Banner tone="neutral" title={`Shown for reference; the plan is ${plan.status === "paused" ? "suspended" : "not active"}.`} />}
       {usage.kind === "failed" && <Banner tone="warning" title="Usage is unavailable">{usage.reason}</Banner>}
-      <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 min-[1500px]:grid-cols-5 gap-3">
+      <ul className="grid grid-cols-2 lg:grid-cols-3 min-[1500px]:grid-cols-5 gap-2.5 sm:gap-3">
         {metrics.map((m) => (
-          <li key={m.spec.key} data-metric={m.spec.key} data-metric-state={m.value === null ? "unavailable" : "value"} className="rounded-xl border border-adm-divider bg-adm-surface p-4 flex flex-col min-w-0">
+          <li key={m.spec.key} data-metric={m.spec.key} data-metric-state={m.value === null ? "unavailable" : "value"} className="rounded-xl border border-adm-divider bg-adm-surface p-3 sm:p-4 flex flex-col min-w-0">
             <span className="flex items-center gap-3">
-              <AdminIconTile name={m.spec.icon} />
+              <AdminIconTile name={m.spec.icon} className="max-sm:hidden" />
               <span className="text-[15px] leading-[20px] font-semibold text-adm-ink">{m.spec.label}</span>
             </span>
             {m.value === null ? (
               <>
-                <p className="mt-3 text-[22px] leading-[30px] font-semibold text-adm-muted">{usage.kind === "loading" && !m.spec.unmetered ? "Loading" : "Unavailable"}</p>
+                <p className="mt-2 text-[20px] leading-[28px] font-semibold text-adm-muted">{usage.kind === "loading" && !m.spec.unmetered ? "Loading" : "Unavailable"}</p>
                 {m.reason && !(usage.kind === "loading" && !m.spec.unmetered) ? <p className="mt-1 text-[14px] leading-[20px] text-adm-muted">{m.reason}</p> : null}
               </>
             ) : (
-              <p className="mt-3 text-[30px] leading-[36px] font-bold text-adm-ink tabular-nums">{m.value.toLocaleString()}</p>
+              <p className="mt-2 text-[28px] leading-[34px] font-bold text-adm-ink tabular-nums">{m.value.toLocaleString()}</p>
             )}
             <div className="mt-2 text-[14px] leading-[20px] text-adm-muted">
               {m.limit.kind === "unlimited" && <p>Unlimited on this plan.</p>}
@@ -133,22 +134,40 @@ export function MetricCards({ metrics, usage, onOpen }: { metrics: MetricModel[]
   );
 }
 
-export function LimitsAndQuotas() {
+const limitText = (m: MetricModel): string => (m.limit.kind === "unlimited" ? "Unlimited" : m.limit.kind === "limited" ? `${m.limit.hard.toLocaleString()} per month` : "No limit set");
+
+export function LimitsAndQuotas({ metrics }: { metrics: MetricModel[] }) {
+  const providers = BUDGET_PROVIDERS.filter((p) => p.id !== "*");
   return (
-    <div className="grid gap-4 lg:grid-cols-2 items-stretch">
-      <SectionCard title="App plan limits" icon="sliders" description="Monthly allowances set by the plan tier. They apply to the five metrics above.">
-        <p className="text-[14px] leading-[20px] text-adm-ink">A metric with no limit set is not unlimited. Only metrics marked Unlimited have no ceiling. Use Compare plans to see the allowance on each tier.</p>
-      </SectionCard>
-      <SectionCard title="Provider quotas" icon="plug" description="Paid providers meter and bill separately from the plan. They are not part of the allowances above.">
-        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-[14px] leading-[20px]">
-          {BUDGET_PROVIDERS.filter((p) => p.id !== "*").map((p) => (<li key={p.id} className="text-adm-ink">{p.label}</li>))}
-        </ul>
-        <div className="flex items-center gap-x-5 gap-y-1 flex-wrap">
-          <Link to={PROVIDER_USAGE_HREF} className={LINK}>Provider usage and budgets</Link>
-          <Link to={adminTabHref("providers")} className={LINK}>Providers</Link>
-        </div>
-      </SectionCard>
-    </div>
+    <SectionCard title="Plan limits and provider quotas" icon="sliders" description={<span className="max-sm:hidden">Plan limits are set by your tier. Paid providers meter and bill separately and are not part of those allowances.</span>}>
+      <div className="grid gap-5 lg:grid-cols-2 items-start">
+        <section aria-labelledby="pl-limits" className="min-w-0 max-sm:hidden">
+          <h3 id="pl-limits" className="text-[16px] leading-[22px] font-semibold text-adm-ink pb-1 border-b border-adm-divider">App plan limits</h3>
+          <ul className="divide-y divide-adm-divider">
+            {metrics.map((m) => (
+              <li key={m.spec.key} className="py-2.5 flex items-center justify-between gap-3 text-[14px] leading-[20px]">
+                <span className="font-medium text-adm-ink">{m.spec.label}</span>
+                <span className="text-adm-muted text-right">{limitText(m)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+        <section aria-labelledby="pl-quotas" className="min-w-0">
+          <h3 id="pl-quotas" className="text-[16px] leading-[22px] font-semibold text-adm-ink pb-1 border-b border-adm-divider">Provider quotas</h3>
+          <ul className="divide-y divide-adm-divider">
+            {providers.map((p) => {
+              const label = p.label.replace(/ \(.*\)$/, "");
+              return (
+                <li key={p.id} className="py-2.5 flex items-center justify-between gap-3 text-[14px] leading-[20px]">
+                  <span className="min-w-0"><span className="font-medium text-adm-ink">{label}</span> <span className="text-adm-muted max-sm:hidden">Metered by the provider</span></span>
+                  <Link to={p.id === "marketcheck" ? PROVIDER_USAGE_HREF : adminTabHref("providers")} aria-label={`${p.id === "marketcheck" ? "Usage" : "Provider settings"} for ${label}`} className={cn(LINK, "whitespace-nowrap")}>{p.id === "marketcheck" ? "Usage and budgets" : "Providers"}</Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      </div>
+    </SectionCard>
   );
 }
 
@@ -156,21 +175,23 @@ const STATUS_COPY: Record<FeatureStatus, { label: string; blurb: string }> = {
   included: { label: "Included", blurb: "In your plan and ready to use." },
   setup_required: { label: "Setup required", blurb: "In your plan but a setting needs attention first." },
   requires_upgrade: { label: "Requires upgrade", blurb: "Not in your current plan." },
-  unavailable: { label: "Unavailable", blurb: "Not offered to this account right now." },
+  unavailable: { label: "Unavailable", blurb: "Not offered while the plan is not active." },
+  platform_only: { label: "Platform only", blurb: "For platform staff, not a dealer plan." },
 };
 
 const FeatureMark = ({ status }: { status: FeatureStatus }) =>
   status === "included" ? <AdminIcon name="check-circle" size="card" className="text-adm-success" label="Included" />
     : status === "setup_required" ? <AdminIcon name="wrench" size="card" className="text-adm-warning" label="Setup required" />
     : status === "requires_upgrade" ? <AdminIcon name="lock" size="card" className="text-adm-muted" label="Requires upgrade" />
+    : status === "platform_only" ? <AdminIcon name="key" size="card" className="text-adm-muted" label="Platform only" />
     : <AdminIcon name="ban" size="card" className="text-adm-muted" label="Unavailable" />;
 
 const FeatureLine = ({ row }: { row: FeatureRow }) => (
-  <li data-feature={row.key} data-feature-status={row.status} className="py-3 flex items-start gap-3">
+  <li data-feature={row.key} data-feature-status={row.status} className="py-2.5 sm:py-3 flex items-start gap-3">
     <span className="mt-0.5"><FeatureMark status={row.status} /></span>
     <div className="min-w-0 flex-1">
-      <p className={cn("text-[15px] leading-[21px] font-semibold", row.status === "requires_upgrade" || row.status === "unavailable" ? "text-adm-muted" : "text-adm-ink")}>{row.label}</p>
-      <p className="text-[14px] leading-[20px] text-adm-muted">{row.detail}</p>
+      <p className={cn("text-[15px] leading-[21px] font-semibold", row.status === "requires_upgrade" || row.status === "unavailable" || row.status === "platform_only" ? "text-adm-muted" : "text-adm-ink")}>{row.label}</p>
+      {row.status !== "included" && <p className={cn("text-[14px] leading-[20px] text-adm-muted", row.status === "platform_only" && "max-sm:hidden")}>{row.detail}</p>}
     </div>
     {row.link && <Link to={row.link.to} aria-label={`${row.link.label} for ${row.label}`} className={cn(LINK, "whitespace-nowrap")}>{row.link.label}</Link>}
   </li>
@@ -179,23 +200,23 @@ const FeatureLine = ({ row }: { row: FeatureRow }) => (
 export function FeatureGroups({ groups }: { groups: FeatureGroup[] }) {
   const counts = featureCounts(groups);
   return (
-    <SectionCard title="Features" icon="list" description="Included, setup required, requires upgrade and unavailable are four different things.">
-      <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2" aria-label="Feature status summary">
+    <SectionCard title="Features" icon="list" description={<span className="max-sm:hidden">Included, setup required, requires upgrade and unavailable are four different things.</span>}>
+      <ul className="grid grid-cols-2 xl:grid-cols-5 gap-2 max-sm:hidden" aria-label="Feature status summary">
         {FEATURE_STATUS_ORDER.map((s) => (
           <li key={s} className="rounded-lg border border-adm-divider px-3 py-2.5 flex items-start gap-2.5">
             <FeatureMark status={s} />
             <span className="min-w-0">
               <span className="block text-[14px] leading-[20px] font-semibold text-adm-ink">{STATUS_COPY[s].label}: {counts[s]}</span>
-              <span className="block text-[13px] leading-[18px] text-adm-muted">{STATUS_COPY[s].blurb}</span>
+              <span className="block text-[13px] leading-[18px] text-adm-muted max-sm:hidden">{STATUS_COPY[s].blurb}</span>
             </span>
           </li>
         ))}
       </ul>
-      <div className="grid gap-5 lg:grid-cols-3 items-start">
+      <div className="space-y-5">
         {groups.map((g) => (
           <section key={g.id} aria-labelledby={`fg-${g.id}`} className="min-w-0">
             <h3 id={`fg-${g.id}`} className="text-[16px] leading-[22px] font-semibold text-adm-ink pb-1 border-b border-adm-divider">{g.label}</h3>
-            <ul className="divide-y divide-adm-divider">{g.rows.map((r) => <FeatureLine key={r.key} row={r} />)}</ul>
+            <ul className="grid lg:grid-cols-2 lg:gap-x-8 divide-y divide-adm-divider lg:divide-y-0 [&>li]:lg:border-b [&>li]:lg:border-adm-divider">{g.rows.map((r) => <FeatureLine key={r.key} row={r} />)}</ul>
           </section>
         ))}
       </div>

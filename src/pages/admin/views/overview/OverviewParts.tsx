@@ -18,14 +18,14 @@ export const plural = (n: number, one: string, many: string): string => `${n.toL
 const knownValue = (c: CountValue | null | undefined): number | null => (c && c.kind === "known" ? c.value : null);
 
 const SummaryShell = ({ to, icon, label, value, unavailable, children, footer, loading }: { to: string; icon: AdminIconName; label: string; value: ReactNode; unavailable?: boolean; children?: ReactNode; footer: string; loading?: boolean }) => (
-  <Link to={to} aria-busy={loading || undefined} className={cn("group flex flex-col h-full min-w-0 rounded-xl border border-adm-divider bg-adm-surface p-4 sm:p-5 hover:border-adm-primary/50 hover:shadow-sm", LINK_FOCUS)}>
+  <Link to={to} aria-busy={loading || undefined} className={cn("group flex flex-col h-full min-w-0 rounded-xl border border-adm-divider bg-adm-surface p-3 sm:p-5 hover:border-adm-primary/50 hover:shadow-sm", LINK_FOCUS)}>
     <span className="flex items-center gap-3">
-      <AdminIconTile name={icon} />
+      <AdminIconTile name={icon} className="max-sm:hidden" />
       <span className="text-[15px] leading-[20px] font-semibold text-adm-ink">{label}</span>
     </span>
     <span data-summary-value className={cn("mt-3 block tabular-nums", unavailable ? "text-[22px] leading-[30px] font-semibold text-adm-muted" : "text-[30px] leading-[36px] font-bold text-adm-ink")}>{value}</span>
     <span className="mt-1 block text-[14px] leading-[20px] text-adm-muted">{children}</span>
-    <span className="mt-auto pt-3 inline-flex items-center gap-1 text-[14px] leading-[20px] font-semibold text-adm-primary group-hover:underline">
+    <span className="mt-auto pt-3 inline-flex items-center gap-1 text-[14px] leading-[20px] font-semibold text-adm-primary group-hover:underline max-sm:hidden">
       {footer}
       <AdminIcon name="chevron-right" size="inline" />
     </span>
@@ -50,14 +50,14 @@ export function SummaryCards({ inventory, progress, reviews, exceptions, loading
   const failedRev = rev?.kind === "failed" || !rev;
   const failedExc = !loading && (!exc || exc.instances.kind === "failed");
   return (
-    <section aria-label="Summary" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 lg:gap-4">
+    <section aria-label="Summary" className="grid grid-cols-2 xl:grid-cols-4 gap-2.5 sm:gap-3 lg:gap-4">
       <SummaryShell to="/inventory" icon="car" label="Active inventory" loading={loading} unavailable={failedInv || loading} value={loading ? "Loading" : failedInv ? "Unavailable" : countDisplay(inv)} footer="Open inventory">
         {failedInv && !loading ? "The count could not be read. It is not zero." : "Vehicles not archived, across all rooftops in this account."}
       </SummaryShell>
 
-      <Link to={overviewHref("setup")} className={cn("group flex flex-col h-full min-w-0 rounded-xl border border-adm-divider bg-adm-surface p-4 sm:p-5 hover:border-adm-primary/50 hover:shadow-sm", LINK_FOCUS)}>
+      <Link to={overviewHref("setup")} className={cn("group flex flex-col h-full min-w-0 rounded-xl border border-adm-divider bg-adm-surface p-3 sm:p-5 hover:border-adm-primary/50 hover:shadow-sm", LINK_FOCUS)}>
         <span className="flex items-center gap-3">
-          <AdminIconTile name="checklist" />
+          <AdminIconTile name="checklist" className="max-sm:hidden" />
           <span className="text-[15px] leading-[20px] font-semibold text-adm-ink">Setup completion</span>
         </span>
         <span data-summary-value className="mt-3 block text-[30px] leading-[36px] font-bold text-adm-ink tabular-nums">{progress.done} of {progress.total}</span>
@@ -75,7 +75,7 @@ export function SummaryCards({ inventory, progress, reviews, exceptions, loading
         <span className="mt-2 block text-[14px] leading-[20px] text-adm-muted">
           {progress.complete ? "Every setup step is complete." : `${progress.percent}% complete. ${plural(progress.total - progress.done, "step", "steps")} left.`}
         </span>
-        <span className="mt-auto pt-3 inline-flex items-center gap-1 text-[14px] leading-[20px] font-semibold text-adm-primary group-hover:underline">
+        <span className="mt-auto pt-3 inline-flex items-center gap-1 text-[14px] leading-[20px] font-semibold text-adm-primary group-hover:underline max-sm:hidden">
           {progress.complete ? "Review checklist" : "Finish setup"}
           <AdminIcon name="chevron-right" size="inline" />
         </span>
@@ -144,7 +144,7 @@ const countText = (c: AttentionItem["count"]): string => (c ? plural(c.value, c.
 export function AttentionQueue({ items, loading, failed }: { items: AttentionItem[]; loading: boolean; failed: boolean }) {
   const narrow = useIsNarrow();
   return (
-    <SectionCard title="What needs attention" description="Ranked by what a manager should act on first." icon="alert">
+    <SectionCard title="What needs attention" description={<span className="max-sm:hidden">Ranked by what a manager should act on first.</span>} icon="alert">
       {loading ? (
         <p role="status" className="text-[14px] text-adm-muted">Checking this account.</p>
       ) : items.length === 0 ? (
@@ -152,17 +152,15 @@ export function AttentionQueue({ items, loading, failed }: { items: AttentionIte
       ) : narrow ? (
         <ul aria-label="Attention queue" className="-my-2 divide-y divide-adm-divider">
           {items.map((item) => (
-            <li key={item.id} className="py-3 space-y-2">
+            <li key={item.id} className="py-3 space-y-1.5">
               <div className="flex items-start justify-between gap-2">
                 <p className="text-[15px] leading-[21px] font-semibold text-adm-ink">{item.title}</p>
                 <SeverityChip status={item.status} />
               </div>
-              <p className="text-[14px] leading-[20px] text-adm-muted">{item.detail}</p>
-              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[14px] leading-[20px]">
-                {item.count && (<><dt className="text-adm-muted">Count</dt><dd>{countText(item.count)}</dd></>)}
-                <dt className="text-adm-muted">Owner</dt><dd>{item.owner ?? "Not assigned"}</dd>
-              </dl>
-              <Link to={item.action.href} className={TEXT_LINK}>{item.action.label}</Link>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[14px] leading-[20px] text-adm-muted min-w-0">{[countText(item.count), item.owner].filter(Boolean).join(" . ") || "Not assigned"}</p>
+                <Link to={item.action.href} className={cn(TEXT_LINK, "whitespace-nowrap")}>{item.action.label}</Link>
+              </div>
             </li>
           ))}
         </ul>
@@ -202,7 +200,7 @@ const CONCEPT_ICON: Record<PolicyConcept["key"], AdminIconName> = { listing_visi
 
 export function PolicySummary({ concepts }: { concepts: PolicyConcept[] }) {
   return (
-    <SectionCard title="Current policy" description="Four separate rules. None is inferred from another." icon="shield" actions={<Link to={overviewHref("policy")} className={TEXT_LINK}>Full detail</Link>}>
+    <SectionCard title="Current policy" description={<span className="max-sm:hidden">Four separate rules. None is inferred from another.</span>} icon="shield">
       <ul className="-my-2 divide-y divide-adm-divider">
         {concepts.map((c) => (
           <li key={c.key} className="py-3 flex items-start gap-3">
@@ -212,7 +210,7 @@ export function PolicySummary({ concepts }: { concepts: PolicyConcept[] }) {
               <p className="text-[15px] leading-[21px] font-semibold text-adm-ink">{c.value}</p>
               <div className="mt-1 flex items-center gap-3 flex-wrap">
                 <StatusBadge state={c.state === "unknown" ? "unknown" : c.state === "attention" ? "setup_required" : c.stateLabel === "Differs by class" ? "overridden" : "enabled"} label={c.stateLabel} />
-                <Link to={`${overviewHref("policy")}&concept=${c.key}`} aria-label={`View details: ${c.title}`} className={TEXT_LINK}>View details</Link>
+                <Link to={`${overviewHref("policy")}&concept=${c.key}`} className={TEXT_LINK}>{c.title} details</Link>
               </div>
             </div>
           </li>
@@ -229,11 +227,11 @@ export function SettingsShortcuts({ visibleIds }: { visibleIds: readonly string[
       <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 min-[1500px]:grid-cols-3 gap-2">
         {categories.map((c) => (
           <li key={c.id}>
-            <Link to={shortcutHref(c)} className={cn("flex items-center gap-3 rounded-lg border border-adm-divider px-3 py-3 min-h-[64px] hover:border-adm-primary/50 hover:bg-adm-workspace", LINK_FOCUS)}>
+            <Link to={shortcutHref(c)} className={cn("flex items-center gap-3 rounded-lg border border-adm-divider px-3 py-3 min-h-[56px] sm:min-h-[64px] hover:border-adm-primary/50 hover:bg-adm-workspace", LINK_FOCUS)}>
               <AdminIconTile name={categoryIcon(c)} />
               <span className="min-w-0 flex-1">
                 <span className="block text-[15px] leading-[20px] font-semibold text-adm-ink">{c.label}</span>
-                <span className="block text-[13px] leading-[18px] text-adm-muted">{c.description}</span>
+                <span className="block text-[13px] leading-[18px] text-adm-muted max-sm:hidden">{c.description}</span>
               </span>
               <AdminIcon name="chevron-right" className="text-adm-muted" />
             </Link>
@@ -258,7 +256,7 @@ const TONE_ICON: Record<ActivityEvent["tone"], AdminIconName> = { warning: "aler
 
 export function RecentActivity({ events, loading, now }: { events: ActivityEvent[] | null; loading: boolean; now: number }) {
   return (
-    <SectionCard title="Recent activity" description="Administration changes and system events." icon="history" actions={<Link to={overviewHref("activity")} className={TEXT_LINK}>View all</Link>}>
+    <SectionCard title="Recent activity" description={<span className="max-sm:hidden">Administration changes and system events.</span>} icon="history" actions={<Link to={overviewHref("activity")} className={TEXT_LINK}>View all</Link>}>
       {loading ? (
         <p role="status" className="text-[14px] text-adm-muted">Loading recent activity.</p>
       ) : events === null ? (

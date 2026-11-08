@@ -27,7 +27,6 @@ export default function PlanUsageView() {
     <div className="space-y-4 lg:space-y-5">
       <div className="flex items-center justify-between gap-x-4 gap-y-1 flex-wrap">
         <ScopeLabel scope="all_rooftops" />
-        <p className="text-[13px] leading-[18px] text-adm-muted">{state.groupLabel ? `${state.groupLabel}. ` : ""}{state.rooftopLabel}</p>
       </div>
       <CurrentPlanCard
         plan={state.plan}
@@ -38,8 +37,8 @@ export default function PlanUsageView() {
         timeZone={state.timeZone}
         onCompare={() => setPanel("compare")}
       />
-      <MetricCards metrics={state.metrics} usage={state.usage} onOpen={(k) => setPanel(`metric-${k}`)} />
-      <LimitsAndQuotas />
+      <MetricCards metrics={state.metrics} usage={state.usage} plan={state.plan} onOpen={(k) => setPanel(`metric-${k}`)} />
+      <LimitsAndQuotas metrics={state.metrics} />
       <FeatureGroups groups={state.features} />
       <CompareDrawer open={panel === "compare"} onClose={() => setPanel(null)} current={state.plan} />
       <MetricDrawer metric={metric} usage={state.usage} onClose={() => setPanel(null)} />

@@ -121,8 +121,8 @@ export const METRIC_SPECS: readonly MetricSpec[] = [
   { key: "stickers_generated", label: "Stickers generated", icon: "file", unmetered: null },
   { key: "documents_published", label: "Documents published", icon: "globe", unmetered: null },
   { key: "template_customizations", label: "Template customizations", icon: "palette", unmetered: null },
-  { key: "batch_jobs", label: "Batch jobs", icon: "layers", unmetered: "Batch jobs are not recorded by the app yet, so no count exists." },
-  { key: "evidence_exports", label: "Evidence exports", icon: "download", unmetered: "Evidence exports are not recorded by the app yet, so no count exists." },
+  { key: "batch_jobs", label: "Batch jobs", icon: "layers", unmetered: "Not recorded by the app yet, so no count exists." },
+  { key: "evidence_exports", label: "Evidence exports", icon: "download", unmetered: "Not recorded by the app yet, so no count exists." },
 ];
 
 export interface MetricReading {
@@ -179,7 +179,7 @@ export function buildMetrics(usage: UsageState, tier: PlanTier): MetricModel[] {
   });
 }
 
-export type FeatureStatus = "included" | "setup_required" | "requires_upgrade" | "unavailable";
+export type FeatureStatus = "included" | "setup_required" | "requires_upgrade" | "unavailable" | "platform_only";
 
 export interface FeatureRow {
   key: FeatureKey;
@@ -245,7 +245,7 @@ export function featureRow(key: FeatureKey, ctx: FeatureContext): FeatureRow {
   if (required === "platform") {
     return ctx.isPlatformAdmin
       ? { key, label, status: "included", detail: "Available to platform administrators.", link }
-      : { key, label, status: "unavailable", detail: "Platform staff only. It is not part of any dealer plan.", link: null };
+      : { key, label, status: "platform_only", detail: "Platform staff only. It is not part of any dealer plan.", link: null };
   }
   if (!ctx.accessActive) return { key, label, status: "unavailable", detail: "Not available while the plan is not active.", link: null };
   if (rankOf(ctx.tier) < rankOf(required)) return { key, label, status: "requires_upgrade", detail: `Requires the ${planLabel(required)} plan.`, link: null };
@@ -257,10 +257,10 @@ export function featureRow(key: FeatureKey, ctx: FeatureContext): FeatureRow {
 export const buildFeatureGroups = (ctx: FeatureContext): FeatureGroup[] =>
   GROUPS.map((g) => ({ id: g.id, label: g.label, rows: g.keys.map((k) => featureRow(k, ctx)) }));
 
-export const FEATURE_STATUS_ORDER: readonly FeatureStatus[] = ["included", "setup_required", "requires_upgrade", "unavailable"];
+export const FEATURE_STATUS_ORDER: readonly FeatureStatus[] = ["included", "setup_required", "requires_upgrade", "unavailable", "platform_only"];
 
 export const featureCounts = (groups: FeatureGroup[]): Record<FeatureStatus, number> => {
-  const out: Record<FeatureStatus, number> = { included: 0, setup_required: 0, requires_upgrade: 0, unavailable: 0 };
+  const out: Record<FeatureStatus, number> = { included: 0, setup_required: 0, requires_upgrade: 0, unavailable: 0, platform_only: 0 };
   for (const g of groups) for (const r of g.rows) out[r.status] += 1;
   return out;
 };
