@@ -52,8 +52,7 @@ export default function PrintCalibrationView() {
         </div>
       </div>
 
-      {!data.canEdit && !data.isFixture && <Callout icon="lock" tone="neutral" title="You can view printer profiles but not change them">{data.readOnlyReason}</Callout>}
-      {data.isFixture && data.variant === "readonly" && <Callout icon="lock" tone="neutral" title="You can view printer profiles but not change them">Printer profiles can be changed by owners, administrators and managers. You can read them here.</Callout>}
+      {!data.canEdit && <Callout icon="lock" tone="neutral" title="You can view printer profiles but not change them">{data.readOnlyReason ?? "Sign in to a dealership to change printer profiles."}</Callout>}
       {actionError && <p role="alert" className="rounded-lg bg-adm-danger-bg text-adm-danger px-4 py-3 text-[14px] font-medium">{actionError}</p>}
 
       {data.state === "failed" ? (
@@ -82,6 +81,7 @@ export default function PrintCalibrationView() {
           <ul className="space-y-2 text-[14px] leading-[20px] text-adm-ink list-disc pl-5">
             <li>Your browser's print dialog chooses the physical printer. Pick the printer named on the profile.</li>
             <li>Print at <strong>Actual size</strong> (100%) with <strong>Headers and footers</strong> turned off.</li>
+            <li>Any signed-in member of this dealership can change printer profiles; changes are not limited by role.</li>
             <li>A profile does not prove a printer is connected or that printed margins match. Only a printed test sheet checked by a person does.</li>
           </ul>
           <p className="text-[13px] leading-[18px] text-adm-muted">Label templates and paper size are on <Link to={adminTabHref("templates")} className="font-semibold text-adm-primary hover:underline">Templates</Link>.{!hasDefault && data.profiles.length > 0 ? " Printing uses the dealership default profile, and none is saved yet." : ""}</p>

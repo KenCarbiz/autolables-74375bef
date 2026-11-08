@@ -70,3 +70,9 @@ export const addService = (all: readonly GetReadyService[], entry: GetReadyServi
 export const replaceService = (all: readonly GetReadyService[], name: string, entry: GetReadyService): GetReadyService[] => all.map((s) => (sameName(s.name, name) ? entry : s));
 
 export const removeService = (all: readonly GetReadyService[], name: string): GetReadyService[] => all.filter((s) => !sameName(s.name, name));
+
+/** Roles merge_dealer_settings accepts for settings keys such as get_ready_services (a platform admin is also accepted). */
+export const CATALOG_WRITE_ROLES = ["owner", "admin", "general_manager", "gsm", "manager"] as const;
+
+export const canWriteCatalog = (role: string | null | undefined, isPlatformAdmin: boolean): boolean =>
+  isPlatformAdmin || CATALOG_WRITE_ROLES.includes(`${role ?? ""}`.trim().toLowerCase() as (typeof CATALOG_WRITE_ROLES)[number]);

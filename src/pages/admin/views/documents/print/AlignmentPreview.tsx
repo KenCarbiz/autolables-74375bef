@@ -1,9 +1,10 @@
-import { useId } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { PrintCalibration } from "@/lib/stickerStudio/printConfig";
 import type { StickerType } from "@/lib/stickerStudio/templates";
 import { PAPER_FORMATS, adjustedRect, formatLength, paperRect, type Unit } from "@/lib/admin/printWizard";
 
-const PAD_IN = 1;
+const PAD_IN = 1.4;
+const LABEL_PX = 14;
 
 /**
  * The page and the sheet border, drawn in inches. The adjusted border is the paper rectangle run through the
@@ -12,6 +13,18 @@ const PAD_IN = 1;
  */
 export const AlignmentPreview = ({ type, cal, unit, compact = false }: { type: StickerType; cal: PrintCalibration; unit: Unit; compact?: boolean }) => {
   const id = useId();
+  const ref = useRef<SVGSVGElement>(null);
+  const [px, setPx] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const read = () => setPx(el.getBoundingClientRect().width);
+    read();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const paper = paperRect(type);
   const adj = adjustedRect(type, cal);
   const x0 = Math.min(paper.x, adj.x) - PAD_IN;
@@ -20,7 +33,9 @@ export const AlignmentPreview = ({ type, cal, unit, compact = false }: { type: S
   const y1 = Math.max(paper.y + paper.h, adj.y + adj.h) + PAD_IN;
   const format = PAPER_FORMATS.find((f) => f.type === type);
   const title = `${format?.name ?? type} ${format?.sizeLabel ?? ""}`.trim();
-  const stroke = (px: number) => px / 26;
+  const stroke = (n: number) => n / 26;
+  const vbW = x1 - x0;
+  const font = Math.min(0.62, Math.max(0.3, px > 0 ? (LABEL_PX * vbW) / px : 0.4));
   const moved = adj.x !== 0 || adj.y !== 0 || cal.scalePct !== 100;
   const description = moved
     ? `Adjusted border starts ${formatLength(Math.abs(adj.x), unit)} ${adj.x >= 0 ? "right" : "left"} and ${formatLength(Math.abs(adj.y), unit)} ${adj.y >= 0 ? "down" : "up"} from the paper's top-left corner and measures ${formatLength(adj.w, unit)} by ${formatLength(adj.h, unit)}.`
@@ -28,6 +43,7 @@ export const AlignmentPreview = ({ type, cal, unit, compact = false }: { type: S
   return (
     <figure className="min-w-0">
       <svg
+        ref={ref}
         role="img"
         aria-labelledby={`${id}-t ${id}-d`}
         viewBox={`${x0} ${y0} ${x1 - x0} ${y1 - y0}`}
@@ -44,10 +60,10 @@ export const AlignmentPreview = ({ type, cal, unit, compact = false }: { type: S
           <line x1={adj.x + adj.w / 2} y1={adj.y} x2={adj.x + adj.w / 2} y2={adj.y + adj.h} stroke="#C2410C" strokeOpacity={0.45} strokeWidth={stroke(1)} />
           <line x1={adj.x} y1={adj.y + adj.h / 2} x2={adj.x + adj.w} y2={adj.y + adj.h / 2} stroke="#C2410C" strokeOpacity={0.45} strokeWidth={stroke(1)} />
         </g>
-        <line x1={paper.x} y1={y0 + 0.6} x2={paper.x + paper.w} y2={y0 + 0.6} stroke="#5B6578" strokeWidth={stroke(1)} />
-        <text x={paper.x + paper.w / 2} y={y0 + 0.45} textAnchor="middle" fontSize={0.36} fill="#1D2433">{formatLength(paper.w, unit)}</text>
-        <line x1={x1 - 0.6} y1={paper.y} x2={x1 - 0.6} y2={paper.y + paper.h} stroke="#5B6578" strokeWidth={stroke(1)} />
-        <text x={x1 - 0.3} y={paper.y + paper.h / 2} textAnchor="middle" fontSize={0.36} fill="#1D2433" transform={`rotate(90 ${x1 - 0.3} ${paper.y + paper.h / 2})`}>{formatLength(paper.h, unit)}</text>
+        <line x1={paper.x} y1={y0 + 1.0} x2={paper.x + paper.w} y2={y0 + 1.0} stroke="#5B6578" strokeWidth={stroke(1)} />
+        <text x={paper.x + paper.w / 2} y={y0 + 0.9 - font * 0.1} textAnchor="middle" fontSize={font} fill="#1D2433">{formatLength(paper.w, unit)}</text>
+        <line x1={x1 - 1.0} y1={paper.y} x2={x1 - 1.0} y2={paper.y + paper.h} stroke="#5B6578" strokeWidth={stroke(1)} />
+        <text x={x1 - 0.85} y={paper.y + paper.h / 2} textAnchor="middle" fontSize={font} fill="#1D2433" transform={`rotate(90 ${x1 - 0.85} ${paper.y + paper.h / 2})`}>{formatLength(paper.h, unit)}</text>
       </svg>
       <figcaption className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-[13px] leading-[18px] text-adm-ink">
         <span className="inline-flex items-center gap-2"><svg width="24" height="12" aria-hidden="true"><line x1="0" y1="6" x2="24" y2="6" stroke="#8A94A6" strokeWidth="2" /></svg>Paper edge</span>

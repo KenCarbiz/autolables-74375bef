@@ -163,7 +163,7 @@ describe("profiles", () => {
   });
 
   it("never reports a profile as verified unless a recorded confirmation exists", () => {
-    expect(confirmationView(profileFromRow(row("a", null)))).toMatchObject({ state: "unavailable", label: "Unavailable" });
+    expect(confirmationView(profileFromRow(row("a", null)))).toMatchObject({ state: "unavailable", label: "Not verified" });
     expect(confirmationView(profileFromRow(row("a", null, { calibration_verified_at: null })))).toMatchObject({ state: "not_verified", label: "Not verified" });
     expect(confirmationView(profileFromRow(row("a", null, { test_sheet_printed_at: "2026-11-01T00:00:00Z", calibration_verified_at: null }))).state).toBe("not_verified");
     expect(confirmationView(profileFromRow(row("a", null, { calibration_verified_at: "2026-11-02T00:00:00Z", calibration_verified_by: "u1" }))).state).toBe("confirmed");

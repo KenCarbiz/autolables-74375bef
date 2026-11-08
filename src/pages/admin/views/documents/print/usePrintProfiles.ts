@@ -2,9 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
-import { useAuth } from "@/contexts/AuthContext";
-import { useEntitlements } from "@/hooks/useEntitlements";
-import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import { useViewFixture } from "@/lib/admin/dataSource";
 import { upsertPrintCalibration } from "@/lib/stickerStudio/useDealerPrintSettings";
 import type { PrintCalibration } from "@/lib/stickerStudio/printConfig";
@@ -76,8 +73,6 @@ export function usePrintProfiles(): PrintProfiles {
   const raw = new URLSearchParams(search).get("state") as PrintVariant | null;
   const variant: PrintVariant = fixture && raw && VARIANTS.includes(raw) ? raw : "default";
   const { tenant, stores } = useTenant();
-  const { isAdmin } = useAuth();
-  const { member } = useEntitlements();
   const tenantId = tenant?.id && tenant.id !== "house" ? tenant.id : null;
 
   const [rows, setRows] = useState<PrintProfileRow[] | null>(null);
@@ -119,12 +114,9 @@ export function usePrintProfiles(): PrintProfiles {
   const source = fixtureRows ?? rows;
   const profiles = useMemo(() => (source ?? []).map(profileFromRow).sort((a, b) => Number(a.locationId !== null) - Number(b.locationId !== null)), [source]);
 
-  const liveCanEdit = hasDealerCapability(member?.role, "can_manage_settings", isAdmin);
-  const canEdit = fixture ? variant !== "readonly" && variant !== "error" : liveCanEdit;
-  const readOnlyReason = fixture
-    ? FIXTURE_DISABLED
-    : !liveCanEdit ? "Printer profiles can be changed by owners, administrators and managers. You can read them here."
-    : null;
+  // dealer_print_settings is writable by any accepted member of the tenant (row-level security), so the page adds no role gate.
+  const canEdit = fixture ? variant !== "readonly" && variant !== "error" : !!tenantId;
+  const readOnlyReason = fixture ? FIXTURE_DISABLED : null;
 
   const rooftopLabel = useCallback(
     (locationId: string | null) => (locationId === null ? (fixture?.tenantName ?? tenant?.name ?? "Dealership default") : rooftops.find((r) => r.id === locationId)?.name ?? "Rooftop not found"),
@@ -148,6 +140,7 @@ export function usePrintProfiles(): PrintProfiles {
   const remove = useCallback(
     async (id: string) => {
       if (fixture) return { ok: false, error: FIXTURE_DISABLED };
+      if (profiles.find((p) => p.id === id)?.locationId === null) return { ok: false, error: "The dealership default profile cannot be deleted. Reset its alignment instead." };
       if (!tenantId) return { ok: false, error: "no_tenant" };
       try {
         const res = await (supabase as unknown as Client).from("dealer_print_settings").delete().eq("id", id).eq("tenant_id", tenantId);
@@ -158,7 +151,7 @@ export function usePrintProfiles(): PrintProfiles {
         return { ok: false, error: e instanceof Error ? e.message : "delete_failed" };
       }
     },
-    [fixture, tenantId],
+    [fixture, tenantId, profiles],
   );
 
   const reload = useCallback(() => setGeneration((g) => g + 1), []);

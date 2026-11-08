@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useDealerSettings, type GetReadyService } from "@/contexts/DealerSettingsContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { useViewFixture } from "@/lib/admin/dataSource";
-import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
+import { canWriteCatalog } from "@/lib/admin/serviceCatalog";
 import { useWaveCVariant, type WaveCVariant } from "@/pages/admin/views/publishing/waveCVariant";
 import { useTeamMembers } from "@/pages/admin/views/people/useTeamMembers";
 import type { TeamMember } from "@/lib/admin/people";
@@ -39,7 +39,7 @@ export function useServiceCatalog(): ServiceCatalog {
   const { member } = useEntitlements();
   const team = useTeamMembers();
 
-  const liveCanEdit = hasDealerCapability(member?.role, "can_manage_service_settings", isAdmin) || hasDealerCapability(member?.role, "can_manage_settings", isAdmin);
+  const liveCanEdit = canWriteCatalog(member?.role, isAdmin);
   const canEdit = fixture ? variant !== "readonly" && variant !== "error" : liveCanEdit;
 
   const services = useMemo<GetReadyService[]>(() => {
@@ -70,7 +70,7 @@ export function useServiceCatalog(): ServiceCatalog {
     members: team.members,
     membersState: team.state,
     canEdit,
-    readOnlyReason: fixture ? CATALOG_FIXTURE_DISABLED : liveCanEdit ? null : "The service catalog can be changed by owners, managers and service managers. You can read it here.",
+    readOnlyReason: fixture ? CATALOG_FIXTURE_DISABLED : liveCanEdit ? null : `Saving the catalog is limited to owners, administrators, general managers, GSMs and managers${member?.role ? `; your role (${member.role}) can read it` : ""}.`,
     isFixture: !!fixture,
     variant,
     tenantName: fixture?.tenantName ?? null,

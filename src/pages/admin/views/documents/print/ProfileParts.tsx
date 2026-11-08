@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AdminButton } from "@/components/admin/v2/primitives";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AdminIcon, AdminIconTile, BlockedFeatureNotice, DetailDrawer, FieldRow, INPUT_CLASS, ScopeLabel, SelectField, StatusBadge } from "@/components/admin/v3/editor";
 import { ADMIN_CHILD_ROUTES } from "@/lib/admin/sections";
 import { DEFAULT_CALIBRATION } from "@/lib/stickerStudio/printConfig";
@@ -19,17 +20,18 @@ export const ProfileCard = ({ profile, data, onEdit, onReset, onDelete }: { prof
   const view = confirmationView(profile);
   const cal = profile.calibration;
   const rooftop = profile.locationId !== null;
+  const name = profile.printerName || "this printer";
   return (
-    <li className="rounded-xl bg-adm-surface border border-adm-divider shadow-[0_1px_2px_rgba(27,43,59,0.06)] p-4 sm:p-5 space-y-4 min-w-0" data-profile-card={profile.locationId ?? "default"}>
+    <li className="rounded-xl bg-adm-surface border border-adm-divider shadow-[0_1px_2px_rgba(27,43,59,0.06)] p-4 sm:p-5 flex flex-col gap-4 min-w-0" data-profile-card={profile.locationId ?? "default"}>
       <div className="flex items-start gap-3">
         <AdminIconTile name="printer" />
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 space-y-1.5">
           <h3 className="text-[18px] leading-[26px] font-semibold text-adm-ink break-words">{profile.printerName || "Unnamed printer"}</h3>
-          <ScopeLabel scope={rooftop ? "rooftop" : "all_rooftops"} rooftopName={data.rooftopLabel(profile.locationId)} />
+          <ScopeLabel scope="rooftop" rooftopName={rooftop ? data.rooftopLabel(profile.locationId) : `${data.rooftopLabel(null)}, dealership default`} />
+          <div><StatusBadge state={view.state === "confirmed" ? "enabled" : "unavailable"} label={view.label} /></div>
         </div>
-        <StatusBadge state={view.state === "confirmed" ? "enabled" : "unavailable"} label={view.label} />
       </div>
-      <dl className="grid grid-cols-[minmax(96px,128px)_1fr] gap-x-4 gap-y-2 text-[14px] leading-[20px]">
+      <dl className="grid grid-cols-[minmax(88px,120px)_1fr] gap-x-4 gap-y-2 text-[14px] leading-[20px]">
         <dt className="text-adm-muted">Paper</dt>
         <dd>{PAPER_FORMATS.map((f) => `${f.name} ${f.sizeLabel}`).join(", ")}</dd>
         <dt className="text-adm-muted">Alignment</dt>
@@ -40,12 +42,25 @@ export const ProfileCard = ({ profile, data, onEdit, onReset, onDelete }: { prof
         <dd>{view.state === "confirmed" ? `${dateText(profile.verification.deployed ? profile.verification.verifiedAt : null)}` : view.reason}</dd>
       </dl>
       {rooftop && <p className="text-[13px] leading-[18px] text-adm-muted">Printing reads the dealership default profile today. A rooftop profile is saved but not applied to prints yet.</p>}
-      <div className="flex flex-wrap gap-2">
-        {data.canEdit && <Link to={wizardHref(profile)} className="inline-flex items-center justify-center gap-2 rounded-md min-h-[36px] max-sm:min-h-[44px] px-3.5 text-[14px] font-semibold bg-adm-primary text-white border border-adm-primary hover:bg-adm-primary-hover"><AdminIcon name="wrench" />Set up printer</Link>}
-        {data.canEdit && <AdminButton variant="secondary" onClick={onEdit} aria-label={`Edit ${profile.printerName || "this printer"}`}><AdminIcon name="edit" />Edit</AdminButton>}
-        {data.canEdit && <AdminButton variant="secondary" onClick={onReset} disabled={!isAdjusted(cal)} aria-label={`Reset alignment for ${profile.printerName || "this printer"}`}><AdminIcon name="refresh" />Reset</AdminButton>}
-        {data.canEdit && <AdminButton variant="danger" onClick={onDelete} aria-label={`Delete ${profile.printerName || "this printer"}`}><AdminIcon name="close" />Delete</AdminButton>}
-      </div>
+      {data.canEdit && (
+        <div className="mt-auto flex items-center gap-2">
+          <Link to={wizardHref(profile)} className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-md min-h-[36px] max-sm:min-h-[44px] px-3.5 text-[14px] font-semibold bg-adm-primary text-white border border-adm-primary hover:bg-adm-primary-hover"><AdminIcon name="wrench" />Set up printer</Link>
+          <AdminButton variant="secondary" className="flex-1 sm:flex-none" onClick={onEdit} aria-label={`Edit ${name}`}><AdminIcon name="edit" />Edit</AdminButton>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" aria-label={`More actions for ${name}`} className="inline-flex items-center justify-center w-11 h-11 sm:w-10 sm:h-10 rounded-md border border-adm-border bg-adm-surface text-adm-ink hover:bg-adm-workspace focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary"><AdminIcon name="chevron-down" /></button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[260px]">
+              <DropdownMenuItem disabled={!isAdjusted(cal)} onSelect={onReset} className="min-h-[44px] sm:min-h-[36px]">Reset alignment</DropdownMenuItem>
+              {rooftop ? (
+                <DropdownMenuItem onSelect={onDelete} className="min-h-[44px] sm:min-h-[36px] text-adm-danger">Delete profile</DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem disabled className="min-h-[44px] sm:min-h-[36px] whitespace-normal">The dealership default cannot be deleted</DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
     </li>
   );
 };

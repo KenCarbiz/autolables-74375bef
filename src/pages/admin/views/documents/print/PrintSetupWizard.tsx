@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { AdminButton } from "@/components/admin/v2/primitives";
 import {
   AdminIcon, AdvancedDisclosure, BlockedFeatureNotice, DraftActionBar, EditorEmpty, EditorLayout, FieldRow, INPUT_CLASS, LeaveGuardDialog, ReviewChangesDialog, ScopeLabel, SectionCard, SelectField, StatusBadge, SwitchField,
-  deriveDraftBarState, useLeaveGuard,
+  deriveDraftBarState, useIsNarrow, useLeaveGuard,
 } from "@/components/admin/v3/editor";
 import { adminTabHref } from "@/lib/admin/sections";
 import { useSaveFlow } from "@/lib/admin/useSaveFlow";
@@ -38,6 +38,7 @@ export default function PrintSetupWizard() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const flow = useSaveFlow(scopeKey ?? "none");
+  const narrow = useIsNarrow();
 
   const profiles = data.profiles;
   const selectedKey = scopeKey ?? (profiles[0] ? keyOf(profiles[0].locationId) : DEFAULT_KEY);
@@ -120,7 +121,6 @@ export default function PrintSetupWizard() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         {scopeNode}
-        {data.isFixture && <StatusBadge state="preview_only" label="Design fixture" />}
       </div>
       <Stepper step={step} onGo={setStep} />
 
@@ -179,15 +179,14 @@ export default function PrintSetupWizard() {
 
       {step === 3 && (
         <>
-          <EditorLayout
-            previewLabel="Alignment preview"
-            preview={
+          <div className="grid gap-4 lg:gap-6 items-start grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+            <aside aria-label="Alignment preview" className="min-w-0 lg:order-2 lg:sticky lg:top-4">
               <SectionCard title="Alignment preview" description={paperLabel(format)}>
                 <FormatPicker value={format} onChange={setFormat} compact />
-                <AlignmentPreview type={format} cal={cal} unit={unit} />
+                <AlignmentPreview type={format} cal={cal} unit={unit} compact={narrow} />
               </SectionCard>
-            }
-          >
+            </aside>
+            <div className="min-w-0 space-y-4 lg:order-1">
             <SectionCard icon="move" title="Adjust alignment" description="Shift the printed sheet until the border from your test sheet lands where it should. Right and down are positive, the same as the print.">
               <div className="flex flex-wrap items-center gap-3">
                 <UnitToggle unit={unit} onChange={switchUnit} />
@@ -235,7 +234,8 @@ export default function PrintSetupWizard() {
               </AdvancedDisclosure>
               <Callout tone="neutral" title="Print again to check">The preview is a drawing. After you apply, print another test sheet to see where the printer lands the page.</Callout>
             </SectionCard>
-          </EditorLayout>
+            </div>
+          </div>
           {stepNav}
         </>
       )}
@@ -243,10 +243,6 @@ export default function PrintSetupWizard() {
       {step === 4 && (
         <>
           <SectionCard icon="shield-check" title="Verify and save" description="A person confirms the printed sheet. AutoLabels does not measure the printer.">
-            <div className="flex items-center gap-3 flex-wrap">
-              <StatusBadge state={view?.state === "confirmed" ? "enabled" : "unavailable"} label={view?.state === "confirmed" ? view.label : "Not verified"} />
-              <p className="text-[14px] leading-[20px] text-adm-ink">{view?.reason ?? `Not verified. Human confirmation cannot be recorded until database update ${VERIFY_MIGRATION_ID} is applied.`}</p>
-            </div>
             <dl className="grid grid-cols-[minmax(110px,160px)_1fr] gap-x-6 gap-y-2 text-[14px] leading-[20px]">
               <dt className="text-adm-muted">Printer label</dt><dd>{cal.printerName || "Not set"}</dd>
               <dt className="text-adm-muted">Offset</dt><dd className="tabular-nums">{formatLength(cal.xOffsetIn, unit)} right, {formatLength(cal.yOffsetIn, unit)} down</dd>
@@ -255,7 +251,10 @@ export default function PrintSetupWizard() {
             </dl>
             {dirty && <Callout tone="warning" icon="alert" title="You have unsaved adjustments">They are not part of verification. Go back to Adjust alignment to review and apply them.</Callout>}
             <BlockedFeatureNotice migrationId={VERIFY_MIGRATION_ID} feature="Confirm alignment and record who verified it">
-              <p className="text-[13px] leading-[18px] text-adm-muted">The confirmation below is preview only. It cannot be saved, and nothing here marks a profile verified.</p>
+              <div className="flex items-center gap-2 flex-wrap pt-1">
+                <StatusBadge state={view?.state === "confirmed" ? "enabled" : "unavailable"} label={view?.state === "confirmed" ? view.label : "Not verified"} />
+                <span className="text-[13px] leading-[18px] text-adm-muted">{view && view.state !== "unavailable" ? view.reason : "The confirmation below is preview only and is never saved."}</span>
+              </div>
             </BlockedFeatureNotice>
             <div className="space-y-3 opacity-70">
               <SwitchField label="I printed the test sheet at Actual size and the border sits where it should" checked={false} onChange={() => undefined} disabled />
