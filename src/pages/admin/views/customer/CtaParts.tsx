@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { AdminButton } from "@/components/admin/v2/primitives";
 import {
-  AdminIcon, AdminIconTile, DetailDrawer, EditorEmpty, FieldRow, IconButton, INPUT_CLASS, PreviewOnlyNotice, SortableList, StatusBadge,
+  AdminIcon, AdminIconTile, DetailDrawer, EditorEmpty, FieldRow, INPUT_CLASS, PreviewOnlyNotice, SortableList, StatusBadge,
 } from "@/components/admin/v3/editor";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
@@ -25,34 +25,38 @@ export function SelectedActions({ cfg, ctx, canEdit, onReorder, onPrimary, onEdi
       label="Selected buttons"
       items={items}
       disabled={!canEdit}
+      stackContentOnMobile
       onChange={(next) => onReorder(next.map(({ id: _id, ...b }) => b))}
       renderItem={(b) => {
         const spec = specOf(b.key);
         const av = spec ? availabilityOf(spec, ctx) : null;
         const primary = cfg.primary_key === b.key;
         const bad = unsafeDestination(b);
-        const btn = "inline-flex items-center justify-center gap-1.5 min-h-[44px] sm:min-h-[40px] min-w-[44px] px-3 rounded-md border text-[13px] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-adm-primary disabled:opacity-60";
+        const btn = "inline-flex items-center justify-center gap-1.5 min-h-[44px] sm:min-h-[40px] min-w-[44px] px-1 whitespace-nowrap sm:px-3 rounded-md border text-[13px] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-adm-primary disabled:opacity-60";
         return (
           <div className="min-w-0 space-y-1" data-selected-row="">
             <div className="flex items-start gap-2 min-w-0">
               {spec && <span className="max-sm:hidden"><AdminIconTile name={spec.icon} tone="neutral" /></span>}
               <div className="min-w-0 flex-1">
-                <p className="text-[14px] leading-[20px] font-semibold text-adm-ink truncate sm:whitespace-normal sm:break-words">{b.label}</p>
-                <p className={cn("text-[13px] leading-[18px] truncate sm:whitespace-normal sm:break-words", av && av.state !== "enabled" ? "text-adm-warning" : "text-adm-muted")}>
-                  {primary && <span className="sm:hidden font-semibold text-adm-primary">Primary. </span>}
+                <p className="text-[14px] leading-[20px] font-semibold text-adm-ink [overflow-wrap:anywhere]">{b.label}</p>
+                <p className={cn("text-[13px] leading-[18px] [overflow-wrap:anywhere]", av && av.state !== "enabled" ? "text-adm-warning" : "text-adm-muted")}>
                   {av && av.state !== "enabled" ? `${av.label}. ${av.reason}` : spec?.destination ?? "Not a supported action"}
                 </p>
                 {bad && <p role="alert" className="text-[13px] leading-[18px] font-medium text-adm-danger">{bad}</p>}
               </div>
               {av && av.state !== "enabled" && <span className="max-sm:hidden"><StatusBadge state={av.state} label={av.label} /></span>}
             </div>
-            <div className="flex items-center gap-1.5">
-              <button type="button" aria-pressed={primary} disabled={!canEdit} aria-label={`${primary ? "Primary button" : "Make primary"}: ${b.label}`} onClick={() => onPrimary(b.key)} className={cn(btn, "max-sm:px-0 max-sm:w-11", primary ? "bg-adm-selected border-adm-primary text-adm-primary" : "bg-adm-surface border-adm-border text-adm-ink hover:bg-adm-workspace")}>
-                <AdminIcon name="star" size="compact" />
-                <span className="max-sm:hidden">{primary ? "Primary" : "Make primary"}</span>
+            <div className="grid grid-cols-3 gap-1.5 sm:flex sm:items-center">
+              <button type="button" aria-pressed={primary} disabled={!canEdit} aria-label={`${primary ? "Primary button" : "Make primary"}: ${b.label}`} onClick={() => onPrimary(b.key)} className={cn(btn, primary ? "bg-adm-selected border-adm-primary text-adm-primary" : "bg-adm-surface border-adm-border text-adm-ink hover:bg-adm-workspace")}>
+                <AdminIcon name="star" size="compact" className={cn(!primary && "max-sm:hidden")} />
+                {primary ? "Primary" : "Make primary"}
               </button>
-              <IconButton name="edit" label={`Edit ${b.label}`} onClick={() => onEdit(b.key)} />
-              <IconButton name="close" label={`Remove ${b.label}`} disabled={!canEdit} onClick={() => onRemove(b.key)} />
+              <button type="button" aria-label={`Edit ${b.label}`} onClick={() => onEdit(b.key)} className={cn(btn, "bg-adm-surface border-adm-border text-adm-ink hover:bg-adm-workspace sm:w-11 sm:px-0")}>
+                <AdminIcon name="edit" size="compact" /><span className="sm:sr-only">Edit</span>
+              </button>
+              <button type="button" aria-label={`Remove ${b.label}`} disabled={!canEdit} onClick={() => onRemove(b.key)} className={cn(btn, "bg-adm-surface border-adm-border text-adm-ink hover:bg-adm-workspace sm:w-11 sm:px-0")}>
+                <AdminIcon name="close" size="compact" /><span className="sm:sr-only">Remove</span>
+              </button>
             </div>
           </div>
         );
