@@ -48,8 +48,8 @@ export const NoPreview = ({ label = "No preview for this option", compact }: { l
  * Real layout at true paper ratio inside a fixed-size frame, never cropped. The frame is an image of the layout
  * with sample data, so it is exposed as one labelled image and its inner sample text is presentational.
  */
-export const Thumb = ({ entry, branding, size = "card" }: { entry: TemplateEntry; branding: StickerBranding; size?: "card" | "small" | "mini" | "tiny" }) => {
-  const dims = size === "tiny" ? { w: 64, h: 84, scale: 0.075 } : size === "card" ? { w: 204, h: 272, scale: 0.243 } : size === "small" ? { w: 120, h: 160, scale: 0.14 } : { w: 144, h: 192, scale: 0.17 };
+export const Thumb = ({ entry, branding, size = "card" }: { entry: TemplateEntry; branding: StickerBranding; size?: "card" | "small" | "mini" | "tiny" | "large" }) => {
+  const dims = size === "large" ? { w: 390, h: 520, scale: 0.46 } : size === "tiny" ? { w: 64, h: 84, scale: 0.075 } : size === "card" ? { w: 180, h: 240, scale: 0.214 } : size === "small" ? { w: 120, h: 160, scale: 0.14 } : { w: 144, h: 192, scale: 0.17 };
   return (
     <div className="rounded-lg border border-adm-divider bg-adm-workspace overflow-hidden flex items-center justify-center flex-shrink-0 mx-auto" style={{ width: dims.w, height: dims.h }} data-preview={entry.template ? "renderer" : "none"}
       {...(entry.template ? { role: "img", "aria-label": `Layout preview of ${entry.name}, drawn with sample data` } : {})}>
@@ -81,8 +81,8 @@ export const EntryFacts = ({ entry, part }: { entry: TemplateEntry; part?: "prim
   </dl>
 );
 
-export const SlotCard = ({ resolved, slot, entry, branding, canEdit, onChange, onPreview, changed }: {
-  resolved: ResolvedSlot; slot: LabelSlot; entry: TemplateEntry | null; branding: StickerBranding; canEdit: boolean; onChange: () => void; onPreview: () => void; changed: boolean;
+export const SlotCard = ({ resolved, slot, entry, branding, canEdit, onChange, onPreview, changed, active, onSelect }: {
+  resolved: ResolvedSlot; slot: LabelSlot; entry: TemplateEntry | null; branding: StickerBranding; canEdit: boolean; onChange: () => void; onPreview: () => void; changed: boolean; active?: boolean; onSelect?: () => void;
 }) => {
   const def = slotDef(slot);
   const narrow = useIsNarrow();
@@ -120,7 +120,7 @@ export const SlotCard = ({ resolved, slot, entry, branding, canEdit, onChange, o
     );
   }
   return (
-    <li className={cn("rounded-xl border bg-adm-surface flex flex-col min-w-0", changed ? "border-adm-primary ring-1 ring-adm-primary/30" : "border-adm-divider")} data-slot={slot}>
+    <li onClick={onSelect} onFocusCapture={onSelect} aria-current={active ? "true" : undefined} className={cn("rounded-xl border bg-adm-surface flex flex-col min-w-0", changed || active ? "border-adm-primary ring-1 ring-adm-primary/30" : "border-adm-divider")} data-slot={slot}>
       <header className="flex items-start gap-3 px-4 pt-4">
         <AdminIconTile name={def.kind === "window" ? "file" : "file-plus"} />
         <div className="min-w-0 flex-1">
@@ -129,44 +129,62 @@ export const SlotCard = ({ resolved, slot, entry, branding, canEdit, onChange, o
         </div>
         {changed && <StatusBadge state="overridden" label="Changed" />}
       </header>
-      <div className="p-4 grid grid-cols-[120px_minmax(0,1fr)] min-[520px]:grid-cols-[204px_minmax(0,1fr)] min-[520px]:grid-rows-[auto_auto_1fr] gap-x-4 gap-y-3 flex-1">
-        <div className="min-[520px]:row-span-3">
-          {entry ? <><div className="hidden min-[520px]:block"><Thumb entry={entry} branding={branding} size="card" /></div><div className="min-[520px]:hidden"><Thumb entry={entry} branding={branding} size="small" /></div></> : (
-            <div className="rounded-lg border border-dashed border-adm-border bg-adm-workspace mx-auto w-[120px] h-[160px] min-[520px]:w-[204px] min-[520px]:h-[272px]"><NoPreview label={resolved.state === "missing" ? "Saved template not found" : "No default chosen"} compact /></div>
+      <div className="p-4 grid grid-cols-[180px_minmax(0,1fr)] gap-x-4 items-start">
+        <div>
+          {entry ? <Thumb entry={entry} branding={branding} size="card" /> : (
+            <div className="rounded-lg border border-dashed border-adm-border bg-adm-workspace w-[180px] h-[240px]"><NoPreview label={resolved.state === "missing" ? "Saved template not found" : "No default chosen"} compact /></div>
           )}
         </div>
-        {entry ? (
-          <>
-            <div className="min-w-0">
-              <p className="text-[16px] leading-[22px] font-semibold text-adm-ink break-words">{entry.name}</p>
-              {!narrow && <div className="mt-1.5 flex flex-wrap gap-1.5"><OriginBadge origin={entry.origin} /></div>}
-              {narrow && <p className="mt-1 text-[13px] leading-[18px] text-adm-muted">{SOURCE_TEXT[resolved.source]}.</p>}
-            </div>
-            <div className="col-span-2 min-[520px]:col-span-1 min-w-0">
+        <div className="min-w-0 flex flex-col gap-2">
+          {entry ? (
+            <>
+              <div>
+                <p className="text-[16px] leading-[22px] font-semibold text-adm-ink break-words">{entry.name}</p>
+                <div className="mt-1.5 flex flex-wrap gap-1.5"><OriginBadge origin={entry.origin} /></div>
+              </div>
               <EntryFacts entry={entry} part="primary" />
-              <p className="mt-2 text-[13px] leading-[18px] text-adm-muted">{SOURCE_TEXT[resolved.source]}.{entry.note ? ` ${entry.note}` : ""}</p>
-              <details className="group mt-1 border-t border-adm-divider">
+              <p className="text-[13px] leading-[18px] text-adm-muted">{SOURCE_TEXT[resolved.source]}.{entry.note ? ` ${entry.note}` : ""}</p>
+              <details className="group border-t border-adm-divider">
                 <summary className="flex items-center justify-between min-h-[44px] cursor-pointer list-none text-[14px] font-semibold text-adm-primary">Details<AdminIcon name="chevron-down" className="group-open:rotate-180" /></summary>
                 <EntryFacts entry={entry} part="rest" />
               </details>
+            </>
+          ) : resolved.state === "missing" ? (
+            <div role="alert" className="rounded-lg bg-adm-danger-bg px-3 py-2 text-[14px] leading-[20px] text-adm-danger">
+              <p className="font-semibold">The saved default is not in the registry</p>
+              <p className="text-adm-ink/80">Saved value <code className="text-[13px] break-all">{resolved.ref}</code>. Documents made earlier are unchanged. Choose a template to replace it.</p>
             </div>
-          </>
-        ) : resolved.state === "missing" ? (
-          <div role="alert" className="col-span-2 min-[520px]:col-span-1 rounded-lg bg-adm-danger-bg px-3 py-2 text-[14px] leading-[20px] text-adm-danger">
-            <p className="font-semibold">The saved default is not in the registry</p>
-            <p className="text-adm-ink/80">Saved value <code className="text-[13px] break-all">{resolved.ref}</code>. Documents made earlier are unchanged. Choose a template to replace it.</p>
+          ) : (
+            <p className="text-[14px] leading-[20px] text-adm-muted">No default is set for this slot, so the generator asks each time.</p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            {canEdit && <AdminButton variant="primary" onClick={onChange}>Change template</AdminButton>}
+            {entry && <AdminButton variant="secondary" onClick={onPreview}><AdminIcon name="eye" />Preview</AdminButton>}
           </div>
-        ) : (
-          <p className="col-span-2 min-[520px]:col-span-1 text-[14px] leading-[20px] text-adm-muted">No default is set for this slot, so the generator asks each time.</p>
-        )}
-        <div className="col-span-2 min-[520px]:col-span-1 flex flex-wrap gap-2 self-end">
-          {canEdit && <AdminButton variant="primary" onClick={onChange}>Change template</AdminButton>}
-          {entry && <AdminButton variant="secondary" onClick={onPreview}><AdminIcon name="eye" />Preview</AdminButton>}
         </div>
       </div>
     </li>
   );
 };
+
+export const InlinePreview = ({ slot, entry, branding, missingRef }: { slot: LabelSlot; entry: TemplateEntry | null; branding: StickerBranding; missingRef?: string | null }) => (
+  <aside aria-label="Selected template preview" className="rounded-xl border border-adm-divider bg-adm-surface p-4 space-y-3 min-w-0">
+    <div>
+      <h3 className="text-[16px] leading-[22px] font-semibold text-adm-ink">{SLOT_TITLE[slot]}</h3>
+      <p className="text-[13px] leading-[18px] text-adm-muted">Preview of the selected default, drawn with sample vehicle data. It is not a real vehicle.</p>
+    </div>
+    {entry ? (
+      <>
+        <div className="flex justify-center"><Thumb entry={entry} branding={branding} size="large" /></div>
+        <p className="text-[14px] leading-[20px] font-semibold text-adm-ink break-words">{entry.name}</p>
+        <p className="text-[13px] leading-[18px] text-adm-muted">Registry ID <code className="text-[13px]">{entry.id}</code>, version {entry.version}</p>
+        {!entry.template && <p className="text-[13px] leading-[18px] text-adm-muted">No stored preview. This builder draws its layout when you open it, so nothing is shown here.</p>}
+      </>
+    ) : (
+      <p role="status" className="rounded-lg border border-dashed border-adm-border bg-adm-workspace px-3 py-10 text-center text-[14px] text-adm-muted">{missingRef ? `The saved default ${missingRef} is not in the registry, so there is no preview.` : "No default chosen, so there is no preview."}</p>
+    )}
+  </aside>
+);
 
 const DialogShell = ({ open, onClose, title, description, children, footer, wide }: { open: boolean; onClose: () => void; title: string; description: string; children: ReactNode; footer?: ReactNode; wide?: boolean }) => {
   const returnFocus = useReturnFocus(open);

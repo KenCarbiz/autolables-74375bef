@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   AdminIcon, AdvancedDisclosure, DraftActionBar, FieldRow, LeaveGuardDialog, ReviewChangesDialog, ScopeLabel, SectionCard, SelectField,
@@ -10,7 +10,7 @@ import type { LabelDefaults, LabelSlot } from "@/lib/labelDefaults";
 import { useEstimatorSummary } from "./paymentEstimator/summary";
 import { directPatch, useSettingsEditor } from "./feeds/useSettingsEditor";
 import { Banner, LinkRow, TenantScope } from "./feeds/bits";
-import { BuyersGuideChoice, EstimatorCard, PickerDialog, PreviewDialog, SlotCard } from "./feeds/DocParts";
+import { BuyersGuideChoice, EstimatorCard, InlinePreview, PickerDialog, PreviewDialog, SlotCard } from "./feeds/DocParts";
 import { ORIGIN_LABEL, fixtureRegistry, resolveSlot, sampleBranding, SLOT_ORDER, useTemplateRegistry, type RegistryFixture, type RegistryState, type TemplateEntry } from "./feeds/templateRegistry";
 
 const OemReference = lazy(() => import("./feeds/OemReference"));
@@ -105,6 +105,21 @@ function LiveDocumentDefaults() {
   return <DocumentDefaultsBody registry={useTemplateRegistry()} />;
 }
 
+function useMinWidth(px: number) {
+  const q = `(min-width: ${px}px)`;
+  const get = () => typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia(q).matches;
+  const [on, setOn] = useState(get);
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia(q);
+    const f = () => setOn(mq.matches);
+    f();
+    mq.addEventListener?.("change", f);
+    return () => mq.removeEventListener?.("change", f);
+  }, [q]);
+  return on;
+}
+
 function DocumentDefaultsBody({ registry }: { registry: RegistryState }) {
   const ed = useSettingsEditor<DocDraft>(OPTIONS);
   const { source, edit, canEdit } = ed;
@@ -112,6 +127,8 @@ function DocumentDefaultsBody({ registry }: { registry: RegistryState }) {
   const estimatorSummary = source.isFixture && ed.variant === "none" ? { kind: "none" as const } : source.isFixture && ed.variant === "partial" ? { kind: "saved" as const, enabled: true, ranges: 1, complete: false, updatedAt: null } : estimatorLive.summary;
   const [picking, setPicking] = useState<LabelSlot | null>(null);
   const [previewing, setPreviewing] = useState<TemplateEntry | null>(null);
+  const [activeSlot, setActiveSlot] = useState<LabelSlot>(SLOT_ORDER[0]);
+  const wide = useMinWidth(1024);
   const draft = edit.draft;
   const branding = useMemo(() => sampleBranding(ed.settings), [ed.settings]);
 
@@ -158,12 +175,18 @@ function DocumentDefaultsBody({ registry }: { registry: RegistryState }) {
         {registry.loading ? (
           <ul className="grid grid-cols-1 xl:grid-cols-2 gap-4" aria-busy="true" aria-label="Loading templates">{[0, 1, 2, 3].map((i) => <li key={i} className="h-[320px] rounded-xl border border-adm-divider bg-adm-workspace animate-pulse" />)}</ul>
         ) : (
-          <ul className="grid grid-cols-1 xl:grid-cols-2 gap-4" aria-label="Default templates">
-            {resolved.map((r) => (
-              <SlotCard key={r.slot} slot={r.slot} resolved={r} entry={r.entry} branding={branding} canEdit={canEdit}
-                changed={edit.changedKeys.includes(SLOT_KEY[r.slot])} onChange={() => setPicking(r.slot)} onPreview={() => setPreviewing(r.entry)} />
-            ))}
-          </ul>
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_430px] gap-4 items-start">
+            <ul className="grid grid-cols-1 gap-4" aria-label="Default templates">
+              {resolved.map((r) => (
+                <SlotCard key={r.slot} slot={r.slot} resolved={r} entry={r.entry} branding={branding} canEdit={canEdit} active={wide && activeSlot === r.slot} onSelect={() => setActiveSlot(r.slot)}
+                  changed={edit.changedKeys.includes(SLOT_KEY[r.slot])} onChange={() => setPicking(r.slot)} onPreview={() => setPreviewing(r.entry)} />
+              ))}
+            </ul>
+            {wide && (() => {
+              const cur = resolved.find((r) => r.slot === activeSlot) ?? resolved[0];
+              return <div className="sticky top-4"><InlinePreview slot={cur.slot} entry={cur.entry} branding={branding} missingRef={cur.state === "missing" ? cur.ref : null} /></div>;
+            })()}
+          </div>
         )}
         <p className="max-sm:hidden text-[13px] leading-[18px] text-adm-muted">Thumbnails are drawn by the live template renderer with sample vehicle data. A builder with no stored preview shows a placeholder, never a made-up image. The same default is also editable under Documents &amp; Service, Templates (linked below); both write the same stored setting.</p>
       </SectionCard>
