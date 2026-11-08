@@ -2,6 +2,10 @@ import type { AdminFixture } from "@/lib/admin/dataSource";
 import type { PublishingFixture } from "@/pages/admin/views/publishing/usePublishingData";
 import type { DestinationsFixture } from "@/pages/admin/views/publishing/useDescriptionSettings";
 import type { AdminScreenFixture } from "./index";
+import { FIXTURE_02 } from "./02";
+
+const brand = FIXTURE_02.fixture.views.brand as Record<string, unknown>;
+const brandView = { ...brand, tenantName: "Example Motors Group", activeStoreId: "store-example-motors", stores: [{ ...(brand.stores as Record<string, unknown>[])[0], id: "store-example-motors", name: "Example Motors", slug: "example-motors" }], settings: { dealer_name: "Example Motors", dealer_city: "Example City", dealer_state: "ST" } };
 
 // Design fixtures for Publishing: Effective policy, Destinations and automation, and Description settings. Every
 // name and value is invented, uses reserved example domains, and is never written anywhere. ?state= selects a
@@ -13,8 +17,8 @@ const known = (value: number) => ({ kind: "known" as const, value });
 const failed = { kind: "failed" as const };
 
 const policyBase: PublishingFixture = {
-  rooftopLabel: "Example Honda (Example City, ST)",
-  groupLabel: "Example Auto Group",
+  rooftopLabel: "Example Motors (Example City, ST)",
+  groupLabel: "Example Motors Group",
   settings: {
     ingest_auto_publish: true,
     require_safety_inspection: true,
@@ -61,9 +65,9 @@ const policyBase: PublishingFixture = {
   },
 };
 
-const policyFixture = (label: string): AdminFixture => ({ label, now: NOW, views: { "effective-policy": policyBase } });
+const policyFixture = (label: string): AdminFixture => ({ label, now: NOW, views: { brand: brandView, "effective-policy": policyBase } });
 
-const nameOf = "Example Honda";
+const nameOf = "Example Motors";
 
 const rowBase = {
   review_mode: "EXCEPTION_REVIEW",
@@ -75,7 +79,7 @@ const rowBase = {
   dealer_name_format: "",
   primary_city: "",
   state: "",
-  cta_template: "Call or visit Example Honda to schedule a test drive.",
+  cta_template: "Call or visit Example Motors to schedule a test drive.",
   required_legal_text: "Advertised price includes the documentation fee. Taxes and registration are additional.",
   prohibited_phrases: ["guaranteed financing", "lowest price"],
   min_length: 400,
@@ -93,13 +97,13 @@ const rowBase = {
 const destinationsBase = (section: "automation" | "description"): DestinationsFixture => ({
   section,
   rooftopLabel: nameOf,
-  groupLabel: "Example Auto Group",
-  identity: { name: "Example Honda", city: "Example City", state: "ST" },
+  groupLabel: "Example Motors Group",
+  identity: { name: "Example Motors", city: "Example City", state: "ST" },
   row: rowBase,
   seeds: {
     empty: null,
     invalid: { ...rowBase, min_length: 3000, max_length: 2000, quality_threshold: 140, prohibited_phrases: ["lowest price", "Lowest Price"], required_legal_text: "We guarantee the lowest price on every vehicle.", cta_template: "Ask about our lowest price today." },
-    blocked: { ...rowBase, review_mode: "DRAFT_ONLY", internal_publication_enabled: false, cta_template: "Hurry before this one is gone, call Example Honda." },
+    blocked: { ...rowBase, review_mode: "DRAFT_ONLY", internal_publication_enabled: false, cta_template: "Hurry before this one is gone, call Example Motors." },
   },
   deliveries: [
     { id: "d1", destination: "vehicle_passport", status: "delivered", delivery_mode: "internal_projection", attempt_count: 1, published_at: "2026-11-06T16:20:00Z", failed_at: null, created_at: "2026-11-06T16:20:00Z" },
@@ -115,7 +119,7 @@ const destinationsBase = (section: "automation" | "description"): DestinationsFi
   ],
 });
 
-const destinationsFixture = (label: string, section: "automation" | "description"): AdminFixture => ({ label, now: NOW, views: { destinations: destinationsBase(section) } });
+const destinationsFixture = (label: string, section: "automation" | "description"): AdminFixture => ({ label, now: NOW, views: { brand: brandView, destinations: destinationsBase(section) } });
 
 export const WAVE_C_PUBLISHING_FIXTURES: Record<string, AdminScreenFixture> = {
   "v3-effective-policy": { tabId: "effective-policy", fixture: policyFixture("Effective policy (v3)") },

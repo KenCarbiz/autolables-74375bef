@@ -71,12 +71,12 @@ export default function DestinationsView() {
         <>
           {narrow && <OutputPreviewRail api={api} mobile />}
           <EditorLayout preview={narrow ? undefined : <OutputPreviewRail api={api} />} previewLabel="Output preview">
-          <SectionCard id="automation" icon="sliders" title="Automation" description="How much AutoLabels does before a person is involved when it writes a description.">
+          <SectionCard id="automation" icon="sliders" title="Automation" description={narrow ? undefined : "How much AutoLabels does before a person is involved when it writes a description."}>
             <AutomationPanel api={api} onEdit={setRule} />
           </SectionCard>
 
-          <SectionCard id="destinations" icon="plug" title="Destinations" description="Each destination separates writing text, how it is delivered, and whether delivery is automatic.">
-            <Banner tone="info" icon="eye" title="Writing and previewing never send anything">{narrow ? "Export only means you send the text. Only the Vehicle Passport is delivered by AutoLabels." : "Export only means AutoLabels produces the text and you send it. Only the internal Vehicle Passport is delivered by AutoLabels. Website, marketplace, vAuto and SEO outputs are separate from each other."}</Banner>
+          <SectionCard id="destinations" icon="plug" title="Destinations" description={narrow ? undefined : "Each destination separates writing text, how it is delivered, and whether delivery is automatic."}>
+            {narrow ? <p className="text-[14px] leading-[20px] text-adm-ink">Writing and previewing never send anything. Only the Vehicle Passport is delivered by AutoLabels.</p> : <Banner tone="info" icon="eye" title="Writing and previewing never send anything">{"Export only means AutoLabels produces the text and you send it. Only the internal Vehicle Passport is delivered by AutoLabels. Website, marketplace, vAuto and SEO outputs are separate from each other."}</Banner>}
             {!draft.internal_publication_enabled && <Banner tone="warning" title="Passport delivery is off">Nothing is written to the shopper Passport automatically, whatever the automation mode says.</Banner>}
             <ul className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 items-stretch" aria-label="Destinations">
               {dests.map((r) => (
@@ -99,13 +99,13 @@ export default function DestinationsView() {
       ) : (
         <>
           <Managed45Notice />
-          <SectionCard id="brand-voice" icon="paintbrush" title="Brand voice" description="How the dealership sounds, and the wording every description must carry.">
+          <SectionCard id="brand-voice" icon="paintbrush" title="Brand voice" description={narrow ? undefined : "How the dealership sounds, and the wording every description must carry."}>
             <BrandVoiceSection api={api} onEditPhrases={() => setPhrases(true)} />
           </SectionCard>
-          <SectionCard id="output-profiles" icon="list" title="Output profiles" description="Target, readable range and limit for each destination. Counts include spaces, the call to action and the required wording.">
+          <SectionCard id="output-profiles" icon="list" title="Output profiles" description={narrow ? "Counts include spaces, the call to action and the required wording." : "Target, readable range and limit for each destination. Counts include spaces, the call to action and the required wording."}>
             <OutputProfilesSection api={api} onEdit={setProfile} onPreview={setSample} onValidate={setValidate} />
           </SectionCard>
-          <SectionCard id="claims" icon="shield-check" title="Claims" description="What descriptions are permitted to say, when the vehicle's own records support it.">
+          <SectionCard id="claims" icon="shield-check" title="Claims" description={narrow ? undefined : "What descriptions are permitted to say, when the vehicle's own records support it."}>
             <ClaimsSection api={api} />
           </SectionCard>
         </>

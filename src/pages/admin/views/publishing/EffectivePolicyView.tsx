@@ -98,7 +98,7 @@ export default function EffectivePolicyView() {
         </div>
         <ul className="grid grid-cols-1 lg:grid-cols-3 gap-4" aria-label="Rules for the selected type">
           {detail.cards.map((c) => (
-            <ConceptCard key={c.key} card={c} cell={row[CONCEPT[c.key].col]} extra={c.key === "documents" ? modeLine : null} onDetails={() => setDetails(c.key)} />
+            <ConceptCard key={c.key} card={c} cell={row[CONCEPT[c.key].col]} extra={null} onDetails={() => setDetails(c.key)} />
           ))}
         </ul>
         <p className="text-[13px] leading-[18px] text-adm-muted">Counts are listings in the database right now, not policy outcomes. The rules above describe what is allowed; they do not say how many vehicles have reached each state.</p>

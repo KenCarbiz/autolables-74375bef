@@ -26,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useOptionalDealerSettings } from "./optionalDealerSettings";
+import { useAdminFixture } from "@/lib/admin/dataSource";
 import { adminTabHref, type AdminVisibilityContext } from "@/lib/admin/sections";
 import {
   categoryHref,
@@ -156,7 +157,9 @@ export const V3Header = ({
 );
 
 const StoreScope = () => {
-  const name = useOptionalDealerSettings()?.settings.dealer_name?.trim();
+  const fixtureName = ((useAdminFixture()?.views?.brand as { settings?: { dealer_name?: string } } | undefined)?.settings?.dealer_name ?? "").trim();
+  const liveName = useOptionalDealerSettings()?.settings.dealer_name?.trim();
+  const name = fixtureName || liveName;
   if (!name) return null;
   return (
     <span className="inline-flex items-center gap-1.5">

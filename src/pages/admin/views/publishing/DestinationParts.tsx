@@ -48,8 +48,8 @@ export const AutomationPanel = ({ api, onEdit }: { api: DescriptionSettingsApi; 
     <div className="space-y-5">
       <fieldset className="min-w-0" disabled={disabled}>
         <legend className="text-[14px] leading-[20px] font-semibold text-adm-ink">Default automation mode</legend>
-        <p className="mt-0.5 text-[13px] leading-[18px] text-adm-muted">How much AutoLabels does before a person is involved. Vehicle types below inherit this unless they have their own rule.</p>
-        <div role="radiogroup" aria-label="Default automation mode" className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <p className="mt-0.5 text-[13px] leading-[18px] text-adm-muted max-sm:hidden">How much AutoLabels does before a person is involved. Vehicle types below inherit this unless they have their own rule.</p>
+        <div role="radiogroup" aria-label="Default automation mode" className="mt-3 grid grid-cols-2 gap-2 sm:gap-3">
           {AUTOMATION_MODES.map((m) => {
             const on = draft.review_mode === m.key;
             return (
@@ -69,7 +69,7 @@ export const AutomationPanel = ({ api, onEdit }: { api: DescriptionSettingsApi; 
 
       <div>
         <h3 className="text-[14px] leading-[20px] font-semibold text-adm-ink">Mode by vehicle type</h3>
-        <p className="mt-0.5 text-[13px] leading-[18px] text-adm-muted">The mode in effect is worked out by the same rule the server uses when it decides whether a description may publish.</p>
+        <p className="mt-0.5 text-[13px] leading-[18px] text-adm-muted max-sm:hidden">The mode in effect is worked out by the same rule the server uses when it decides whether a description may publish.</p>
         <ul className="mt-3 divide-y divide-adm-divider rounded-xl border border-adm-divider" aria-label="Automation by vehicle type">
           {rows.map((r) => (
             <li key={r.type} className="flex items-center gap-x-3 px-4 py-2 sm:py-3 sm:flex-wrap sm:gap-y-2" data-automation-type={r.type}>
@@ -152,9 +152,9 @@ export const DestinationCard = ({ row, summary, deliveryState, api, onAction }: 
         <p className="text-[14px] leading-[20px] text-adm-muted" aria-label={`${row.label} delivery record`}>No deliveries recorded yet</p>
       ) : (
         <dl className="grid grid-cols-1 gap-2" aria-label={`${row.label} delivery record`}>
-          <Fact label={passport ? "Last attempt" : "Last export or attempt"}>{lastLine(summary?.lastAttempt)}</Fact>
-          <Fact label="Last success">{lastLine(summary?.lastSuccess)}</Fact>
-          <Fact label="Last error" tone={summary?.lastError ? "danger" : undefined}>{deliveryState === "ok" && summary?.lastError ? `${fmtWhen(summary.lastError.at)}: ${summary.lastError.message}` : lastLine(null)}</Fact>
+          {(deliveryState !== "ok" || summary?.lastAttempt) && <Fact label={passport ? "Last attempt" : "Last export or attempt"}>{lastLine(summary?.lastAttempt)}</Fact>}
+          {(deliveryState !== "ok" || summary?.lastSuccess) && <Fact label="Last success">{lastLine(summary?.lastSuccess)}</Fact>}
+          {(deliveryState !== "ok" || summary?.lastError) && <Fact label="Last error" tone={summary?.lastError ? "danger" : undefined}>{deliveryState === "ok" && summary?.lastError ? `${fmtWhen(summary.lastError.at)}: ${summary.lastError.message}` : lastLine(null)}</Fact>}
         </dl>
       )}
     </>
@@ -165,7 +165,7 @@ export const DestinationCard = ({ row, summary, deliveryState, api, onAction }: 
         <div className="flex-shrink-0 rounded-lg border border-adm-divider bg-adm-workspace flex items-center justify-center p-1 overflow-hidden" style={narrow ? { width: 44, height: 44 } : { width: LOGO_VIEWPORT.width, height: LOGO_VIEWPORT.height }}><DestLogo channel={row.key} name={row.label} kind={row.kind} /></div>
         <div className="min-w-0 flex-1">
           <h3 className="text-[16px] leading-[22px] font-semibold text-adm-ink">{row.label}</h3>
-          <p className="flex items-center gap-1.5 text-[13px] leading-[18px] text-adm-muted"><AdminIcon name={KIND_ICON[row.kind]} size="compact" />{row.kindLabel}</p>
+          <p className="flex items-center gap-1.5 text-[13px] leading-[18px] text-adm-muted"><AdminIcon name={KIND_ICON[row.kind]} size="compact" />{row.kindLabel}{narrow && row.delivery === "internal" ? ", delivered by AutoLabels" : ""}</p>
           {narrow && (
             <div className="mt-1">
               {row.delivery === "internal" && <StatusBadge state="internal_publication" />}
@@ -174,12 +174,13 @@ export const DestinationCard = ({ row, summary, deliveryState, api, onAction }: 
             </div>
           )}
         </div>
+        {narrow && <SwitchField label="" checked={generates} disabled={!api.canEdit} onChange={toggleGenerate} ariaLabel={`Generate content for ${row.label}`} />}
       </div>
 
-      <section aria-label={`${row.label} generate content`} className="sm:border-t sm:border-adm-divider sm:pt-3">
+      {!narrow && <section aria-label={`${row.label} generate content`} className="sm:border-t sm:border-adm-divider sm:pt-3">
         <SwitchField label="Generate content" checked={generates} disabled={!api.canEdit} onChange={toggleGenerate} ariaLabel={`Generate content for ${row.label}`} />
-        {!narrow && <p className="text-[13px] leading-[18px] text-adm-muted">{generates ? "Descriptions are written for this destination." : "No text is written for this destination."} Writing never sends anything.</p>}
-      </section>
+        <p className="text-[13px] leading-[18px] text-adm-muted">{generates ? "Descriptions are written for this destination." : "No text is written for this destination."} Writing never sends anything.</p>
+      </section>}
 
       <section aria-label={`${row.label} delivery`} className="sm:border-t sm:border-adm-divider sm:pt-3 space-y-2">
         {!narrow && (
@@ -197,10 +198,9 @@ export const DestinationCard = ({ row, summary, deliveryState, api, onAction }: 
           </div>
         )}
         {narrow ? (
-          <details>
-            <summary className="cursor-pointer min-h-[44px] flex items-center text-[14px] font-semibold text-adm-primary">Delivery details</summary>
-            <div className="space-y-2 pb-1">{reasonAndRecord}</div>
-          </details>
+          <p className={cn("text-[13px] leading-[18px]", summary?.lastError && deliveryState === "ok" ? "text-adm-danger" : "text-adm-muted")}>
+            {deliveryState === "unavailable" ? "Delivery record unavailable" : deliveryState === "loading" ? "Loading delivery record" : nothingRecorded ? "No deliveries recorded yet" : summary?.lastError ? `Last error ${fmtWhen(summary.lastError.at)}: ${summary.lastError.message}` : `Last ${summary?.lastSuccess ? "success" : "attempt"} ${fmtWhen(summary?.lastSuccess ?? summary?.lastAttempt)}`}
+          </p>
         ) : reasonAndRecord}
       </section>
 
@@ -244,13 +244,17 @@ export const ExportOptionsDrawer = ({ row, onClose }: { row: DestinationRow | nu
   );
 };
 
-const OutputPreviewBody = ({ api, profileKey }: { api: DescriptionSettingsApi; profileKey: string }) => {
+const EXCERPT = 600;
+
+const OutputPreviewBody = ({ api, profileKey, excerpt }: { api: DescriptionSettingsApi; profileKey: string; excerpt?: boolean }) => {
+  const [full, setFull] = useState(false);
   const draft = api.edit.draft!;
   const profile = outputProfile(profileKey, api.overrides.data[profileKey]);
   const sample = useMemo(() => (profile ? buildSample(profile, FIXTURE_SAMPLE_NARRATIVE, draft) : null), [profile, draft]);
   const count = sample?.counts?.codePoints ?? null;
   if (sample?.blocker) return <Banner tone="danger" title="This output cannot be built">{sample.blocker.message}</Banner>;
   if (!sample) return <EditorEmpty title="No profile" description="This destination has no output profile." />;
+  const text = sample.text ?? "";
   return (
     <>
       <div className="grid grid-cols-2 gap-3">
@@ -258,7 +262,17 @@ const OutputPreviewBody = ({ api, profileKey }: { api: DescriptionSettingsApi; p
         <div className="rounded-lg border border-adm-divider p-3"><p className="text-[13px] text-adm-muted">{profile?.target ? "Target / limit" : "Limit"}</p><p className="text-[24px] leading-[30px] font-bold text-adm-ink tabular-nums">{profile?.target ? `${profile.target.toLocaleString("en-US")}` : profile?.policy.characterLimit.toLocaleString("en-US")}</p><p className="text-[13px] text-adm-muted">{profile?.target ? `within ${profile.policy.characterLimit.toLocaleString("en-US")}` : "characters"}</p></div>
       </div>
       {sample.parts && <p className="text-[13px] leading-[18px] text-adm-muted">Narrative {sample.parts.narrative.toLocaleString("en-US")} + call to action {sample.parts.cta.toLocaleString("en-US")} + required wording {sample.parts.disclosure.toLocaleString("en-US")}{sample.dropped ? `. ${sample.dropped} optional sentences left out to land on the target.` : "."}</p>}
-      <pre className="whitespace-pre-wrap break-words rounded-lg bg-adm-workspace border border-adm-divider p-3 text-[13px] leading-[19px] text-adm-ink max-h-[320px] overflow-y-auto" tabIndex={0} aria-label="Output text">{sample.text}</pre>
+      {excerpt ? (
+        <>
+          <p className="whitespace-pre-wrap break-words rounded-lg bg-adm-workspace border border-adm-divider p-3 text-[13px] leading-[19px] text-adm-ink" aria-label="Output excerpt">{text.length > EXCERPT ? `${text.slice(0, EXCERPT).trimEnd()}...` : text}</p>
+          {text.length > EXCERPT && <AdminButton variant="secondary" className="min-h-[44px] w-full" onClick={() => setFull(true)}>View full output</AdminButton>}
+          <DetailDrawer open={full} onClose={() => setFull(false)} title="Full output" description={`${count?.toLocaleString("en-US")} characters. Read only. Nothing is sent, saved or published.`} footer={<AdminButton variant="primary" onClick={() => setFull(false)}>Close</AdminButton>}>
+            <p className="whitespace-pre-wrap break-words text-[14px] leading-[22px] text-adm-ink" aria-label="Output text">{text}</p>
+          </DetailDrawer>
+        </>
+      ) : (
+        <p className="whitespace-pre-wrap break-words rounded-lg bg-adm-workspace border border-adm-divider p-3 text-[13px] leading-[19px] text-adm-ink" aria-label="Output text">{text}</p>
+      )}
       {sample.findings.filter((f) => f.severity !== "info").map((f, i) => <Banner key={`${f.code}-${i}`} tone={f.severity === "blocking" ? "danger" : "warning"} title={f.message} />)}
     </>
   );
@@ -275,7 +289,7 @@ export const OutputPreviewRail = ({ api, mobile }: { api: DescriptionSettingsApi
           {OUTPUT_PROFILE_KEYS.map((k) => <option key={k} value={k}>{outputProfile(k)?.label ?? k}</option>)}
         </SelectField>
       </label>
-      <OutputPreviewBody api={api} profileKey={key} />
+      <OutputPreviewBody api={api} profileKey={key} excerpt />
       <p className="text-[13px] leading-[18px] text-adm-muted">Read only. Draft settings applied to a fixture narrative. Nothing is sent, saved or published.</p>
     </div>
   );
