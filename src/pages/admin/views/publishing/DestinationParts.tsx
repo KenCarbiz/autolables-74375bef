@@ -159,6 +159,38 @@ export const DestinationCard = ({ row, summary, deliveryState, api, onAction }: 
       )}
     </>
   );
+  if (narrow) {
+    const badge = row.delivery === "internal" ? <StatusBadge state="internal_publication" /> : row.delivery === "manual_export" ? <StatusBadge state="manual_export" /> : <StatusBadge state="setup_required" label="Not connected" />;
+    const record = deliveryState === "unavailable" ? "Delivery record unavailable" : deliveryState === "loading" ? "Loading delivery record" : nothingRecorded ? "No deliveries recorded yet" : summary?.lastError ? `Last error ${fmtWhen(summary.lastError.at)}: ${summary.lastError.message}` : `Last ${summary?.lastSuccess ? "success" : "attempt"} ${fmtWhen(summary?.lastSuccess ?? summary?.lastAttempt)}`;
+    return (
+      <li className="rounded-xl border border-adm-divider bg-adm-surface min-w-0" data-destination={row.key}>
+        <details className="group">
+          <summary className="list-none cursor-pointer min-h-[56px] px-3 flex items-center gap-2 [&::-webkit-details-marker]:hidden">
+            <span className="min-w-0 flex-1 truncate text-[15px] leading-[22px] font-semibold text-adm-ink">{row.label}</span>
+            {badge}
+            <AdminIcon name="chevron-down" size="inline" className="flex-shrink-0 text-adm-muted transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="px-3 pb-3 space-y-2 border-t border-adm-divider pt-2">
+            <p className="text-[13px] leading-[18px] text-adm-muted">{row.kindLabel}</p>
+            <SwitchField label="Generate content" checked={generates} disabled={!api.canEdit} onChange={toggleGenerate} ariaLabel={`Generate content for ${row.label}`} />
+            {passport && (
+              <div className="rounded-lg bg-adm-workspace border border-adm-divider px-3 py-1">
+                <SwitchField label="Automatic delivery to Passport" checked={draft.internal_publication_enabled} disabled={!api.canEdit} onChange={(v) => api.edit.set("internal_publication_enabled", v)} />
+              </div>
+            )}
+            <p className="text-[14px] leading-[20px] text-adm-ink">{row.automaticDelivery.reason}</p>
+            <p className={cn("text-[13px] leading-[18px]", summary?.lastError && deliveryState === "ok" ? "text-adm-danger" : "text-adm-muted")}>{record}</p>
+            <div className="flex gap-2 pt-1">
+              <AdminButton variant="secondary" className="min-h-[44px] flex-1 min-w-0 px-2" aria-label="Preview output" onClick={() => onAction("preview", row.key)}>Preview</AdminButton>
+              {row.delivery === "manual_export" && <AdminButton variant="secondary" className="min-h-[44px] flex-1 min-w-0 px-2" onClick={() => onAction("export", row.key)}>Export</AdminButton>}
+              {row.delivery === "connector_needed" && <AdminButton variant="secondary" className="min-h-[44px] flex-1 min-w-0 px-2" onClick={() => onAction("connector", row.key)}>Configure</AdminButton>}
+              <AdminButton variant="secondary" className="min-h-[44px] flex-1 min-w-0 px-2" onClick={() => onAction("history", row.key)}>History</AdminButton>
+            </div>
+          </div>
+        </details>
+      </li>
+    );
+  }
   return (
     <li className="rounded-xl border border-adm-divider bg-adm-surface p-3 sm:p-5 flex flex-col gap-1.5 sm:gap-4 min-w-0 h-full" data-destination={row.key}>
       <div className="flex items-start gap-3">
