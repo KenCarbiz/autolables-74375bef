@@ -26,7 +26,7 @@ export const ProofDrawer = ({ open, service, photoTasks, onClose }: { open: bool
         The photo-proof list stores task labels. It has no task id yet, so renaming a service or a task stops the rule from matching. Check the list after any rename.
       </Callout>
       <Callout tone="neutral" icon="link" title="Edited in one place">
-        The photo-proof list is edited in Service policy, under Technician sign-off rules. <Link to={PROOF_HREF} className="font-semibold text-adm-primary hover:underline">Open Service policy</Link>
+        The photo-proof list is edited in Service policy, under Technician sign-off rules. <Link to={PROOF_HREF} className="font-semibold text-adm-primary hover:underline max-sm:inline-flex max-sm:items-center max-sm:min-h-[44px] max-sm:px-1">Open Service policy</Link>
       </Callout>
     </DetailDrawer>
   );
