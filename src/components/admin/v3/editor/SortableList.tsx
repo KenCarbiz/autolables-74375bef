@@ -23,6 +23,7 @@ export function SortableList<T extends SortableItem>({
   label,
   className,
   disabled = false,
+  stackContentOnMobile = false,
 }: {
   items: T[];
   onChange: (next: T[]) => void;
@@ -30,6 +31,7 @@ export function SortableList<T extends SortableItem>({
   label: string;
   className?: string;
   disabled?: boolean;
+  stackContentOnMobile?: boolean;
 }) {
   const [announce, setAnnounce] = useState("");
   const [dragId, setDragId] = useState<string | null>(null);
@@ -71,7 +73,7 @@ export function SortableList<T extends SortableItem>({
                 setAnnounce(`${items[from].label} moved to position ${i + 1} of ${items.length}`);
               }
             }}
-            className={cn("flex items-center gap-2 rounded-lg border border-adm-divider bg-adm-surface px-2 py-2", dragId === item.id && "opacity-60")}
+            className={cn("flex items-center gap-2 rounded-lg border border-adm-divider bg-adm-surface px-2 py-2", stackContentOnMobile && "max-sm:flex-wrap", dragId === item.id && "opacity-60")}
           >
             <button
               type="button"
@@ -88,7 +90,8 @@ export function SortableList<T extends SortableItem>({
             >
               <AdminIcon name="drag" />
             </button>
-            <div className="min-w-0 flex-1 text-[14px] leading-[20px] text-adm-ink break-words">{renderItem ? renderItem(item) : item.label}</div>
+            {stackContentOnMobile && <span aria-hidden="true" className="flex-1 sm:hidden" />}
+            <div className={cn("min-w-0 flex-1 text-[14px] leading-[20px] text-adm-ink break-words", stackContentOnMobile && "max-sm:order-last max-sm:flex-[0_0_100%] max-sm:max-w-full max-sm:w-full px-1")}>{renderItem ? renderItem(item) : item.label}</div>
             <IconButton ref={ref(`${item.id}:up`)} name="arrow-up" label={`Move ${item.label} up`} disabled={disabled || i === 0} onClick={() => move(i, i - 1, "up")} />
             <IconButton ref={ref(`${item.id}:down`)} name="arrow-down" label={`Move ${item.label} down`} disabled={disabled || i === items.length - 1} onClick={() => move(i, i + 1, "down")} />
           </li>
