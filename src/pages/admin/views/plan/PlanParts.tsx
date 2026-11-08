@@ -195,18 +195,18 @@ const ROW_GRID = "sm:grid-cols-[minmax(0,1fr)_150px_170px]";
 const FeatureLine = ({ row }: { row: FeatureRow }) => {
   const action = row.link ?? (row.status === "requires_upgrade" ? { label: "Compare plans", to: adminTabHref("plan-features", "compare") } : null);
   return (
-  <li data-feature={row.key} data-feature-status={row.status} className={cn("py-2.5 max-sm:py-0 max-sm:min-h-[56px] grid max-sm:grid-cols-[minmax(0,1fr)_auto_auto] gap-x-4 max-sm:gap-x-2 gap-y-0.5 items-center", ROW_GRID)}>
+  <li data-feature={row.key} data-feature-status={row.status} className={cn("py-2.5 max-sm:py-2 max-sm:min-h-[56px] grid max-sm:grid-cols-[minmax(0,1fr)_146px_20px] gap-x-4 max-sm:gap-x-2 gap-y-0.5 items-center", ROW_GRID)}>
     <div className="min-w-0">
       <p className={cn("text-[15px] leading-[21px] font-semibold", row.status === "included" || row.status === "setup_required" ? "text-adm-ink" : "text-adm-muted")}>{row.label}</p>
-      {row.status !== "included" && <p className={cn("text-[14px] leading-[20px] text-adm-muted", "max-sm:hidden")}>{row.detail}</p>}
+      {row.status !== "included" && <p className={cn("text-[14px] leading-[20px] text-adm-muted max-sm:text-[13px] max-sm:leading-[18px]", (row.status === "unknown" || row.status === "platform_only") && "max-sm:hidden")}>{row.detail}</p>}
     </div>
-    <p className="flex items-center gap-2 text-[14px] leading-[20px] text-adm-ink">
+    <p className="flex items-center gap-2 whitespace-nowrap text-[14px] max-sm:text-[13px] leading-[20px] text-adm-ink">
       <span aria-hidden="true"><FeatureMark status={row.status} /></span>
-      <span className="max-sm:sr-only">{STATUS_COPY[row.status].label}</span>
+      <span>{STATUS_COPY[row.status].label}</span>
     </p>
-    <div className="text-right max-sm:min-w-[44px]">
+    <div className="text-right max-sm:relative max-sm:h-5">
       {action && (
-        <Link to={action.to} aria-label={`${action.label} for ${row.label}`} className={cn(LINK, "whitespace-nowrap max-sm:min-w-[44px] max-sm:justify-center")}>
+        <Link to={action.to} aria-label={`${action.label} for ${row.label}`} className={cn(LINK, "whitespace-nowrap max-sm:absolute max-sm:right-[-12px] max-sm:top-1/2 max-sm:-translate-y-1/2 max-sm:h-11 max-sm:w-11 max-sm:justify-center")}>
           <span className="max-sm:hidden">{action.label}</span>
           <AdminIcon name="chevron-right" className="sm:hidden text-adm-muted" />
         </Link>
@@ -237,6 +237,7 @@ export function FeatureGroups({ groups, planUnknown = false }: { groups: Feature
           </li>
         ))}
       </ul>
+      {planUnknown && <p role="status" className="sm:hidden text-[14px] leading-[20px] font-semibold text-adm-ink">Plan could not be loaded.</p>}
       <div className="space-y-5">
         {shown.map((g) => (
           <section key={g.id} aria-labelledby={`fg-${g.id}`} className="min-w-0">
