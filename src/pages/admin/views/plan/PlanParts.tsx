@@ -94,39 +94,39 @@ export function MetricCards({ metrics, usage, plan, onOpen }: { metrics: MetricM
       {usage.kind === "failed" && <Banner tone="warning" title="Usage is unavailable">{usage.reason}</Banner>}
       <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2.5 sm:gap-3">
         {metrics.map((m, idx) => (
-          <li key={m.spec.key} data-metric={m.spec.key} data-metric-state={m.value === null ? "unavailable" : "value"} className={cn("rounded-xl border border-adm-divider bg-adm-surface p-3 sm:p-4 flex flex-col min-w-0", idx < 3 ? "lg:col-span-2" : "lg:col-span-3")}>
+          <li key={m.spec.key} data-metric={m.spec.key} data-metric-state={m.value === null ? "unavailable" : "value"} className={cn("rounded-xl border border-adm-divider bg-adm-surface p-3 sm:p-4 flex flex-col min-w-0", idx < 3 ? "lg:col-span-2" : "lg:col-span-3", "max-sm:grid max-sm:grid-cols-[minmax(0,1fr)_auto] max-sm:items-center max-sm:gap-x-3 max-sm:gap-y-0 max-sm:py-2")}>
             <span className="flex items-center gap-3">
               <AdminIconTile name={m.spec.icon} className="max-sm:hidden" />
               <span className="text-[15px] leading-[20px] font-semibold text-adm-ink">{m.spec.label}</span>
             </span>
             {m.value === null ? (
               <>
-                <p className="mt-2 text-[20px] leading-[28px] font-semibold text-adm-muted">{usage.kind === "loading" && !m.spec.unmetered ? "Loading" : "Unavailable"}</p>
-                {m.reason && !(usage.kind === "loading" && !m.spec.unmetered) ? <p className="mt-1 text-[14px] leading-[20px] text-adm-muted">{m.reason}</p> : null}
+                <p className="mt-2 max-sm:mt-0 max-sm:text-right text-[20px] leading-[28px] font-semibold text-adm-muted">{usage.kind === "loading" && !m.spec.unmetered ? "Loading" : "Unavailable"}</p>
+                {m.reason && !(usage.kind === "loading" && !m.spec.unmetered) && !(usage.kind === "failed" && !m.spec.unmetered) ? <p className="mt-1 max-sm:order-6 max-sm:col-span-2 max-sm:mt-0 text-[14px] leading-[20px] text-adm-muted">{m.reason}</p> : null}
               </>
             ) : (
-              <p className="mt-2 text-[28px] leading-[34px] font-bold text-adm-ink tabular-nums">{m.value.toLocaleString()}</p>
+              <p className="mt-2 max-sm:mt-0 max-sm:text-right max-sm:text-[22px] max-sm:leading-[28px] text-[28px] leading-[34px] font-bold text-adm-ink tabular-nums">{m.value.toLocaleString()}</p>
             )}
-            <div className="mt-2 text-[14px] leading-[20px] text-adm-muted">
+            <div className="mt-2 text-[14px] leading-[20px] text-adm-muted max-sm:contents [&>p]:max-sm:order-3 [&>p]:max-sm:m-0">
               {m.limit.kind === "unknown" && <p>Plan limit: Unknown</p>}
               {m.limit.kind === "no_plan" && <p>No plan on record</p>}
               {m.limit.kind === "unlimited" && <p>Unlimited on this plan.</p>}
               {m.limit.kind === "undefined" && <p>No monthly limit is set for this activity.</p>}
               {m.limit.kind === "limited" && (
                 <>
-                  <p>Plan limit: {m.limit.hard.toLocaleString()} per month</p>
+                  <p className="max-sm:order-3">Plan limit: {m.limit.hard.toLocaleString()} per month</p>
                   {m.percent !== null && (
                     <>
-                      <span role="progressbar" aria-label={`${m.spec.label} against the monthly limit`} aria-valuemin={0} aria-valuemax={m.limit.hard} aria-valuenow={Math.min(m.value ?? 0, m.limit.hard)} aria-valuetext={`${m.value?.toLocaleString()} of ${m.limit.hard.toLocaleString()}`} className="mt-1.5 block h-2 rounded-full bg-adm-workspace overflow-hidden">
+                      <span role="progressbar" aria-label={`${m.spec.label} against the monthly limit`} aria-valuemin={0} aria-valuemax={m.limit.hard} aria-valuenow={Math.min(m.value ?? 0, m.limit.hard)} aria-valuetext={`${m.value?.toLocaleString()} of ${m.limit.hard.toLocaleString()}`} className="mt-1.5 max-sm:mt-0 max-sm:mb-1 max-sm:order-5 max-sm:col-span-2 block h-2 rounded-full bg-adm-workspace overflow-hidden">
                         <span className={cn("block h-full rounded-full", m.quota === "blocked" ? "bg-adm-danger" : m.quota === "over_soft" || m.quota === "near" ? "bg-adm-warning" : "bg-adm-primary")} style={{ width: `${m.percent}%` }} />
                       </span>
-                      <p className="mt-1">{m.percent}% of the limit used{m.quota && QUOTA_TEXT[m.quota] ? `. ${QUOTA_TEXT[m.quota]}.` : ""}</p>
+                      <p className="mt-1 max-sm:hidden">{m.percent}% of the limit used{m.quota && QUOTA_TEXT[m.quota] ? `. ${QUOTA_TEXT[m.quota]}.` : ""}</p>
                     </>
                   )}
                 </>
               )}
             </div>
-            <button type="button" onClick={() => onOpen(m.spec.key)} aria-label={`Details for ${m.spec.label}`} className={cn(LINK, "mt-auto pt-3 self-start inline-flex items-center gap-1")}>
+            <button type="button" onClick={() => onOpen(m.spec.key)} aria-label={`Details for ${m.spec.label}`} className={cn(LINK, "mt-auto pt-3 self-start inline-flex items-center gap-1 max-sm:order-4 max-sm:mt-0 max-sm:pt-0 max-sm:justify-self-end")}>
               Details <AdminIcon name="chevron-right" size="inline" />
             </button>
           </li>
@@ -192,21 +192,29 @@ const FeatureMark = ({ status }: { status: FeatureStatus }) =>
 
 const ROW_GRID = "sm:grid-cols-[minmax(0,1fr)_150px_170px]";
 
-const FeatureLine = ({ row }: { row: FeatureRow }) => (
-  <li data-feature={row.key} data-feature-status={row.status} className={cn("py-2.5 max-sm:pb-0 grid max-sm:grid-cols-2 gap-x-4 gap-y-0.5 items-center", ROW_GRID)}>
-    <div className="min-w-0 max-sm:col-span-2">
+const FeatureLine = ({ row }: { row: FeatureRow }) => {
+  const action = row.link ?? (row.status === "requires_upgrade" ? { label: "Compare plans", to: adminTabHref("plan-features", "compare") } : null);
+  return (
+  <li data-feature={row.key} data-feature-status={row.status} className={cn("py-2.5 max-sm:py-0 max-sm:min-h-[56px] grid max-sm:grid-cols-[minmax(0,1fr)_auto_auto] gap-x-4 max-sm:gap-x-2 gap-y-0.5 items-center", ROW_GRID)}>
+    <div className="min-w-0">
       <p className={cn("text-[15px] leading-[21px] font-semibold", row.status === "included" || row.status === "setup_required" ? "text-adm-ink" : "text-adm-muted")}>{row.label}</p>
-      {row.status !== "included" && <p className={cn("text-[14px] leading-[20px] text-adm-muted", row.status === "platform_only" && "max-sm:hidden")}>{row.detail}</p>}
+      {row.status !== "included" && <p className={cn("text-[14px] leading-[20px] text-adm-muted", "max-sm:hidden")}>{row.detail}</p>}
     </div>
     <p className="flex items-center gap-2 text-[14px] leading-[20px] text-adm-ink">
       <span aria-hidden="true"><FeatureMark status={row.status} /></span>
-      {STATUS_COPY[row.status].label}
+      <span className="max-sm:sr-only">{STATUS_COPY[row.status].label}</span>
     </p>
-    <div className="text-right">
-      {row.link && <Link to={row.link.to} aria-label={`${row.link.label} for ${row.label}`} className={cn(LINK, "whitespace-nowrap")}>{row.link.label}</Link>}
+    <div className="text-right max-sm:min-w-[44px]">
+      {action && (
+        <Link to={action.to} aria-label={`${action.label} for ${row.label}`} className={cn(LINK, "whitespace-nowrap max-sm:min-w-[44px] max-sm:justify-center")}>
+          <span className="max-sm:hidden">{action.label}</span>
+          <AdminIcon name="chevron-right" className="sm:hidden text-adm-muted" />
+        </Link>
+      )}
     </div>
   </li>
-);
+  );
+};
 
 export function FeatureGroups({ groups, planUnknown = false }: { groups: FeatureGroup[]; planUnknown?: boolean }) {
   const counts = featureCounts(groups);

@@ -203,19 +203,15 @@ export function PolicySummary({ concepts }: { concepts: PolicyConcept[] }) {
     <SectionCard title="Current policy" description={<span className="max-sm:hidden">Four separate rules. None is inferred from another.</span>} icon="shield">
       <ul className="-my-2 divide-y divide-adm-divider">
         {concepts.map((c) => (
-          <li key={c.key} className="py-2.5 sm:py-3 flex items-start gap-3">
-            <AdminIconTile name={CONCEPT_ICON[c.key]} tone="neutral" className="max-sm:hidden" />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[13px] leading-[18px] text-adm-muted">{c.title}</p>
-                <StatusBadge state={c.state === "unknown" ? "unknown" : c.state === "attention" ? "setup_required" : c.stateLabel === "Differs by class" ? "overridden" : "enabled"} label={c.stateLabel} />
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[15px] leading-[21px] font-semibold text-adm-ink min-w-0">{c.value}</p>
-                <Link to={`${overviewHref("policy")}&concept=${c.key}`} aria-label={`${c.title} details`} className={cn(TEXT_LINK, "whitespace-nowrap")}>
-                  <span className="sm:hidden">Details</span><span className="max-sm:hidden">{c.title} details</span>
-                </Link>
-              </div>
+          <li key={c.key} className="py-2.5 lg:py-3 flex items-start gap-3">
+            <AdminIconTile name={CONCEPT_ICON[c.key]} tone="neutral" className="max-lg:hidden" />
+            <div className="min-w-0 flex-1 grid grid-cols-[minmax(0,1fr)_auto] lg:flex lg:flex-wrap items-center gap-x-2 lg:gap-x-3 lg:gap-y-0">
+              <p className="text-[13px] leading-[18px] text-adm-muted lg:basis-full lg:order-1">{c.title}</p>
+              <span className="lg:order-3 lg:mt-0"><StatusBadge state={c.state === "unknown" ? "unknown" : c.state === "attention" ? "setup_required" : c.stateLabel === "Differs by class" ? "overridden" : "enabled"} label={c.stateLabel} /></span>
+              <p className="text-[15px] leading-[21px] font-semibold text-adm-ink min-w-0 lg:basis-full lg:order-2">{c.value}</p>
+              <Link to={`${overviewHref("policy")}&concept=${c.key}`} aria-label={`${c.title} details`} className={cn(TEXT_LINK, "whitespace-nowrap lg:whitespace-normal lg:order-4")}>
+                <span className="lg:hidden">Details</span><span className="max-lg:hidden">{c.title} details</span>
+              </Link>
             </div>
           </li>
         ))}
