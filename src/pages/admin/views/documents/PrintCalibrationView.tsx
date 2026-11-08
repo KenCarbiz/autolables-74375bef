@@ -84,7 +84,7 @@ export default function PrintCalibrationView() {
             <li>Any signed-in member of this dealership can change printer profiles; changes are not limited by role.</li>
             <li>A profile does not prove a printer is connected or that printed margins match. Only a printed test sheet checked by a person does.</li>
           </ul>
-          <p className="text-[13px] leading-[18px] text-adm-muted">Label templates and paper size are on <Link to={adminTabHref("templates")} className="font-semibold text-adm-primary hover:underline">Templates</Link>.{!hasDefault && data.profiles.length > 0 ? " Printing uses the dealership default profile, and none is saved yet." : ""}</p>
+          <p className="text-[13px] leading-[18px] text-adm-muted">Label templates and paper size are on <Link to={adminTabHref("templates")} className="font-semibold text-adm-primary hover:underline max-sm:inline-flex max-sm:items-center max-sm:min-h-[44px] max-sm:px-1">Templates</Link>.{!hasDefault && data.profiles.length > 0 ? " Printing uses the dealership default profile, and none is saved yet." : ""}</p>
         </SectionCard>
         <SectionCard icon="shield-check" title="Test sheet and confirmation">
           <BlockedFeatureNotice migrationId={VERIFY_MIGRATION_ID} feature="Test sheet record, profile name and confirmed alignment">

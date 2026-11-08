@@ -136,7 +136,7 @@ export default function ServiceCatalogView() {
         />
         )}
       </SectionCard>
-      <p className="text-[13px] leading-[18px] text-adm-muted">Photo-proof rules are edited in <Link to={PROOF_HREF} className="font-semibold text-adm-primary hover:underline">Service policy</Link>. Other service settings are on <Link to={adminTabHref("service-policy")} className="font-semibold text-adm-primary hover:underline">Service policy</Link>.</p>
+      <p className="text-[13px] leading-[18px] text-adm-muted">Photo-proof rules are edited in <Link to={PROOF_HREF} className="font-semibold text-adm-primary hover:underline max-sm:inline-flex max-sm:items-center max-sm:min-h-[44px] max-sm:px-1">Service policy</Link>. Other service settings are on <Link to={adminTabHref("service-policy")} className="font-semibold text-adm-primary hover:underline max-sm:inline-flex max-sm:items-center max-sm:min-h-[44px] max-sm:px-1">Service policy</Link>.</p>
 
       <ServicePanel open={panel !== null || invalidDemo} editing={panel?.editing ?? null} catalog={catalog} onClose={() => setPanel(null)} onProof={(s) => setProof(s)} startInvalid={invalidDemo && panel === null} />
       <ProofDrawer open={!!proof} service={proof} photoTasks={catalog.photoTasks} onClose={() => setProof(null)} />

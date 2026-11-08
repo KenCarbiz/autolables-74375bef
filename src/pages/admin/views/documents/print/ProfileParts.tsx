@@ -25,13 +25,15 @@ export const ProfileCard = ({ profile, data, onEdit, onReset, onDelete }: { prof
     <li className="rounded-xl bg-adm-surface border border-adm-divider shadow-[0_1px_2px_rgba(27,43,59,0.06)] p-4 sm:p-5 flex flex-col gap-4 min-w-0" data-profile-card={profile.locationId ?? "default"}>
       <div className="flex items-start gap-3">
         <AdminIconTile name="printer" />
-        <div className="min-w-0 flex-1 space-y-1.5">
-          <h3 className="text-[18px] leading-[26px] font-semibold text-adm-ink break-words">{profile.printerName || "Unnamed printer"}</h3>
-          <ScopeLabel scope="rooftop" rooftopName={rooftop ? data.rooftopLabel(profile.locationId) : `${data.rooftopLabel(null)}, dealership default`} />
-          <div><StatusBadge state={view.state === "confirmed" ? "enabled" : "unavailable"} label={view.label} /></div>
+        <div className="min-w-0 flex-1 space-y-1">
+          <h3 className="text-[18px] leading-[24px] font-semibold text-adm-ink break-words">{profile.printerName || "Unnamed printer"}</h3>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <ScopeLabel scope="rooftop" rooftopName={rooftop ? data.rooftopLabel(profile.locationId) : "Dealership default"} />
+            <StatusBadge state={view.state === "confirmed" ? "enabled" : "unavailable"} label={view.label} />
+          </div>
         </div>
       </div>
-      <dl className="grid grid-cols-[minmax(88px,120px)_1fr] gap-x-4 gap-y-2 text-[14px] leading-[20px]">
+      <dl className="grid grid-cols-[minmax(88px,120px)_1fr] gap-x-4 gap-y-1 text-[14px] leading-[20px]">
         <dt className="text-adm-muted">Paper</dt>
         <dd>{PAPER_FORMATS.map((f) => `${f.name} ${f.sizeLabel}`).join(", ")}</dd>
         <dt className="text-adm-muted">Alignment</dt>
@@ -39,7 +41,12 @@ export const ProfileCard = ({ profile, data, onEdit, onReset, onDelete }: { prof
         <dt className="text-adm-muted">Last saved</dt>
         <dd>{dateText(profile.updatedAt)}</dd>
         <dt className="text-adm-muted">Confirmed</dt>
-        <dd>{view.state === "confirmed" ? `${dateText(profile.verification.deployed ? profile.verification.verifiedAt : null)}` : view.reason}</dd>
+        <dd>{view.state === "confirmed" ? `${dateText(profile.verification.deployed ? profile.verification.verifiedAt : null)}` : (
+          <details>
+            <summary className="cursor-pointer list-none inline-flex items-center min-h-[44px] sm:min-h-0 text-adm-primary font-semibold">Not confirmed. Why?</summary>
+            <p className="text-adm-muted">{view.reason}</p>
+          </details>
+        )}</dd>
       </dl>
       {rooftop && <p className="text-[13px] leading-[18px] text-adm-muted">Printing reads the dealership default profile today. A rooftop profile is saved but not applied to prints yet.</p>}
       {data.canEdit && (
