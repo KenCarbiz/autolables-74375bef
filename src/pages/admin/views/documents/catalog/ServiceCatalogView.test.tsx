@@ -140,6 +140,16 @@ describe("Service catalog", () => {
     expect(await screen.findByText("You can view this service but not change it")).toBeInTheDocument();
   });
 
+  it("allows exactly the roles the server accepts for settings keys", () => {
+    for (const [role, edits] of [["manager", true], ["general_manager", true], ["gsm", true], ["admin", true], ["service_manager", false], ["finance", false]] as const) {
+      mocks.role = role;
+      const { unmount } = renderIt();
+      expect(screen.queryAllByRole("button", { name: "Add service" }).length > 0).toBe(edits);
+      if (!edits) expect(screen.getByText(/Saving the catalog is limited to owners, administrators, general managers, GSMs and managers/)).toBeInTheDocument();
+      unmount();
+    }
+  });
+
   it("is empty with a working Add service action", async () => {
     mocks.settings.get_ready_services = [];
     renderIt();

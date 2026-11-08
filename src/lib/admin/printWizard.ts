@@ -202,7 +202,7 @@ export const VERIFY_MIGRATION_ID = "20261114010000";
 /** A profile is only ever shown as confirmed when a person's recorded confirmation exists. */
 export function confirmationView(p: PrintProfile): ConfirmationView {
   if (!p.verification.deployed) {
-    return { state: "unavailable", label: "Unavailable", reason: `Human confirmation cannot be recorded until database update ${VERIFY_MIGRATION_ID} is applied. Not verified.` };
+    return { state: "unavailable", label: "Not verified", reason: `Nobody has confirmed this profile, and a confirmation cannot be recorded until database update ${VERIFY_MIGRATION_ID} is applied.` };
   }
   if (!p.verification.verifiedAt) {
     return { state: "not_verified", label: "Not verified", reason: "No person has confirmed a printed test sheet for this profile." };

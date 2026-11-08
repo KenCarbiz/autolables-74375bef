@@ -130,12 +130,12 @@ describe("Set up printer wizard", () => {
     print.mockRestore();
   });
 
-  it("shows a summary, not editable controls, to a read-only member", async () => {
+  it("does not add a role gate the server does not enforce", async () => {
     mocks.role = "sales";
     renderIt(<PrintSetupWizard />, "/?profile=loc-b");
-    expect(await screen.findByText(/view this profile but not change it/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Adjust alignment/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /Move print/ })).toBeNull();
+    await screen.findByRole("heading", { name: "Choose printer and paper" });
+    expect(screen.queryByText(/view this profile but not change it/)).toBeNull();
+    expect(screen.getByRole("button", { name: /Adjust alignment/ })).toBeInTheDocument();
   });
 });
 
@@ -144,7 +144,7 @@ describe("Printer profiles", () => {
     renderIt(<PrintCalibrationView />);
     const cards = await screen.findAllByRole("heading", { level: 3 });
     expect(cards.map((c) => c.textContent)).toEqual(["Example front office", "Example service printer"]);
-    expect(screen.getAllByText("Unavailable").length).toBe(2);
+    expect(screen.getAllByText("Not verified").length).toBe(2);
     expect(screen.queryByText("Confirmed by a person")).toBeNull();
     expect(screen.getAllByText(/Letter 8.5 x 11 in/).length).toBeGreaterThan(0);
   });
@@ -175,7 +175,8 @@ describe("Printer profiles", () => {
   it("deleting confirms what changes and removes only that row", async () => {
     renderIt(<PrintCalibrationView />);
     await screen.findByText("Example service printer");
-    fireEvent.click(screen.getByRole("button", { name: "Delete Example service printer" }));
+    fireEvent.keyDown(screen.getByRole("button", { name: "More actions for Example service printer" }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Delete profile" }));
     const dialog = await screen.findByRole("alertdialog");
     expect(within(dialog).getByText(/Other profiles are not changed/)).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole("button", { name: "Delete profile" }));
@@ -190,14 +191,20 @@ describe("Printer profiles", () => {
     expect(screen.getAllByRole("link", { name: /Set up printer/ }).length).toBeGreaterThan(0);
   });
 
-  it("hides every mutation for a read-only member", async () => {
+  it("keeps the dealership default from being deleted and offers reset instead", async () => {
+    renderIt(<PrintCalibrationView />);
+    await screen.findByText("Example front office");
+    fireEvent.keyDown(screen.getByRole("button", { name: "More actions for Example front office" }), { key: "Enter" });
+    expect(await screen.findByText("The dealership default cannot be deleted")).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Delete profile" })).toBeNull();
+  });
+
+  it("states that any member can edit, matching the row-level security", async () => {
     mocks.role = "sales";
     renderIt(<PrintCalibrationView />);
     await screen.findByText("Example service printer");
-    expect(screen.queryByRole("button", { name: /^Edit / })).toBeNull();
-    expect(screen.queryByRole("button", { name: /^Delete / })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Add profile" })).toBeNull();
-    expect(screen.getByText(/view printer profiles but not change them/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit Example service printer" })).toBeInTheDocument();
+    expect(screen.getByText(/Any signed-in member of this dealership can change printer profiles/)).toBeInTheDocument();
   });
 });
 
