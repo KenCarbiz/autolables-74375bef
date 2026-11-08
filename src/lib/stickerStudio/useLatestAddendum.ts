@@ -30,7 +30,7 @@ export function useLatestAddendum(vin?: string | null) {
         // deno-lint-ignore no-explicit-any
         const { data } = await (supabase as any)
           .from("addendums")
-          .select("id, products_snapshot, status, signed_at, content_hash, customer_name, total_price, created_at")
+          .select("id, products_snapshot, status, customer_signed_at, content_hash, customer_name, total_with_optional, created_at")
           .eq("vehicle_vin", vin)
           .order("created_at", { ascending: false })
           .limit(1)
@@ -42,10 +42,10 @@ export function useLatestAddendum(vin?: string | null) {
           id: data.id,
           products: Array.isArray(data.products_snapshot) ? data.products_snapshot : [],
           status: data.status ?? null,
-          signedAt: data.signed_at ?? null,
+          signedAt: data.customer_signed_at ?? null,
           contentHash: data.content_hash ?? null,
           customerName: data.customer_name ?? null,
-          totalPrice: data.total_price ?? null,
+          totalPrice: data.total_with_optional ?? null,
           createdAt: data.created_at,
         });
       } catch { if (!cancelled) setLoading(false); }
