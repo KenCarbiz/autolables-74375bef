@@ -120,8 +120,8 @@ describe("Plan & Usage from the fixture", () => {
 
   it("separates provider quotas and links the provider usage pages", () => {
     open();
-    expect(screen.getByRole("link", { name: "Usage for MarketCheck" })).toHaveAttribute("href", "/admin/integrations/inventory-network?view=marketcheck");
-    expect(screen.getByRole("link", { name: "Provider settings for Firecrawl" })).toHaveAttribute("href", adminTabHref("providers"));
+    expect(screen.getByRole("link", { name: "Usage and budgets for MarketCheck" })).toHaveAttribute("href", "/admin/integrations/inventory-network?view=marketcheck");
+    expect(screen.getByRole("link", { name: "Providers for Firecrawl" })).toHaveAttribute("href", adminTabHref("providers"));
     expect(screen.getByText("MarketCheck")).toBeTruthy();
   });
 

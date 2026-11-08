@@ -19,7 +19,7 @@ export const PanelBack = ({ title, description }: { title: string; description: 
       <AdminIcon name="arrow-left" size="inline" />
       Back to overview
     </Link>
-    <h2 className="text-[22px] leading-[30px] font-bold text-adm-ink">{title}</h2>
+    <h2 className="sr-only">{title}</h2>
     <p className="text-[14px] leading-[20px] text-adm-muted max-w-3xl">{description}</p>
   </div>
 );
@@ -47,13 +47,13 @@ export function ExceptionsPanel({ stats, failed }: { stats: ExceptionStats | nul
         description={
           unavailable
             ? "The exceptions queue could not be read. No count is shown, and that is not the same as zero."
-            : `${plural(stats!.instances.kind === "known" ? stats!.instances.value : 0, "open issue", "open issues")} across ${stats!.vehicles.kind === "known" ? plural(stats!.vehicles.value, "vehicle", "vehicles") : "an unknown number of vehicles"}${stats!.vehicles.kind === "known" && stats!.vehicles.capped ? " or more" : ""}. A vehicle with several issues counts once as a vehicle and once per issue.`
+            : `${plural(stats!.instances.kind === "known" ? stats!.instances.value : 0, "open issue", "open issues")} across ${stats!.vehicles.kind === "known" ? plural(stats!.vehicles.value, "vehicle", "vehicles") : "an unknown number of vehicles"}${stats!.vehicles.kind === "known" && stats!.vehicles.capped ? " or more" : ""}.${stats!.instances.kind === "known" && stats!.instances.value === 0 ? "" : " A vehicle with several issues counts once as a vehicle and once per issue."}`
         }
       />
       {!unavailable && (
         <SectionCard title="By severity" description="Issues and the vehicles they sit on. Select a severity to filter." icon="filter">
           {stats!.vehicles.kind === "known" && stats!.vehicles.capped && <p className="text-[14px] leading-[20px] text-adm-muted">Based on the first 1,000 open issues.</p>}
-          <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+          <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
             <li>
               <Link to={overviewHref("exceptions")} aria-current={!activeSeverity ? "true" : undefined} className={cn("block rounded-lg border px-3 py-3 min-h-[44px]", !activeSeverity ? "border-adm-primary bg-adm-selected" : "border-adm-divider hover:bg-adm-workspace")}>
                 <span className="block text-[13px] text-adm-muted">All severities</span>
@@ -122,7 +122,7 @@ export function PolicyPanel({ concepts }: { concepts: PolicyConcept[] }) {
       <PanelBack title="Current policy" description="Listing visibility, document publication, retail readiness and customer routing are four separate rules. Each is read from its own setting; none is inferred from another." />
       {concepts.map((c) => (
         <SectionCard key={c.key} id={`concept-${c.key}`} title={c.title} description={c.value} actions={<StatusBadge state={c.state === "unknown" ? "unknown" : c.state === "attention" ? "setup_required" : "enabled"} label={c.stateLabel} />} className={target === c.key ? "ring-2 ring-adm-primary/40" : undefined}>
-          <p className="text-[14px] leading-[20px] text-adm-ink">{c.detail}</p>
+          {!(c.byClass.length > 0 && !c.byClass.every((b) => b.cell.label === c.byClass[0].cell.label && b.cell.detail === c.byClass[0].cell.detail)) && <p className="text-[14px] leading-[20px] text-adm-ink">{c.detail}</p>}
           {c.byClass.length > 0 && (c.byClass.every((b) => b.cell.label === c.byClass[0].cell.label && b.cell.detail === c.byClass[0].cell.detail) ? (
             <p className="text-[14px] leading-[20px]"><span className="font-semibold text-adm-ink">All vehicle classes.</span> <span className="text-adm-muted">The same rule applies to new, used and CPO vehicles.</span></p>
           ) : (
@@ -140,7 +140,7 @@ export function PolicyPanel({ concepts }: { concepts: PolicyConcept[] }) {
           {c.tiers && (
             <p className="text-[14px] leading-[20px] text-adm-muted">{c.tiers.ready} of {c.tiers.total} routing steps are ready. Steps are listed in the saved order on the Routing page.</p>
           )}
-          <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-x-4 gap-y-0 flex-wrap">
             <Link to={c.href} className={TEXT_LINK}>{c.editLabel}</Link>
             {c.key === "retail_readiness" || c.key === "document_publication" ? <Link to={DOCUMENTS_ATTENTION_HREF} className={TEXT_LINK}>Vehicles needing document attention</Link> : null}
             {c.key === "listing_visibility" ? <Link to={adminTabHref("data-quality")} className={TEXT_LINK}>Data quality</Link> : null}

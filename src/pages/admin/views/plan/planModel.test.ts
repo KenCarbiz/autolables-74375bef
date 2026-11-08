@@ -102,6 +102,6 @@ describe("compare plans and the reporting month", () => {
     expect(unknown.every((x) => x.limit.kind === "unknown" && x.percent === null)).toBe(true);
     const rows = buildFeatureGroups({ tier: "none", accessActive: false, isPlatformAdmin: false, settings: DEFAULT_SETTINGS, planKnown: false }).flatMap((g) => g.rows);
     const dealer = rows.filter((r) => r.status !== "platform_only");
-    expect(dealer.every((r) => r.status === "unavailable" && r.detail === "Plan could not be loaded.")).toBe(true);
+    expect(dealer.every((r) => r.status === "unknown" && r.detail === "Plan could not be loaded.")).toBe(true);
   });
 });

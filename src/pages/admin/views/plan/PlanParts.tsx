@@ -43,7 +43,7 @@ export function CurrentPlanCard({ plan, unreadable, loading, canManageBilling, c
                 <p data-plan-name className="text-[28px] leading-[34px] font-bold text-adm-ink">{plan.planName}</p>
                 <StatusBadge state={STATUS_BADGE[plan.tone]} label={plan.statusLabel} />
               </div>
-              <p className="mt-1 text-[14px] leading-[20px] text-adm-muted">{plan.headline}</p>
+              {plan.status !== "paused" && <p className="mt-1 text-[14px] leading-[20px] text-adm-muted">{plan.headline}</p>}
               {plan.billingName && <p className="mt-1 text-[14px] leading-[20px] text-adm-muted">Billing plan: <span className="text-adm-ink font-medium">{plan.billingName}</span></p>}
             </div>
             <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-[14px] leading-[20px]">
@@ -54,7 +54,7 @@ export function CurrentPlanCard({ plan, unreadable, loading, canManageBilling, c
             </dl>
           </div>
           {plan.status === "past_due" && <Banner tone="warning" title="Payment is past due">{plan.headline}</Banner>}
-          {plan.status === "paused" && <Banner tone="danger" title="This plan is suspended">{plan.headline} Features marked unavailable below are locked for that reason.</Banner>}
+          {plan.status === "paused" && <Banner tone="danger" title="This plan is suspended">Its features are not available until billing restores it. Features marked unavailable below are locked for that reason.</Banner>}
           {(plan.status === "canceled" || plan.status === "expired" || plan.status === "none") && <Banner tone="warning" title={plan.status === "none" ? "No plan on record" : "This plan is not active"}>{plan.headline}</Banner>}
           {plan.status === "trial" && <Banner tone="info" title="This account is on a trial">{plan.headline}</Banner>}
           <div className="flex items-center gap-x-4 gap-y-2 flex-wrap pt-1 max-sm:flex-col max-sm:items-stretch">
@@ -92,9 +92,9 @@ export function MetricCards({ metrics, usage, plan, onOpen }: { metrics: MetricM
       </dl>
       {ready && !plan.accessActive && <Banner tone="neutral" title={`Shown for reference; the plan is ${plan.status === "paused" ? "suspended" : "not active"}.`} />}
       {usage.kind === "failed" && <Banner tone="warning" title="Usage is unavailable">{usage.reason}</Banner>}
-      <ul className="grid grid-cols-2 lg:grid-cols-3 min-[1500px]:grid-cols-5 gap-2.5 sm:gap-3">
-        {metrics.map((m) => (
-          <li key={m.spec.key} data-metric={m.spec.key} data-metric-state={m.value === null ? "unavailable" : "value"} className="rounded-xl border border-adm-divider bg-adm-surface p-3 sm:p-4 flex flex-col min-w-0">
+      <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2.5 sm:gap-3">
+        {metrics.map((m, idx) => (
+          <li key={m.spec.key} data-metric={m.spec.key} data-metric-state={m.value === null ? "unavailable" : "value"} className={cn("rounded-xl border border-adm-divider bg-adm-surface p-3 sm:p-4 flex flex-col min-w-0", idx < 3 ? "lg:col-span-2" : "lg:col-span-3")}>
             <span className="flex items-center gap-3">
               <AdminIconTile name={m.spec.icon} className="max-sm:hidden" />
               <span className="text-[15px] leading-[20px] font-semibold text-adm-ink">{m.spec.label}</span>
@@ -109,6 +109,7 @@ export function MetricCards({ metrics, usage, plan, onOpen }: { metrics: MetricM
             )}
             <div className="mt-2 text-[14px] leading-[20px] text-adm-muted">
               {m.limit.kind === "unknown" && <p>Plan limit: Unknown</p>}
+              {m.limit.kind === "no_plan" && <p>No plan on record</p>}
               {m.limit.kind === "unlimited" && <p>Unlimited on this plan.</p>}
               {m.limit.kind === "undefined" && <p>No monthly limit is set for this activity.</p>}
               {m.limit.kind === "limited" && (
@@ -135,7 +136,7 @@ export function MetricCards({ metrics, usage, plan, onOpen }: { metrics: MetricM
   );
 }
 
-const limitText = (m: MetricModel): string => (m.limit.kind === "unknown" ? "Unknown" : m.limit.kind === "unlimited" ? "Unlimited" : m.limit.kind === "limited" ? `${m.limit.hard.toLocaleString()} per month` : "No limit set");
+const limitText = (m: MetricModel): string => (m.limit.kind === "unknown" ? "Unknown" : m.limit.kind === "no_plan" ? "No plan on record" : m.limit.kind === "unlimited" ? "Unlimited" : m.limit.kind === "limited" ? `${m.limit.hard.toLocaleString()} per month` : "No limit set");
 
 export function LimitsAndQuotas({ metrics }: { metrics: MetricModel[] }) {
   const providers = BUDGET_PROVIDERS.filter((p) => p.id !== "*");
@@ -159,9 +160,9 @@ export function LimitsAndQuotas({ metrics }: { metrics: MetricModel[] }) {
             {providers.map((p) => {
               const label = p.label.replace(/ \(.*\)$/, "");
               return (
-                <li key={p.id} className="py-2.5 flex items-center justify-between gap-3 text-[14px] leading-[20px]">
+                <li key={p.id} className="py-2.5 max-sm:py-0 max-sm:min-h-[44px] flex items-center justify-between gap-3 text-[14px] leading-[20px]">
                   <span className="min-w-0"><span className="font-medium text-adm-ink">{label}</span> <span className="text-adm-muted max-sm:hidden">Metered by the provider</span></span>
-                  <Link to={p.id === "marketcheck" ? PROVIDER_USAGE_HREF : adminTabHref("providers")} aria-label={`${p.id === "marketcheck" ? "Usage" : "Provider settings"} for ${label}`} className={cn(LINK, "whitespace-nowrap")}>{p.id === "marketcheck" ? "Usage and budgets" : "Providers"}</Link>
+                  <Link to={p.id === "marketcheck" ? PROVIDER_USAGE_HREF : adminTabHref("providers")} aria-label={p.id === "marketcheck" ? "Usage and budgets for MarketCheck" : `Providers for ${label}`} className={cn(LINK, "whitespace-nowrap")}>{p.id === "marketcheck" ? "Usage and budgets" : "Providers"}</Link>
                 </li>
               );
             })}
@@ -178,46 +179,64 @@ const STATUS_COPY: Record<FeatureStatus, { label: string; blurb: string }> = {
   requires_upgrade: { label: "Requires upgrade", blurb: "Not in your current plan." },
   unavailable: { label: "Unavailable", blurb: "Not offered while the plan is not active." },
   platform_only: { label: "Platform only", blurb: "For platform staff, not a dealer plan." },
+  unknown: { label: "Unknown", blurb: "Plan could not be loaded." },
 };
 
 const FeatureMark = ({ status }: { status: FeatureStatus }) =>
   status === "included" ? <AdminIcon name="check-circle" size="card" className="text-adm-success" label="Included" />
     : status === "setup_required" ? <AdminIcon name="wrench" size="card" className="text-adm-warning" label="Setup required" />
     : status === "requires_upgrade" ? <AdminIcon name="lock" size="card" className="text-adm-muted" label="Requires upgrade" />
+    : status === "unknown" ? <AdminIcon name="help" size="card" className="text-adm-muted" label="Unknown" />
     : status === "platform_only" ? <AdminIcon name="key" size="card" className="text-adm-muted" label="Platform only" />
     : <AdminIcon name="ban" size="card" className="text-adm-muted" label="Unavailable" />;
 
+const ROW_GRID = "sm:grid-cols-[minmax(0,1fr)_150px_170px]";
+
 const FeatureLine = ({ row }: { row: FeatureRow }) => (
-  <li data-feature={row.key} data-feature-status={row.status} className="py-2.5 sm:py-3 flex items-start gap-3">
-    <span className="mt-0.5"><FeatureMark status={row.status} /></span>
-    <div className="min-w-0 flex-1">
-      <p className={cn("text-[15px] leading-[21px] font-semibold", row.status === "requires_upgrade" || row.status === "unavailable" || row.status === "platform_only" ? "text-adm-muted" : "text-adm-ink")}>{row.label}</p>
+  <li data-feature={row.key} data-feature-status={row.status} className={cn("py-2.5 max-sm:pb-0 grid max-sm:grid-cols-2 gap-x-4 gap-y-0.5 items-center", ROW_GRID)}>
+    <div className="min-w-0 max-sm:col-span-2">
+      <p className={cn("text-[15px] leading-[21px] font-semibold", row.status === "included" || row.status === "setup_required" ? "text-adm-ink" : "text-adm-muted")}>{row.label}</p>
       {row.status !== "included" && <p className={cn("text-[14px] leading-[20px] text-adm-muted", row.status === "platform_only" && "max-sm:hidden")}>{row.detail}</p>}
     </div>
-    {row.link && <Link to={row.link.to} aria-label={`${row.link.label} for ${row.label}`} className={cn(LINK, "whitespace-nowrap")}>{row.link.label}</Link>}
+    <p className="flex items-center gap-2 text-[14px] leading-[20px] text-adm-ink">
+      <span aria-hidden="true"><FeatureMark status={row.status} /></span>
+      {STATUS_COPY[row.status].label}
+    </p>
+    <div className="text-right">
+      {row.link && <Link to={row.link.to} aria-label={`${row.link.label} for ${row.label}`} className={cn(LINK, "whitespace-nowrap")}>{row.link.label}</Link>}
+    </div>
   </li>
 );
 
 export function FeatureGroups({ groups, planUnknown = false }: { groups: FeatureGroup[]; planUnknown?: boolean }) {
   const counts = featureCounts(groups);
+  const platformRows = groups.flatMap((g) => g.rows.filter((r) => r.status === "platform_only"));
+  const shown: FeatureGroup[] = [
+    ...groups.map((g) => ({ ...g, rows: g.rows.filter((r) => r.status !== "platform_only") })).filter((g) => g.rows.length > 0),
+    ...(platformRows.length > 0 ? [{ id: "platform", label: "Platform only", rows: platformRows } as FeatureGroup] : []),
+  ];
+  const tiles = FEATURE_STATUS_ORDER.filter((s) => (s === "unknown" ? counts.unknown > 0 : !(planUnknown && s === "unavailable")));
   return (
     <SectionCard title="Features" icon="list" description={<span className="max-sm:hidden">Included, setup required, requires upgrade and unavailable are four different things.</span>}>
       <ul className="grid grid-cols-2 xl:grid-cols-5 gap-2 max-sm:hidden" aria-label="Feature status summary">
-        {FEATURE_STATUS_ORDER.map((s) => (
+        {tiles.map((s) => (
           <li key={s} className="rounded-lg border border-adm-divider px-3 py-2.5 flex items-start gap-2.5">
             <FeatureMark status={s} />
             <span className="min-w-0">
               <span className="block text-[14px] leading-[20px] font-semibold text-adm-ink">{STATUS_COPY[s].label}: {counts[s]}</span>
-              <span className="block text-[13px] leading-[18px] text-adm-muted max-sm:hidden">{s === "unavailable" && planUnknown ? "Plan could not be loaded." : STATUS_COPY[s].blurb}</span>
+              <span className="block text-[13px] leading-[18px] text-adm-muted max-sm:hidden">{STATUS_COPY[s].blurb}</span>
             </span>
           </li>
         ))}
       </ul>
       <div className="space-y-5">
-        {groups.map((g) => (
+        {shown.map((g) => (
           <section key={g.id} aria-labelledby={`fg-${g.id}`} className="min-w-0">
             <h3 id={`fg-${g.id}`} className="text-[16px] leading-[22px] font-semibold text-adm-ink pb-1 border-b border-adm-divider">{g.label}</h3>
-            <ul className="grid lg:grid-cols-2 lg:gap-x-8 divide-y divide-adm-divider lg:divide-y-0 [&>li]:lg:border-b [&>li]:lg:border-adm-divider">{g.rows.map((r) => <FeatureLine key={r.key} row={r} />)}</ul>
+            <div aria-hidden="true" className={cn("hidden sm:grid gap-x-4 py-1.5 text-[13px] leading-[18px] font-semibold text-adm-muted border-b border-adm-divider", ROW_GRID)}>
+              <span>Feature</span><span>Status</span><span className="text-right">Action</span>
+            </div>
+            <ul className="divide-y divide-adm-divider">{g.rows.map((r) => <FeatureLine key={r.key} row={r} />)}</ul>
           </section>
         ))}
       </div>
@@ -261,11 +280,11 @@ export function MetricDrawer({ metric, usage, onClose }: { metric: MetricModel |
     ? [
         ["Reporting month", snap ? `${snap.monthLabel} (${snap.timeZone})` : "Not available"],
         ["Scope", snap ? snap.scope : "All rooftops in this account"],
-        ["How it is counted", "The month follows the dealer time zone. Plan-limit enforcement uses the browser month, so counts near a month boundary can differ. A recorded quantity of zero counts as 0."],
+        ["How it is counted", "The month follows the dealer time zone. Plan-limit enforcement uses the browser month, so counts near a month boundary can differ. A recorded quantity of zero counts as 0, while enforcement counts it as 1."],
         ["Count", metric.value === null ? "Unavailable" : metric.value.toLocaleString()],
         ["Recorded events", metric.reading ? metric.reading.events.toLocaleString() : "Unavailable"],
         ["Latest event", metric.reading ? (metric.reading.lastEventAt ? formatDateTime(metric.reading.lastEventAt, { timeZone: snap?.timeZone, withYear: true, withZone: true }) : "None this month") : "Unavailable"],
-        ["Plan limit", metric.limit.kind === "unknown" ? "Unknown" : metric.limit.kind === "unlimited" ? "Unlimited" : metric.limit.kind === "limited" ? `${metric.limit.hard.toLocaleString()} per month (recommended ${metric.limit.soft.toLocaleString()})` : "No limit set"],
+        ["Plan limit", metric.limit.kind === "unknown" ? "Unknown" : metric.limit.kind === "no_plan" ? "No plan on record" : metric.limit.kind === "unlimited" ? "Unlimited" : metric.limit.kind === "limited" ? `${metric.limit.hard.toLocaleString()} per month (recommended ${metric.limit.soft.toLocaleString()})` : "No limit set"],
         ["Source", metric.spec.unmetered ? "No source records this activity yet" : "Usage events recorded by the app (autolabels_usage_events)"],
         ["Last updated", snap ? formatDateTime(snap.updatedAt, { timeZone: snap.timeZone, withYear: true, withZone: true }) : "Not available"],
       ]
