@@ -74,10 +74,10 @@
     "2026 HYUNDAI PALISADE",
     "CALLIGRAPHY AWD",
     "STANDARD EQUIPMENT",
-    "EXTERIOR",
-    "INTERIOR & COMFORT",
     "PERFORMANCE & MECHANICAL",
     "SAFETY & DRIVER ASSISTANCE",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
     "MSRP INCLUDES",
     "PORT OF ENTRY OPTIONS",
     "DESTINATION & HANDLING",
@@ -98,6 +98,6 @@
   ],
   "totalBand": "$55,805.00",
   "svgDigest": [
-    "fab46a15"
+    "910b85cf"
   ]
 }

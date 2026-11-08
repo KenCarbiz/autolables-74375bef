@@ -1,0 +1,26 @@
+{
+  "note": "Counts only. Read-only grouped SELECT over vehicle_listings (model years 2025-2026, catalog makes), 2026-11-04.",
+  "rows": [
+    {"make":"FORD","model":"Bronco 4-Door","year":"2025","fuel":"Premium Unleaded","body":"SUV","n":1},
+    {"make":"HONDA","model":"Accord","year":"2025","fuel":"Unleaded","body":"Sedan","n":1},
+    {"make":"HONDA","model":"Odyssey","year":"2025","fuel":"Unleaded","body":"Minivan","n":1},
+    {"make":"HYUNDAI","model":"Kona","year":"2026","fuel":"Unleaded","body":"SUV","n":1},
+    {"make":"HYUNDAI","model":"Palisade","year":"2026","fuel":"Unleaded","body":"SUV","n":4},
+    {"make":"HYUNDAI","model":"Santa Cruz","year":"2026","fuel":"Unleaded","body":"Pickup","n":2},
+    {"make":"HYUNDAI","model":"Santa Fe","year":"2026","fuel":"Unleaded","body":"SUV","n":5},
+    {"make":"HYUNDAI","model":"Sonata","year":"2026","fuel":"Unleaded","body":"Sedan","n":3},
+    {"make":"HYUNDAI","model":"Tucson","year":"2026","fuel":"Unleaded","body":"SUV","n":4},
+    {"make":"INFINITI","model":"QX50","year":"2025","fuel":"Premium Unleaded","body":"SUV","n":8},
+    {"make":"INFINITI","model":"QX55","year":"2025","fuel":"Premium Unleaded","body":"SUV","n":4},
+    {"make":"INFINITI","model":"QX60","year":"2025","fuel":"Premium Unleaded","body":"SUV","n":3},
+    {"make":"INFINITI","model":"QX60","year":"2026","fuel":"Premium Unleaded","body":"SUV","n":14},
+    {"make":"INFINITI","model":"QX80","year":"2025","fuel":"Premium Unleaded","body":"SUV","n":4},
+    {"make":"INFINITI","model":"QX80","year":"2026","fuel":"Premium Unleaded","body":"SUV","n":13},
+    {"make":"NISSAN","model":"Altima","year":"2025","fuel":"Unleaded","body":"Sedan","n":1},
+    {"make":"NISSAN","model":"Frontier","year":"2025","fuel":"Unleaded","body":"Pickup","n":3},
+    {"make":"NISSAN","model":"KICKS","year":"2026","fuel":"Unleaded","body":"SUV","n":1},
+    {"make":"NISSAN","model":"Rogue","year":"2026","fuel":"Unleaded","body":"SUV","n":2},
+    {"make":"NISSAN","model":"Sentra","year":"2026","fuel":"Unleaded","body":"Sedan","n":1},
+    {"make":"NISSAN","model":"Z","year":"2025","fuel":"Premium Unleaded","body":"Coupe","n":1}
+  ]
+}

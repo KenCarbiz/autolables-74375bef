@@ -76,10 +76,10 @@
     "2025 CHEVROLET SILVERADO 1500",
     "LT CREW CAB 4WD",
     "STANDARD EQUIPMENT",
-    "EXTERIOR",
-    "INTERIOR & COMFORT",
     "PERFORMANCE & MECHANICAL",
     "SAFETY & DRIVER ASSISTANCE",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
     "FACTORY OPTIONS",
     "DESTINATION & HANDLING",
     "1,995.00",
@@ -99,6 +99,6 @@
   ],
   "totalBand": "$55,720.00",
   "svgDigest": [
-    "7ce73ca0"
+    "ccededbd"
   ]
 }

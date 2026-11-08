@@ -27,10 +27,8 @@ export interface OemPageFormat {
   widthInches: number;
   heightInches: number;
   orientation: "portrait" | "landscape";
-  /** Hard page count. Exceeding it is a Layout Overflow, not a taller page. */
+  /** Exact page count. Any other count is a Layout Overflow, never a taller page. */
   expectedPageCount: number;
-  /** A continuation page is permitted for equipment-heavy builds only. */
-  continuationAllowed: boolean;
 }
 
 export interface OemTemplateDefinition {
@@ -61,7 +59,6 @@ const SHARED_PAGE_FORMAT: OemPageFormat = {
   heightInches: PAGE_HEIGHT / PT_PER_INCH,
   orientation: "landscape",
   expectedPageCount: 1,
-  continuationAllowed: true,
 };
 
 // Fields the shared sticker-data contract must carry before a customer-
@@ -424,12 +421,11 @@ export function validatePageGeometry(
   }
   if (reasons.length) return { pass: false, code: "PDF_VALIDATION_FAILED", reasons };
 
-  const maxPages = format.expectedPageCount + (format.continuationAllowed ? 1 : 0);
-  if (actual.pageCount < 1 || actual.pageCount > maxPages) {
+  if (actual.pageCount !== format.expectedPageCount) {
     return {
       pass: false,
       code: "LAYOUT_OVERFLOW",
-      reasons: [`rendered ${actual.pageCount} pages; the template allows at most ${maxPages}`],
+      reasons: [`rendered ${actual.pageCount} pages; the template requires exactly ${format.expectedPageCount}`],
     };
   }
   return { pass: true, code: "OK", reasons: [] };

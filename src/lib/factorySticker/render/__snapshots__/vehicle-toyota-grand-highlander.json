@@ -75,10 +75,10 @@
     "2025 TOYOTA GRAND HIGHLANDER",
     "XLE AWD",
     "STANDARD EQUIPMENT",
-    "EXTERIOR",
-    "INTERIOR & COMFORT",
     "PERFORMANCE & MECHANICAL",
     "SAFETY & DRIVER ASSISTANCE",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
     "FACTORY OPTIONS",
     "DESTINATION & HANDLING",
     "1,450.00",
@@ -98,6 +98,6 @@
   ],
   "totalBand": "$48,420.00",
   "svgDigest": [
-    "ae9838ff"
+    "69b24280"
   ]
 }

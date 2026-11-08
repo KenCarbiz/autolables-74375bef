@@ -1,11 +1,11 @@
 {
-  "pages": 2,
+  "pages": 1,
   "geometry": "792x612",
-  "mode": "CONTINUATION_REQUIRED",
+  "mode": "DENSE",
   "fonts": "\"Helvetica Neue\", \"Segoe UI\", Helvetica, Arial, sans-serif | \"Helvetica Neue\", Helvetica, Arial, sans-serif | \"Helvetica Neue\", \"Arial Narrow\", Arial, sans-serif",
   "primitivesByKind": {
     "barcode": 1,
-    "path": 54,
+    "path": 55,
     "qr": 2,
     "rect": 29,
     "rule": 11,
@@ -45,10 +45,8 @@
     6.4,
     6.5,
     6.6,
-    6.7,
     6.8,
     7.2,
-    7.5,
     7.6,
     8,
     8.5,
@@ -73,10 +71,6 @@
     "2026 AUDI Q5",
     "PREMIUM PLUS QUATTRO",
     "STANDARD EQUIPMENT",
-    "EXTERIOR",
-    "INTERIOR & COMFORT",
-    "PERFORMANCE & MECHANICAL",
-    "SAFETY & DRIVER ASSISTANCE",
     "FACTORY OPTIONS",
     "DESTINATION & HANDLING",
     "1,295.00",
@@ -93,11 +87,12 @@
     "spend",
     "$1,750",
     "cost",
-    "$2,250"
+    "$2,250",
+    "fueleconomy.gov",
+    "VEHICLE PASSPORT"
   ],
   "totalBand": "$61,640.00",
   "svgDigest": [
-    "43d0d818",
-    "a5e73c9e"
+    "2a7b63fa"
   ]
 }

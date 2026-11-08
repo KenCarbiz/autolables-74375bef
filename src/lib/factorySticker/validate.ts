@@ -167,6 +167,7 @@ const stickerSchema = z
         greenhouseGasRating: epaRating.optional(),
         smogRating: epaRating.optional(),
         epaSourceReference: cleanStr.optional(),
+        epaRetrievedAt: cleanStr.optional(),
         nhtsaStatus: z.enum(["VERIFIED", "NOT_RATED", "UNAVAILABLE"]),
         overallRating: nhtsaRating.optional(),
         frontalDriverRating: nhtsaRating.optional(),

@@ -68,17 +68,17 @@
     "barcode": "21,560 227.15x23",
     "qr": "755.5,209.3 17",
     "qr2": "592,377.8 100",
-    "totalMsrp": "493,486 @11.5"
+    "totalMsrp": "493,421.6 @11.5"
   },
   "headings": [
     "ORIGINAL FACTORY BUILD & MSRP RECORD",
     "2025 NISSAN PATHFINDER",
     "PLATINUM 4WD",
     "STANDARD EQUIPMENT",
+    "UTILITY & TOWING",
+    "SAFETY & DRIVER ASSISTANCE",
     "EXTERIOR",
     "INTERIOR & COMFORT",
-    "PERFORMANCE & MECHANICAL",
-    "SAFETY & DRIVER ASSISTANCE",
     "INCLUDED FACTORY PACKAGES",
     "PLATINUM PREMIUM PACKAGE",
     "1,990.00",
@@ -98,6 +98,6 @@
   ],
   "totalBand": "$53,550.00",
   "svgDigest": [
-    "9a7fc079"
+    "4a16d373"
   ]
 }

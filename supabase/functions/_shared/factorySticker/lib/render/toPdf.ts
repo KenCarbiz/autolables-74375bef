@@ -85,6 +85,8 @@ function base64ToBytes(b64: string): Uint8Array {
 }
 
 export async function realizePdf(model: LayoutModel, lib: PdfLibModule): Promise<Uint8Array> {
+  if (!model.fit.ok) throw new Error(`one_page_review_required: ${model.fit.detail}`);
+  if (model.pages.length !== 1) throw new Error(`one_page_only: layout has ${model.pages.length} pages`);
   const doc = await lib.PDFDocument.create();
   const fonts: Record<LayoutFont, PdfFontLike> = {
     body: await doc.embedFont(lib.StandardFonts.Helvetica),

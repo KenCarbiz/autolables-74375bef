@@ -26,6 +26,16 @@ export const FACTORY_BUILD_UNVERIFIED = "Original factory build specifications h
 
 export const PASSPORT_QR_CAPTION = "Scan for Vehicle Passport";
 
+// The QR payload uses the public customer host, never the origin of whoever
+// generated the sticker (an admin preview domain would print a dead link).
+export const PASSPORT_PUBLIC_BASE = "https://autolabels.io";
+
+/** Shortest canonical Vehicle Passport URL; the slug is unique per listing. */
+export function canonicalPassportUrl(slug: string): string {
+  const s = slug.trim();
+  return s ? `${PASSPORT_PUBLIC_BASE}/v/${encodeURIComponent(s)}` : "";
+}
+
 /**
  * Evidence that the build data came from authenticated original factory
  * build specifications. A decode's confidence score is not this evidence:

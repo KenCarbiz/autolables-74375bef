@@ -12,11 +12,14 @@
 //     never a default, and an absent fact omits its line or prints an
 //     explicit "not available" state, never a zero
 //   * the logo slot carries the owner-authorized artwork from the master
-//   * EPA agency seals and the source QR are not reproduced; the QR slot
-//     carries a new Vehicle Passport QR only when a Passport URL exists
+//   * EPA agency seals and the source QR are not reproduced; the Vehicle
+//     Passport QR prints at 0.90in (quiet zone included) in the free foot of
+//     the pricing column, and drops to the EPA footer slot only when the
+//     price list leaves no room; it prints only when a Passport URL exists
 //   * the OEM publication/phone footer is omitted until verified per OEM
-//   * equipment that does not fit continues onto as many pages as needed,
-//     each carrying the reproduction banner and disclosure
+//   * equipment is compacted down to the 5.5pt floor on the single page;
+//     content that still does not fit returns null so the generic one-page
+//     layout (or a review hold) decides, never a second page
 
 import type { FactoryStickerData, StandardEquipmentGroup } from "../../types.ts";
 import {
@@ -25,11 +28,14 @@ import {
   Painter,
   formatMoney,
   formatPlain,
+  measureText,
+  fitOk,
+  fuelCategoryLabel,
+  runInLines,
   validateModel,
   wrapText,
   type LayoutFont,
   type LayoutModel,
-  type LayoutPage,
 } from "../layout.ts";
 import {
   EPA_BLUE,
@@ -135,7 +141,26 @@ const PRICE_W = 298;
 const PRICE_BOTTOM = COLS_TOP + 750;
 const RIGHT_X = BODY_X + 836;
 const ITEM_PX = 11.4;
+// 0.90in printed, four-module quiet zone included (2 Figma units per point).
+export const PASSPORT_QR_TARGET = 129.6;
+const PASSPORT_QR_FOOTER = 64;
+const QR_HEAD = 16;
+const QR_CAPTION = 16;
+const QR_GAP = 16;
 const ITEM_LH = 12.2;
+
+interface LetterStyle { px: number; lh: number }
+
+// Master type first, then leading tightens to the tightest approved ratio,
+// then the size steps down to the 5.5pt equipment floor (11px at 2x).
+const LETTER_STYLES: LetterStyle[] = [
+  { px: ITEM_PX, lh: ITEM_LH },
+  { px: ITEM_PX, lh: 11.95 },
+  { px: ITEM_PX, lh: 11.7 },
+  { px: 11.2, lh: 11.9 },
+  { px: 11.2, lh: 11.7 },
+  { px: 11, lh: 11.66 },
+];
 const DISCLOSURE_Y = 1100;
 
 interface Section {
@@ -182,22 +207,49 @@ const CATEGORY_HINT: Record<StandardEquipmentGroup["category"], string> = {
 
 /** Lines a flowed equipment entry occupies: heading or wrapped item. */
 interface FlowLine {
+  /** Source item this line belongs to; every line must place for it to count. */
+  itemId?: number;
+  item?: string;
   text: string;
   font: LayoutFont;
   indent: number;
   gapBefore: number;
   heading: boolean;
+  /** Run-in line: each drawn piece with its offset in Figma units. */
+  tokens?: Array<{ text: string; font: LayoutFont; x: number; comma: boolean }>;
+  /** Items whose last piece is on this run-in line. */
+  done?: Array<{ itemId: number; item: string }>;
 }
 
-function flowLines(sections: Section[], width: number): Array<{ column: 1 | 2; lines: FlowLine[] }> {
-  const size = pt(ITEM_PX);
+function flowRunInLines(sections: Section[], width: number, px: number): Array<{ column: 1 | 2; lines: FlowLine[] }> {
+  const size = pt(px);
+  let nextId = 0;
+  return sections.map((s, si) => {
+    const ids = new Map(s.items.map((item) => [item, nextId++]));
+    const lines: FlowLine[] = runInLines(s.spec.heading, s.items, size, u(width - 8)).map((l, li) => ({
+      text: l.tokens.map((t) => t.text).join(" "),
+      font: "body",
+      indent: 0,
+      gapBefore: li === 0 && si > 0 ? 12 : 0,
+      heading: li === 0,
+      tokens: l.tokens.map((t) => ({ text: t.text, font: t.bold ? "bold" : "body", x: t.x * 2, comma: t.comma })),
+      done: l.tokens.flatMap((t) => (t.item ? [{ itemId: ids.get(t.item)!, item: t.item }] : [])),
+    }));
+    return { column: s.spec.column, lines };
+  });
+}
+
+function flowLines(sections: Section[], width: number, px: number): Array<{ column: 1 | 2; lines: FlowLine[] }> {
+  const size = pt(px);
+  let nextId = 0;
   return sections.map((s, si) => {
     const lines: FlowLine[] = [{
       text: s.spec.heading, font: "bold", indent: 0, gapBefore: si === 0 ? 0 : 12, heading: true,
     }];
     for (const item of s.items) {
       const wrapped = wrapText(item, "body", size, u(width - 8));
-      wrapped.forEach((text, i) => lines.push({ text, font: "body", indent: i === 0 ? 0 : 8, gapBefore: 0, heading: false }));
+      const itemId = nextId++;
+      wrapped.forEach((text, i) => lines.push({ itemId, item, text, font: "body", indent: i === 0 ? 0 : 8, gapBefore: 0, heading: false }));
     }
     return { column: s.spec.column, lines };
   });
@@ -213,7 +265,7 @@ interface PlacedLine extends FlowLine {
  * start at their master position; if column 1 overflows, its remainder
  * runs into column 2 ahead of them. Anything left continues on later pages.
  */
-function placeEquipment(blocks: Array<{ column: 1 | 2; lines: FlowLine[] }>): { placed: PlacedLine[]; rest: FlowLine[] } {
+function placeEquipment(blocks: Array<{ column: 1 | 2; lines: FlowLine[] }>, itemLh: number): { placed: PlacedLine[]; rest: FlowLine[] } {
   const placed: PlacedLine[] = [];
   const cols = [
     { x: COL1_X, top: COLS_TOP + 109, w: COL1_W },
@@ -238,14 +290,14 @@ function placeEquipment(blocks: Array<{ column: 1 | 2; lines: FlowLine[] }>): { 
     }
     const gap = y === cols[col].top ? 0 : line.gapBefore;
     // Keep a heading with its first item.
-    const need = gap + ITEM_LH * (line.heading ? 2 : 1);
+    const need = gap + itemLh * (line.heading ? 2 : 1);
     if (y + need > COL_BOTTOM) {
       if (col === 0) { col = 1; y = cols[1].top; continue; }
       break;
     }
     y += gap;
     placed.push({ ...line, x: cols[col].x + line.indent, top: y });
-    y += ITEM_LH;
+    y += itemLh;
     i++;
   }
   const rest = queue.slice(i).filter((l) => l.text !== "");
@@ -288,12 +340,19 @@ function paintHeader(p: Painter, d: FactoryStickerData, config: LetterVariantCon
   box(p, BODY_X, BODY_Y + 108, 834, 3, INK);
 }
 
-function paintEquipment(p: Painter, placed: PlacedLine[]): void {
+function paintEquipment(p: Painter, placed: PlacedLine[], style: LetterStyle): void {
   box(p, BODY_X + 267, COLS_TOP, 1.5, 775, INK);
   box(p, BODY_X + 524.5, COLS_TOP, 1.5, 805, INK);
-  txt(p, "Standard Equipment Included at No Extra Charge", COL1_X, COLS_TOP + 76, 11, "body", { lh: ITEM_LH });
+  txt(p, "Standard Equipment Included at No Extra Charge", COL1_X, COLS_TOP + 76, 11, "body", { lh: style.lh });
   for (const line of placed) {
-    txt(p, line.text, line.x, line.top, ITEM_PX, line.font, { lh: ITEM_LH });
+    if (!line.tokens) {
+      txt(p, line.text, line.x, line.top, style.px, line.font, { lh: style.lh });
+      continue;
+    }
+    for (const t of line.tokens) {
+      txt(p, t.text, line.x + t.x, line.top, style.px, t.font, { lh: style.lh });
+      if (t.comma) txt(p, ",", line.x + t.x + measureFigma(t.text, style.px), line.top, style.px, "body", { lh: style.lh });
+    }
   }
 }
 
@@ -311,8 +370,8 @@ function priceAmount(price: number | undefined, status: string): string | null {
   return formatPlain(price);
 }
 
-/** Returns false when the pricing column cannot hold every row. */
-function paintPricing(p: Painter | null, d: FactoryStickerData): boolean {
+/** Returns the bottom of the pricing content; above PRICE_BOTTOM means it fits. */
+function paintPricing(p: Painter | null, d: FactoryStickerData): number {
   const eq = d.equipment;
   const pr = d.pricing;
   const rows: PriceRow[] = [
@@ -345,11 +404,12 @@ function paintPricing(p: Painter | null, d: FactoryStickerData): boolean {
     top += ITEM_LH;
     for (const r of rows) {
       const wrapped = wrapFigma(r.label.join(" "), "bold", size, labelW);
-      wrapped.forEach((line, i) => {
+      const rowTop = top;
+      wrapped.forEach((line) => {
         draw(line, PRICE_X, top, "bold");
-        if (i === 0 && r.amount) draw(r.amount, amountX, top, "bold", "right");
         top += ITEM_LH;
       });
+      if (r.amount) draw(r.amount, amountX, rowTop, "bold", "right");
       for (const c of r.contents) {
         for (const line of wrapFigma(c, "body", 11, labelW - 10)) {
           if (p) txt(p, line, PRICE_X + 10, top, 11, "body", { lh: 11.8 });
@@ -370,16 +430,31 @@ function paintPricing(p: Painter | null, d: FactoryStickerData): boolean {
   draw("Total*", PRICE_X, top, "bold");
   draw(total !== undefined ? formatMoney(total) : "NOT AVAILABLE", amountX, top, "bold", "right");
   top += ITEM_LH + 6;
-  if (p) {
-    for (const line of wrapFigma("*Total of the original manufacturer's suggested retail prices shown. Excludes taxes, title, license, dealer-installed items and current selling price.", "body", 10, PRICE_W)) {
-      txt(p, line, PRICE_X, top, 10, "body", { lh: 11.5 });
-      top += 11.5;
-    }
+  for (const line of wrapFigma("*Total of the original manufacturer's suggested retail prices shown. Excludes taxes, title, license, dealer-installed items and current selling price.", "body", 10, PRICE_W)) {
+    if (p) txt(p, line, PRICE_X, top, 10, "body", { lh: 11.5 });
+    top += 11.5;
   }
-  return top <= PRICE_BOTTOM;
+  return top;
 }
 
-function paintEpa(p: Painter, d: FactoryStickerData): void {
+interface QrPlacement { x: number; y: number; size: number }
+
+/** The largest Passport QR, up to 0.90in, that fits below the price list; null when it fits only the footer slot. */
+function pricingColumnQr(pricingBottom: number): QrPlacement | null {
+  const room = PRICE_BOTTOM - pricingBottom - QR_GAP - QR_HEAD - QR_CAPTION;
+  const size = Math.min(PASSPORT_QR_TARGET, room);
+  if (size <= PASSPORT_QR_FOOTER) return null;
+  return { x: PRICE_X + (PRICE_W - size) / 2, y: PRICE_BOTTOM - QR_CAPTION - size, size };
+}
+
+function paintPassportQr(p: Painter, passportUrl: string, q: QrPlacement): void {
+  const cx = PRICE_X + PRICE_W / 2;
+  txt(p, "VEHICLE PASSPORT", cx, q.y - QR_HEAD, 10.4, "bold", { align: "center" });
+  p.qr(u(q.x), u(q.y), u(q.size), passportUrl, INK);
+  txt(p, PASSPORT_QR_CAPTION, cx, q.y + q.size + 3, 10.4, "body", { align: "center" });
+}
+
+function paintEpa(p: Painter, d: FactoryStickerData, footerQrUrl: string): void {
   const r = d.regulatory;
   const X = RIGHT_X;
   const Y = BODY_Y;
@@ -390,7 +465,7 @@ function paintEpa(p: Painter, d: FactoryStickerData): void {
   txt(p, "Fuel Economy and Environment", X + 47, Y + 12, 21, "bold", { color: PAPER });
   box(p, X + 435, Y + 8, 211, 32, EPA_BLUE);
   pump(p, X + 440, Y + 9, 30, INK);
-  txt(p, "Gasoline Vehicle", X + 435 + 208, Y + 17, 13, "bold", { align: "right" });
+  txt(p, fuelCategoryLabel(d.vehicle.fuelType), X + 435 + 208, Y + 17, 13, "bold", { align: "right" });
 
   if (r.epaStatus !== "VERIFIED" || r.combinedMpg === undefined) {
     for (const [i, line] of wrapFigma(
@@ -399,7 +474,7 @@ function paintEpa(p: Painter, d: FactoryStickerData): void {
     ).entries()) {
       txt(p, line, X + 44, Y + 80 + i * 20, 16, "bold", { lh: 20 });
     }
-    paintEpaFooter(p, d.document.passportUrl.trim());
+    paintEpaFooter(p, footerQrUrl);
     return;
   }
 
@@ -451,7 +526,7 @@ function paintEpa(p: Painter, d: FactoryStickerData): void {
     txt(p, String(r.smogRating), rx + 294, ry + 16, 22, "bold");
     scale(p, rx + 294, ry + 42, 146);
   }
-  paintEpaFooter(p, d.document.passportUrl.trim());
+  paintEpaFooter(p, footerQrUrl);
 }
 
 
@@ -468,7 +543,7 @@ function paintEpaFooter(p: Painter, passportUrl: string): void {
     const slotX = X + 512;
     box(p, slotX, Y, 130, 95, PAPER);
     txt(p, "VEHICLE PASSPORT", slotX + 65, Y + 3, 10.4, "bold", { align: "center" });
-    const qr = 64;
+    const qr = PASSPORT_QR_FOOTER;
     p.qr(u(slotX + 65 - qr / 2), u(Y + 16), u(qr), passportUrl, INK);
     txt(p, PASSPORT_QR_CAPTION, slotX + 65, Y + 82, 10.4, "body", { align: "center" });
   }
@@ -590,7 +665,7 @@ function paintOwnership(p: Painter, d: FactoryStickerData, config: LetterVariant
   }
 }
 
-function paintIdentity(p: Painter, d: FactoryStickerData): void {
+function paintIdentity(p: Painter, d: FactoryStickerData, barcodePayload: string, footerTop: number): void {
   const X = RIGHT_X + 338;
   const Y = BODY_Y + 746;
   const dealer = d.dealer;
@@ -604,7 +679,8 @@ function paintIdentity(p: Painter, d: FactoryStickerData): void {
     }
   }
   top = Math.max(top + 4, Y + 43);
-  txt(p, `VIN:  ${d.vehicle.vin}`, X, top, 15, "bold");
+  txt(p, "VIN:", X, top, 15, "bold");
+  txt(p, d.vehicle.vin, X + 42, top, 15, "bold");
   top += 22;
   const v = d.vehicle;
   const color = (label: string, name?: string, code?: string): string | null =>
@@ -621,37 +697,10 @@ function paintIdentity(p: Painter, d: FactoryStickerData): void {
       top += 11;
     }
   }
+  top += 4;
+  const barH = Math.min(34, footerTop - 6 - top);
+  if (barcodePayload && barH >= 18) p.barcode(u(X), u(top), u(300), u(barH), barcodePayload, INK);
 }
-
-function paintContinuation(
-  p: Painter, d: FactoryStickerData, displayMake: string, lines: FlowLine[], bottom: number,
-): FlowLine[] {
-  const [l1, l2] = titleLines(d, displayMake);
-  txt(p, `${l1} ${l2}`.trim().toUpperCase(), BODY_X, BODY_Y, 22, "bold");
-  txt(p, `VIN: ${d.vehicle.vin}`, BODY_X + BODY_W, BODY_Y + 4, 15, "bold", { align: "right" });
-  box(p, BODY_X, BODY_Y + 30, BODY_W, 3, INK);
-  txt(p, "STANDARD EQUIPMENT CONTINUED", BODY_X, BODY_Y + 42, 16, "bold");
-  txt(p, `Continuation of the reproduction window sticker for VIN ${d.vehicle.vin}. This page belongs to the sticker on page 1 and is not valid on its own.`, BODY_X, BODY_Y + 62, 11, "body");
-  const colW = (BODY_W - 3 * 24) / 4;
-  let col = 0;
-  let y = BODY_Y + 86;
-  let i = 0;
-  while (i < lines.length && col < 4) {
-    const line = lines[i];
-    const gap = y === BODY_Y + 86 ? 0 : line.gapBefore;
-    if (y + gap + ITEM_LH * (line.heading ? 2 : 1) > bottom) {
-      col++;
-      y = BODY_Y + 86;
-      continue;
-    }
-    y += gap;
-    txt(p, line.text, BODY_X + col * (colW + 24) + line.indent, y, ITEM_PX, line.font, { lh: ITEM_LH });
-    y += ITEM_LH;
-    i++;
-  }
-  return lines.slice(i);
-}
-
 
 /**
  * Builds the dedicated reference layout, or returns null when the content
@@ -665,62 +714,67 @@ export function buildLetterVariantLayout(
   const config = LETTER_VARIANT_CONFIGS[variantKey];
   if (!config) return null;
   const d = input.layout.data;
-  if (!paintPricing(null, d)) return null;
+  const pricingBottom = paintPricing(null, d);
+  if (pricingBottom > PRICE_BOTTOM) return null;
+  const passportUrl = d.document.passportUrl.trim();
+  const columnQr = passportUrl ? pricingColumnQr(pricingBottom) : null;
 
   const groups = input.equipmentGroups.length
     ? input.equipmentGroups
     : d.equipment.standard.map((g) => ({ hint: CATEGORY_HINT[g.category], items: g.items }));
   const sections = assignSections(config, groups);
-  const { placed, rest } = placeEquipment(flowLines(sections, COL1_W));
   const disclosure = [...reproductionDisclosureLines(input.layout.factoryBuild), ...input.layout.disclaimers];
   const footerTop = Math.min(DISCLOSURE_Y, 1224 - 18 - disclosureHeight(disclosure));
 
-  // Plan continuation pages first so every page can say "PAGE n OF m".
-  const contBottom = footerTop - 12;
-  const plan: FlowLine[][] = [];
-  let remaining = rest;
-  while (remaining.length) {
-    const before = remaining.length;
-    const next = paintContinuation(new Painter(null), d, input.displayMake, remaining, contBottom);
-    if (next.length === before) throw new Error("layout_failed: continuation entry cannot fit an empty page");
-    plan.push(remaining.slice(0, before - next.length));
-    remaining = next;
+  const attempts = [false, true].flatMap((runIn) => LETTER_STYLES.map((style) => ({ style, runIn })));
+  for (const { style, runIn } of attempts) {
+    const blocks = runIn ? flowRunInLines(sections, COL1_W, style.px) : flowLines(sections, COL1_W, style.px);
+    if (input.equipmentNote && blocks.length) {
+      wrapText(input.equipmentNote, "body", pt(style.px), u(COL1_W - 8)).forEach((text, i) =>
+        blocks[blocks.length - 1].lines.push({ text, font: "body", indent: 0, gapBefore: i === 0 ? 12 : 0, heading: false }));
+    }
+    const { placed, rest } = placeEquipment(blocks, style.lh);
+    if (rest.length) continue;
+
+    const drawn: string[] = [];
+    const p = new Painter(drawn);
+    paintBanner(p, "PAGE 1 OF 1");
+    paintHeader(p, d, config, input.displayMake);
+    paintEquipment(p, placed, style);
+    paintPricing(p, d);
+    if (columnQr) paintPassportQr(p, passportUrl, columnQr);
+    paintEpa(p, d, columnQr ? "" : passportUrl);
+    paintSafety(p, d);
+    paintOrigin(p, d);
+    paintOwnership(p, d, config);
+    paintIdentity(p, d, input.layout.barcodePayload, footerTop);
+    paintDisclosureAt(p, disclosure, footerTop);
+
+    const model: LayoutModel = {
+      width: PAGE_WIDTH,
+      height: PAGE_HEIGHT,
+      mode: style === LETTER_STYLES[0] && !runIn ? "STANDARD" : "DENSE",
+      pages: [{ primitives: p.primitives }],
+      drawnStrings: drawn,
+      printedEquipment: printedItems(placed),
+      fontFamilies: { heading: "Helvetica-Bold", body: "Helvetica", numeric: "Courier" },
+      fit: fitOk(2, pt(style.px), runIn ? "run_in" : "list"),
+    };
+    validateModel(model);
+    return model;
   }
-  const pageCount = plan.length + 1;
+  return null;
+}
 
-  const drawn: string[] = [];
-  const p = new Painter(drawn);
-  paintBanner(p, pageCount > 1 ? `PAGE 1 OF ${pageCount} - EQUIPMENT CONTINUED ON PAGE 2` : "PAGE 1 OF 1");
-  paintHeader(p, d, config, input.displayMake);
-  paintEquipment(p, placed);
-  paintPricing(p, d);
-  paintEpa(p, d);
-  paintSafety(p, d);
-  paintOrigin(p, d);
-  paintOwnership(p, d, config);
-  paintIdentity(p, d);
-  paintDisclosureAt(p, disclosure, footerTop);
+const measureFigma = (text: string, px: number): number => measureText(text, "body", pt(px)) * 2;
 
-  const pages: LayoutPage[] = [{ primitives: p.primitives }];
-  plan.forEach((lines, i) => {
-    const cp = new Painter(drawn);
-    const label = `PAGE ${i + 2} OF ${pageCount}`;
-    paintBanner(cp, label);
-    paintContinuation(cp, d, input.displayMake, lines, contBottom);
-    paintDisclosureAt(cp, disclosure, footerTop);
-    pages.push({ primitives: cp.primitives });
-  });
-
-  const model: LayoutModel = {
-    width: PAGE_WIDTH,
-    height: PAGE_HEIGHT,
-    mode: pages.length > 1 ? "CONTINUATION_REQUIRED" : "STANDARD",
-    pages,
-    drawnStrings: drawn,
-    fontFamilies: { heading: "Helvetica-Bold", body: "Helvetica", numeric: "Courier" },
-  };
-  validateModel(model);
-  return model;
+function printedItems(placed: PlacedLine[]): string[] {
+  const seen = new Map<number, string>();
+  for (const l of placed) {
+    if (l.itemId !== undefined && l.item) seen.set(l.itemId, l.item);
+    for (const d of l.done ?? []) seen.set(d.itemId, d.item);
+  }
+  return [...seen.values()];
 }
 
 function paintDisclosureAt(p: Painter, lines: string[], top: number): void {

@@ -13,9 +13,10 @@ import {
   measureText,
   starPath,
   validateModel,
+  EQUIPMENT_MIN_FONT_PT,
+  fitOk,
   type LayoutFont,
   type LayoutModel,
-  type LayoutPage,
 } from "../layout.ts";
 import {
   INK,
@@ -210,11 +211,14 @@ export interface FlowEntry {
   gapBefore: number;
   /** Start this entry in the next column when the current one has content. */
   columnBreak?: boolean;
+  /** The fixed key-feature scope line: drawn, never recorded as a printed item. */
+  note?: boolean;
 }
 
 export function toEntries(
   sections: Section[], headingCase: (s: string) => string, gap: number,
   breakBefore?: (heading: string, index: number) => boolean,
+  note?: string,
 ): FlowEntry[] {
   const out: FlowEntry[] = [];
   sections.forEach((s, i) => {
@@ -224,6 +228,7 @@ export function toEntries(
     });
     for (const item of s.items) out.push({ text: item, heading: false, gapBefore: 0 });
   });
+  if (note) out.push({ text: note, heading: false, gapBefore: gap * 3, note: true });
   return out;
 }
 
@@ -308,33 +313,6 @@ export function paintPlaced(
   }
 }
 
-export interface ContinuationContext {
-  title: string;
-  vin: string;
-  style: FlowStyle;
-  bottom: number;
-}
-
-const CONT_TOP = 120;
-
-export function continuationColumns(bottom: number): ColumnSpec[] {
-  const gap = 28;
-  const w = (1940 - 3 * gap) / 4;
-  return [0, 1, 2, 3].map((i) => ({ x: 30 + i * (w + gap), w, top: CONT_TOP, bottom }));
-}
-
-export function paintContinuation(p: Painter, ctx: ContinuationContext, entries: FlowEntry[]): FlowEntry[] {
-  tx(p, ctx.title, 30, 66, 24, "bold");
-  tx(p, `VIN: ${ctx.vin}`, 1970, 70, 17, "bold", { align: "right" });
-  bx(p, 30, 100, 1940, 3, INK);
-  tx(p, "STANDARD EQUIPMENT CONTINUED", 30, 112, 15, "bold");
-  const cols = continuationColumns(ctx.bottom).map((c) => ({ ...c, top: CONT_TOP + 44 }));
-  const { placed, rest } = flow(entries, cols, ctx.style);
-  tx(p, `Continuation of the reproduction window sticker for VIN ${ctx.vin}. This page belongs to the sticker on page 1 and is not valid on its own.`, 30, CONT_TOP + 20, 11, "body");
-  paintPlaced(p, placed, ctx.style, { bullet: "dot" });
-  return rest;
-}
-
 // ── Pricing ───────────────────────────────────────────────────────────
 
 export interface PriceRow {
@@ -357,6 +335,12 @@ export function priceRows(d: FactoryStickerData, money: (n: number) => string = 
     ...eq.options.map((o) => ({ label: o.name, amount: priceAmount(o.price, o.priceStatus, money), features: o.features ?? [] })),
     ...(eq.portInstalled ?? []).map((o) => ({ label: o.name, amount: priceAmount(o.price, o.priceStatus, money), features: [] })),
   ];
+}
+
+/** Price rows without the unpriced paint and trim entries the decoder lists as options; the colour rows already print them. */
+export function priceRowsWithoutColors(d: FactoryStickerData, money: (n: number) => string = formatMoney): PriceRow[] {
+  const colors = new Set([d.vehicle.exteriorColor, d.vehicle.interiorColor].filter((c): c is string => !!c).map((c) => c.trim().toUpperCase()));
+  return priceRows(d, money).filter((r) => !(r.amount === "N/A" && !r.features.length && colors.has(r.label.trim().toUpperCase())));
 }
 
 export function totalMsrp(d: FactoryStickerData): number | undefined {
@@ -391,9 +375,12 @@ export function paintSafetyPanel(p: Painter, d: FactoryStickerData, x: number, y
 
   const value = (n: number | undefined): number | string => {
     if (r.nhtsaStatus === "UNAVAILABLE") return "Not Available";
+    if (n === undefined && r.nhtsaDecodeOnly && r.nhtsaStatus !== "NOT_RATED") return "Not Available";
     if (r.nhtsaStatus === "NOT_RATED" || n === undefined || n <= 0) return "Not Rated";
     return Math.min(5, Math.round(n));
   };
+  const combinedFrontal = r.frontalRating !== undefined && r.frontalDriverRating === undefined && r.frontalPassengerRating === undefined;
+  const combinedSide = r.sideRating !== undefined && r.sideFrontRating === undefined && r.sideRearRating === undefined;
   const L = x + 9;
   const subX = x + w * o.subFrac;
   const valX = x + w * o.valFrac;
@@ -410,21 +397,31 @@ export function paintSafetyPanel(p: Painter, d: FactoryStickerData, x: number, y
   note("Based on the combined ratings of frontal, side and rollover.", 28);
   note("Should ONLY be compared to other vehicles of similar size and weight.", 40);
   rule(67);
-  tx(p, "Frontal", L, at(71), o.labelSize, "bold");
+  // A single combined rating is NHTSA's overall frontal (or side) rating and is
+  // labeled that way; it is never presented as a per-seat rating.
+  tx(p, combinedFrontal ? "Overall Frontal" : "Frontal", L, at(71), o.labelSize, "bold");
   tx(p, "Crash", L, at(95), o.labelSize, "bold");
-  tx(p, "Driver", subX, at(71), o.labelSize, "body");
-  tx(p, "Passenger", subX, at(95), o.labelSize, "body");
-  cell(value(r.frontalDriverRating), at(71));
-  cell(value(r.frontalPassengerRating), at(95));
+  if (combinedFrontal) {
+    cell(value(r.frontalRating), at(83));
+  } else {
+    tx(p, "Driver", subX, at(71), o.labelSize, "body");
+    tx(p, "Passenger", subX, at(95), o.labelSize, "body");
+    cell(value(r.frontalDriverRating), at(71));
+    cell(value(r.frontalPassengerRating), at(95));
+  }
   note("Based on the risk of injury in a frontal impact.", 113);
   note("Should ONLY be compared to other vehicles of similar size and weight.", 125);
   rule(145);
-  tx(p, "Side", L, at(149), o.labelSize, "bold");
+  tx(p, combinedSide ? "Overall Side" : "Side", L, at(149), o.labelSize, "bold");
   tx(p, "Crash", L, at(173), o.labelSize, "bold");
-  tx(p, "Front seat", subX, at(149), o.labelSize, "body");
-  tx(p, "Rear seat", subX, at(173), o.labelSize, "body");
-  cell(value(r.sideFrontRating), at(149));
-  cell(value(r.sideRearRating), at(173));
+  if (combinedSide) {
+    cell(value(r.sideRating), at(161));
+  } else {
+    tx(p, "Front seat", subX, at(149), o.labelSize, "body");
+    tx(p, "Rear seat", subX, at(173), o.labelSize, "body");
+    cell(value(r.sideFrontRating), at(149));
+    cell(value(r.sideRearRating), at(173));
+  }
   note("Based on the risk of injury in a side impact.", 189);
   rule(206);
   tx(p, "Rollover", L, at(210), o.labelSize, "bold");
@@ -463,6 +460,12 @@ export interface PartsFacts {
   assembly?: string;
 }
 
+/** Label for the final-assembly line: a country alone is never presented as a plant or city. */
+export function assemblyLabel(d: FactoryStickerData): string {
+  const country = d.factory.assemblyCountry;
+  return country && d.factory.finalAssemblyPoint === country ? "COUNTRY OF FINAL ASSEMBLY" : "FINAL ASSEMBLY POINT";
+}
+
 export function partsFacts(d: FactoryStickerData): PartsFacts {
   const entries = (d.factory.partsContent ?? []).filter((e) => e.sourceVerified);
   const find = (re: RegExp) => entries.find((e) => re.test(e.label.toLowerCase()));
@@ -485,64 +488,110 @@ export interface FirstPageContext {
   input: VariantRenderInput;
   d: FactoryStickerData;
   footerTop: number;
+  /** Equipment type for this attempt, from the spec's compaction ladder. */
+  style: FlowStyle;
+  /** Columns added to the master's equipment region for this attempt. */
+  extraColumns: number;
+}
+
+/**
+ * Re-splits the master's equipment region into more, narrower columns. The
+ * region (outer edges, top, bottom) never changes; only the split does.
+ */
+export function withColumns(base: ColumnSpec[], extra: number): ColumnSpec[] {
+  if (extra <= 0 || !base.length) return base;
+  const n = base.length + extra;
+  const gap = 12;
+  const x0 = base[0].x;
+  const x1 = base[base.length - 1].x + base[base.length - 1].w;
+  const w = (x1 - x0 - gap * (n - 1)) / n;
+  return Array.from({ length: n }, (_, i) => ({ x: x0 + i * (w + gap), w, top: base[0].top, bottom: base[0].bottom }));
+}
+
+export const MAX_EXTRA_COLUMNS = 2;
+
+/** Equipment left unplaced, and the items that were placed whole. */
+export interface FirstPageResult {
+  rest: FlowEntry[];
+  printed: string[];
+}
+
+export function placedResult(entries: FlowEntry[], rest: FlowEntry[]): FirstPageResult {
+  return {
+    rest,
+    printed: entries.slice(0, entries.length - rest.length).filter((e) => !e.heading && !e.note).map((e) => e.text),
+  };
 }
 
 export interface TabloidSpec {
-  /** Paints page 1 (below the banner); returns unplaced equipment, or null when pricing cannot fit. */
-  paintFirst: (p: Painter, ctx: FirstPageContext) => FlowEntry[] | null;
-  contStyle: FlowStyle;
-  contTitle: (d: FactoryStickerData, displayMake: string) => string;
+  /** Paints page 1 (below the banner); returns null when pricing cannot fit. */
+  paintFirst: (p: Painter, ctx: FirstPageContext) => FirstPageResult | null;
+  /** The approved master equipment type; the ladder never grows past it. */
+  eqStyle: FlowStyle;
+  /**
+   * Keep the equipment at eqStyle in the template's own columns: no smaller
+   * type and no added columns. Equipment that does not fit is left to the
+   * significance selection, which prints the scope note.
+   */
+  fixedStyle?: boolean;
+}
+
+/** Tightest leading ratio found across the approved tabloid masters. */
+export const VARIANT_MIN_LINE_HEIGHT_RATIO = 1.06;
+
+const DISPLAY_PT = (K * 1) / 2;
+
+/**
+ * Compaction ladder for a reference layout: leading tightens first, then
+ * type size steps down to the equipment floor. The floor is the readable
+ * minimum, or the master's own size when the approved master is already
+ * smaller. Sizes are display units.
+ */
+export function styleLadder(master: FlowStyle): FlowStyle[] {
+  const floorSize = Math.min(master.size, EQUIPMENT_MIN_FONT_PT / DISPLAY_PT);
+  const out: FlowStyle[] = [master];
+  const minLh = (size: number): number => size * VARIANT_MIN_LINE_HEIGHT_RATIO;
+  for (let i = 1; i <= 3; i++) {
+    const lh = master.lh - ((master.lh - Math.min(master.lh, minLh(master.size))) * i) / 3;
+    if (lh < out[out.length - 1].lh - 0.01) out.push({ ...master, lh });
+  }
+  for (let size = master.size - 0.25; size > floorSize + 0.01; size -= 0.25) {
+    out.push({ ...master, size, lh: Math.min(master.lh, minLh(size)) });
+  }
+  if (floorSize < master.size - 0.01) out.push({ ...master, size: floorSize, lh: Math.min(master.lh, minLh(floorSize)) });
+  return out;
 }
 
 export function assembleTabloid(input: VariantRenderInput, spec: TabloidSpec): LayoutModel | null {
   const d = input.layout.data;
   const disclosure = disclosureLines(input);
   const footerTop = footerTopFor(disclosure);
-  const ctx: FirstPageContext = { input, d, footerTop };
 
-  const probe = spec.paintFirst(new Painter(null), ctx);
-  if (probe === null) return null;
+  for (const style of spec.fixedStyle ? [spec.eqStyle] : styleLadder(spec.eqStyle)) {
+   for (let extraColumns = 0; extraColumns <= (spec.fixedStyle ? 0 : MAX_EXTRA_COLUMNS); extraColumns++) {
+    const ctx: FirstPageContext = { input, d, footerTop, style, extraColumns };
+    const probe = spec.paintFirst(new Painter(null), ctx);
+    if (probe === null) return null;
+    if (probe.rest.length) continue;
 
-  const contBottom = footerTop - 14;
-  const cont: ContinuationContext = {
-    title: spec.contTitle(d, input.displayMake),
-    vin: d.vehicle.vin,
-    style: spec.contStyle,
-    bottom: contBottom,
-  };
-  const plan: FlowEntry[][] = [];
-  let remaining = probe;
-  while (remaining.length) {
-    const next = paintContinuation(new Painter(null), cont, remaining);
-    if (next.length === remaining.length) throw new Error("layout_failed: continuation entry cannot fit an empty page");
-    plan.push(remaining.slice(0, remaining.length - next.length));
-    remaining = next;
+    const drawn: string[] = [];
+    const p = new Painter(drawn);
+    paintBanner(p, "PAGE 1 OF 1");
+    spec.paintFirst(p, ctx);
+    paintDisclosure(p, disclosure, footerTop);
+    const model: LayoutModel = {
+      width: TABLOID_WIDTH,
+      height: TABLOID_HEIGHT,
+      mode: style === spec.eqStyle ? "STANDARD" : "DENSE",
+      pages: [{ primitives: p.primitives }],
+      drawnStrings: drawn,
+      printedEquipment: probe.printed,
+      fontFamilies: { heading: "Helvetica-Bold", body: "Helvetica", numeric: "Courier" },
+      fit: fitOk(0, style.size * DISPLAY_PT),
+    };
+    validateModel(model);
+    return model;
+   }
   }
-  const pageCount = plan.length + 1;
-
-  const drawn: string[] = [];
-  const p = new Painter(drawn);
-  paintBanner(p, pageCount > 1 ? `PAGE 1 OF ${pageCount} - EQUIPMENT CONTINUED ON PAGE 2` : "PAGE 1 OF 1");
-  spec.paintFirst(p, ctx);
-  paintDisclosure(p, disclosure, footerTop);
-  const pages: LayoutPage[] = [{ primitives: p.primitives }];
-
-  plan.forEach((entries, i) => {
-    const cp = new Painter(drawn);
-    paintBanner(cp, `PAGE ${i + 2} OF ${pageCount}`);
-    paintContinuation(cp, cont, entries);
-    paintDisclosure(cp, disclosure, footerTop);
-    pages.push({ primitives: cp.primitives });
-  });
-
-  const model: LayoutModel = {
-    width: TABLOID_WIDTH,
-    height: TABLOID_HEIGHT,
-    mode: pages.length > 1 ? "CONTINUATION_REQUIRED" : "STANDARD",
-    pages,
-    drawnStrings: drawn,
-    fontFamilies: { heading: "Helvetica-Bold", body: "Helvetica", numeric: "Courier" },
-  };
-  validateModel(model);
-  return model;
+  return null;
 }

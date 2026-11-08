@@ -1,8 +1,8 @@
 {
-  "minimum_content": "1p STANDARD 44a445fd",
-  "maximum_content": "2p CONTINUATION_REQUIRED d8456d0c",
-  "option_heavy": "2p CONTINUATION_REQUIRED dbb57d87",
-  "long_model_trim": "1p STANDARD 65025835",
-  "long_package_name": "1p STANDARD 2c0c2ef0",
-  "electrified": "2p CONTINUATION_REQUIRED cdf45890"
+  "minimum_content": "1p STANDARD 71e17f6f",
+  "maximum_content": "1p DENSE 05783768",
+  "option_heavy": "1p DENSE 2440aeb2",
+  "long_model_trim": "1p STANDARD 009cd2e7",
+  "long_package_name": "1p STANDARD a84e1986",
+  "electrified": "1p DENSE 38d1e18f"
 }
