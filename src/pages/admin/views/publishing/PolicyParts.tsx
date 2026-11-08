@@ -82,19 +82,19 @@ export const ConceptCard = ({ card, cell, extra, onDetails }: { card: ClassDetai
   const c = CONCEPT[card.key];
   const tone = card.tone === "danger" ? "danger" : card.tone === "warning" ? "primary" : "primary";
   return (
-    <li className="rounded-xl border border-adm-divider bg-adm-surface p-4 sm:p-5 flex flex-col gap-3 min-w-0" data-concept={card.key}>
+    <li className="rounded-xl border border-adm-divider bg-adm-surface p-4 sm:p-5 flex flex-col gap-2 min-w-0" data-concept={card.key}>
       <div className="flex items-start gap-3">
         <AdminIconTile name={c.icon} tone={tone} />
         <div className="min-w-0 flex-1">
           <p className="text-[13px] leading-[18px] text-adm-muted">{c.heading}</p>
           <h3 className="text-[16px] leading-[22px] font-semibold text-adm-ink">{card.title}</h3>
         </div>
+        <button type="button" onClick={onDetails} aria-label={`Rule details: ${c.heading}`} className="flex-shrink-0 inline-flex items-center gap-1 min-h-[44px] -mt-2 -mr-2 px-2 text-[14px] font-semibold text-adm-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-adm-primary">Rule details<AdminIcon name="chevron-right" size="inline" /></button>
       </div>
       <div><StatusBadge state={CELL_STATE[cell.state].state} label={CELL_STATE[cell.state].label} /></div>
       <p className="text-[14px] leading-[20px] text-adm-ink">{card.summary}</p>
       <p className="text-[14px] leading-[20px] text-adm-muted">{card.explanation}</p>
       {extra && <p className="text-[14px] leading-[20px] text-adm-ink">{extra}</p>}
-      <div className="mt-auto pt-1"><AdminButton variant="secondary" className="min-h-[44px]" onClick={onDetails} aria-label={`Rule details: ${c.heading}`}>Rule details<AdminIcon name="chevron-right" /></AdminButton></div>
     </li>
   );
 };

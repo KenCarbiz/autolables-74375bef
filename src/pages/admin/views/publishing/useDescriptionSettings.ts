@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
@@ -101,6 +101,11 @@ export function useDescriptionSettings() {
   const edit = useEditorDraft<DescriptionDraft>({ scopeKey, generation, baseline, validate: validateDescription });
   const flow = useSaveFlow(scopeKey);
   const guard = useLeaveGuard(edit.dirty);
+  const pinned = useRef<{ key: string; at: string | null } | null>(null);
+  const rowAt = (row as { updated_at?: string } | null)?.updated_at ?? null;
+  useEffect(() => {
+    if (!edit.dirty) pinned.current = { key: scopeKey, at: rowAt };
+  }, [edit.dirty, scopeKey, rowAt]);
 
   const canEdit = fixture ? variant !== "readonly" : perms.canConfigure;
   const blockedReason = unreadable
@@ -128,7 +133,7 @@ export function useDescriptionSettings() {
     const draft = edit.draft;
     const ok = await flow.run(async () => {
       const current = unwrap(await db().from("description_settings").select("updated_at").eq("tenant_id", tenantId).maybeSingle()) as { updated_at?: string } | null;
-      const loadedAt = (row as { updated_at?: string } | null)?.updated_at;
+      const loadedAt = pinned.current && pinned.current.key === scopeKey ? pinned.current.at : rowAt;
       if ((current?.updated_at ?? null) !== (loadedAt ?? null)) throw new SaveConflictError("These settings were changed by someone else after you opened them.");
       const { data, error } = await db().rpc("save_description_settings", { p_tenant_id: tenantId, p_settings: descriptionPayload(draft) });
       if (error) throw new Error("The server did not accept the change.");
@@ -139,7 +144,7 @@ export function useDescriptionSettings() {
       await qc.invalidateQueries({ queryKey: ["admin-v3", "destinations", "settings", tenantId] });
     }
     return ok;
-  }, [canApply, tenantId, edit, flow, row, qc]);
+  }, [canApply, tenantId, edit, flow, rowAt, scopeKey, qc]);
 
   const discard = useCallback(() => {
     edit.reset();

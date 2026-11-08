@@ -48,7 +48,8 @@ describe("Destinations and automation", () => {
     const passport = screen.getAllByRole("listitem").find((li) => li.getAttribute("data-destination") === "vehicle_passport")!;
     expect(within(passport).getByText(/archived before the description/)).toBeInTheDocument();
     const facebook = screen.getAllByRole("listitem").find((li) => li.getAttribute("data-destination") === "facebook")!;
-    expect(within(facebook).getAllByText("None recorded").length).toBe(3);
+    expect(within(facebook).getAllByText("No deliveries recorded yet").length).toBe(1);
+    expect(within(facebook).queryByText("None recorded")).toBeNull();
   });
 
   it("keeps all four modes and resolves inherited vs custom per type", () => {
@@ -110,12 +111,21 @@ describe("Destinations and automation", () => {
     expect(screen.queryByText("Default automation mode")).toBeNull();
   });
 
-  it("description settings: invalid values show errors and the PR 45 notice is preview only", () => {
+  it("description settings: invalid values show errors and the engine notice uses dealer wording", () => {
     fixture("v3-description-settings", "invalid");
-    expect(screen.getByText(/Managed in Description Engine \(PR #45, not merged\)/)).toBeInTheDocument();
+    expect(screen.getByText("Managed in the Description Engine (coming soon)")).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/PR #?45/);
     expect(screen.getAllByText(/The maximum cannot be below the minimum/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/contains the prohibited phrase/).length).toBeGreaterThan(0);
     for (const t of ["Brand voice", "Output profiles", "Claims"]) expect(screen.getByRole("heading", { name: t })).toBeInTheDocument();
     expect(screen.getAllByText(/3,921 characters in total/).length).toBe(1);
+  });
+
+  it("vAuto card matches its drawer: valid defaults, readable max shown clamped to the limit", () => {
+    fixture("v3-description-settings");
+    const card = document.querySelector('[data-profile="vauto"]') as HTMLElement;
+    expect(within(card).queryByText("Profile invalid")).toBeNull();
+    expect(within(card).getByText(/shown here capped at the limit/)).toBeInTheDocument();
+    expect(within(card).getByText("3,500 to 4,000")).toBeInTheDocument();
   });
 });

@@ -367,16 +367,51 @@ export function outputProfile(key: string, override?: ProfileOverride | null): O
 
 export const OUTPUT_PROFILE_KEYS = ORDER;
 
-export function validateProfileEdit(key: string, edit: { recommendedMin: number; recommendedMax: number; characterLimit: number }): Partial<Record<keyof typeof edit, string>> {
+export type ProfileValues = { recommendedMin: number; recommendedMax: number; characterLimit: number };
+
+/**
+ * The one validation for an output profile, used by the card and by the editor. Order: min, target, readable max,
+ * limit. For a destination with a fixed target the readable range only sizes the draft the writer starts from, so
+ * it may run past the limit (the registry's vAuto range goes to 4,300 inside a 4,000 limit); the limit can never
+ * go below the target, because the server passes the limit to the exact-fit step as its local maximum.
+ */
+export function validateProfileEdit(key: string, edit: ProfileValues): Partial<Record<keyof ProfileValues, string>> {
   const base = DEFAULT_CHANNEL_POLICIES.find((p) => p.key === key);
-  const e: Partial<Record<keyof typeof edit, string>> = {};
+  const target = base?.exactTotal ?? null;
+  const e: Partial<Record<keyof ProfileValues, string>> = {};
   for (const k of ["recommendedMin", "recommendedMax", "characterLimit"] as const) {
     if (!Number.isInteger(edit[k]) || edit[k] < 0) e[k] = "Enter a whole number of characters.";
   }
-  if (!e.recommendedMax && !e.recommendedMin && edit.recommendedMax < edit.recommendedMin) e.recommendedMax = "The maximum cannot be below the minimum.";
-  if (!e.characterLimit && base && edit.characterLimit > base.characterLimit) e.characterLimit = `The limit can be tightened but not raised past ${base.characterLimit.toLocaleString("en-US")}.`;
-  if (!e.characterLimit && !e.recommendedMax && edit.recommendedMax > edit.characterLimit) e.recommendedMax = "The readable maximum cannot exceed the hard limit.";
+  if (e.recommendedMin || e.recommendedMax || e.characterLimit) return e;
+  const t = target ? target.toLocaleString("en-US") : "";
+  if (edit.recommendedMax < edit.recommendedMin) e.recommendedMax = "The maximum cannot be below the minimum.";
+  if (base && edit.characterLimit > base.characterLimit) e.characterLimit = `The limit can be tightened but not raised past ${base.characterLimit.toLocaleString("en-US")}.`;
+  if (target) {
+    if (edit.characterLimit < target) e.characterLimit = `The limit cannot go below the fixed ${t} target.`;
+    if (edit.recommendedMin > target) e.recommendedMin = `The minimum cannot be above the fixed ${t} target.`;
+    if (edit.recommendedMax < target) e.recommendedMax = `The maximum cannot be below the fixed ${t} target.`;
+  } else if (!e.recommendedMax && edit.recommendedMax > edit.characterLimit) {
+    e.recommendedMax = "The readable maximum cannot exceed the hard limit.";
+  }
   return e;
+}
+
+export const profileValues = (p: OutputProfile): ProfileValues => ({ recommendedMin: p.policy.recommendedMin, recommendedMax: p.policy.recommendedMax, characterLimit: p.policy.characterLimit });
+
+/** The readable maximum as shown. A registry range that runs past the limit is clamped, with a note saying so. */
+export function displayRange(p: OutputProfile): { min: number; max: number; clamped: boolean; registryMax: number } {
+  const v = profileValues(p);
+  const max = Math.min(v.recommendedMax, v.characterLimit);
+  return { min: Math.min(v.recommendedMin, max), max, clamped: v.recommendedMax > v.characterLimit, registryMax: v.recommendedMax };
+}
+
+export const profileProblems = (p: OutputProfile): string[] => Object.values(validateProfileEdit(p.key, profileValues(p))).filter((m): m is string => !!m);
+
+/** Only the numbers that differ from what the profile resolves to now. */
+export function changedProfileNumbers(initial: ProfileValues, next: ProfileValues): Partial<ProfileValues> {
+  const out: Partial<ProfileValues> = {};
+  for (const k of ["recommendedMin", "recommendedMax", "characterLimit"] as const) if (initial[k] !== next[k]) out[k] = next[k];
+  return out;
 }
 
 // ── Sample output and counts ────────────────────────────────────────────────

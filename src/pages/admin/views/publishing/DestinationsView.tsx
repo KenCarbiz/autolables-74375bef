@@ -3,10 +3,10 @@ import { useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { AdminButton } from "@/components/admin/v2/primitives";
 import { adminTabHref } from "@/lib/admin/sections";
-import { DraftActionBar, EditorEmpty, LeaveGuardDialog, ReviewChangesDialog, ScopeLabel, SectionCard } from "@/components/admin/v3/editor";
+import { DraftActionBar, EditorEmpty, EditorLayout, LeaveGuardDialog, ReviewChangesDialog, ScopeLabel, SectionCard, useIsNarrow } from "@/components/admin/v3/editor";
 import { Banner, LinkRow } from "../brand/feeds/bits";
 import { destinationRows } from "@/lib/admin/descriptionSettingsModel";
-import { AutomationPanel, AutomationRuleDrawer, ConnectorDrawer, DeliveryHistoryDrawer, DestinationCard, ExportOptionsDrawer, OutputPreviewDrawer } from "./DestinationParts";
+import { AutomationPanel, AutomationRuleDrawer, ConnectorDrawer, DeliveryHistoryDrawer, DestinationCard, ExportOptionsDrawer, OutputPreviewDrawer, OutputPreviewRail } from "./DestinationParts";
 import { BrandVoiceSection, ClaimsSection, Managed45Notice, OutputProfileDrawer, OutputProfilesSection, PhraseEditorDrawer, ValidationDrawer } from "./DescriptionParts";
 import { useDescriptionSettings } from "./useDescriptionSettings";
 
@@ -19,6 +19,7 @@ const NAV: Array<{ id: Section; label: string }> = [
 
 export default function DestinationsView() {
   const api = useDescriptionSettings();
+  const narrow = useIsNarrow();
   const [params, setParams] = useSearchParams();
   const section: Section = (api.section ?? params.get("section")) === "description" ? "description" : "automation";
   const [rule, setRule] = useState<string | null>(null);
@@ -68,19 +69,23 @@ export default function DestinationsView() {
 
       {section === "automation" ? (
         <>
+          {narrow && <OutputPreviewRail api={api} mobile />}
+          <EditorLayout preview={narrow ? undefined : <OutputPreviewRail api={api} />} previewLabel="Output preview">
           <SectionCard id="automation" icon="sliders" title="Automation" description="How much AutoLabels does before a person is involved when it writes a description.">
             <AutomationPanel api={api} onEdit={setRule} />
           </SectionCard>
 
           <SectionCard id="destinations" icon="plug" title="Destinations" description="Each destination separates writing text, how it is delivered, and whether delivery is automatic.">
-            <Banner tone="info" icon="eye" title="Writing and previewing never send anything">Export only means AutoLabels produces the text and you send it. Only the internal Vehicle Passport is delivered by AutoLabels. Website, marketplace, vAuto and SEO outputs are separate from each other.</Banner>
+            <Banner tone="info" icon="eye" title="Writing and previewing never send anything">{narrow ? "Export only means you send the text. Only the Vehicle Passport is delivered by AutoLabels." : "Export only means AutoLabels produces the text and you send it. Only the internal Vehicle Passport is delivered by AutoLabels. Website, marketplace, vAuto and SEO outputs are separate from each other."}</Banner>
             {!draft.internal_publication_enabled && <Banner tone="warning" title="Passport delivery is off">Nothing is written to the shopper Passport automatically, whatever the automation mode says.</Banner>}
-            <ul className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4" aria-label="Destinations">
+            <ul className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 items-stretch" aria-label="Destinations">
               {dests.map((r) => (
                 <DestinationCard key={r.key} row={r} summary={api.deliveries.summary[r.key]} deliveryState={api.deliveries.state} api={api} onAction={(kind, key) => setDrawer({ kind, key })} />
               ))}
             </ul>
           </SectionCard>
+
+          </EditorLayout>
 
           <div>
             <h2 className="text-[16px] leading-[24px] font-semibold text-adm-ink mb-2">Related settings</h2>
