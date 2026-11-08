@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import { buildRenderLayout, productionLayoutKey, templateRoutingFacts, type FactoryStickerRenderData } from "./contract";
 import { infinitiBenchmark, themeFor } from "./__fixtures__/renderData";
 import {
-  TEMPLATE_CATALOG, evaluateCatalogTemplate, getCatalogTemplate, type CatalogFuelClass, type CatalogVehicleInput,
+  TEMPLATE_CATALOG, evaluateCatalogTemplate, getCatalogTemplate, isRoutable, type CatalogFuelClass, type CatalogVehicleInput,
 } from "../oem/templateCatalog";
+import { pinCatalogPending } from "./__fixtures__/catalogState";
 
 const theme = themeFor(null);
 
@@ -30,6 +31,8 @@ const routing = (c: Config) => {
 };
 
 describe("Section 8: a template applies only to the configuration it was built from", () => {
+  pinCatalogPending();
+
   it("a Wrangler gasoline template is never applied to a Grand Cherokee 4xe", () => {
     const gc = { make: "Jeep", year: 2024, model: "Grand Cherokee 4xe", trim: "4xe", body: "SUV", fuelType: "Premium and Electricity", drivetrain: "4WD" };
     const r = routing(gc);
@@ -108,6 +111,8 @@ function sourceConfig(id: string): CatalogVehicleInput {
 }
 
 describe("Section 8: configuration matrix over all 28 catalog templates", () => {
+  pinCatalogPending();
+
   it("each template matches its own reference configuration and no other template's", () => {
     for (const t of TEMPLATE_CATALOG) {
       expect(evaluateCatalogTemplate(t, sourceConfig(t.id)), t.id).toMatchObject({ matched: true });
@@ -146,7 +151,24 @@ describe("Section 8: configuration matrix over all 28 catalog templates", () => 
   });
 });
 
+describe("Section 8: production routing follows the recorded owner decision", () => {
+  it("routes each template's own configuration to it only when the owner approved it", () => {
+    for (const t of TEMPLATE_CATALOG) {
+      const v = sourceConfig(t.id);
+      const r = routing({
+        make: v.make!, year: v.modelYear!, model: v.model!, trim: v.trim, body: v.bodyClass!,
+        fuelType: ({ gasoline: "Regular", diesel: "Diesel", hybrid: "Regular", phev: "Premium and Electricity", ev: "Electricity" } as const)[v.fuelClass!],
+        drivetrain: v.drivetrain ?? "AWD",
+        neovin: v.fuelClass === "hybrid" ? { ratingMetadata: [], madeIn: null, hybridDecode: true } : undefined,
+      });
+      expect(r.layout === t.id, t.id).toBe(isRoutable(t));
+    }
+  });
+});
+
 describe("Section 8: the generic layout's fuel panel follows the powertrain", () => {
+  pinCatalogPending();
+
   const generic = (fuelType: string, rangeMiles: number | null) => {
     const d = record({ make: "Volkswagen", year: 2026, model: "Atlas", trim: "SE", body: "SUV", fuelType, drivetrain: "AWD" });
     return buildRenderLayout({ ...d, epa: { ...d.epa!, rangeMiles } }, theme).drawnStrings;

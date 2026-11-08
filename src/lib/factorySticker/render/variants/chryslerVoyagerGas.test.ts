@@ -8,6 +8,7 @@ import { encodeQrMatrix } from "../qrMatrix";
 import { TEMPLATE_CATALOG, getCatalogTemplate } from "../../oem/templateCatalog";
 import { PASSPORT_QR_PT } from "./hyundaiTucsonGas";
 import { CHRYSLER_VOYAGER_GAS_ID } from "./chryslerVoyagerGas";
+import { pinCatalogPending } from "../__fixtures__/catalogState";
 
 const theme: FactoryStickerTheme = {
   oemThemeId: "oem-chrysler", oemThemeVersion: "1", canonicalOemId: "chrysler", templateFamilyId: "x",
@@ -251,6 +252,8 @@ describe("Chrysler Voyager gasoline template", () => {
   });
 
   describe("routing", () => {
+    pinCatalogPending([CHRYSLER_VOYAGER_GAS_ID]);
+
     it("is never selected by production routing while pending owner approval", () => {
       for (const data of [real, ref]) {
         const production = buildRenderLayout(data, theme);
@@ -278,6 +281,8 @@ describe("Chrysler Voyager gasoline template", () => {
   });
 
   describe("recorded routing flags", () => {
+    pinCatalogPending([CHRYSLER_VOYAGER_GAS_ID]);
+
     it("matches 2026 gasoline minivan Voyagers as pending approval and flags other configurations unsupported", () => {
       expect(templateRoutingFacts(ref)).toMatchObject({ status: "pending_match", flags: ["template_pending_owner_approval"] });
       expect(templateRoutingFacts(real).flags).toEqual(["template_configuration_unsupported"]);

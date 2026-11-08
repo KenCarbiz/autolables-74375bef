@@ -8,6 +8,7 @@ import { HYUNDAI_TUCSON_GAS_ID } from "./variants/hyundaiTucsonGas";
 import { JEEP_WRANGLER_GAS_ID } from "./variants/jeepWranglerGas";
 import { normalizeForSticker } from "../../../../supabase/functions/factory-sticker-orchestrate/normalize.ts";
 import { canonicalPassportUrl } from "../reproduction";
+import { pinCatalogPending } from "./__fixtures__/catalogState";
 
 const theme: FactoryStickerTheme = {
   oemThemeId: "o", oemThemeVersion: "1", canonicalOemId: null, templateFamilyId: "x",
@@ -15,6 +16,8 @@ const theme: FactoryStickerTheme = {
 };
 
 describe("NeoVIN decode facts for catalog templates", () => {
+  pinCatalogPending();
+
   it("reads stars from NHTSA rows only, and never from IIHS rows", () => {
     const rows = ["Standard-IIHS", "Side Impact-Good", "Standard-NHTSA", "Side Impact-5", "Rollover Rating-4", "Overall-5", "Frontal Crash Rating-5", "Top Safety Pick Status-TSP Plus", "Rear Crash Protect/Head Restraint Rating-Poor"];
     expect(nhtsaFromRatingMetadata(rows)).toEqual({ overall: 5, frontal: 5, side: 5, rollover: 4 });
@@ -89,6 +92,8 @@ describe("NeoVIN decode facts for catalog templates", () => {
 });
 
 describe("EPA match conflict guard for catalog templates", () => {
+  pinCatalogPending();
+
   const base = tucsonListings()[0];
   const make = (ymm: string, trim: string, mc: Record<string, unknown>, epa: Record<string, unknown>) =>
     normalizeForSticker(
@@ -134,6 +139,8 @@ describe("EPA match conflict guard for catalog templates", () => {
 });
 
 describe("EPA cost figures come from one timestamped retrieval", () => {
+  pinCatalogPending();
+
   const base = tucsonListings()[0];
   const norm = (epa: Record<string, unknown>) =>
     normalizeForSticker({ ...base, epa_economy: { ...(base.epa_economy as Record<string, unknown>), ...epa } }, {}, canonicalPassportUrl("x"), "t").data;

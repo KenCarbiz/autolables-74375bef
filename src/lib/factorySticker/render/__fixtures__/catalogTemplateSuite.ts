@@ -9,7 +9,7 @@ import { textBBox, type LayoutModel, type TextPrimitive } from "../layout";
 import { expectNoTextOverlap, pageStrings } from "./layoutAsserts";
 import { canonicalPassportUrl, PASSPORT_QR_CAPTION, REPRODUCTION_BANNER, REPRODUCTION_DISCLOSURE } from "../../reproduction";
 import { encodeQrMatrix } from "../qrMatrix";
-import { TEMPLATE_CATALOG, getCatalogTemplate } from "../../oem/templateCatalog";
+import { TEMPLATE_CATALOG, getCatalogTemplate, isRoutable } from "../../oem/templateCatalog";
 import { PASSPORT_QR_PT } from "../variants/hyundaiTucsonGas";
 import type { CatalogListing } from "./catalogRecord";
 
@@ -346,43 +346,66 @@ export function describeCatalogTemplate(c: CatalogSuiteConfig): void {
     });
 
     describe("routing", () => {
-      it("is never selected by production routing while pending owner approval", () => {
-        for (const data of [real, ref]) {
-          const production = buildRenderLayout(data, theme);
-          expect(production.fit.ok ? production.fit.figmaMaster : undefined).toBeUndefined();
-          expect(production.width).toBe(792);
+      const entry = () => TEMPLATE_CATALOG.find((t) => t.id === c.templateId)!;
+      const withState = (approval: string, layoutStatus: string, fn: () => void) => {
+        const mutable = entry() as { approval: string; layoutStatus: string };
+        const saved = { approval: mutable.approval, layoutStatus: mutable.layoutStatus };
+        try {
+          Object.assign(mutable, { approval, layoutStatus });
+          fn();
+        } finally {
+          Object.assign(mutable, saved);
         }
+      };
+
+      it("is never selected by production routing while pending owner approval", () => {
+        withState("pending_owner_approval", "sample_ready", () => {
+          for (const data of [real, ref]) {
+            const production = buildRenderLayout(data, theme);
+            expect(production.fit.ok ? production.fit.figmaMaster : undefined).toBeUndefined();
+            expect(production.width).toBe(792);
+          }
+        });
       });
 
       it("routes to the template in production only once owner approval and the layout are both approved", () => {
-        const entry = TEMPLATE_CATALOG.find((t) => t.id === c.templateId)!;
-        const mutable = entry as { approval: string; layoutStatus: string };
-        const saved = { approval: mutable.approval, layoutStatus: mutable.layoutStatus };
-        try {
-          mutable.approval = "approved";
+        withState("approved", "sample_ready", () => {
           expect(buildRenderLayout(ref, theme).width).toBe(792);
-          mutable.layoutStatus = "approved";
+        });
+        withState("approved", "approved", () => {
           const routed = buildRenderLayout(ref, theme);
           expect([routed.width, routed.height]).toEqual(c.pageSize ?? [1224, 792]);
           expect(routed.fit.ok && routed.fit.figmaMaster).toBe(true);
           expect(buildRenderLayout({ ...ref, identity: { ...ref.identity, year: c.offYear ?? "2025" } }, theme).width).toBe(792);
-        } finally {
-          Object.assign(mutable, saved);
+        });
+      });
+
+      it("routes production exactly as the catalog's recorded owner decision says", () => {
+        const routed = buildRenderLayout(ref, theme);
+        if (isRoutable(entry())) {
+          expect([routed.width, routed.height]).toEqual(c.pageSize ?? [1224, 792]);
+          expect(routed.fit.ok && routed.fit.figmaMaster).toBe(true);
+          expect(templateRoutingFacts(ref)).toMatchObject({ status: "approved_match", flags: [] });
+        } else {
+          expect(routed.width).toBe(792);
+          expect(templateRoutingFacts(ref)).toMatchObject({ status: "pending_match", flags: ["template_pending_owner_approval"] });
         }
       });
-    });
 
-    describe("recorded routing flags", () => {
-      it("matches the supported configurations as pending approval", () => {
-        expect(templateRoutingFacts(ref)).toMatchObject({ status: "pending_match", flags: ["template_pending_owner_approval"] });
-        for (const s of c.supported) expect(templateRoutingFacts(s.patch(ref)), s.label).toMatchObject({ status: "pending_match" });
+      it("matches the supported configurations as pending approval while pending", () => {
+        withState("pending_owner_approval", "sample_ready", () => {
+          expect(templateRoutingFacts(ref)).toMatchObject({ status: "pending_match", flags: ["template_pending_owner_approval"] });
+          for (const s of c.supported) expect(templateRoutingFacts(s.patch(ref)), s.label).toMatchObject({ status: "pending_match" });
+        });
       });
 
       it("flags the stress record and every unsupported configuration", () => {
-        expect(templateRoutingFacts(real).flags).toEqual(c.stressOtherMake ? [] : [
-          ...(c.stressMatches ? ["template_pending_owner_approval"] : ["template_configuration_unsupported"]),
-          ...(real.neovin?.epaConflict ? ["epa_match_conflict"] : []),
-        ]);
+        withState("pending_owner_approval", "sample_ready", () => {
+          expect(templateRoutingFacts(real).flags).toEqual(c.stressOtherMake ? [] : [
+            ...(c.stressMatches ? ["template_pending_owner_approval"] : ["template_configuration_unsupported"]),
+            ...(real.neovin?.epaConflict ? ["epa_match_conflict"] : []),
+          ]);
+        });
         for (const u of c.unsupported) {
           const facts = templateRoutingFacts(u.patch(ref));
           expect(facts.flags, u.label).toEqual(["template_configuration_unsupported"]);

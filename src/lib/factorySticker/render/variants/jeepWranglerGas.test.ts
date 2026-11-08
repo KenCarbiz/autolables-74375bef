@@ -8,6 +8,7 @@ import { encodeQrMatrix } from "../qrMatrix";
 import { TEMPLATE_CATALOG, getCatalogTemplate } from "../../oem/templateCatalog";
 import { PASSPORT_QR_PT } from "./hyundaiTucsonGas";
 import { JEEP_WRANGLER_GAS_ID } from "./jeepWranglerGas";
+import { pinCatalogPending } from "../__fixtures__/catalogState";
 
 const theme: FactoryStickerTheme = {
   oemThemeId: "oem-jeep", oemThemeVersion: "1", canonicalOemId: "jeep", templateFamilyId: "x",
@@ -254,6 +255,8 @@ describe("Jeep Wrangler gasoline template", () => {
   });
 
   describe("routing", () => {
+    pinCatalogPending([JEEP_WRANGLER_GAS_ID]);
+
     it("is never selected by production routing while pending owner approval", () => {
       for (const data of [real, ref]) {
         const production = buildRenderLayout(data, theme);
@@ -281,6 +284,8 @@ describe("Jeep Wrangler gasoline template", () => {
   });
 
   describe("recorded routing flags", () => {
+    pinCatalogPending([JEEP_WRANGLER_GAS_ID]);
+
     it("matches 2026 gasoline SUV Wranglers as pending approval and flags other configurations unsupported", () => {
       expect(templateRoutingFacts(ref)).toMatchObject({ status: "pending_match", flags: ["template_pending_owner_approval"] });
       expect(templateRoutingFacts(real).flags).toEqual(["template_configuration_unsupported"]);

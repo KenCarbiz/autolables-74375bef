@@ -8,6 +8,7 @@ import { encodeQrMatrix } from "../qrMatrix";
 import { TEMPLATE_CATALOG, getCatalogTemplate } from "../../oem/templateCatalog";
 import { PASSPORT_QR_PT } from "./hyundaiTucsonGas";
 import { MITSUBISHI_OUTLANDER_SPORT_ID } from "./mitsubishiOutlanderSport";
+import { pinCatalogPending } from "../__fixtures__/catalogState";
 
 const theme: FactoryStickerTheme = {
   oemThemeId: "oem-mitsubishi", oemThemeVersion: "1", canonicalOemId: "mitsubishi", templateFamilyId: "x",
@@ -266,6 +267,8 @@ describe("Mitsubishi Outlander Sport gasoline template", () => {
   });
 
   describe("routing", () => {
+    pinCatalogPending([MITSUBISHI_OUTLANDER_SPORT_ID]);
+
     it("is never selected by production routing while pending owner approval", () => {
       for (const data of [real, ref]) {
         const production = buildRenderLayout(data, theme);
@@ -293,6 +296,8 @@ describe("Mitsubishi Outlander Sport gasoline template", () => {
   });
 
   describe("recorded routing flags", () => {
+    pinCatalogPending([MITSUBISHI_OUTLANDER_SPORT_ID]);
+
     it("matches 2026 gasoline SUV Outlander Sports as pending approval and flags other configurations unsupported", () => {
       expect(templateRoutingFacts(ref)).toMatchObject({ status: "pending_match", flags: ["template_pending_owner_approval"] });
       expect(templateRoutingFacts(real).flags).toEqual(["template_configuration_unsupported", "epa_match_conflict"]);

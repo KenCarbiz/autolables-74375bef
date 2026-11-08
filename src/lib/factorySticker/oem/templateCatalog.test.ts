@@ -3,13 +3,59 @@ import {
   BLOCKED_VARIANT_REQUESTS, CATALOG_ENTRY_COUNT, TEMPLATE_CATALOG, evaluateCatalogTemplate, hasBuiltCatalogTemplates, getCatalogTemplate, isRoutable, normalizeBodyClass,
   resolveCatalogTemplate, type CatalogVehicleInput,
 } from "./templateCatalog";
+import { pinCatalogPending } from "../render/__fixtures__/catalogState";
 
 const tucson = (over: Partial<CatalogVehicleInput> = {}): CatalogVehicleInput => ({
   make: "Hyundai", modelYear: 2026, model: "Tucson", trim: "SEL", bodyClass: "SUV",
   fuelClass: "gasoline", drivetrain: "AWD", ...over,
 });
 
+// Ken approved every template the review board listed as Ready for review on 2026-11-08.
+const OWNER_APPROVED_2026_11_08: readonly string[] = [
+  "alfa_romeo_2026_giulia_veloce",
+  "aston_martin_2026_vantage_roadster",
+  "bentley_2026_continental_gt_azure",
+  "chrysler_2026_voyager_lx",
+  "dodge_2026_durango_gt_blacktop",
+  "fiat_2025_500e_giorgio_armani",
+  "genesis_2026_gv80_3.5t_prestige",
+  "hyundai_2026_tucson_se_awd",
+  "jeep_2026_wrangler_willys_392",
+  "kia_2026_sorento_lx",
+  "lamborghini_2026_urus_se",
+  "lexus_2026_rx_350_awd",
+  "lincoln_2026_nautilus_premiere",
+  "mitsubishi_2026_outlander_sport_s",
+  "subaru_2026_forester_wilderness",
+  "toyota_2026_4runner_trd_sport",
+  "volvo_2025_xc60_b5_awd_plus",
+];
+
+describe("owner decision of 2026-11-08", () => {
+  it("approves exactly the 17 templates that were ready for review; the rest stay held", () => {
+    for (const t of TEMPLATE_CATALOG) {
+      if (OWNER_APPROVED_2026_11_08.includes(t.id)) {
+        expect([t.approval, t.layoutStatus], t.id).toEqual(["approved", "approved"]);
+        expect(isRoutable(t), t.id).toBe(true);
+        expect(t.blockers, t.id).not.toContain("owner_exact_match_not_approved");
+      } else {
+        expect(isRoutable(t), t.id).toBe(false);
+        expect(t.blockers, t.id).toContain("owner_exact_match_not_approved");
+      }
+    }
+    expect(TEMPLATE_CATALOG.filter(isRoutable).map((t) => t.id).sort()).toEqual([...OWNER_APPROVED_2026_11_08]);
+    for (const b of BLOCKED_VARIANT_REQUESTS) expect([b.id, b.approval, b.layoutStatus]).toEqual([b.id, "pending_owner_approval", "not_started"]);
+  });
+
+  it("routes a matching approved configuration to its template", () => {
+    expect(resolveCatalogTemplate(tucson())).toMatchObject({ status: "approved_match", flags: [] });
+    expect(resolveCatalogTemplate(tucson()).template?.id).toBe("hyundai_2026_tucson_se_awd");
+  });
+});
+
 describe("template catalog", () => {
+  pinCatalogPending();
+
   it("holds the 28 handoff templates: 26 pending owner approval, 2 superseded by approved masters, none approved", () => {
     expect(TEMPLATE_CATALOG).toHaveLength(28);
     expect(new Set(TEMPLATE_CATALOG.map((t) => t.id)).size).toBe(28);
@@ -17,7 +63,7 @@ describe("template catalog", () => {
       const superseded = t.id === "infiniti_2026_qx60_sport" || t.id === "nissan_2026_pathfinder_platinum";
       expect(t.approval).toBe(superseded ? "superseded_by_approved_master" : "pending_owner_approval");
       expect(isRoutable(t)).toBe(false);
-      expect(t.blockers).toContain("owner_exact_match_not_approved");
+      if (!OWNER_APPROVED_2026_11_08.includes(t.id)) expect(t.blockers).toContain("owner_exact_match_not_approved");
       expect(t.design.fileKey).toMatch(/^[A-Za-z0-9]{22}$/);
     }
   });
@@ -192,7 +238,7 @@ describe("template catalog", () => {
       expect(t.approval, id).toBe("pending_owner_approval");
       expect(t.page, id).toEqual({ widthPt: 1224, heightPt: 792, orientation: "landscape" });
       expect(t.blockers, id).not.toContain("layout_not_built");
-      expect(t.blockers, id).toContain("owner_exact_match_not_approved");
+      if (!OWNER_APPROVED_2026_11_08.includes(id)) expect(t.blockers, id).toContain("owner_exact_match_not_approved");
       expect(t.blockers, id).not.toContain("missing_source_artwork");
     }
   });

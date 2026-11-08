@@ -8,6 +8,7 @@ import { canonicalPassportUrl, PASSPORT_QR_CAPTION, REPRODUCTION_BANNER, REPRODU
 import { encodeQrMatrix } from "../qrMatrix";
 import { TEMPLATE_CATALOG, getCatalogTemplate } from "../../oem/templateCatalog";
 import { HYUNDAI_TUCSON_GAS_ID, PASSPORT_QR_PT, scaleState } from "./hyundaiTucsonGas";
+import { pinCatalogPending } from "../__fixtures__/catalogState";
 
 const theme: FactoryStickerTheme = {
   oemThemeId: "oem-hyundai", oemThemeVersion: "1", canonicalOemId: "hyundai", templateFamilyId: "x",
@@ -249,6 +250,8 @@ describe("Hyundai Tucson gasoline template", () => {
   });
 
   describe("routing", () => {
+    pinCatalogPending([HYUNDAI_TUCSON_GAS_ID]);
+
     it("is never selected by production routing while pending owner approval", () => {
       for (const data of [...records, referenceMatchData(records[0])]) {
         const production = buildRenderLayout(data, theme);
@@ -278,6 +281,8 @@ describe("Hyundai Tucson gasoline template", () => {
   });
 
   describe("recorded routing flags", () => {
+    pinCatalogPending([HYUNDAI_TUCSON_GAS_ID]);
+
     it("records pending approval for a matching configuration and unsupported for the rest of the make", () => {
       expect(templateRoutingFacts(records[0])).toMatchObject({ status: "pending_match", flags: ["template_pending_owner_approval"] });
       const y2025 = templateRoutingFacts({ ...records[0], identity: { ...records[0].identity, year: "2025" } });

@@ -15,6 +15,7 @@ import { masterFor, productionLayoutKey, templateRoutingFacts } from "../render/
 import { TEMPLATE_CATALOG, type CatalogTemplate } from "../oem/templateCatalog";
 import { tucsonListings } from "../render/__fixtures__/tucson";
 import { recordListing } from "../render/__fixtures__/catalogRecord";
+import { pinCatalogPending } from "../render/__fixtures__/catalogState";
 
 const TUCSON_ID = "hyundai_2026_tucson_se_awd";
 
@@ -83,6 +84,8 @@ let restore: (() => void) | null = null;
 afterEach(() => { restore?.(); restore = null; });
 
 describe("automatic and manual generation produce the same document for the same snapshot", () => {
+  pinCatalogPending();
+
   it("approved make-wide master: same master layout, same PDF", { timeout: 120_000 }, async () => {
     const l = masterListing();
     const { auto, manual } = await both(l);
@@ -182,6 +185,8 @@ describe("automatic and manual generation produce the same document for the same
 });
 
 describe("the automatic path never regenerates a settled sticker", () => {
+  pinCatalogPending();
+
   const index = readFileSync(join(__dirname, "../../../../supabase/functions/factory-sticker-orchestrate/index.ts"), "utf8");
   const ingest = readFileSync(join(__dirname, "../../../../supabase/functions/ingest-orchestrate/index.ts"), "utf8");
   const setOf = (src: string, name: string): string[] => {
