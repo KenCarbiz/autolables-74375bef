@@ -10,7 +10,7 @@ import wordmarkReverse from "@/assets/admin-v2/brand/wordmark-reverse.svg";
 import { US_STATES, contactReadiness, fieldLabel, headerPreview } from "./brandModel";
 import { BrandEditorFrame, LoadingState } from "./editor/BrandEditorFrame";
 import { settingsWriter, useBrandEditor, useBrandEditorContext } from "./editor/useBrandEditor";
-import { BlockedCard, EditLink, OwnedValue, PreviewFrame, ReadinessList, Segmented, SourceLine, type ReadinessItem } from "./editor/parts";
+import { EditLink, OwnedValue, PreviewFrame, ReadinessList, Segmented, SourceLine, UpcomingCard, type ReadinessItem } from "./editor/parts";
 import { useRooftops } from "./editor/useRooftops";
 
 interface IdentityDraft extends Record<string, unknown> {
@@ -146,19 +146,12 @@ export default function IdentityView() {
         <FieldRow label="Public display name" required error={errors.dealer_name} help={<SourceLine>Dealer settings (dealer_name), saved once for the account. Printed on documents, stickers and the Passport header.</SourceLine>}>
           {(p) => <input {...p} className={INPUT_CLASS} value={draft.dealer_name} disabled={disabled} autoComplete="organization" onChange={(e) => editor.set("dealer_name", e.target.value)} />}
         </FieldRow>
-        <BlockedCard
-          icon="shield"
-          title="Legal name"
-          does="Stores the registered business name separately from the public name, for legal and compliance documents. It lives in the shared dealer profile."
-          migrationId={LEGAL_NAME_MIGRATION}
-          preview={<FieldRow label="Legal name">{(p) => <input {...p} className={INPUT_CLASS} value="" placeholder="Not stored yet" disabled readOnly />}</FieldRow>}
-        />
       </SectionCard>
 
-      <SectionCard icon="layers" title="Group and rooftop" description="These come from the account and Store settings. They are shown here so you can see what each surface reads, and they are not edited on this page.">
+      <SectionCard icon="layers" title="Group and rooftop" description="From the account and Store settings. Not edited on this page.">
         <div className="grid gap-4 md:grid-cols-2">
-          <OwnedValue label="Dealer group" value={source.tenantName ?? ""} empty="No dealer group" source="Account (tenants.name). Shared by every rooftop." />
-          <OwnedValue
+          <OwnedValue compactOnPhone label="Dealer group" value={source.tenantName ?? ""} empty="No dealer group" source="Account (tenants.name). Shared by every rooftop." />
+          <OwnedValue compactOnPhone
             label="Active rooftop"
             value={rooftop?.displayName || ctx.rooftopName || ""}
             empty="No rooftop selected"
@@ -166,7 +159,7 @@ export default function IdentityView() {
             editTo={adminTabHref("store-settings")}
             editLabel="Store settings"
           />
-          {rooftop && <OwnedValue label="Rooftop legal name" value={rooftop.legalName ?? ""} empty="Not recorded for this rooftop" source="Rooftop registry (dealer_stores.legal_name)." />}
+          {rooftop && <OwnedValue compactOnPhone label="Rooftop legal name" value={rooftop.legalName ?? ""} empty="Not recorded for this rooftop" source="Rooftop registry (dealer_stores.legal_name)." />}
         </div>
         {rooftops.state === "unavailable" && !ctx.fixture && (
           <p className="text-[14px] leading-[20px] text-adm-muted">The rooftop registry names are not readable for your role or are not set up yet, so only the Store settings name is shown.</p>
@@ -178,10 +171,10 @@ export default function IdentityView() {
 
       <SectionCard icon="pin" title="Location and time zone" description="One editor for city and state, so documents and the header cannot disagree.">
         <div className="grid gap-4 md:grid-cols-2">
-          <FieldRow label="City" optional help={<SourceLine>Dealer settings (dealer_city).</SourceLine>}>
+          <FieldRow label="City" optional help={<SourceLine hideOnPhone>Dealer settings (dealer_city).</SourceLine>}>
             {(p) => <input {...p} className={INPUT_CLASS} value={draft.dealer_city} disabled={disabled} autoComplete="address-level2" onChange={(e) => editor.set("dealer_city", e.target.value)} />}
           </FieldRow>
-          <FieldRow label="State" error={errors.dealer_state} help={<SourceLine>Dealer settings (dealer_state). Drives state compliance rules.</SourceLine>}>
+          <FieldRow label="State" error={errors.dealer_state} help={<SourceLine hideOnPhone>Dealer settings (dealer_state). Drives state compliance rules.</SourceLine>}>
             {(p) => (
               <SelectField {...p} value={draft.dealer_state} disabled={disabled} onChange={(e) => editor.set("dealer_state", e.target.value)}>
                 <option value="">Select a state</option>
@@ -196,7 +189,7 @@ export default function IdentityView() {
             <span>Store settings lists {activeStore?.name} in {storeCity}. Documents use the city above. Update the rooftop in Store settings if they should match.</span>
           </p>
         )}
-        <FieldRow label="Time zone" error={errors.dealer_timezone} help={<SourceLine>Dealer settings (dealer_timezone), stored as an IANA identifier. Deadlines and hours are read in this zone.</SourceLine>}>
+        <FieldRow label="Time zone" error={errors.dealer_timezone} help={<SourceLine hideOnPhone>Dealer settings (dealer_timezone), stored as an IANA identifier. Deadlines and hours are read in this zone.</SourceLine>}>
           {(p) => (
             <SelectField {...p} value={draft.dealer_timezone} disabled={disabled} onChange={(e) => editor.set("dealer_timezone", e.target.value)}>
               <option value="">Select a time zone</option>
@@ -229,6 +222,11 @@ export default function IdentityView() {
           <div className="sm:ml-auto"><EditLink to={adminTabHref("appearance")}>Manage logos and colours</EditLink></div>
         </div>
       </SectionCard>
+
+      <UpcomingCard
+        items={[{ icon: "shield", title: "Legal name", does: "The registered business name, stored separately from the public name for legal documents.", migrationId: LEGAL_NAME_MIGRATION }]}
+        preview={<FieldRow label="Legal name">{(p) => <input {...p} className={INPUT_CLASS} value="" placeholder="Not stored yet" disabled readOnly />}</FieldRow>}
+      />
     </BrandEditorFrame>
   );
 }

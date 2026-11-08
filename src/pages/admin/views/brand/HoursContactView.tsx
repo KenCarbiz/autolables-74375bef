@@ -8,7 +8,7 @@ import { contactReadiness, fieldLabel, validateHoursContact } from "./brandModel
 import { BrandEditorFrame, LoadingState } from "./editor/BrandEditorFrame";
 import { useNarrow } from "./editor/useNarrow";
 import { settingsWriter, useBrandEditor, useBrandEditorContext } from "./editor/useBrandEditor";
-import { BlockedCard, EditLink, OwnedValue, PreviewFrame, ReadinessList, SourceLine, type ReadinessItem } from "./editor/parts";
+import { EditLink, OwnedValue, PreviewFrame, ReadinessList, SourceLine, UpcomingCard, type ReadinessItem } from "./editor/parts";
 
 interface HoursDraft extends Record<string, unknown> {
   dealer_hours: string;
@@ -143,6 +143,7 @@ export default function HoursContactView() {
             source="Contact & Routing (passport_agents). Never copied from the public phone."
             editTo={adminTabHref("routing")}
             editLabel="Contact & Routing"
+            compactOnPhone
           />
           <FieldRow label="Website" optional error={errors.dealer_website_url} help={site.display ? `Customers see ${site.display}` : <SourceLine hideOnPhone>Dealer settings (dealer_website_url).</SourceLine>}>
             {(p) => <input {...p} className={INPUT_CLASS} value={draft.dealer_website_url} inputMode="url" disabled={disabled} onChange={(e) => editor.set("dealer_website_url", e.target.value)} />}
@@ -164,30 +165,16 @@ export default function HoursContactView() {
         <OwnedValue label="Time zone" value={settings.dealer_timezone} empty="No time zone set" source="Dealer settings (dealer_timezone)." editTo={adminTabHref("identity")} editLabel="Identity" compactOnPhone />
       </SectionCard>
 
-      <BlockedCard
-        icon="calendar"
-        title="Structured hours and phones"
-        does="Weekly schedule, holidays, routing hours and department phones. Your saved hours text stays the source. AutoFilm parity is not claimed."
-        migrationId={MIGRATION}
-        preview={
-          <>
-            <FieldRow label="Schedule time zone">{(p) => <SelectField {...p} disabled><option>Uses the time zone from Identity</option></SelectField>}</FieldRow>
-            <FieldRow label="Phone (E.164)">{(p) => <input {...p} className={INPUT_CLASS} disabled placeholder="+15555550100" />}</FieldRow>
-            <AdminButton variant="secondary" disabled><AdminIcon name="plus" />Add number</AdminButton>
-          </>
-        }
-      />
-
       <SectionCard icon="pin" title="Address and licensing" description="Seller identity on the addendum and Buyers Guide.">
         <div className="grid grid-cols-2 gap-4">
           <FieldRow label="Street address" optional className="col-span-2" help={<SourceLine hideOnPhone>Dealer settings (dealer_address).</SourceLine>}>
             {(p) => <input {...p} className={INPUT_CLASS} value={draft.dealer_address} autoComplete="street-address" disabled={disabled} onChange={(e) => editor.set("dealer_address", e.target.value)} />}
           </FieldRow>
           <div className="col-span-2 md:col-span-1"><OwnedValue label="City and state" value={[settings.dealer_city, settings.dealer_state].filter(Boolean).join(", ")} empty="Not set" source="Dealer settings. Edited on Identity." editTo={adminTabHref("identity")} editLabel="Identity" compactOnPhone /></div>
-          <FieldRow label="ZIP" optional error={errors.dealer_zip}>
+          <FieldRow label="ZIP" optional error={errors.dealer_zip} className="col-span-2 sm:col-span-1">
             {(p) => <input {...p} className={INPUT_CLASS} value={draft.dealer_zip} inputMode="numeric" autoComplete="postal-code" disabled={disabled} onChange={(e) => editor.set("dealer_zip", e.target.value)} />}
           </FieldRow>
-          <FieldRow label="DMV dealer license number" optional>
+          <FieldRow label="DMV license no." optional help="DMV dealer license number" className="col-span-2 sm:col-span-1">
             {(p) => <input {...p} className={INPUT_CLASS} value={draft.dealer_license_number} disabled={disabled} onChange={(e) => editor.set("dealer_license_number", e.target.value)} />}
           </FieldRow>
         
@@ -199,6 +186,18 @@ export default function HoursContactView() {
           <EditLink to={adminTabHref("routing")}>Lead routing recipients: Contact & Routing</EditLink>
         </div>
       </SectionCard>
+
+      <UpcomingCard
+        items={[
+          { icon: "calendar", title: "Structured hours", does: "Weekly schedule, holidays and routing hours. Your saved hours text stays the source.", migrationId: MIGRATION },
+          { icon: "users", title: "Department phone numbers", does: "Labelled sales, service and parts numbers. AutoFilm parity is not claimed.", migrationId: MIGRATION },
+        ]}
+        preview={<>
+            <FieldRow label="Schedule time zone">{(p) => <SelectField {...p} disabled><option>Uses the time zone from Identity</option></SelectField>}</FieldRow>
+            <FieldRow label="Phone (E.164)">{(p) => <input {...p} className={INPUT_CLASS} disabled placeholder="+15555550100" />}</FieldRow>
+            <AdminButton variant="secondary" disabled><AdminIcon name="plus" />Add number</AdminButton>
+          </>}
+      />
     </BrandEditorFrame>
   );
 }

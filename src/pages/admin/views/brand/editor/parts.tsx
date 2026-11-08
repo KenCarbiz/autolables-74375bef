@@ -153,3 +153,30 @@ export const BlockedCard = ({ icon, title, does, migrationId, preview, className
     )}
   </section>
 );
+
+export interface UpcomingItem { icon: AdminIconName; title: string; does: ReactNode; migrationId: string }
+
+export const UpcomingCard = ({ items, preview }: { items: UpcomingItem[]; preview: ReactNode }) => (
+  <section aria-label="Coming with the next database update" className="rounded-xl bg-adm-surface border border-adm-divider p-4 sm:p-5 space-y-3 min-w-0">
+    <div>
+      <h2 className="text-[16px] leading-[22px] font-semibold text-adm-ink">Coming with the next database update</h2>
+      <p className="text-[14px] leading-[20px] text-adm-muted max-sm:hidden">These controls stay read-only and nothing shown for them is stored until the update is applied.</p>
+    </div>
+    <ul className="divide-y divide-adm-divider">
+      {items.map((it) => (
+        <li key={it.title} data-blocked-feature="" className="py-3 first:pt-0 last:pb-0 flex items-start gap-3">
+          <AdminIcon name={it.icon} size="card" className="mt-0.5 text-adm-muted" />
+          <div className="min-w-0 flex-1">
+            <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{it.title}</p>
+            <p className="text-[13px] leading-[18px] text-adm-muted">{it.does}</p>
+            <p className="text-[13px] leading-[18px] text-adm-muted">Needs database update <code className="rounded bg-adm-workspace border border-adm-divider px-1.5 py-0.5 break-all">{it.migrationId}</code></p>
+          </div>
+        </li>
+      ))}
+    </ul>
+    <AdvancedDisclosure title="Preview these editors">
+      <p className="text-[13px] leading-[18px] text-adm-muted">Inert preview. Nothing here is saved or reflects your data.</p>
+      <fieldset disabled className="space-y-3 opacity-70 min-w-0">{preview}</fieldset>
+    </AdvancedDisclosure>
+  </section>
+);
