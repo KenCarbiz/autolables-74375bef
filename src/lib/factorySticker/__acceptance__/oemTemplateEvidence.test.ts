@@ -71,7 +71,9 @@ import { NISSAN_PATHFINDER_PLATINUM_ID } from "../render/variants/nissanPathfind
 import { pathfinderReferenceMatchData, qx60ReferenceMatchData } from "../render/__fixtures__/letterMasters";
 import { NEW_TITLE, buildListing, loadFixture, passportUrlFor } from "./harness";
 import { normalizeForSticker } from "../../../../supabase/functions/factory-sticker-orchestrate/normalize";
-import { TEMPLATE_CATALOG, evaluateCatalogTemplate, type CatalogTemplate } from "../oem/templateCatalog";
+import {
+  BLOCKED_VARIANT_REQUESTS, CATALOG_ENTRY_COUNT, TEMPLATE_CATALOG, evaluateCatalogTemplate, type CatalogMatchRule, type CatalogTemplate,
+} from "../oem/templateCatalog";
 import { CATALOG_LAYOUTS } from "../render/variants";
 
 const DIR = process.env.OEM_TEMPLATES_EVIDENCE_DIR;
@@ -1035,7 +1037,6 @@ async function writeSample(
 
 describe.skipIf(!DIR)("OEM template evidence", () => {
   const root = DIR!;
-  const samplePath = new Map<string, string>();
   const only = process.env.OEM_TEMPLATES_ONLY?.split(",").filter(Boolean);
 
   for (const spec of packages) {
@@ -1073,48 +1074,88 @@ describe.skipIf(!DIR)("OEM template evidence", () => {
         generatedBy: "src/lib/factorySticker/__acceptance__/oemTemplateEvidence.test.ts",
         vehicles: results,
       }, null, 2));
-      samplePath.set(t.id, `samples/${spec.dirName}/`);
     }, 120000);
   }
 
-  it("writes the coverage matrix", () => {
+  it("writes the catalog facts the coverage matrix is built from", () => {
     const prod = JSON.parse(readFileSync(join(__dirname, "catalogProdCounts.fixture.json"), "utf8")) as {
       rows: Array<{ make: string; model: string; year: string; fuel: string; body: string; n: number }>;
     };
-    const rows = TEMPLATE_CATALOG.map((t) => {
-      let prodRecords = 0;
+    const dirOf = new Map(packages.map((p) => [p.templateId, p.dirName]));
+    const prodRecordsFor = (t: { canonicalMake: string; match: CatalogMatchRule; source: { model: string } }): number => {
+      let n = 0;
       for (const r of prod.rows) {
-        const year = Number(r.year);
         const ev = evaluateCatalogTemplate(t, {
-          make: r.make, modelYear: year, model: r.model, trim: null, bodyClass: r.body,
+          make: r.make, modelYear: Number(r.year), model: r.model, trim: null, bodyClass: r.body,
           fuelClass: fuelClassOf(r.fuel), drivetrain: null,
         });
-        if (r.make.replace(/[^A-Z0-9]/g, "") === t.canonicalMake && ev.matched) prodRecords += r.n;
-
+        if (r.make.replace(/[^A-Z0-9]/gi, "").toUpperCase() === t.canonicalMake && ev.matched) n += r.n;
       }
-      const m = t.match;
+      return n;
+    };
+    const rule = (m: CatalogMatchRule): string =>
+      `year ${m.modelYears.join("/")}; model /${m.modelPattern}/${m.excludedModelPattern ? ` not /${m.excludedModelPattern}/` : ""}; body ${m.bodyClasses.join("/")}; powertrain ${m.fuelClasses.join("/")}${m.drivetrains ? `; drive ${m.drivetrains.join("/")}` : ""}`;
+    const built = TEMPLATE_CATALOG.map((t) => {
+      const dir = dirOf.get(t.id) ?? null;
       return {
         template_id: t.id,
+        entry_kind: "handoff_template",
         brand: t.brand,
-        source_vehicle: `${t.source.modelYear} ${t.source.model} ${t.source.trim}`,
-        page_size: `${t.page.widthPt}x${t.page.heightPt}pt (${(t.page.widthPt / 72).toFixed(2)}x${(t.page.heightPt / 72).toFixed(2)}in) ${t.page.orientation}`,
-        configuration_rule: `year ${m.modelYears.join("/")}; model /${m.modelPattern}/${m.excludedModelPattern ? ` not /${m.excludedModelPattern}/` : ""}; body ${m.bodyClasses.join("/")}; powertrain ${m.fuelClasses.join("/")}${m.drivetrains ? `; drive ${m.drivetrains.join("/")}` : ""}`,
+        model_year: t.source.modelYear,
+        model: t.source.model,
+        trim: t.source.trim,
+        powertrain: t.match.fuelClasses.join("/"),
+        body: t.match.bodyClasses.join("/"),
+        reference_status: t.referenceStatus,
+        reference_pdf: `reference-pdfs/${t.referencePdf}`,
+        figma_frame: `${t.design.fileKey} node ${t.design.masterNodeId}`,
+        page_width_pt: t.page.widthPt,
+        page_height_pt: t.page.heightPt,
+        orientation: t.page.orientation,
+        configuration_rule: rule(t.match),
         layout_status: t.layoutStatus,
         approval_state: t.approval,
-        sample_path: samplePath.get(t.id) ?? "",
-        blocker_codes: t.blockers.join(";"),
+        sample_dir: dir && existsSync(join(root, "samples", dir, "REVIEW.md")) ? `samples/${dir}/` : "",
+        blocker_codes: t.blockers,
         has_layout_builder: Boolean(CATALOG_LAYOUTS[t.id]),
         existing_approved_master: t.existingMasterKey ?? "",
-        prod_records: prodRecords,
+        diesel_template_id: "",
+        required_from_reference: [] as string[],
+        prod_records: prodRecordsFor(t),
       };
     });
-    const header = Object.keys(rows[0]);
-    const esc = (v: unknown): string => `"${String(v).replace(/"/g, '""')}"`;
-    writeFileSync(join(root, "coverage-matrix.csv"), [header.join(","), ...rows.map((r) => header.map((h) => esc((r as Record<string, unknown>)[h])).join(","))].join("\n") + "\n");
-    writeFileSync(join(root, "coverage-matrix.json"), JSON.stringify({
-      generatedFrom: "src/lib/factorySticker/oem/templateCatalog.ts",
-      prodRecordsNote: "Count of saved vehicle_listings rows (model years 2025-2026) that match the template's year, model, body and powertrain rule; read-only grouped SELECT on 2026-11-04. The Tucson count is the four 2026 Hyundai Tucson rows.",
-      rows,
+    const requests = BLOCKED_VARIANT_REQUESTS.map((b) => ({
+      template_id: b.id,
+      entry_kind: "blocked_variant_request",
+      brand: b.brand,
+      model_year: b.source.modelYear,
+      model: b.source.model,
+      trim: "",
+      powertrain: b.match.fuelClasses.join("/"),
+      body: b.match.bodyClasses.join("/"),
+      reference_status: "missing",
+      reference_pdf: "",
+      figma_frame: "",
+      page_width_pt: null,
+      page_height_pt: null,
+      orientation: "",
+      configuration_rule: rule(b.match),
+      layout_status: b.layoutStatus,
+      approval_state: b.approval,
+      sample_dir: "",
+      blocker_codes: b.blockers,
+      has_layout_builder: false,
+      existing_approved_master: "",
+      diesel_template_id: b.dieselTemplateId,
+      required_from_reference: [...b.requiredFromReference],
+      prod_records: prodRecordsFor({ ...b, source: b.source }),
+    }));
+    writeFileSync(join(root, "catalog-facts.json"), JSON.stringify({
+      generatedFrom: "src/lib/factorySticker/oem/templateCatalog.ts (TEMPLATE_CATALOG + BLOCKED_VARIANT_REQUESTS)",
+      generatedBy: "src/lib/factorySticker/__acceptance__/oemTemplateEvidence.test.ts",
+      entryCount: CATALOG_ENTRY_COUNT,
+      prodRecordsNote: "Count of saved vehicle_listings rows (model years 2025-2026) that match the entry's year, model, body and powertrain rule; read-only grouped SELECT on 2026-11-04.",
+      rows: [...built, ...requests],
     }, null, 2));
   }, 120000);
 });

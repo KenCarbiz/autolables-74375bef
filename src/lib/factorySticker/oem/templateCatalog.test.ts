@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  TEMPLATE_CATALOG, evaluateCatalogTemplate, getCatalogTemplate, isRoutable, normalizeBodyClass,
+  BLOCKED_VARIANT_REQUESTS, CATALOG_ENTRY_COUNT, TEMPLATE_CATALOG, evaluateCatalogTemplate, hasBuiltCatalogTemplates, getCatalogTemplate, isRoutable, normalizeBodyClass,
   resolveCatalogTemplate, type CatalogVehicleInput,
 } from "./templateCatalog";
 
@@ -19,6 +19,38 @@ describe("template catalog", () => {
       expect(isRoutable(t)).toBe(false);
       expect(t.blockers).toContain("owner_exact_match_not_approved");
       expect(t.design.fileKey).toMatch(/^[A-Za-z0-9]{22}$/);
+    }
+  });
+
+  it("adds four gasoline heavy-duty requests: 32 entries, each blocked without a genuine OEM gasoline label", () => {
+    expect(CATALOG_ENTRY_COUNT).toBe(32);
+    expect(BLOCKED_VARIANT_REQUESTS.map((b) => b.id)).toEqual([
+      "ford_2026_f250_gas", "chevrolet_2026_silverado_2500hd_gas", "gmc_2026_sierra_3500hd_gas", "ram_2026_2500_gas",
+    ]);
+    const ids = new Set([...TEMPLATE_CATALOG, ...BLOCKED_VARIANT_REQUESTS].map((t) => t.id));
+    expect(ids.size).toBe(32);
+    for (const b of BLOCKED_VARIANT_REQUESTS) {
+      expect(b.approval).toBe("pending_owner_approval");
+      expect(b.layoutStatus).toBe("not_started");
+      expect(b.blockers).toContain("missing_oem_gasoline_reference");
+      expect(b.match.fuelClasses).toEqual(["gasoline"]);
+      const diesel = getCatalogTemplate(b.dieselTemplateId)!;
+      expect(diesel.match.fuelClasses).toEqual(["diesel"]);
+      expect(diesel.canonicalMake).toBe(b.canonicalMake);
+    }
+  });
+
+  it("never routes a gasoline heavy-duty truck to the diesel layout or to its unbuilt gasoline entry", () => {
+    const trucks: Array<[string, string]> = [["Ford", "F-250 Super Duty"], ["Chevrolet", "Silverado 2500HD"], ["GMC", "Sierra 3500HD"], ["Ram", "2500"]];
+    for (const [make, model] of trucks) {
+      const v: CatalogVehicleInput = { make, modelYear: 2026, model, trim: "XL", bodyClass: "Crew Cab Pickup", fuelClass: "gasoline", drivetrain: "4WD" };
+      const r = resolveCatalogTemplate(v);
+      expect(r.status, model).toBe("configuration_unsupported");
+      expect(r.template, model).toBeNull();
+      expect(r.flags, model).toEqual(["template_configuration_unsupported"]);
+      expect(r.reasons.some((x) => x.includes("_gas: matches the configuration, but no genuine OEM gasoline label exists")), model).toBe(true);
+      expect(resolveCatalogTemplate({ ...v, fuelClass: "diesel" }).status, model).toBe("pending_match");
+      expect(hasBuiltCatalogTemplates(make)).toBe(true);
     }
   });
 

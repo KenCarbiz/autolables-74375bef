@@ -17,6 +17,8 @@
 // panel and no EPA label (over 8,500 lb GVWR), and a gasoline heavy-duty truck
 // is not matched even though the layout would carry it. Fuel evidence is the
 // verified EPA fuel type, else the NeoVIN fuel_type when it states diesel.
+// Each gasoline variant is a separate entry in BLOCKED_VARIANT_REQUESTS that
+// stays unbuilt until a genuine OEM gasoline label is supplied.
 //
 // A reference label proves nothing about other model years, bodies or
 // powertrains, so a vehicle matches only when model year, model line, body
@@ -61,7 +63,8 @@ export type CatalogBlockerCode =
   | "nhtsa_ratings_not_wired"
   | "parts_content_not_wired"
   | "warranty_terms_not_wired"
-  | "ev_figures_not_wired";
+  | "ev_figures_not_wired"
+  | "missing_oem_gasoline_reference";
 
 export interface CatalogMatchRule {
   modelYears: readonly number[];
@@ -493,6 +496,69 @@ export const TEMPLATE_CATALOG: readonly CatalogTemplate[] = [
     blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "reference_is_2025", "powertrain_rule_unverified", "parts_content_not_wired", "warranty_terms_not_wired"],
   },];
 
+/**
+ * A gasoline variant of a heavy-duty diesel template (owner directive, Nov 8
+ * 2026). It has its own entry so it is never served by the diesel layout, but
+ * no genuine OEM gasoline label is in project files, so nothing is built and
+ * it never matches for routing. Engine, emissions, GVWR, EPA applicability,
+ * MSRP and page format must all come from that label, never from the diesel.
+ */
+export interface CatalogVariantRequest {
+  id: string;
+  brand: string;
+  canonicalMake: string;
+  source: { modelYear: number; model: string; trim: null };
+  dieselTemplateId: string;
+  match: CatalogMatchRule;
+  approval: "pending_owner_approval";
+  layoutStatus: "not_started";
+  blockers: readonly CatalogBlockerCode[];
+  requiredFromReference: readonly string[];
+}
+
+const GAS_HD_REQUIRED = [
+  "genuine OEM gasoline window label (PDF or flat scan) for a 2026 model-year truck",
+  "engine and transmission as printed",
+  "emissions certification and the CARB medium-duty panel as printed",
+  "GVWR, and whether an EPA fuel economy label applies at that GVWR",
+  "base price, options, destination and total MSRP as printed",
+  "page size and orientation",
+] as const;
+
+const GAS_HD_BLOCKERS: readonly CatalogBlockerCode[] = [
+  "missing_oem_gasoline_reference", "layout_not_built", "owner_exact_match_not_approved",
+  "carb_panel_pending", "powertrain_rule_unverified",
+];
+
+export const BLOCKED_VARIANT_REQUESTS: readonly CatalogVariantRequest[] = [
+  {
+    id: "ford_2026_f250_gas", brand: "Ford", canonicalMake: "FORD",
+    source: { modelYear: 2026, model: "F-250 Super Duty", trim: null }, dieselTemplateId: "ford_2026_f250",
+    match: { modelYears: [2026], modelPattern: "^f250(superduty)?(pickup)?$", bodyClasses: ["PICKUP"], fuelClasses: ["gasoline"] },
+    approval: "pending_owner_approval", layoutStatus: "not_started", blockers: GAS_HD_BLOCKERS, requiredFromReference: GAS_HD_REQUIRED,
+  },
+  {
+    id: "chevrolet_2026_silverado_2500hd_gas", brand: "Chevrolet", canonicalMake: "CHEVROLET",
+    source: { modelYear: 2026, model: "Silverado 2500HD", trim: null }, dieselTemplateId: "chevrolet_2026_silverado_2500_high_country",
+    match: { modelYears: [2026], modelPattern: "^silverado2500", bodyClasses: ["PICKUP"], fuelClasses: ["gasoline"] },
+    approval: "pending_owner_approval", layoutStatus: "not_started", blockers: GAS_HD_BLOCKERS, requiredFromReference: GAS_HD_REQUIRED,
+  },
+  {
+    id: "gmc_2026_sierra_3500hd_gas", brand: "GMC", canonicalMake: "GMC",
+    source: { modelYear: 2026, model: "Sierra 3500HD", trim: null }, dieselTemplateId: "gmc_2026_sierra_3500_denali_ultimate",
+    match: { modelYears: [2026], modelPattern: "^sierra3500", bodyClasses: ["PICKUP"], fuelClasses: ["gasoline"] },
+    approval: "pending_owner_approval", layoutStatus: "not_started", blockers: GAS_HD_BLOCKERS, requiredFromReference: GAS_HD_REQUIRED,
+  },
+  {
+    id: "ram_2026_2500_gas", brand: "Ram", canonicalMake: "RAM",
+    source: { modelYear: 2026, model: "2500", trim: null }, dieselTemplateId: "ram_2026_2500_limited",
+    match: { modelYears: [2026], modelPattern: "^(ram)?2500(pickup)?$", bodyClasses: ["PICKUP"], fuelClasses: ["gasoline"] },
+    approval: "pending_owner_approval", layoutStatus: "not_started", blockers: GAS_HD_BLOCKERS, requiredFromReference: GAS_HD_REQUIRED,
+  },
+];
+
+export const CATALOG_ENTRY_COUNT = TEMPLATE_CATALOG.length + BLOCKED_VARIANT_REQUESTS.length;
+
 /** True when the catalog holds at least one template with a built layout for this make. */
 export const hasBuiltCatalogTemplates = (make: string | null | undefined): boolean => {
   const m = token(make);
@@ -535,7 +601,9 @@ export interface CatalogEvaluation {
   reasons: string[];
 }
 
-export function evaluateCatalogTemplate(t: CatalogTemplate, v: CatalogVehicleInput): CatalogEvaluation {
+export function evaluateCatalogTemplate(
+  t: { match: CatalogMatchRule; source: { model: string } }, v: CatalogVehicleInput,
+): CatalogEvaluation {
   const reasons: string[] = [];
   const r = t.match;
   if (v.modelYear === null || !r.modelYears.includes(v.modelYear)) {
@@ -602,6 +670,11 @@ export function resolveCatalogTemplate(v: CatalogVehicleInput): CatalogResolutio
       status: "pending_match", template: matches[0], flags: ["template_pending_owner_approval"], candidates,
       reasons: [`${matches[0].id}: matches the configuration but is ${matches[0].approval}`],
     };
+  }
+  for (const b of BLOCKED_VARIANT_REQUESTS) {
+    if (b.canonicalMake === make && evaluateCatalogTemplate(b, v).matched) {
+      reasons.push(`${b.id}: matches the configuration, but no genuine OEM gasoline label exists, so no layout is built`);
+    }
   }
   return { status: "configuration_unsupported", template: null, flags: ["template_configuration_unsupported"], candidates, reasons };
 }
