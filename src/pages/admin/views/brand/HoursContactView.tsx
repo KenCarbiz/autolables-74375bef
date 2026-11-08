@@ -124,8 +124,10 @@ export default function HoursContactView() {
           {readiness}
         </>
       }
-      mobilePreview={{ top: shopper, after: readiness }}
+      mobilePreview={{ top: shopper }}
     >
+      {narrow && readiness}
+
       <SectionCard icon="phone" title="Public contact" description="Numbers and addresses customers see.">
         <div id="contact-phone" className="grid gap-4 md:grid-cols-2">
           <FieldRow
@@ -174,7 +176,7 @@ export default function HoursContactView() {
           <FieldRow label="ZIP" optional error={errors.dealer_zip} className="col-span-2 sm:col-span-1">
             {(p) => <input {...p} className={INPUT_CLASS} value={draft.dealer_zip} inputMode="numeric" autoComplete="postal-code" disabled={disabled} onChange={(e) => editor.set("dealer_zip", e.target.value)} />}
           </FieldRow>
-          <FieldRow label="DMV license no." optional help="DMV dealer license number" className="col-span-2 sm:col-span-1">
+          <FieldRow label="DMV license no." optional className="col-span-2 sm:col-span-1">
             {(p) => <input {...p} className={INPUT_CLASS} value={draft.dealer_license_number} disabled={disabled} onChange={(e) => editor.set("dealer_license_number", e.target.value)} />}
           </FieldRow>
         

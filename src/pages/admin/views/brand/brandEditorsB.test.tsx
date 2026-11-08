@@ -105,7 +105,7 @@ describe("Identity", () => {
   it("renders the fixture read-only variant", () => {
     fixture(IdentityView, "v3-identity", "?state=readonly");
     expect(screen.getByText("View only")).toBeTruthy();
-    expect(screen.getByText("Example Auto Group")).toBeTruthy();
+    expect(screen.getByText("Example Motors Group")).toBeTruthy();
   });
 });
 

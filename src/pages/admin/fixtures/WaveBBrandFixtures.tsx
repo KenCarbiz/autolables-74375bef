@@ -9,8 +9,8 @@ import type { Store } from "@/types/tenant";
 const store: Store = {
   id: "store-example-1",
   tenant_id: "tenant-example",
-  name: "Example INFINITI of Sampleville",
-  slug: "example-infiniti",
+  name: "Example Motors",
+  slug: "example-motors",
   address: "",
   city: "Sampleville",
   state: "CT",
@@ -28,7 +28,7 @@ const LOGO = "data:image/svg+xml;utf8," + encodeURIComponent(
 );
 
 const baseSettings = {
-  dealer_name: "Example INFINITI",
+  dealer_name: "Example Motors",
   dealer_tagline: "Sample tagline for design review",
   why_buy_here: "Sample promise: a fixture sentence that is not a real claim.",
   warranty_programs: "",
@@ -87,7 +87,7 @@ const emptySettings = {
   dealer_advisor_response: "", why_buy_profile: null, passport_agents: [],
 } as unknown as BrandBFixture["settings"];
 
-const rooftops = [{ id: "store-example-1", displayName: "Example INFINITI of Sampleville", legalName: "Example Motors of Sampleville LLC", city: "Sampleville", state: "CT" }];
+const rooftops = [{ id: "store-example-1", displayName: "Example Motors", legalName: "Example Motors of Sampleville LLC", city: "Sampleville", state: "CT" }];
 
 type Variants = NonNullable<BrandBFixture["variants"]>;
 const common: Variants = {
@@ -97,15 +97,15 @@ const common: Variants = {
 };
 
 const make = (tabId: string, label: string, variants: Variants): AdminScreenFixture => {
-  const brand: BrandBFixture = { tenantName: "Example Auto Group", activeStoreId: store.id, stores: [store], settings: baseSettings, secondaryColor: "#0F766E", rooftops, variants: { ...common, ...variants } as Partial<Record<FixtureState, never>> };
+  const brand: BrandBFixture = { tenantName: "Example Motors Group", activeStoreId: store.id, stores: [store], settings: baseSettings, secondaryColor: "#0F766E", rooftops, variants: { ...common, ...variants } as Partial<Record<FixtureState, never>> };
   return { tabId, fixture: { label, now: Date.parse("2026-11-07T12:00:00Z"), views: { brand } } };
 };
 
 export const WAVE_B_BRAND_FIXTURES: Record<string, AdminScreenFixture> = {
   "v3-identity": make("identity", "Identity", {
-    dirty: { seed: { dealer_name: "Example INFINITI Sampleville", dealer_timezone: "America/Chicago" } },
+    dirty: { seed: { dealer_name: "Example Motors Sampleville", dealer_timezone: "America/Chicago" } },
     invalid: { seed: { dealer_name: "", dealer_state: "ZZ" } },
-    review: { seed: { dealer_name: "Example INFINITI Sampleville", dealer_city: "Sampleton" } },
+    review: { seed: { dealer_name: "Example Motors Sampleville", dealer_city: "Sampleton" } },
   }),
   "v3-appearance": make("appearance", "Appearance", {
     dirty: { seed: { primary_color: "#0F766E", secondary_color: "#B45309" } },

@@ -165,6 +165,7 @@ export interface GroupTab { id: string; label: string; count: number | null; iss
 export function GroupNav({ tabs, value, onChange }: { tabs: GroupTab[]; value: string; onChange: (id: string) => void }) {
   return (
     <div className="lg:sticky lg:top-0 z-10 bg-adm-workspace/95 backdrop-blur lg:py-2 -mx-1 px-1">
+      <div className="relative">
       <div role="tablist" aria-label="Why buy sections" className="flex gap-2 overflow-x-auto lg:overflow-visible [scrollbar-width:none] pb-1">
         {tabs.map((t) => (
           <button
@@ -182,6 +183,8 @@ export function GroupNav({ tabs, value, onChange }: { tabs: GroupTab[]; value: s
             {t.issue && <AdminIcon name="alert" size="inline" className="text-adm-danger" label="Needs attention" />}
           </button>
         ))}
+      </div>
+      <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-adm-workspace to-transparent lg:hidden" />
       </div>
     </div>
   );
