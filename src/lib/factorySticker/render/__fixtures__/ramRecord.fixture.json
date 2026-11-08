@@ -1,0 +1,359 @@
+{
+ "note": "Read-only extract of one saved production vehicle_listings row (SELECT 2026-11-04). 2022 RAM 2500 Pickup Tradesman, used: an off-year record of the same model line, a layout stress record, not a production candidate.",
+ "vin": "3C6UR5CJXNG247030",
+ "slug": "2022-ram-ram-2500-pickup-247030",
+ "ymm": "2022 RAM Ram 2500 Pickup",
+ "trim": "Tradesman",
+ "condition": "used",
+ "body_type": "Pickup",
+ "build_sheet": {
+  "colors": {
+   "exterior": {
+    "code": "PW7",
+    "name": "Bright White Clear Coat"
+   },
+   "interior": {
+    "code": "TXX8",
+    "name": "Black/Diesel Gray Vinyl Bench Seats"
+   }
+  },
+  "decoded_at": "2026-08-01T03:09:25.150Z",
+  "generic": false,
+  "key_features": {
+   "GPG": [
+    "Trailer Tow Mirrors"
+   ],
+   "STANDARD": [
+    "Heated Door Mirrors",
+    "Bluetooth",
+    "Voice Recognition",
+    "Parking Distance System",
+    "Trailer Assist",
+    "Premium Speakers",
+    "Touch Screen Audio",
+    "Upgraded Tire Type",
+    "Regular Pickup Bed",
+    "Smart Card / Smart Key",
+    "Upgrade Paint",
+    "Full Size Pickup",
+    "Automatic Transmission",
+    "Rear Parking Device",
+    "Upgraded Wheel Size",
+    "Brake Assist",
+    "Keyless Start/Remote Engine Start",
+    "Upgraded Aux Jack Input",
+    "Upgraded USB Connection"
+   ],
+   "UBL": [
+    "Satellite Radio",
+    "Premium Audio",
+    "Navigation",
+    "Traffic Information",
+    "Collision/Breakdown Telematics",
+    "Voice Recognition",
+    "Virtual Assistant",
+    "WiFi Network",
+    "Phone Integration",
+    "Apple CarPlay",
+    "Android Auto",
+    "Keyless Start/Remote Engine Start"
+   ],
+   "XAA": [
+    "Parking Distance System"
+   ],
+   "XHC": [
+    "Trailer Assist"
+   ],
+   "XMF": [
+    "Pickup Bed Liner"
+   ]
+  },
+  "options": [
+   {
+    "code": "ADB",
+    "msrp": 145,
+    "name": "Protection Group"
+   },
+   {
+    "code": "GFA",
+    "msrp": 195,
+    "name": "Rear Window Defroster"
+   },
+   {
+    "code": "LNC",
+    "msrp": 95,
+    "name": "Clearance Lamps"
+   },
+   {
+    "code": "AHD",
+    "msrp": 245,
+    "name": "HD Snow Plow Prep Group"
+   },
+   {
+    "code": "CLF",
+    "msrp": 150,
+    "name": "Mopar Front & Rear Rubber Floor Mats (Dealer)"
+   },
+   {
+    "code": "DK3",
+    "msrp": 295,
+    "name": "Electric Shift-On-The-Fly Transfer Case"
+   },
+   {
+    "code": "GPG",
+    "msrp": 195,
+    "name": "Power Trailer Tow Mirrors"
+   },
+   {
+    "code": "JKV",
+    "msrp": 255,
+    "name": "115V Auxiliary Power Outlet"
+   },
+   {
+    "code": "LHL",
+    "msrp": 145,
+    "name": "Auxiliary Switches - I/P Mounted"
+   },
+   {
+    "code": "MRU",
+    "msrp": 445,
+    "name": "Black Tubular Side Steps (Fleet)"
+   },
+   {
+    "code": "UBL",
+    "msrp": 1590,
+    "name": "Uconnect 5 Nav with 8.4\" Display"
+   },
+   {
+    "code": "XAA",
+    "msrp": 295,
+    "name": "ParkSense Rear Park Assist"
+   },
+   {
+    "code": "XHC",
+    "msrp": 295,
+    "name": "Trailer Brake Control"
+   },
+   {
+    "code": "XMF",
+    "msrp": 600,
+    "name": "Mopar Spray In Bedliner (Dealer)"
+   },
+   {
+    "code": "XCH",
+    "msrp": 195,
+    "name": "2 Additiona Key Fobs (Fleet)"
+   }
+  ],
+  "packages": [],
+  "pricing": {
+   "base_msrp": 49325,
+   "destination_charge": 1795,
+   "total_msrp": 56210
+  },
+  "source": "neovin",
+  "standard": {
+   "ADB": [
+    "Front Tow/Recovery Hooks"
+   ],
+   "AHD": [
+    "Transfer Case Skid Plate",
+    "Heavy Duty Alternator"
+   ],
+   "DK3": [
+    "Assisted Four Wheel Drive Selection"
+   ],
+   "GFA": [
+    "Rear Window Defogger"
+   ],
+   "GPG": [
+    "Trailer Towing Mirrors",
+    "Door Entry Light"
+   ],
+   "JKV": [
+    "110/115 Volt Power Outlet"
+   ],
+   "LNC": [
+    "Clearance Lights"
+   ],
+   "STANDARD": [
+    "Driver-Electrically Adjustable",
+    "Passenger-Electrically Adjustable",
+    "Heated Door Mirrors",
+    "Turn Signal In Mirror",
+    "12 Volt Power Outlet",
+    "Bluetooth Connection",
+    "Voice Recognition",
+    "Rear Parking Distance System",
+    "Rear Parking Camera",
+    "Trailer Stability Program",
+    "6 Speakers",
+    "Complex Surface Headlights",
+    "Halogen Headlights-Low Beam",
+    "Halogen Headlights-High Beam",
+    "Dusk Sensor",
+    "Daytime Running Lights",
+    "Touch Screen Audio",
+    "Side Curtain Airbag",
+    "Side Curtain Airbag-Front And Rear",
+    "Driver Airbag",
+    "Passenger Airbag",
+    "Front Side Airbag",
+    "All Season Tires",
+    "Pickup Bed-Straight Side",
+    "Regular Pickup Bed",
+    "Load Restraint-Hooks",
+    "Remote Power Locks",
+    "Paint-Pearl",
+    "Front Seats Head Restraints",
+    "Rear Seats Head Restraints",
+    "Front Seats Height Adjustable Head Restraints",
+    "Rear Seats Height Adjustable Head Restraints",
+    "Front Seats Head Restraints-2",
+    "Rear Seats Head Restraints-3",
+    "Front Seat belts Pre-Tensioners",
+    "Front Seat Belts Height Adjustable",
+    "Pickup",
+    "Vinyl Seats",
+    "Full Size Pickup",
+    "Reclining Manual Driver Seat",
+    "Passenger Seat Manual Reclining",
+    "Rear Seats Bench",
+    "Folding Rear Seats",
+    "Plastic Steering Wheel",
+    "Height Adjustment Steering Wheel",
+    "Multi Function Steering Wheel",
+    "Power Steering",
+    "Beam Suspension-Front",
+    "Beam Suspension-Rear",
+    "Coil Suspension-Front",
+    "Coil Suspension-Rear",
+    "Front Stabilizer Bar",
+    "Rigid Suspension-Front",
+    "Rigid Suspension-Rear",
+    "Automatic Transmission",
+    "8 Speed Transmission",
+    "Automatic Only Mode Select",
+    "Manual Mode",
+    "Automatic With Manual Mode Trans",
+    "Micro Filter",
+    "Rear View Mirror/Camera",
+    "Automatic Intermittent Wipe",
+    "Front Power Windows",
+    "Rear Power Windows",
+    "Front Express Power Windows",
+    "Front Steel Wheels",
+    "Rear Steel Wheels",
+    "Front Wheel Diameter (17 in)",
+    "Rear Wheel Diameter (17 in)",
+    "Front Wheel Width (7.5 in)",
+    "Rear Wheel Width (7.5 in)",
+    "Spare Wheel",
+    "Fullsize Spare Wheel",
+    "Steel Spare Wheel",
+    "Electronic Noise Reduction",
+    "Compass",
+    "Disc Brakes",
+    "Disc Brakes-4",
+    "Ventilated Disc Brakes-4",
+    "ABS Brakes",
+    "Brake Assist",
+    "Low Tire Pressure Monitor",
+    "Isofix Preparation",
+    "Smart Card / Smart Key",
+    "Keyless Start",
+    "Engine Cylinder Shutdown",
+    "Hill Holder Assist",
+    "Passenger Door-Front Hinged",
+    "Rear Driver Door-Front Hinged",
+    "Rear Passenger Door-Front Hinged",
+    "Roll Stability Control",
+    "Cruise Control",
+    "AUX Jack Front",
+    "Front USB Connection",
+    "Rear USB Connection",
+    "Number Of USB Connections Front-2",
+    "Number Of USB Connections Rear-2",
+    "Front USB Charging Port",
+    "Rear USB Charging Port",
+    "Vehicle Start Button",
+    "Interior Illuminated Entry System",
+    "Cargo Area Light",
+    "6 Airbags",
+    "Short Wheelbase",
+    "Cargo Doors-Rear",
+    "Tailgate Cargo Doors-Rear",
+    "Black Exterior Door Handles",
+    "Over Air Updates-Ota Updates",
+    "4WD",
+    "Four Wheel Drive Type-Part-Time",
+    "Drive Selection-Manual",
+    "Accident Data Recorder",
+    "Electronic Traction Control",
+    "5 Person Seating Capacity",
+    "Engine Displacement (6.4 Liters)",
+    "8-Cyl",
+    "V",
+    "Unleaded",
+    "Instrument Cluster",
+    "Instrument Cluster Analog & Digital"
+   ],
+   "UBL": [
+    "Digital Radio",
+    "Satellite Radio",
+    "Built-in Apps",
+    "Premium Brand Audio",
+    "Dual Zone Air Conditioning",
+    "Automatic Air Conditioning",
+    "Navigational Systems",
+    "Navigational Systems Data Feed-Sd Card",
+    "Navigational Systems Display Type-Color",
+    "Mobile Phone Navigational Systems",
+    "Navigational Systems Screen Size (8.4 in)",
+    "Traffic Information",
+    "Telematics System",
+    "Breakdown Assistance",
+    "Text To Speech / Speech To Text",
+    "Includes Audio Player",
+    "Includes Phone",
+    "Includes Navigation System",
+    "Virtual Assistant-Alexa",
+    "Display Screen-Dashboard Center 1 (8.4 in)",
+    "Multi-Touch Screen-Dashboard Center 1",
+    "WiFi Network",
+    "WiFi Network Embedded Sim Card",
+    "Apps Control",
+    "Mobile Integration",
+    "Apple Carplay",
+    "Android Auto",
+    "Apple Wireless Connection",
+    "Android Wireless Connection",
+    "Theft Alert",
+    "Remote Lock/Unlock",
+    "Remote-Find My Car",
+    "Remote-Beep/Flash",
+    "Remote-Geo Fencing",
+    "Speed Alert",
+    "Remote Engine Starter",
+    "Send Destination To Car"
+   ],
+   "XAA": [
+    "Rear Parking Sensor & Camera"
+   ],
+   "XHC": [
+    "Trailer Assist",
+    "Trailer Brake Control"
+   ],
+   "XMF": [
+    "Spray-In Pickup Bed Liner"
+   ]
+  }
+ },
+ "epa_economy": null,
+ "mc_extra": {
+  "engine": "6.4L V8",
+  "transmission": "Automatic",
+  "drivetrain": "4WD",
+  "made_in": "USA"
+ }
+}

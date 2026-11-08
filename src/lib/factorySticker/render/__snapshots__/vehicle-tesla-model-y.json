@@ -75,10 +75,10 @@
     "2026 TESLA MODEL Y",
     "LONG RANGE ALL-WHEEL DRIVE",
     "STANDARD EQUIPMENT",
-    "EXTERIOR",
-    "INTERIOR & COMFORT",
     "PERFORMANCE & MECHANICAL",
     "SAFETY & DRIVER ASSISTANCE",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
     "MSRP INCLUDES",
     "FACTORY OPTIONS",
     "DESTINATION & HANDLING",
@@ -99,6 +99,6 @@
   ],
   "totalBand": "$51,630.00",
   "svgDigest": [
-    "48d10971"
+    "183abbc6"
   ]
 }

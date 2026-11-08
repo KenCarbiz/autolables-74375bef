@@ -70,10 +70,10 @@
     "2026 HONDA PILOT",
     "ELITE AWD",
     "STANDARD EQUIPMENT",
-    "EXTERIOR",
-    "INTERIOR & COMFORT",
     "PERFORMANCE & MECHANICAL",
     "SAFETY & DRIVER ASSISTANCE",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
     "PORT OF ENTRY OPTIONS",
     "DESTINATION & HANDLING",
     "1,395.00",
@@ -94,6 +94,6 @@
   ],
   "totalBand": "$56,670.00",
   "svgDigest": [
-    "9bbfd651"
+    "00874af8"
   ]
 }

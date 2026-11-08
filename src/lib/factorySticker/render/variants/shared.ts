@@ -21,6 +21,8 @@ export interface VariantRenderInput {
   /** Source equipment groups by their original group names. */
   equipmentGroups: Array<{ hint: string; items: string[] }>;
   displayMake: string;
+  /** One fixed line printed after the equipment when only the key-feature layer fits. */
+  equipmentNote?: string;
 }
 
 /** Returns null when the content cannot be represented faithfully. */

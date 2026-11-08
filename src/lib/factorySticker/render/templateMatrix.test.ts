@@ -46,12 +46,14 @@ function assertInvariants(
   model: LayoutModel,
 ): void {
   const where = `${oemId}/${variant}`;
+  expect(model.fit.ok, `${where}: fits one page`).toBe(true);
+  expect(model.pages.length, where).toBe(1);
 
   // Registered page geometry, orientation and page count.
   const def = getTemplateDefinition(oemId, Number(data.identity.year) || null);
   const format = def?.pageFormat ?? {
     widthInches: 11, heightInches: 8.5, orientation: "landscape" as const,
-    expectedPageCount: 1, continuationAllowed: true,
+    expectedPageCount: 1,
   };
   const geometry = validatePageGeometry(format, {
     widthPt: model.width, heightPt: model.height, pageCount: model.pages.length,

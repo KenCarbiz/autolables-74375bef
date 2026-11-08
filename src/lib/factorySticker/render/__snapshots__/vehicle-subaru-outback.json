@@ -70,10 +70,10 @@
     "2026 SUBARU OUTBACK",
     "TOURING XT AWD",
     "STANDARD EQUIPMENT",
-    "EXTERIOR",
-    "INTERIOR & COMFORT",
     "PERFORMANCE & MECHANICAL",
     "SAFETY & DRIVER ASSISTANCE",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
     "FACTORY OPTIONS",
     "DESTINATION & HANDLING",
     "1,420.00",
@@ -94,6 +94,6 @@
   ],
   "totalBand": "$47,316.00",
   "svgDigest": [
-    "d539f8aa"
+    "290d3656"
   ]
 }

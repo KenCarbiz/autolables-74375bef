@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { getTheme } from "../oem/themes";
-import { adaptRenderData, buildRenderLayout } from "./contract";
-import { buildStickerLayout, formatMoney, measureText } from "./layout";
+import { adaptRenderData, resolveRenderTheme } from "./contract";
+import {
+  DENSITY_MINIMUM, EQUIPMENT_MIN_FONT_PT, EQUIPMENT_MIN_LINE_HEIGHT_RATIO,
+  GENERIC_DENSITY_LADDER, buildStickerLayout, formatMoney, measureText,
+} from "./layout";
 import {
   infinitiBenchmark,
   longEquipmentFixture,
   newConditionBenchmark,
   noEpaFixture,
+  qx55ClassFixture,
   themeFor,
 } from "./__fixtures__/renderData";
 import {
@@ -16,6 +20,9 @@ import {
   expectWithinBounds,
   pageStrings,
 } from "./__fixtures__/layoutAsserts";
+
+const buildRenderLayout = (data: Parameters<typeof adaptRenderData>[0], theme: Parameters<typeof resolveRenderTheme>[1]) =>
+  buildStickerLayout(adaptRenderData(data), resolveRenderTheme(data, theme));
 
 const VIN = "JN8AZ3NE5S9123456";
 
@@ -117,60 +124,86 @@ describe("layout: empty EPA", () => {
   });
 });
 
-describe("layout: long equipment continuation", () => {
-  const model = buildRenderLayout(longEquipmentFixture(), themeFor("infiniti"));
+describe("layout: one physical page only", () => {
+  const long = buildRenderLayout(longEquipmentFixture(), themeFor("infiniti"));
 
-  it("produces as many continuation pages as the equipment needs", () => {
-    expect(model.pages.length).toBe(3);
-    expect(model.mode).toBe("CONTINUATION_REQUIRED");
+  it("never creates a second page: unfittable content is a review-required fit failure", () => {
+    expect(long.pages.length).toBe(1);
+    expect(long.mode).toBe("REVIEW_REQUIRED");
+    expect(long.fit.ok).toBe(false);
+    if (long.fit.ok) return;
+    expect(long.fit.reason).toBe("one_page_fit_failed");
+    expect(long.fit.overflowPt).toBeGreaterThan(0);
+    expect(long.fit.detail).toContain("approved one-page layout adjustment");
+    const all = long.pages[0].primitives.flatMap((p) => (p.kind === "text" ? [p.str] : []));
+    expect(all.some((s) => /CONTINUED ON PAGE 2|EQUIPMENT CONTINUATION|PAGE 2 OF/.test(s))).toBe(false);
   });
 
-  it("keeps pricing, banner, VIN and disclosures on page 1", () => {
-    const page1 = pageStrings(model, 0);
-    expect(page1.some((s) => (s.includes("TOTAL ORIGINAL MSRP") || s.includes("ORIGINAL TOTAL MSRP")))).toBe(true);
-    expect(page1).toContain("$95,695.00");
-    expect(page1).toContain(VIN);
-    expect(page1.some((s) => s.includes("Monroney label"))).toBe(true);
-    expect(page1.some((s) => s.includes("CONTINUED ON PAGE 2"))).toBe(true);
-  });
-
-  it("labels the continuation page and repeats the identity", () => {
-    const page2 = pageStrings(model, 1);
-    expect(page2).toContain("FACTORY EQUIPMENT CONTINUATION");
-    expect(page2).toContain(`VIN: ${VIN}`);
-    expect(page2).toContain("PAGE 2 OF 3");
-    expect(pageStrings(model, 2)).toContain("PAGE 3 OF 3");
-    expect(page2.some((s) => s.includes("belongs to the sticker on page 1"))).toBe(true);
-  });
-
-  it("never separates a category heading from its first item", () => {
-    for (const page of [0, 1] as const) {
-      const texts = model.pages[page].primitives.filter((p) => p.kind === "text");
-      // Category headings are bold sectionHeading-colored column entries;
-      // an item at the same x must follow within one line height.
-      for (const t of texts) {
-        if (t.kind !== "text" || t.font !== "bold") continue;
-        if (!/EQUIPMENT ITEM|^(EXTERIOR|INTERIOR|SAFETY|MECHANICAL|TECHNOLOGY|COMFORT)/.test(t.str)) continue;
-        if (/ITEM/.test(t.str)) continue;
-        // Identity lines like "EXTERIOR: MAJESTIC WHITE" are not column headings.
-        if (t.str.includes(":")) continue;
-        // Items sit a bullet-indent (5pt) right of their column heading.
-        const follower = texts.find(
-          (o) =>
-            o.kind === "text" &&
-            o.font === "body" &&
-            Math.abs(o.x - t.x) < 6 &&
-            o.y > t.y &&
-            o.y - t.y < 14,
-        );
-        expect(follower, `heading ${t.str} on page ${page + 1} has no item beneath it`).toBeDefined();
-      }
+  it("exports the validated readability floor", () => {
+    expect(EQUIPMENT_MIN_FONT_PT).toBe(5.5);
+    expect(EQUIPMENT_MIN_LINE_HEIGHT_RATIO).toBe(1.15);
+    expect(DENSITY_MINIMUM.item).toBe(EQUIPMENT_MIN_FONT_PT);
+    expect(DENSITY_MINIMUM.itemLh / DENSITY_MINIMUM.item).toBeGreaterThanOrEqual(EQUIPMENT_MIN_LINE_HEIGHT_RATIO);
+    for (const d of GENERIC_DENSITY_LADDER) {
+      expect(d.item).toBeGreaterThanOrEqual(EQUIPMENT_MIN_FONT_PT);
+      expect(d.itemLh / d.item).toBeGreaterThanOrEqual(EQUIPMENT_MIN_LINE_HEIGHT_RATIO);
     }
   });
 
-  it("stays within bounds on both pages", () => {
-    expectWithinBounds(model);
-    expectMinFontRespected(model);
+  describe("QX55-class build (about 60 items, 3 options)", () => {
+    const model = buildRenderLayout(qx55ClassFixture(), themeFor("infiniti"));
+    const data = qx55ClassFixture();
+
+    it("fits one page at or above the equipment floor", () => {
+      expect(model.pages.length).toBe(1);
+      expect(model.fit.ok).toBe(true);
+      expect(model.fit.ok && model.fit.equipmentFontPt).toBeGreaterThanOrEqual(EQUIPMENT_MIN_FONT_PT);
+      expect(Object.values(data.standardEquipment).flat().length).toBeGreaterThanOrEqual(58);
+    });
+
+    it("renders no standard-equipment text below the floor", () => {
+      const items = new Set(Object.values(data.standardEquipment).flat().map((s) => s.split(" ")[0]));
+      for (const prim of model.pages[0].primitives) {
+        if (prim.kind !== "text" || prim.font !== "body") continue;
+        if (items.has(prim.str.split(" ")[0]) && prim.size < 7.4) {
+          expect(prim.size, prim.str).toBeGreaterThanOrEqual(EQUIPMENT_MIN_FONT_PT);
+        }
+      }
+      expectMinFontRespected(model);
+      expectWithinBounds(model);
+    });
+
+    it("keeps MSRP total, rollup rows and the disclosure at their fixed sizes", () => {
+      const prims = model.pages[0].primitives.flatMap((p) => (p.kind === "text" ? [p] : []));
+      const total = prims.find((p) => /^\$[\d,]+\.\d{2}$/.test(p.str) && p.size > 10);
+      expect(total?.size).toBe(11.5);
+      const banner = prims.find((p) => p.str.startsWith("REPRODUCTION WINDOW STICKER") && p.color === "#ffffff");
+      expect(banner?.size).toBe(6.4);
+      const rollup = prims.find((p) => p.str === "BASE MSRP");
+      expect(rollup?.size).toBe(7.6);
+    });
+
+    it("has no overlapping text", () => {
+      expectNoTextOverlap(model, 0);
+    });
+
+    it("never separates a category heading from its first item", () => {
+      const texts = model.pages[0].primitives.filter((p) => p.kind === "text");
+      for (const t of texts) {
+        if (t.kind !== "text" || t.font !== "bold") continue;
+        if (!/^(PERFORMANCE|SAFETY|EXTERIOR|INTERIOR|TECHNOLOGY|CONVENIENCE|ADDITIONAL)/.test(t.str)) continue;
+        if (t.str.includes(":")) continue;
+        const follower = texts.find(
+          (o) => o.kind === "text" && o.font === "body" && Math.abs(o.x - t.x) < 6 && o.y > t.y && o.y - t.y < 14,
+        );
+        expect(follower, `heading ${t.str} has no item beneath it`).toBeDefined();
+      }
+    });
+
+    it("prints every verified item exactly once", () => {
+      const expected = Object.values(data.standardEquipment).flat();
+      expect([...model.printedEquipment].sort()).toEqual([...expected].sort());
+    });
   });
 });
 

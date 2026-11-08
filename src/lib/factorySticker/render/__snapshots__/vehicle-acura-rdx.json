@@ -1,7 +1,7 @@
 {
   "pages": 1,
   "geometry": "792x612",
-  "mode": "STANDARD",
+  "mode": "DENSE",
   "fonts": "\"Arial Narrow\", \"Roboto Condensed\", \"Helvetica Neue\", Arial, sans-serif | \"Arial Narrow\", \"Roboto Condensed\", Arial, sans-serif | \"Arial Narrow\", \"Roboto Condensed\", Arial, sans-serif",
   "primitivesByKind": {
     "barcode": 1,
@@ -9,7 +9,7 @@
     "qr": 2,
     "rect": 32,
     "rule": 11,
-    "text": 205
+    "text": 204
   },
   "fills": [
     "#000000",
@@ -51,7 +51,6 @@
     7.2,
     7.5,
     7.6,
-    7.8,
     8,
     8.5,
     9,
@@ -75,10 +74,10 @@
     "2025 ACURA RDX",
     "SH-AWD A-SPEC ADVANCE",
     "STANDARD EQUIPMENT",
-    "EXTERIOR",
-    "INTERIOR & COMFORT",
     "PERFORMANCE & MECHANICAL",
     "SAFETY & DRIVER ASSISTANCE",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
     "MSRP INCLUDES",
     "FACTORY OPTIONS",
     "DESTINATION & HANDLING",
@@ -99,6 +98,6 @@
   ],
   "totalBand": "$56,645.00",
   "svgDigest": [
-    "e9c1a202"
+    "e50d0360"
   ]
 }

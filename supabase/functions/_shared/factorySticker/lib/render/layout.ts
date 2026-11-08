@@ -5,7 +5,10 @@
 // Deterministic, pdf-agnostic layout engine for the Factory Window Sticker.
 // Consumes FactoryStickerData + an OemStickerTheme and produces a LayoutModel
 // of drawing primitives in points on a 792x612 letter-landscape page, with
-// measurement-based content fit, density fallback, and a continuation page.
+// measurement-based content fit and density fallback. A sticker is always
+// exactly one physical page: content that cannot fit at the validated
+// minimum sizes is reported as a review-required fit failure, never moved
+// to a second page.
 //
 // The page structure mirrors the OEM Monroney reference approved as the
 // visual goal: a full-width factory code strip, a ~57% left column (header,
@@ -31,9 +34,51 @@ export const PAGE_HEIGHT = 612;
 export const PAGE_MARGIN = 9;
 export const MIN_BODY_FONT_SIZE = 5.2;
 
+/** Readability floor for standard-equipment and package-description text. */
+export const EQUIPMENT_MIN_FONT_PT = 5.5;
+/** Line height / font size floor for the generic layout's equipment text. */
+export const EQUIPMENT_MIN_LINE_HEIGHT_RATIO = 1.15;
+
 export type LayoutFont = "heading" | "body" | "numeric" | "bold";
 export type LayoutAlign = "left" | "right" | "center";
-export type LayoutMode = "STANDARD" | "DENSE" | "CONTINUATION_REQUIRED";
+export type LayoutMode = "STANDARD" | "DENSE" | "REVIEW_REQUIRED";
+
+/** "list" prints one item per line; "run_in" prints each category as a comma-joined paragraph. */
+export type EquipmentMode = "list" | "run_in";
+
+/** "equipment_priority" moves the VIN/barcode block and vehicle record into the right rail and compacts the Passport block. */
+export type PageComposition = "standard" | "equipment_priority";
+
+export type OnePageFitReason = "one_page_fit_failed";
+
+/** "selected" prints the most significant normalized lines; the complete list stays on the Vehicle Passport. */
+export type EquipmentScope = "full" | "selected";
+
+export type LayoutFit =
+  | {
+    ok: true; columns: number; equipmentFontPt: number; equipmentMode?: EquipmentMode; composition?: PageComposition;
+    equipmentScope?: EquipmentScope;
+    /** Source items printed, verified source items in total, and printed lines. */
+    equipmentCounts?: { printed: number; total: number; lines: number };
+    /** Set when an approved Figma master drew the page; masters print option names and prices, not internal option codes. */
+    figmaMaster?: boolean;
+  }
+  | {
+    ok: false;
+    reason: OnePageFitReason;
+    /** Points of content left over after the tightest validated configuration. */
+    overflowPt: number;
+    detail: string;
+    equipmentFontPt: number;
+    columns: number;
+    equipmentMode?: EquipmentMode;
+    composition?: PageComposition;
+    equipmentScope?: EquipmentScope;
+  };
+
+export const fitOk = (
+  columns: number, equipmentFontPt: number, equipmentMode: EquipmentMode = "list", composition: PageComposition = "standard",
+): LayoutFit => ({ ok: true, columns, equipmentFontPt, equipmentMode, composition });
 
 export interface TextPrimitive {
   kind: "text";
@@ -139,7 +184,11 @@ export interface LayoutModel {
   mode: LayoutMode;
   pages: LayoutPage[];
   drawnStrings: string[];
+  /** Every standard-equipment item printed whole, once per print. */
+  printedEquipment: string[];
   fontFamilies: LayoutFontFamilies;
+  /** Always present on a one-page sticker; ok:false means REVIEW_REQUIRED. */
+  fit: LayoutFit;
 }
 
 export interface StickerLayoutInput {
@@ -150,6 +199,8 @@ export interface StickerLayoutInput {
   generic: boolean;
   /** Authenticated factory-build evidence; absent means unverified. */
   factoryBuild?: FactoryBuildProvenance | null;
+  /** Fixed line printed in the equipment area when only selected equipment is shown. */
+  equipmentNote?: string;
 }
 
 // ── Font metrics (Helvetica / Helvetica-Bold AFM widths, units per 1000 em;
@@ -194,14 +245,22 @@ export function charWidthUnits(ch: string, font: LayoutFont): number {
   return table[ch] ?? DEFAULT_CHAR_WIDTH;
 }
 
+const WIDTH_CACHE = new Map<string, number>();
+
 export function measureText(
   str: string,
   font: LayoutFont,
   size: number,
   charSpacing = 0,
 ): number {
-  let units = 0;
-  for (const ch of str) units += charWidthUnits(ch, font);
+  const key = `${font}|${str}`;
+  let units = WIDTH_CACHE.get(key);
+  if (units === undefined) {
+    units = 0;
+    for (const ch of str) units += charWidthUnits(ch, font);
+    if (WIDTH_CACHE.size > 200_000) WIDTH_CACHE.clear();
+    WIDTH_CACHE.set(key, units);
+  }
   const spacing = str.length > 1 ? charSpacing * (str.length - 1) : 0;
   return (units / 1000) * size + spacing;
 }
@@ -253,7 +312,7 @@ function ellipsize(str: string, font: LayoutFont, size: number, maxWidth: number
 
 // WinAnsi-safe sanitation: smart punctuation to ASCII, anything beyond
 // Latin-1 dropped, whitespace collapsed.
-function sanitize(raw: string): string {
+export function sanitize(raw: string): string {
   return raw
     .replace(/[‘’‚]/g, "'")
     .replace(/[“”„]/g, '"')
@@ -291,21 +350,36 @@ interface Density {
   row: number;
   rowLh: number;
   head: number;
+  /** Leading for priced package/option rows; their type size stays fixed. */
+  optLh: number;
 }
 
-// Print-legibility floor per the approved document standard: equipment body
-// never drops below 6.5pt — overflow goes to a deliberate continuation page
-// instead of shrinking.
-const DENSITY_LARGE: Density = { mode: "STANDARD", item: 7.2, itemLh: 9.2, row: 7.6, rowLh: 10.4, head: 9 };
-const DENSITY_STANDARD: Density = { mode: "STANDARD", item: 6.8, itemLh: 8.6, row: 7.2, rowLh: 9.8, head: 8.5 };
-const DENSITY_DENSE: Density = { mode: "DENSE", item: 6.5, itemLh: 7.9, row: 7, rowLh: 9.4, head: 8.5 };
-const DENSITY_FLOOR: Density = { mode: "DENSE", item: 6.5, itemLh: 7.6, row: 7, rowLh: 9.4, head: 8.5 };
+// Equipment body steps from the roomy reference size down to the validated
+// floor (EQUIPMENT_MIN_FONT_PT at EQUIPMENT_MIN_LINE_HEIGHT_RATIO). Anything
+// that still does not fit is a one-page review hold, never a second page.
+// MSRP rows, totals, regulatory panels and the disclosure keep fixed sizes.
+const DENSITY_LARGE: Density = { mode: "STANDARD", item: 7.2, itemLh: 9.2, row: 7.6, rowLh: 10.4, head: 9, optLh: 9.8 };
+const DENSITY_STANDARD: Density = { mode: "STANDARD", item: 6.8, itemLh: 8.6, row: 7.2, rowLh: 9.8, head: 8.5, optLh: 9.8 };
+const DENSITY_DENSE: Density = { mode: "DENSE", item: 6.5, itemLh: 7.9, row: 7, rowLh: 9.4, head: 8.5, optLh: 9.4 };
+const DENSITY_FLOOR: Density = { mode: "DENSE", item: 6.5, itemLh: 7.6, row: 7, rowLh: 9.4, head: 8.5, optLh: 9.4 };
+const DENSITY_TIGHT: Density = { mode: "DENSE", item: 6.2, itemLh: 7.3, row: 7, rowLh: 9.4, head: 8.5, optLh: 9.1 };
+const DENSITY_TIGHTER: Density = { mode: "DENSE", item: 5.9, itemLh: 6.9, row: 7, rowLh: 9.4, head: 8.5, optLh: 8.9 };
+export const DENSITY_MINIMUM: Density = {
+  mode: "DENSE",
+  item: EQUIPMENT_MIN_FONT_PT,
+  itemLh: Math.ceil(EQUIPMENT_MIN_FONT_PT * EQUIPMENT_MIN_LINE_HEIGHT_RATIO * 100) / 100,
+  row: 7, rowLh: 9.4, head: 8.5,
+  optLh: Math.ceil(7.6 * EQUIPMENT_MIN_LINE_HEIGHT_RATIO * 100) / 100,
+};
+export const GENERIC_DENSITY_LADDER: readonly Density[] = [
+  DENSITY_LARGE, DENSITY_STANDARD, DENSITY_DENSE, DENSITY_FLOOR, DENSITY_TIGHT, DENSITY_TIGHTER, DENSITY_MINIMUM,
+];
 
 const CATEGORY_LABELS: Record<EquipmentCategory, string> = {
   EXTERIOR: "Exterior",
   INTERIOR: "Interior & Comfort",
   COMFORT_CONVENIENCE: "Convenience & Utility",
-  FUNCTIONAL: "Performance & Mechanical",
+  FUNCTIONAL: "Utility & Towing",
   POWERTRAIN: "Performance & Mechanical",
   SAFETY_SECURITY: "Safety & Driver Assistance",
   TECHNOLOGY: "Technology & Connectivity",
@@ -491,8 +565,10 @@ export class Painter {
     });
   }
 
-  image(png: string, assetId: string, x: number, y: number, w: number, h: number): void {
+  /** `printedText` records the words a wordmark image prints (a logo that reads "HYUNDAI"), so content checks can find them. */
+  image(png: string, assetId: string, x: number, y: number, w: number, h: number, printedText?: string): void {
     this.primitives.push({ kind: "image", png, assetId, x, y, w, h });
+    if (printedText && this.drawn) this.drawn.push(printedText);
   }
 }
 
@@ -543,6 +619,11 @@ const priceLabel = (item: { price?: number; priceStatus: string }, plain: boolea
   return "SEE DEALER";
 };
 
+/**
+ * One leader row. A name that does not fit beside its price shrinks to the
+ * equipment floor, then wraps onto continuation lines under the row; it is
+ * never cut. Returns the extra height the wrapped lines occupy.
+ */
 function leaderRow(
   p: Painter,
   x: number,
@@ -554,18 +635,15 @@ function leaderRow(
   nameFont: LayoutFont,
   color: string,
   dotColor: string,
-): void {
+): number {
   const priceW = measureText(price, "bold", size);
   const nameMax = rowRight - x - priceW - 10;
-  // An option or package name states what the buyer is being charged for,
-  // so it shrinks to fit rather than being cut off. Only a name too long
-  // even at the minimum size is ellipsized, and the completeness check
-  // catches that as missing content.
   let nameSize = size;
-  while (nameSize > MIN_BODY_FONT_SIZE && measureText(name, nameFont, nameSize) > nameMax) {
+  while (nameSize > EQUIPMENT_MIN_FONT_PT && measureText(name, nameFont, nameSize) > nameMax) {
     nameSize -= 0.1;
   }
-  const shown = ellipsize(name, nameFont, nameSize, nameMax);
+  const lines = wrapText(name, nameFont, nameSize, nameMax);
+  const shown = lines[0] ?? name;
   p.text(shown, x, y, nameSize, nameFont, color);
   const nameW = measureText(shown, nameFont, nameSize);
   const dotW = measureText(".", "body", size);
@@ -576,10 +654,32 @@ function leaderRow(
     p.text(".".repeat(dots), gapStart, y, size, "body", dotColor);
   }
   p.text(price, rowRight, y, size, nameFont === "bold" ? "bold" : "body", color, { align: "right" });
+  const step = nameSize * EQUIPMENT_MIN_LINE_HEIGHT_RATIO;
+  lines.slice(1).forEach((line, i) => p.text(line, x, y + (i + 1) * step, nameSize, nameFont, color));
+  return Math.max(0, lines.length - 1) * step;
+}
+
+/** One drawn piece of a run-in paragraph; an item is its own token (or fragments of it). */
+export interface RunToken {
+  text: string;
+  bold: boolean;
+  x: number;
+  /** Set on the token that completes a source item, so it is recorded exactly once. */
+  item?: string;
+  /** A comma follows this token. */
+  comma: boolean;
+}
+
+export interface RunLine {
+  tokens: RunToken[];
 }
 
 interface FlowEntry {
+  /** Run-in paragraph: bold label and items joined inline, pre-wrapped to the column. */
+  paragraph?: RunLine[];
   heading?: string;
+  /** Whole sanitized item text, for the printed-equipment record. */
+  item?: string;
   lines: string[];
   bullet?: boolean;
 }
@@ -592,6 +692,16 @@ interface BuildContext {
   // columns) on the retry pass. Members are never dropped — only the
   // spacing changes, so the semantic content is identical either way.
   compactPackages: boolean;
+  /** Standard-equipment column count for this attempt. */
+  columns: number;
+  /** Equipment printed as run-in category paragraphs instead of one item per line. */
+  runIn?: boolean;
+  /** Equipment-priority composition: see PageComposition. */
+  priority?: boolean;
+  /** Pricing as a column at the bottom right of the left region, equipment flowing beside and above it. */
+  stackedPricing?: { x: number; w: number };
+  /** Height the pricing column takes out of the equipment columns that overlap it. */
+  shortBy?: number;
 }
 
 // ── Reproduction banner: first thing on every page ───────────────────
@@ -870,8 +980,10 @@ function paintHeader(p: Painter, y: number, ctx: BuildContext): number {
     if (value) idRows[col].push([label, value.toUpperCase()]);
   };
   pushId(0, "VIN", v.vin);
-  pushId(0, "EXTERIOR", v.exteriorColor);
-  pushId(0, "INTERIOR", v.interiorColor);
+  const coded = (name: string | undefined, code: string | undefined): string | undefined =>
+    name && ctx.priority && code ? `${name} (${code})` : name;
+  pushId(0, "EXTERIOR", coded(v.exteriorColor, v.exteriorColorCode));
+  pushId(0, "INTERIOR", coded(v.interiorColor, v.interiorColorCode));
   pushId(1, "ENGINE", v.engine);
   pushId(1, "TRANSMISSION", v.transmission);
   pushId(1, "DRIVETRAIN", v.drivetrain);
@@ -898,12 +1010,23 @@ function paintHeader(p: Painter, y: number, ctx: BuildContext): number {
 function equipmentEntries(ctx: BuildContext, colWidth: number): FlowEntry[] {
   const { density } = ctx;
   const entries: FlowEntry[] = [];
+  const seen = new Set<string>();
   for (const group of ctx.input.data.equipment.standard) {
-    if (!group.items.length) continue;
+    const items = group.items
+      .map((item) => sanitize(item))
+      .filter((item) => item && !seen.has(item.toUpperCase()) && seen.add(item.toUpperCase()));
+    if (!items.length) continue;
+    if (ctx.runIn) {
+      entries.push({
+        paragraph: runInLines(`${CATEGORY_LABELS[group.category].toUpperCase()}:`, items, density.item, colWidth),
+        lines: [],
+      });
+      continue;
+    }
     entries.push({ heading: CATEGORY_LABELS[group.category].toUpperCase(), lines: [] });
-    for (const item of group.items) {
-      const lines = wrapText(sanitize(item), "body", density.item, colWidth - 7);
-      if (lines.length) entries.push({ lines, bullet: true });
+    for (const item of items) {
+      const lines = wrapText(item, "body", density.item, colWidth - 7);
+      if (lines.length) entries.push({ lines, bullet: true, item });
     }
   }
   return entries;
@@ -938,18 +1061,63 @@ function paintEntryLines(
   return yy;
 }
 
+const EQUIPMENT_COLUMN_GAP = 13;
+
+/** Height of equipment column `col`: columns that overlap the stacked pricing column are shorter. */
+function columnHeight(
+  ctx: BuildContext, x0: number, colW: number, gap: number, col: number, height: number,
+): number {
+  const sp = ctx.stackedPricing;
+  return sp && x0 + col * (colW + gap) + colW > sp.x - 4 ? Math.max(0, height - (ctx.shortBy ?? 0)) : height;
+}
+/** Narrowest column that still wraps item names legibly at the floor size. */
+const MAX_EQUIPMENT_COLUMNS = 5;
+
+/**
+ * Smallest column height at which the entries flow into `columns` columns,
+ * so the columns come out balanced instead of filling the first one to the
+ * page limit. Returns null when even `maxHeight` cannot hold them.
+ */
+function balancedColumnHeight(
+  entries: FlowEntry[], width: number, maxHeight: number, columns: number, ctx: BuildContext,
+): number | null {
+  const fits = (h: number): boolean =>
+    flowColumns(new Painter(null), entries, 0, 0, width, h, columns, ctx).leftover.length === 0;
+  if (maxHeight <= 0 || !fits(maxHeight)) return null;
+  let lo = 0;
+  let hi = maxHeight;
+  while (hi - lo > 0.5) {
+    const mid = (lo + hi) / 2;
+    if (fits(mid)) hi = mid;
+    else lo = mid;
+  }
+  let h = Math.ceil(hi * 2) / 2;
+  while (h < maxHeight && !fits(h)) h += 0.5;
+  return Math.min(h, maxHeight);
+}
+
+function paintEquipmentFootnote(p: Painter, ctx: BuildContext, y: number): void {
+  const owner = "* See Owner's Manual for complete details, limitations and exclusions.";
+  const note = ctx.input.equipmentNote;
+  if (!note) {
+    p.text(owner, LX + LW / 2, y, 5.5, "body", "#4c5157", { align: "center" });
+    return;
+  }
+  p.text(note, LX, y, 5.5, "body", "#4c5157");
+  p.text(owner, LX + LW, y, 5.5, "body", "#4c5157", { align: "right" });
+}
+
 function paintStandardEquipment(
   p: Painter,
   y: number,
   budget: number,
   ctx: BuildContext,
-): { yEnd: number; leftover: FlowEntry[] } {
-  const { density } = ctx;
-  const gap = 13;
-  const columns = familyStyle(ctx.theme).equipmentColumns;
+): { yEnd: number; leftover: FlowEntry[]; overflowPt: number; printed: string[] } {
+  const { density, columns } = ctx;
+  const gap = EQUIPMENT_COLUMN_GAP;
   const colW = (LW - gap * (columns - 1)) / columns;
   const entries = equipmentEntries(ctx, colW);
-  if (!entries.length) return { yEnd: y, leftover: [] };
+  if (!entries.length) return { yEnd: y, leftover: [], overflowPt: 0, printed: [] };
 
   let cursor = y + 9;
   const h1 = "STANDARD EQUIPMENT";
@@ -961,48 +1129,60 @@ function paintStandardEquipment(
 
   const colTop = cursor;
   // Reserve the footnote + closing rule (~14pt) that follow this section.
-  const colBudget = Math.max(0, budget - (cursor - y) - (familyStyle(ctx.theme).boxedZones ? 21 : 14));
-  const { leftover, usedHeight } = flowColumns(p, entries, LX, colTop, LW, colBudget, columns, ctx);
+  const colBudget = Math.max(0, budget - (cursor - y) - (ctx.stackedPricing ? 0 : familyStyle(ctx.theme).boxedZones ? 21 : 14));
+  const balanced = balancedColumnHeight(entries, LW, colBudget, columns, ctx);
+  const flowHeight = balanced ?? colBudget;
+  const { leftover, usedHeight, placedItems } = flowColumns(p, entries, LX, colTop, LW, flowHeight, columns, ctx);
+  let overflowPt = 0;
+  if (leftover.length) {
+    const all = flowColumns(new Painter(null), entries, 0, 0, LW, 1e6, columns, ctx).usedHeight;
+    const lines = leftover.reduce((n, e) => n + (e.paragraph ? e.paragraph.length : e.lines.length), 0);
+    overflowPt = Math.max(1, Math.min(all, lines * density.itemLh / columns));
+  }
 
   for (let col = 1; col < columns; col++) {
     const sx = LX + col * (colW + gap) - gap / 2;
-    p.rule(sx, colTop + 3, 0.5, Math.max(0, usedHeight - 2), "#b6b9bd");
+    const ruleH = ctx.stackedPricing
+      ? Math.min(usedHeight, columnHeight(ctx, LX, colW, gap, col, flowHeight))
+      : usedHeight;
+    p.rule(sx, colTop + 3, 0.5, Math.max(0, ruleH - 2), "#b6b9bd");
   }
+  if (ctx.stackedPricing) return { yEnd: colTop + usedHeight, leftover, overflowPt, printed: placedItems };
 
   const boxed = familyStyle(ctx.theme).boxedZones;
   if (boxed) {
     p.rect(LX - 3, colTop - 2, LW + 6, usedHeight + 6, null, "#3a3d42", 0.75);
   }
   let end = colTop + usedHeight + (boxed ? 13 : 7);
-  p.text(
-    "* See Owner's Manual for complete details, limitations and exclusions.",
-    LX + LW / 2, end, 5.5, "body", "#4c5157", { align: "center" },
-  );
+  paintEquipmentFootnote(p, ctx, end);
   end += 4;
   p.rule(LX, end, LW, 1.4, BLACK);
-  return { yEnd: end + 1.4, leftover };
+  return { yEnd: end + 1.4, leftover, overflowPt, printed: placedItems };
 }
 
 // ── Included / Optional pricing split ─────────────────────────────────
 
 function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
   const { input } = ctx;
-  const leftW = LW * 0.415;
-  const rightX = LX + leftW + 10;
-  const rightW = LX + LW - rightX;
+  const stacked = ctx.stackedPricing;
+  const px = stacked ? stacked.x : LX;
+  const leftW = stacked ? stacked.w : LW * 0.415;
+  const rightX = stacked ? stacked.x : px + leftW + 10;
+  const rightW = stacked ? stacked.w : LX + LW - rightX;
   // The pricing pair reads larger than the equipment lists on the OEM
   // reference, so its sizes are fixed rather than density-driven.
   const size = 7.6;
   const lh = 9.8;
-  const density = { ...ctx.density, item: 6.8, itemLh: 8.1 };
+  const optLh = Math.min(lh, ctx.density.optLh);
+  const density = { ...ctx.density, item: Math.min(6.8, ctx.density.item), itemLh: Math.min(8.1, ctx.density.itemLh) };
 
   // Left half: factory packages included on this vehicle. A priced package
   // whose value is already inside Base MSRP is labeled so the visible rows
   // can never read as double-counted against the reconciliation.
   let ly = y + 10;
   if (input.data.equipment.packages.length) {
-    p.text("INCLUDED FACTORY PACKAGES", LX, ly, 8, "bold", BLACK, { charSpacing: 0.4 });
-    p.text("(MSRP)", LX + leftW - 2, ly, 6, "body", "#4c5157", { align: "right" });
+    p.text("INCLUDED FACTORY PACKAGES", px, ly, 8, "bold", BLACK, { charSpacing: 0.4 });
+    p.text("(MSRP)", px + leftW - 2, ly, 6, "body", "#4c5157", { align: "right" });
   }
   ly += 2;
   const pricing0 = input.data.pricing;
@@ -1012,22 +1192,27 @@ function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
       : undefined);
   const optionsSum = input.data.equipment.options.reduce((a, o) => a + (o.price ?? 0), 0);
   for (const pkg of input.data.equipment.packages) {
-    ly += lh + 1;
+    ly += optLh + 1;
     const label = [pkg.code, pkg.name].filter(Boolean).join(" ").toUpperCase();
-    p.text(ellipsize(label, "bold", size, leftW - 50), LX, ly, size, "bold", BLACK);
-    p.text(priceLabel(pkg, true), LX + leftW - 2, ly, size, "bold", BLACK, { align: "right" });
+    const labelLines = wrapText(label, "bold", size, leftW - 50);
+    p.text(labelLines[0] ?? label, px, ly, size, "bold", BLACK);
+    p.text(priceLabel(pkg, true), px + leftW - 2, ly, size, "bold", BLACK, { align: "right" });
+    for (const extra of labelLines.slice(1)) {
+      ly += size * EQUIPMENT_MIN_LINE_HEIGHT_RATIO;
+      p.text(extra, px, ly, size, "bold", BLACK);
+    }
     // If the priced packages are not part of the factory-options total, they
     // are already inside Base MSRP — say so explicitly.
     if (pkg.price !== undefined && optTotal !== undefined && Math.abs(optionsSum - optTotal) < 1) {
       ly += 7.5;
-      p.text("INCLUDED IN BASE MSRP", LX + leftW - 2, ly, 5.5, "body", "#4c5157", { align: "right" });
+      p.text("INCLUDED IN BASE MSRP", px + leftW - 2, ly, 5.5, "body", "#4c5157", { align: "right" });
     }
     for (const feature of pkg.features) {
       const lines = wrapText(sanitize(feature), "body", density.item, leftW - 14);
       for (const [li, line] of lines.entries()) {
         ly += density.itemLh;
-        if (li === 0) bulletDot(p, LX + 4, ly, density.item, BLACK);
-        p.text(line, LX + 9, ly, density.item, "body", BLACK);
+        if (li === 0) bulletDot(p, px + 4, ly, density.item, BLACK);
+        p.text(line, px + 9, ly, density.item, "body", BLACK);
       }
     }
   }
@@ -1041,13 +1226,13 @@ function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
       : [];
     if (includeLines.length) {
       ly += 2;
-      p.text("MSRP INCLUDES", LX, ly, 8, "bold", BLACK, { charSpacing: 0.4 });
+      p.text("MSRP INCLUDES", px, ly, 8, "bold", BLACK, { charSpacing: 0.4 });
       for (const line of includeLines) {
         const wrapped = wrapText(line.toUpperCase(), "body", 6.8, leftW - 12);
         wrapped.forEach((seg, si) => {
           ly += si === 0 ? 9 : 7.6;
-          if (si === 0) bulletDot(p, LX + 1.5, ly, 6.8, BLACK);
-          p.text(seg, LX + 6, ly, 6.8, "body", BLACK);
+          if (si === 0) bulletDot(p, px + 1.5, ly, 6.8, BLACK);
+          p.text(seg, px + 6, ly, 6.8, "body", BLACK);
         });
       }
     }
@@ -1058,7 +1243,7 @@ function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
   // FACTORY OPTIONS heading rather than printing a vacant section.
   const hasPortOnly = !input.data.equipment.options.length &&
     (input.data.equipment.portInstalled?.length ?? 0) > 0;
-  let ry = y + 10;
+  let ry = stacked && ly > y + 12 ? ly + 6 : y + 10;
   if (!hasPortOnly) {
     p.text("FACTORY OPTIONS", rightX, ry, 8, "bold", BLACK, { charSpacing: 0.4 });
   }
@@ -1066,7 +1251,7 @@ function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
   ry += 2;
   if (hasPortOnly) ry -= lh + 2;
   for (const opt of input.data.equipment.options) {
-    ry += lh;
+    ry += optLh;
     const code = opt.code ? `${opt.code}` : "";
     const codeW = 20;
     if (code) p.text(code, rightX, ry, size, "body", BLACK);
@@ -1077,7 +1262,7 @@ function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
       // and the members follow beneath in a compact grid whose column
       // count is chosen from the widest member — never truncated, never
       // repriced, never silently dropped.
-      leaderRow(p, nameX, rightX + rightW, ry, opt.name, priceLabel(opt, true), size, "body", BLACK, BLACK);
+      ry += leaderRow(p, nameX, rightX + rightW, ry, opt.name, priceLabel(opt, true), size, "body", BLACK, BLACK);
       // Members indent under the option code column, not under the name,
       // so the grid gets the full column width to solve in.
       const memberX = rightX + 6;
@@ -1085,17 +1270,31 @@ function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
       const shown = opt.features.map((f) => sanitize(f));
       const grid = packageMemberGrid(shown, availW, density.item, ctx.compactPackages);
       const memberLh = ctx.compactPackages ? grid.size + 1.2 : grid.size + 1.9;
-      for (let i = 0; i < shown.length; i++) {
-        const col = i % grid.cols;
-        const rowIdx = Math.floor(i / grid.cols);
-        const mx = memberX + col * (availW / grid.cols);
-        const my = ry + (rowIdx + 1) * memberLh;
-        bulletDot(p, mx, my, grid.size, BLACK);
-        p.text(shown[i], mx + 4, my, grid.size, "body", BLACK);
+      if (grid.wrapped) {
+        let lineNo = 0;
+        for (const member of shown) {
+          const wrappedLines = wrapText(member, "body", grid.size, availW - 4);
+          wrappedLines.forEach((line, li) => {
+            lineNo++;
+            const my = ry + lineNo * memberLh;
+            if (li === 0) bulletDot(p, memberX, my, grid.size, BLACK);
+            p.text(line, memberX + 4, my, grid.size, "body", BLACK);
+          });
+        }
+        ry += lineNo * memberLh;
+      } else {
+        for (let i = 0; i < shown.length; i++) {
+          const col = i % grid.cols;
+          const rowIdx = Math.floor(i / grid.cols);
+          const mx = memberX + col * (availW / grid.cols);
+          const my = ry + (rowIdx + 1) * memberLh;
+          bulletDot(p, mx, my, grid.size, BLACK);
+          p.text(shown[i], mx + 4, my, grid.size, "body", BLACK);
+        }
+        ry += grid.rows * memberLh;
       }
-      ry += grid.rows * memberLh;
     } else {
-      leaderRow(p, nameX, rightX + rightW, ry, opt.name, priceLabel(opt, true), size, "body", BLACK, BLACK);
+      ry += leaderRow(p, nameX, rightX + rightW, ry, opt.name, priceLabel(opt, true), size, "body", BLACK, BLACK);
     }
   }
   // Port-installed accessories stay a separate subsection: they are never
@@ -1106,8 +1305,8 @@ function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
     p.text("PORT OF ENTRY OPTIONS", rightX, ry, 8, "bold", BLACK, { charSpacing: 0.4 });
     ry += 2;
     for (const opt of portInstalled) {
-      ry += lh;
-      leaderRow(p, rightX, rightX + rightW, ry, opt.name, priceLabel(opt, true), size, "body", BLACK, BLACK);
+      ry += optLh;
+      ry += leaderRow(p, rightX, rightX + rightW, ry, opt.name, priceLabel(opt, true), size, "body", BLACK, BLACK);
     }
   }
   const destination = input.data.pricing.destinationCharge;
@@ -1132,6 +1331,9 @@ function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
     // it for this exact vehicle; never derived from fuel economy.
     ...(pricing.gasGuzzlerTax !== undefined
       ? [["GAS GUZZLER TAX", pricing.gasGuzzlerTax, false] as [string, number | undefined, boolean]]
+      : []),
+    ...(pricing.importCharge !== undefined
+      ? [["IMPORT COSTS", pricing.importCharge, false] as [string, number | undefined, boolean]]
       : []),
   ];
   for (const [label, amount, dollar] of rollup) {
@@ -1166,7 +1368,7 @@ function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
   }
 
   const end = Math.max(ly, ry) + 5;
-  p.rule(rightX - 6, y + 4, 0.5, end - y - 8, "#b6b9bd");
+  if (!stacked) p.rule(rightX - 6, y + 4, 0.5, end - y - 8, "#b6b9bd");
   return end;
 }
 
@@ -1233,23 +1435,22 @@ function paintSpecGrid(p: Painter, y: number, ctx: BuildContext): number {
   return cursor;
 }
 
-function paintVinBarcode(p: Painter, y: number, ctx: BuildContext): number {
+function paintVinBarcode(p: Painter, y: number, ctx: BuildContext, bx: number = LX, boxW: number = LW * 0.72): number {
   const { theme, input } = ctx;
   const v = input.data.vehicle;
-  const boxW = LW * 0.72;
   const showBarcode = theme.layout.barcodeVariant !== "NONE";
   const boxH = showBarcode ? 48 : 22;
-  p.rect(LX, y, boxW, boxH, null, BLACK, 0.9);
-  p.text("VIN", LX + 6, y + 11, 6, "bold", "#4c5157");
-  p.text(v.vin, LX + 6 + measureText("VIN  ", "bold", 6), y + 11.5, 8.5, "bold", BLACK, { charSpacing: 0.5 });
+  p.rect(bx, y, boxW, boxH, null, BLACK, 0.9);
+  p.text("VIN", bx + 6, y + 11, 6, "bold", "#4c5157");
+  p.text(v.vin, bx + 6 + measureText("VIN  ", "bold", 6), y + 11.5, 8.5, "bold", BLACK, { charSpacing: 0.5 });
   if (showBarcode) {
-    p.barcode(LX + 6, y + 15, boxW * 0.66, 23, input.barcodePayload, BLACK);
+    p.barcode(bx + 6, y + 15, boxW * 0.66, 23, input.barcodePayload, BLACK);
   }
   // Factory allocation families show the ship-to dealer beside the barcode.
   if (familyStyle(theme).shipToBlock && input.data.dealer.name) {
     const d = input.data.dealer;
     const f = input.data.factory;
-    const sx = LX + boxW - 6;
+    const sx = bx + boxW - 6;
     const shipMax = boxW * 0.31;
     const cityLine = [d.city, [d.state, d.postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", ");
     p.text(`SHIP TO: ${f.dealerCode ?? ""}`.trim(), sx, y + 12, 5.4, "bold", BLACK, { align: "right" });
@@ -1267,7 +1468,7 @@ function paintVinBarcode(p: Painter, y: number, ctx: BuildContext): number {
     v.stockNumber ? `STOCK ${v.stockNumber.toUpperCase()}` : null,
     `DOCUMENT v${input.data.document.templateVersion}`,
   ].filter(Boolean).join("   -   ");
-  p.text(meta, LX + 6, y + boxH - 5.5, 5.5, "body", "#4c5157");
+  p.text(meta, bx + 6, y + boxH - 5.5, 5.5, "body", "#4c5157");
   return y + boxH;
 }
 
@@ -1301,9 +1502,14 @@ function paintTotalBand(p: Painter, y: number, ctx: BuildContext): number {
 
 // ── Right column: EPA Fuel Economy & Environment ──────────────────────
 
-function fuelCategoryLabel(fuelType: string | undefined): string {
+// FuelEconomy.gov files plug-in hybrids as "Premium and Electricity" or
+// "Regular Gas and Electricity"; those must never read as a pure EV.
+export const isPlugInFuel = (fuelType: string | null | undefined): boolean =>
+  /phev|plug/i.test(fuelType ?? "") || /(gas|gasoline|premium|regular|midgrade|diesel)\s+and\s+electricity/i.test(fuelType ?? "");
+
+export function fuelCategoryLabel(fuelType: string | undefined): string {
   const f = (fuelType || "").toLowerCase();
-  if (/phev|plug/.test(f)) return "Plug-In Hybrid";
+  if (isPlugInFuel(f)) return "Plug-In Hybrid";
   if (/hybrid/.test(f)) return "Hybrid Vehicle";
   if (/electric|\bev\b/.test(f)) return "Electric Vehicle";
   if (/diesel/.test(f)) return "Diesel Vehicle";
@@ -1375,7 +1581,7 @@ function paintEpaPanel(p: Painter, y: number, ctx: BuildContext): number {
   // never inherit gasoline-only structures; hybrids keep the gasoline shape
   // under a Hybrid Vehicle tag. Only verified fields are drawn.
   const fuel = (input.data.vehicle.fuelType || "").toLowerCase();
-  const isPhev = /phev|plug/.test(fuel);
+  const isPhev = isPlugInFuel(fuel);
   const isEv = /electric|\bev\b/.test(fuel) && !/hybrid|phev/.test(fuel) && !isPhev;
   const tagW = 70;
   let cy = bodyTop + 12;
@@ -1448,11 +1654,15 @@ function paintEpaPanel(p: Painter, y: number, ctx: BuildContext): number {
   sy = paintRatingSlider(p, sliderX, sy, sliderW, "Fuel Economy & Greenhouse Gas Rating", reg.greenhouseGasRating, ctx.theme);
   paintRatingSlider(p, sliderX, sy - 3, sliderW, "Smog Rating (tailpipe only)", reg.smogRating, ctx.theme);
 
-  // Fine print with the computed CO2 line (8,887 g CO2 per gallon of
-  // gasoline at the verified combined MPG — derived, never asserted).
+  // Fine print CO2 line. The saved EPA tailpipe figure wins; only when the row
+  // carries none is it derived (8,887 g CO2 per gallon of gasoline at the
+  // verified combined MPG), because the derivation can be several grams off
+  // the figure EPA published for that exact vehicle.
   let fy = subTop + 62;
   const isGas = !isEv && !isPhev;
-  const co2 = combined !== undefined && combined > 0 && isGas ? Math.round(8887 / combined) : null;
+  const co2 = !isGas ? null
+    : reg.co2TailpipeGpm !== undefined && reg.co2TailpipeGpm > 0 ? Math.round(reg.co2TailpipeGpm)
+    : combined !== undefined && combined > 0 ? Math.round(8887 / combined) : null;
   const finePrint =
     (co2 !== null ? `This vehicle emits ${co2} grams CO2 per mile (tailpipe only). ` : "") +
     (reg.epaClassNote ? `${reg.epaClassNote} ` : "") +
@@ -1491,14 +1701,14 @@ function packageMemberGrid(
   availW: number,
   preferredSize: number,
   compact: boolean,
-): { cols: number; rows: number; size: number } {
+): { cols: number; rows: number; size: number; wrapped?: boolean } {
   const gap = compact ? 8 : 10;
   const step = 0.1;
-  let best: { cols: number; rows: number; size: number } | null = null;
+  let best: { cols: number; rows: number; size: number; wrapped?: boolean } | null = null;
   for (const cols of [3, 2, 1]) {
     if (cols > members.length) continue;
     const cellW = availW / cols - gap;
-    for (let size = preferredSize; size >= MIN_BODY_FONT_SIZE - 1e-9; size -= step) {
+    for (let size = preferredSize; size >= EQUIPMENT_MIN_FONT_PT - 1e-9; size -= step) {
       const rounded = Math.round(size * 10) / 10;
       const fits = members.every((m) => measureText(m, "body", rounded) <= cellW);
       if (!fits) continue;
@@ -1509,10 +1719,9 @@ function packageMemberGrid(
       break;
     }
   }
-  // A member too long for even a full-width cell at the minimum size still
-  // prints: one per row at the minimum, overflowing the cell rather than
-  // being cut. The completeness check catches it as a layout problem.
-  return best ?? { cols: 1, rows: members.length, size: MIN_BODY_FONT_SIZE };
+  // A member too long for even a full-width cell at the minimum size wraps
+  // onto continuation lines, one member per row group, never cut.
+  return best ?? { cols: 1, rows: members.length, size: EQUIPMENT_MIN_FONT_PT, wrapped: true };
 }
 
 // ── Right column: Government 5-Star Safety Ratings ────────────────────
@@ -1701,6 +1910,55 @@ function paintPassportPanel(p: Painter, y: number, ctx: BuildContext, targetH: n
   return y + boxH;
 }
 
+const STACKED_PRICING_W = 205;
+const PRIORITY_QR_SIZE = 60; // 0.83in, above the 0.8in scan minimum
+
+function paintPassportFixed(p: Painter, y: number, ctx: BuildContext): number {
+  const passportUrl = ctx.input.data.document.passportUrl.trim();
+  if (!passportUrl) return y;
+  const navy = "#0b1f3a";
+  let cy = y + 9;
+  p.text("VEHICLE PASSPORT", RX + RW / 2, cy, 7.5, "bold", BLACK, { align: "center", charSpacing: 0.4 });
+  cy += 8;
+  p.text(PASSPORT_QR_CAPTION, RX + RW / 2, cy, 6, "body", "#4c5157", { align: "center" });
+  cy += 5;
+  p.qr(RX + (RW - PRIORITY_QR_SIZE) / 2, cy, PRIORITY_QR_SIZE, passportUrl, BLACK);
+  cy += PRIORITY_QR_SIZE + 8;
+  p.text(passportUrl.replace(/^https?:\/\//i, ""), RX + RW / 2, cy, 6.2, "body", "#4c5157", { align: "center" });
+  cy += 8;
+  const t1 = "Powered by ", t2 = "auto", t3 = "(LABELS)";
+  const total = measureText(t1, "body", 6) + measureText(t2, "bold", 6.2) + measureText(t3, "bold", 6.2);
+  let bx = RX + (RW - total) / 2;
+  p.text(t1, bx, cy, 6, "body", "#55595e");
+  bx += measureText(t1, "body", 6);
+  p.text(t2, bx, cy, 6.2, "bold", "#2563eb");
+  bx += measureText(t2, "bold", 6.2);
+  p.text(t3, bx, cy, 6.2, "bold", navy);
+  return cy + 3;
+}
+
+/** Verified vehicle-record facts the equipment-priority page moves out of the left spec grid. */
+function priorityRecordRows(ctx: BuildContext): Array<[string, string]> {
+  const f = ctx.input.data.factory;
+  const rows: Array<[string, string]> = [];
+  const assembly = f.finalAssemblyPoint || [f.assemblyPlant, f.assemblyCountry].filter(Boolean).join(", ");
+  if (assembly) rows.push(["FINAL ASSEMBLY POINT:", assembly]);
+  if (f.transportMethod) rows.push(["METHOD OF TRANSPORT:", f.transportMethod]);
+  return rows;
+}
+
+function paintPriorityRecord(p: Painter, y: number, ctx: BuildContext): number {
+  const rows = priorityRecordRows(ctx);
+  let cy = y;
+  for (const [label, value] of rows) {
+    cy += 8.4;
+    p.text(label, RX, cy, 5.5, "bold", "#4c5157");
+    const lw = measureText(`${label} `, "bold", 5.5);
+    p.text(ellipsize(value.toUpperCase(), "body", 6.4, RW - lw - 2), RX + lw + 2, cy, 6.4, "body", BLACK);
+  }
+  return rows.length ? cy + 4 : y;
+}
+
 // ── Right column: verification block and reproduction disclosure ──────
 
 function paintVerificationBlock(p: Painter, y: number, ctx: BuildContext): number {
@@ -1735,7 +1993,108 @@ function paintRightFooter(p: Painter, y: number, ctx: BuildContext, pageLabel: s
 }
 
 
-// ── Continuation page ─────────────────────────────────────────────────
+// ── Column flow ───────────────────────────────────────────────────────
+
+
+/**
+ * Lays one category out as a run-in paragraph: the bold label, then every
+ * item verbatim joined by ", ". Items are never merged or reworded; an item
+ * that reaches the column edge continues on the next line.
+ */
+export function runInLines(label: string, items: string[], size: number, width: number): RunLine[] {
+  const space = measureText(" ", "body", size);
+  const comma = measureText(",", "body", size);
+  const lines: RunLine[] = [{ tokens: [] }];
+  let x = 0;
+  const cur = (): RunLine => lines[lines.length - 1];
+  const newLine = (): void => { lines.push({ tokens: [] }); x = 0; };
+  // Words flow from one line to the next; each line's share of an item is
+  // its own token, and the token that ends the item carries the item itself.
+  const flow = (text: string, bold: boolean, item: string | undefined, hasComma: boolean): void => {
+    const font = bold ? "bold" : "body";
+    const words = text.split(" ");
+    let frag = "";
+    let fragX = x;
+    const flush = (last: boolean): void => {
+      if (!frag) return;
+      cur().tokens.push({ text: frag, bold, x: fragX, item: last ? item : undefined, comma: last && hasComma });
+      x = fragX + measureText(frag, font, size) + (last && hasComma ? comma : 0) + space;
+      frag = "";
+    };
+    words.forEach((w, i) => {
+      const lastWord = i === words.length - 1;
+      const tail = lastWord && hasComma ? comma : 0;
+      const candidate = frag ? `${frag} ${w}` : w;
+      const startX = frag ? fragX : x;
+      if (startX + measureText(candidate, font, size) + tail > width && (frag || cur().tokens.length)) {
+        flush(false);
+        newLine();
+        frag = w;
+        fragX = 0;
+      } else {
+        if (!frag) fragX = x;
+        frag = candidate;
+      }
+    });
+    flush(true);
+  };
+  flow(label, true, undefined, false);
+  items.forEach((item, i) => flow(item, false, item, i < items.length - 1));
+  return lines;
+}
+
+function flowRunIn(
+  p: Painter,
+  entries: FlowEntry[],
+  x0: number,
+  y0: number,
+  totalWidth: number,
+  height: number,
+  columns: number,
+  ctx: BuildContext,
+): { leftover: FlowEntry[]; usedHeight: number; placedItems: string[] } {
+  const { density } = ctx;
+  const gap = EQUIPMENT_COLUMN_GAP;
+  const colW = (totalWidth - gap * (columns - 1)) / columns;
+  const placedItems: string[] = [];
+  const PARA_GAP = 2.5;
+  let col = 0;
+  let cy = y0;
+  let usedHeight = 0;
+  let idx = 0;
+  let lineIdx = 0;
+  while (idx < entries.length) {
+    const lines = entries[idx].paragraph ?? [];
+    if (lineIdx >= lines.length) { idx++; lineIdx = 0; continue; }
+    const gapBefore = cy === y0 ? 0 : (lineIdx === 0 ? PARA_GAP : 0);
+    const remaining = lines.length - lineIdx;
+    const keep = lineIdx === 0 ? Math.min(2, remaining) : 1;
+    if (cy + gapBefore + keep * density.itemLh > y0 + columnHeight(ctx, x0, colW, gap, col, height)) {
+      col++;
+      cy = y0;
+      if (col >= columns) break;
+      continue;
+    }
+    cy += gapBefore + density.itemLh;
+    const cx = x0 + col * (colW + gap);
+    for (const t of lines[lineIdx].tokens) {
+      p.text(t.text, cx + t.x, cy, density.item, t.bold ? "bold" : "body", BLACK);
+      if (t.comma) {
+        p.text(",", cx + t.x + measureText(t.text, "body", density.item), cy, density.item, "body", BLACK);
+      }
+      if (t.item) placedItems.push(t.item);
+    }
+    usedHeight = Math.max(usedHeight, cy - y0);
+    lineIdx++;
+  }
+  const leftover: FlowEntry[] = [];
+  if (idx < entries.length) {
+    const rest = entries[idx].paragraph ?? [];
+    if (lineIdx < rest.length) leftover.push({ ...entries[idx], paragraph: rest.slice(lineIdx) });
+    for (let i = idx + 1; i < entries.length; i++) leftover.push(entries[i]);
+  }
+  return { leftover, usedHeight, placedItems };
+}
 
 function flowColumns(
   p: Painter,
@@ -1746,11 +2105,19 @@ function flowColumns(
   height: number,
   columns: number,
   ctx: BuildContext,
-): { leftover: FlowEntry[]; usedHeight: number } {
+): { leftover: FlowEntry[]; usedHeight: number; placedItems: string[] } {
+  if (ctx.runIn) return flowRunIn(p, entries, x0, y0, totalWidth, height, columns, ctx);
   const { density } = ctx;
-  const gap = 10;
+  const gap = EQUIPMENT_COLUMN_GAP;
+  const placedItems: string[] = [];
   const colW = (totalWidth - gap * (columns - 1)) / columns;
-  const headH = density.itemLh + 3.5;
+  const fs0 = familyStyle(ctx.theme);
+  // Tracked headings are letter-spaced, so they wrap against a narrower measure.
+  const headWrapW = (fs0.trackedHeadings ? colW * 0.86 : colW - (fs0.sectionHeadingBar ? 4 : 0)) * 0.97;
+  const headLinesFor = (text: string): string[] =>
+    wrapText(text, "bold", density.item + (fs0.trackedHeadings ? 0.3 : 1), headWrapW);
+  const headHFor = (text: string): number =>
+    density.itemLh + 3.5 + (headLinesFor(text).length - 1) * density.itemLh;
   let col = 0;
   let cy = y0;
   let usedHeight = 0;
@@ -1772,32 +2139,41 @@ function flowColumns(
       continue;
     }
     const itemH = entry.lines.length * density.itemLh;
-    const needed = (pendingHeading !== null ? headH : 0) + itemH;
-    if (cy + needed > y0 + height) {
+    const needed = (pendingHeading !== null ? headHFor(pendingHeading) : 0) + itemH;
+    if (cy + needed > y0 + columnHeight(ctx, x0, colW, gap, col, height)) {
       if (!advanceColumn()) break;
       continue;
     }
     if (pendingHeading !== null) {
+      const headLines = headLinesFor(pendingHeading);
       cy += density.itemLh + 0.5;
       const fs = familyStyle(ctx.theme);
       let headColor = fs.sectionHeadingTint ? ctx.theme.colors.sectionHeadingText : BLACK;
+      const barH = density.item + 4.5 + (headLines.length - 1) * density.itemLh;
       if (fs.sectionHeadingBar) {
         const fill = fs.headingBarAccent ? ctx.theme.colors.accent : (fs.headingBarFill ?? "#e8e9ea");
-        p.rect(colX(), cy - density.item - 1.5, colW, density.item + 4.5, fill);
+        p.rect(colX(), cy - density.item - 1.5, colW, barH, fill);
         if (fs.headingBarAccent) headColor = "#ffffff";
         else if (fs.headingBarInk) headColor = fs.headingBarInk;
       }
+      headLines.forEach((line, li) => {
+        if (li > 0) cy += density.itemLh;
+        if (fs.trackedHeadings) {
+          p.text(line, colX(), cy, density.item + 0.3, "bold", headColor, { charSpacing: 1.1 });
+        } else {
+          p.text(line, colX() + (fs.sectionHeadingBar ? 3 : 0), cy, density.item + 1, "bold", headColor, { charSpacing: 0.35 });
+        }
+      });
       if (fs.trackedHeadings) {
-        p.text(pendingHeading, colX(), cy, density.item + 0.3, "bold", headColor, { charSpacing: 1.1 });
         p.rule(colX(), cy + 2, colW, 0.5, "#9a9da1");
         cy += 4;
       } else {
-        p.text(pendingHeading, colX() + (fs.sectionHeadingBar ? 3 : 0), cy, density.item + 1, "bold", headColor, { charSpacing: 0.35 });
         cy += 3;
       }
       pendingHeading = null;
     }
     cy = paintEntryLines(p, entry, colX(), cy, density, BLACK);
+    if (entry.item) placedItems.push(entry.item);
     usedHeight = Math.max(usedHeight, cy - y0);
     idx++;
   }
@@ -1807,87 +2183,7 @@ function flowColumns(
     if (pendingHeading !== null) leftover.push({ heading: pendingHeading, lines: [] });
     for (let i = idx; i < entries.length; i++) leftover.push(entries[i]);
   }
-  return { leftover, usedHeight };
-}
-
-const CONTINUATION_COLS_TOP = 56 + BANNER_H;
-
-function continuationFooterHeight(ctx: BuildContext): number {
-  const fullW = PAGE_WIDTH - 2 * PAGE_MARGIN;
-  let lines = 0;
-  for (const d of disclosureLines(ctx)) lines += wrapText(d, "body", 5.5, fullW).length;
-  return lines * 6.3 + 12;
-}
-
-function continuationColumnsHeight(ctx: BuildContext): number {
-  return PAGE_HEIGHT - PAGE_MARGIN - continuationFooterHeight(ctx) - CONTINUATION_COLS_TOP;
-}
-
-function withContinuedHeading(ctx: BuildContext, entries: FlowEntry[]): FlowEntry[] {
-  return entries[0] && entries[0].heading === undefined
-    ? [{ heading: headingCase(ctx.theme, "Continued"), lines: [] }, ...entries]
-    : entries;
-}
-
-/**
- * Splits the page-1 overflow into continuation pages. Every entry lands on
- * some page: an entry that cannot fit an empty page is a layout failure,
- * never a silent drop.
- */
-function planContinuationPages(ctx: BuildContext, leftover: FlowEntry[]): FlowEntry[][] {
-  const fullW = PAGE_WIDTH - 2 * PAGE_MARGIN;
-  const colsH = continuationColumnsHeight(ctx);
-  const pages: FlowEntry[][] = [];
-  let remaining = leftover;
-  while (remaining.some((e) => e.heading === undefined)) {
-    const flow = withContinuedHeading(ctx, remaining);
-    const scratch = new Painter([]);
-    const { leftover: next } = flowColumns(scratch, flow, PAGE_MARGIN, CONTINUATION_COLS_TOP, fullW, colsH, 4, ctx);
-    const placed = flow.filter((e) => e.heading === undefined).length -
-      next.filter((e) => e.heading === undefined).length;
-    if (placed <= 0) throw new Error("layout_failed: continuation entry cannot fit an empty page");
-    pages.push(remaining);
-    remaining = next;
-  }
-  return pages;
-}
-
-function paintContinuationPage(
-  drawn: string[],
-  ctx: BuildContext,
-  entries: FlowEntry[],
-  pageNumber: number,
-  pageCount: number,
-): LayoutPage {
-  const p = new Painter(drawn);
-  const { theme, input } = ctx;
-  const v = input.data.vehicle;
-  const fullW = PAGE_WIDTH - 2 * PAGE_MARGIN;
-  const top = paintReproductionBanner(p);
-  const nameParts = [v.year > 0 ? String(v.year) : "", v.make, v.model, v.trim ?? ""].filter(Boolean);
-  p.text(nameParts.join(" ").toUpperCase(), PAGE_MARGIN, top + 12, 11, "bold", BLACK);
-  p.text(`VIN: ${v.vin}`, PAGE_WIDTH - PAGE_MARGIN, top + 12, 7.5, "bold", BLACK, { align: "right" });
-  p.rule(PAGE_MARGIN, top + 16, fullW, 1, BLACK);
-  p.text(headingCase(theme, "Factory Equipment Continuation"), PAGE_MARGIN, top + 29, 9, "bold", BLACK, {
-    charSpacing: parseEm(theme.typography.headingLetterSpacing) * 9,
-  });
-  p.text(
-    `Continuation of the reproduction window sticker for VIN ${v.vin}. This page belongs to the sticker on page 1 and is not valid on its own.`,
-    PAGE_MARGIN, top + 39, 6, "body", "#6b6f76",
-  );
-  flowColumns(
-    p, withContinuedHeading(ctx, entries), PAGE_MARGIN, CONTINUATION_COLS_TOP, fullW,
-    continuationColumnsHeight(ctx), 4, ctx,
-  );
-  let fy = PAGE_HEIGHT - PAGE_MARGIN - continuationFooterHeight(ctx) + 8;
-  for (const d of disclosureLines(ctx)) {
-    for (const line of wrapText(d, "body", 5.5, fullW)) {
-      p.text(line, PAGE_MARGIN, fy, 5.5, "body", "#4c5157");
-      fy += 6.3;
-    }
-  }
-  p.text(`PAGE ${pageNumber} OF ${pageCount}`, PAGE_WIDTH - PAGE_MARGIN, PAGE_HEIGHT - PAGE_MARGIN - 2, 5.5, "bold", "#6b6f76", { align: "right" });
-  return { primitives: p.primitives };
+  return { leftover, usedHeight, placedItems };
 }
 
 // ── Validation ────────────────────────────────────────────────────────
@@ -1937,14 +2233,28 @@ function measureStack(
   return y;
 }
 
+interface AttemptResult {
+  model: LayoutModel;
+  overflowPt: number;
+}
+
+/**
+ * One full-page composition at a fixed density and column count. With
+ * `force` unset it returns null the moment anything does not fit; with
+ * `force` set it paints the best it can and reports how many points of
+ * content did not fit, for the review-required diagnostic.
+ */
 function buildAttempt(
   input: StickerLayoutInput,
   theme: OemStickerTheme,
   density: Density,
-  allowContinuation: boolean,
-  compactPackages = false,
-): LayoutModel | null {
-  const ctx: BuildContext = { input, theme, density, compactPackages };
+  columns: number,
+  compactPackages: boolean,
+  force = false,
+  runIn = false,
+  priority = false,
+): AttemptResult | null {
+  const ctx: BuildContext = { input, theme, density, compactPackages, columns, runIn, priority };
   const drawn: string[] = [];
   const p = new Painter(drawn);
 
@@ -1960,51 +2270,77 @@ function buildAttempt(
   // The pricing split follows the equipment block directly; the spec grid,
   // barcode and navy band anchor together at the page bottom, so any slack
   // lands between the optional list and the spec grid as on the reference.
-  const bottomH = measureStack([
-    (sp, sy) => paintSpecGrid(sp, sy, ctx),
-    (sp, sy) => paintVinBarcode(sp, sy, ctx) + SECTION_GAP,
-    (sp, sy) => paintTotalBand(sp, sy, ctx),
-  ]);
-  const pricingH = measureStack([(sp, sy) => paintPricingSplit(sp, sy, ctx) + SECTION_GAP]);
-  // The left parts panel reserves its height out of the equipment budget so
-  // it always fits between the pricing split and the spec grid.
+  const bottomH = measureStack(priority
+    ? [(sp, sy) => paintTotalBand(sp, sy, ctx)]
+    : [
+      (sp, sy) => paintSpecGrid(sp, sy, ctx),
+      (sp, sy) => paintVinBarcode(sp, sy, ctx) + SECTION_GAP,
+      (sp, sy) => paintTotalBand(sp, sy, ctx),
+    ]);
   const fsAll = familyStyle(theme);
   const leftPartsW = LW * 0.62;
   const leftPartsH = fsAll.leftPartsPanel
     ? measureStack([(sp, sy) => paintPartsContentPanel(sp, sy, ctx, LX, leftPartsW)])
     : 0;
+  if (priority && leftPartsH === 0) ctx.stackedPricing = { x: LX + LW - STACKED_PRICING_W, w: STACKED_PRICING_W };
+  const stackedH = ctx.stackedPricing ? measureStack([(sp, sy) => paintPricingSplit(sp, sy, ctx)]) : 0;
+  if (ctx.stackedPricing) ctx.shortBy = stackedH + 6;
+  const pricingH = ctx.stackedPricing ? 0 : measureStack([(sp, sy) => paintPricingSplit(sp, sy, ctx) + SECTION_GAP]);
+  // The left parts panel reserves its height out of the equipment budget so
+  // it always fits between the pricing split and the spec grid.
 
   const hasStandard = input.data.equipment.standard.some((g) => g.items.length > 0);
+  const footnoteH = ctx.stackedPricing ? 14 : 0;
   const stdBudget = hasStandard
-    ? Math.max(40, CONTENT_BOTTOM - y - bottomH - pricingH - (leftPartsH > 0 ? leftPartsH + 6 : 0) - SECTION_GAP)
+    ? Math.max(40, CONTENT_BOTTOM - y - bottomH - pricingH - footnoteH - (leftPartsH > 0 ? leftPartsH + 6 : 0) - (ctx.stackedPricing ? 0 : SECTION_GAP))
     : 0;
 
-  let leftover: FlowEntry[] = [];
+  let overflowPt = 0;
+  let printedEquipment: string[] = [];
+  const regionTop = y;
   if (hasStandard) {
     const result = paintStandardEquipment(p, y, stdBudget, ctx);
-    leftover = result.leftover;
+    overflowPt = result.overflowPt;
+    printedEquipment = result.printed;
     y = result.yEnd;
   }
-  if (leftover.length && !allowContinuation) return null;
+  if (overflowPt > 0 && !force) return null;
 
-  y = paintPricingSplit(p, y + 3, ctx);
   const bottomTop = CONTENT_BOTTOM - bottomH;
-  if (y + SECTION_GAP > bottomTop + 0.5) return null;
+  let pricingOverflow: number;
+  if (ctx.stackedPricing) {
+    const areaBottom = bottomTop - footnoteH;
+    const priceTop = areaBottom - stackedH;
+    paintPricingSplit(p, priceTop, ctx);
+    paintEquipmentFootnote(p, ctx, areaBottom + 8);
+    p.rule(LX, areaBottom + 11, LW, 1.4, BLACK);
+    pricingOverflow = hasStandard ? Math.max(0, regionTop + 40 - priceTop) : 0;
+    y = areaBottom;
+  } else {
+    y = paintPricingSplit(p, y + 3, ctx);
+    pricingOverflow = y + SECTION_GAP - (bottomTop + 0.5);
+  }
+  if (pricingOverflow > 0) {
+    if (!force) return null;
+    overflowPt = Math.max(overflowPt, pricingOverflow);
+  }
   // Premium-factory variant: verified parts content occupies the reserved
   // zone between the pricing split and the spec grid.
   if (leftPartsH > 0 && y + 6 + leftPartsH <= bottomTop - 2) {
     paintPartsContentPanel(p, y + 6, ctx, LX, leftPartsW);
   }
-  y = paintSpecGrid(p, bottomTop, ctx);
-  y = paintVinBarcode(p, y, ctx) + SECTION_GAP;
-  paintTotalBand(p, y, ctx);
+  if (priority) {
+    paintTotalBand(p, bottomTop, ctx);
+  } else {
+    y = paintSpecGrid(p, bottomTop, ctx);
+    y = paintVinBarcode(p, y, ctx) + SECTION_GAP;
+    paintTotalBand(p, y, ctx);
+  }
 
   // Right column, top to bottom: regulatory panels (supporting), then the
   // Passport panel stretched over the middle, with the verification block,
   // and reproduction disclosure pinned to the bottom.
-  const continuation = leftover.length ? planContinuationPages(ctx, leftover) : [];
-  const pages = continuation.length + 1;
-  const pageLabel = pages > 1 ? `PAGE 1 OF ${pages} - EQUIPMENT CONTINUED ON PAGE 2` : "PAGE 1 OF 1";
+  const pageLabel = "PAGE 1 OF 1";
   const footerH = measureStack([(sp, sy) => paintRightFooter(sp, sy, ctx, pageLabel)]);
   const verifyH = measureStack([(sp, sy) => paintVerificationBlock(sp, sy, ctx)]);
   let ry = paintEpaPanel(p, stripBottom + 6, ctx);
@@ -2020,49 +2356,117 @@ function buildAttempt(
     ...(fsAll.leftPartsPanel ? [] : [paintPartsContentPanel]),
     ...(fsAll.msrpIncludes ? [] : [paintWarrantyPanel]),
   ];
-  for (const panel of railPanels) {
-    const panelH = measureStack([(sp, sy) => panel(sp, sy, ctx)]);
-    if (panelH > 0 && ry + panelH + 7 + 118 <= bottomBlockTop - 6) {
-      ry = panel(p, ry, ctx) + 7;
+  if (priority) {
+    for (const panel of railPanels) {
+      const panelH = measureStack([(sp, sy) => panel(sp, sy, ctx)]);
+      if (panelH > 0) ry = panel(p, ry, ctx) + 7;
     }
+    ry = paintPassportFixed(p, ry, ctx) + 7;
+    const recordEnd = paintPriorityRecord(p, ry, ctx);
+    ry = recordEnd > ry ? recordEnd + 4 : ry;
+    ry = paintVinBarcode(p, ry, ctx, RX, RW) + 4;
+    const railOverflow = ry - (bottomBlockTop - 2);
+    if (railOverflow > 0) {
+      if (!force) return null;
+      overflowPt = Math.max(overflowPt, railOverflow);
+    }
+  } else {
+    for (const panel of railPanels) {
+      const panelH = measureStack([(sp, sy) => panel(sp, sy, ctx)]);
+      if (panelH > 0 && ry + panelH + 7 + 118 <= bottomBlockTop - 6) {
+        ry = panel(p, ry, ctx) + 7;
+      }
+    }
+    paintPassportPanel(p, ry, ctx, bottomBlockTop - 6 - ry);
   }
-  paintPassportPanel(p, ry, ctx, bottomBlockTop - 6 - ry);
   const by = paintVerificationBlock(p, bottomBlockTop, ctx);
   paintRightFooter(p, by, ctx, pageLabel);
-
-  const layoutPages: LayoutPage[] = [{ primitives: p.primitives }];
-  continuation.forEach((entries, i) => {
-    layoutPages.push(paintContinuationPage(drawn, ctx, entries, i + 2, pages));
-  });
 
   const model: LayoutModel = {
     width: PAGE_WIDTH,
     height: PAGE_HEIGHT,
-    mode: leftover.length ? "CONTINUATION_REQUIRED" : density.mode,
-    pages: layoutPages,
+    mode: density.mode,
+    pages: [{ primitives: p.primitives }],
     drawnStrings: drawn,
+    printedEquipment,
     fontFamilies: {
       heading: theme.typography.headingFont,
       body: theme.typography.bodyFont,
       numeric: theme.typography.numericFont,
     },
+    fit: fitOk(columns, density.item, runIn ? "run_in" : "list", priority ? "equipment_priority" : "standard"),
   };
-  validateModel(model);
-  return model;
+  if (!force) validateModel(model);
+  return { model, overflowPt };
+}
+
+function candidateColumns(theme: OemStickerTheme): number[] {
+  const base = familyStyle(theme).equipmentColumns;
+  const out = [base];
+  for (let c = base + 1; c <= MAX_EQUIPMENT_COLUMNS; c++) out.push(c);
+  return out;
 }
 
 export function buildStickerLayout(input: StickerLayoutInput, theme: OemStickerTheme): LayoutModel {
-  const densities = [DENSITY_LARGE, DENSITY_STANDARD, DENSITY_DENSE, DENSITY_FLOOR];
-  for (const density of densities) {
-    // Roomy package grids first, then the same density compacted, so a
-    // content-heavy package never costs the page a font-size step. Both
-    // passes print every member; only the spacing differs.
-    for (const compactPackages of [false, true]) {
-      const attempt = buildAttempt(input, theme, density, false, compactPackages);
-      if (attempt) return attempt;
+  // Largest readable type first. Within a density a roomier package grid is
+  // tried before a compact one, and more equipment columns only after the
+  // family's own column count, so type never shrinks while a layout change
+  // would do. Every step prints every member; only spacing and wrapping move.
+  //
+  // Smaller type only ever frees space, so a (columns, packages) setting that
+  // cannot fit at the floor cannot fit at any larger size: each composition
+  // probes the floor once per setting and walks the ladder over the survivors.
+  const settings = candidateColumns(theme).flatMap((columns) =>
+    [false, true].map((compactPackages) => ({ columns, compactPackages })));
+  const compositions: Array<{ runIn: boolean; priority: boolean }> = [
+    { runIn: false, priority: false },
+    // One item per line cannot fit at the floor. Each category then prints as
+    // a run-in paragraph: same items, verbatim, once each, joined inline.
+    { runIn: true, priority: false },
+    // Equipment-priority composition: the VIN/barcode block and vehicle record
+    // move into the right rail beside a compact fixed Passport block, and the
+    // left region gives equipment the height they occupied.
+    { runIn: false, priority: true },
+    { runIn: true, priority: true },
+  ];
+  for (const { runIn, priority } of compositions) {
+    const feasible = settings.filter((st) =>
+      buildAttempt(input, theme, DENSITY_MINIMUM, st.columns, st.compactPackages, false, runIn, priority) !== null);
+    if (!feasible.length) continue;
+    for (const density of GENERIC_DENSITY_LADDER) {
+      for (const st of feasible) {
+        const attempt = buildAttempt(input, theme, density, st.columns, st.compactPackages, false, runIn, priority);
+        if (attempt) return attempt.model;
+      }
     }
   }
-  const floor = buildAttempt(input, theme, DENSITY_FLOOR, true, true);
-  if (!floor) throw new Error("layout_failed: content cannot fit even with continuation");
-  return floor;
+  // Nothing fits on one page at the validated minimum. Report the tightest
+  // of the floor configurations as a review-required fit failure.
+  const columns = Math.max(...candidateColumns(theme));
+  const floors = [
+    buildAttempt(input, theme, DENSITY_MINIMUM, columns, true, true, false, false),
+    buildAttempt(input, theme, DENSITY_MINIMUM, columns, true, true, true, false),
+    buildAttempt(input, theme, DENSITY_MINIMUM, columns, true, true, false, true),
+    buildAttempt(input, theme, DENSITY_MINIMUM, columns, true, true, true, true),
+  ].filter((f): f is AttemptResult => f !== null);
+  const floor = floors.reduce<AttemptResult | null>((best, f) => (!best || f.overflowPt < best.overflowPt ? f : best), null);
+  const overflowPt = floor ? Math.round(floor.overflowPt * 10) / 10 : 0;
+  const base = floor?.model;
+  if (!base) throw new Error("layout_failed: floor attempt produced no model");
+  const mode = base.fit.ok ? base.fit.equipmentMode ?? "list" : "list";
+  const composition = base.fit.ok ? base.fit.composition ?? "standard" : "standard";
+  return {
+    ...base,
+    mode: "REVIEW_REQUIRED",
+    fit: {
+      ok: false,
+      reason: "one_page_fit_failed",
+      overflowPt,
+      equipmentFontPt: DENSITY_MINIMUM.item,
+      columns,
+      equipmentMode: mode,
+      composition,
+      detail: `verified content does not fit one readable page at ${DENSITY_MINIMUM.item}pt equipment text, even as run-in category paragraphs on the equipment-priority page, in ${columns} columns (about ${overflowPt}pt over); an approved one-page layout adjustment is required`,
+    },
+  };
 }

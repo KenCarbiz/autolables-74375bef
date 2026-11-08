@@ -1,0 +1,221 @@
+{
+ "note": "Read-only extract of one saved production vehicle_listings row (SELECT 2026-11-04). 2008 Dodge Grand Caravan SXT, used: an off-year, other-model layout stress record, not a production candidate.",
+ "vin": "2D8HN54P68R833362",
+ "slug": "2008-dodge-grand-caravan-833362",
+ "ymm": "2008 Dodge Grand Caravan",
+ "trim": "SXT",
+ "condition": "used",
+ "body_type": "Minivan",
+ "build_sheet": {
+  "colors": {
+   "exterior": {
+    "code": "PKG",
+    "msrp": 150,
+    "name": "Light Sandstone Metallic"
+   },
+   "interior": {
+    "code": "H7VS",
+    "name": "Dark Slate/Light Shale Cloth"
+   }
+  },
+  "decoded_at": "2026-07-28T17:28:45.102Z",
+  "generic": false,
+  "key_features": {
+   "JRC": [
+    "Power Closing Liftgate"
+   ],
+   "JRJ": [
+    "3rd Row Seats"
+   ],
+   "STANDARD": [
+    "3rd Row Seats",
+    "Automatic Transmission",
+    "Premium Speakers",
+    "Fog Lights",
+    "Satellite Radio",
+    "Steering Wheel Controls",
+    "Upgraded Tire Type",
+    "Smart Card / Smart Key",
+    "Upgrade Paint",
+    "Upgraded Cloth/Velour Seats",
+    "Mini Van",
+    "Rear Parking Device",
+    "Heated Door Mirrors",
+    "Premium Wheels",
+    "Upgraded Wheel Size",
+    "Brake Assist",
+    "Coming Home Device",
+    "Power Closing Doors",
+    "Upgraded Aux Jack Input"
+   ]
+  },
+  "options": [
+   {
+    "code": "JRJ",
+    "msrp": 595,
+    "name": "Power Folding 3rd Row Seat"
+   },
+   {
+    "code": "EGL",
+    "name": "3.8L V6 OHV Engine"
+   },
+   {
+    "code": "DG2",
+    "name": "6-Speed Automatic Transmission"
+   },
+   {
+    "code": "CEF",
+    "name": "Dark Slate Gray Seats"
+   },
+   {
+    "code": "JRC",
+    "msrp": 400,
+    "name": "Power Liftgate"
+   }
+  ],
+  "packages": [],
+  "pricing": {
+   "base_msrp": 27730,
+   "destination_charge": 770,
+   "total_msrp": 29495
+  },
+  "source": "neovin",
+  "standard": {
+   "DG2": [
+    "Lock-Up (Auto Only)",
+    "Electronic Control (Auto Only)"
+   ],
+   "JRC": [
+    "Remote Control Remote Trunk/Hatch Release",
+    "Power Tailgate/Trunk"
+   ],
+   "JRJ": [
+    "Third Row Seats Folds Electrically"
+   ],
+   "STANDARD": [
+    "Third Row Seats",
+    "Rear Seats-Tip/Tumble",
+    "Engine Displacement (3.8 Liters)",
+    "Automatic Transmission",
+    "6 Speed Transmission",
+    "Automatic Only Mode Select",
+    "6 Speakers",
+    "Antenna",
+    "Fixed Mast Antenna",
+    "Complex Surface Headlights",
+    "Halogen Headlights-Low Beam",
+    "Front Fog Lights",
+    "Satellite Radio",
+    "CD Player",
+    "CD Player-Reads MP3",
+    "Rear Side Curtain Airbag",
+    "Side Curtain Airbag-All Three Rows",
+    "Driver Airbag",
+    "Passenger Airbag",
+    "Intelligent Airbag",
+    "Remote Audio Controls",
+    "Steering Wheel Mounted Audio Controls",
+    "All Season Tires",
+    "Remote Power Locks",
+    "Power Locks Automatic Locking",
+    "Paint-Pearl",
+    "Front Seats Head Restraints",
+    "Rear Seats Head Restraints",
+    "3rd Row Head Restraints",
+    "Front Seats Height Adjustable Head Restraints",
+    "Rear Seats Height Adjustable Head Restraints",
+    "3rd Row Height Adjustable Head Restraints",
+    "Front Seats Head Restraints-2",
+    "Rear Seats Head Restraints-2",
+    "3rd Row Seats Head Restraints-3",
+    "Front Seat belts Pre-Tensioners",
+    "Front Seat Belts Height Adjustable",
+    "Height Adjustable Rear Seat Belts",
+    "Full Size MPV",
+    "Upgraded Cloth/Velour Seats",
+    "Mini Van",
+    "Driver Bucket Seat",
+    "Passenger Bucket Seat",
+    "Electrically Adjustable",
+    "Folding Rear Seats",
+    "Leather Steering Wheel",
+    "Height Adjustment Steering Wheel",
+    "Multi Function Steering Wheel",
+    "Power Steering",
+    "12 Volt Power Outlet",
+    "12 Volt Rear Power Outlet",
+    "110/115 Volt Power Outlet",
+    "Strut Suspension-Front",
+    "Beam Suspension-Rear",
+    "Coil Suspension-Front",
+    "Coil Suspension-Rear",
+    "Front Stabilizer Bar",
+    "Independent Suspension-Front",
+    "Rigid Suspension-Rear",
+    "Automatic Trans",
+    "Rear View Mirror/Camera",
+    "Driver-Electrically Adjustable",
+    "Passenger-Electrically Adjustable",
+    "Heated Door Mirrors",
+    "Rear Window Defogger",
+    "Rear Windshield Wipers",
+    "Variable Intermittent Wipe",
+    "Tinted Glass-Cabin",
+    "Tinted Glass-Rear",
+    "Tinted Glass-Side",
+    "Front Power Windows",
+    "Rear Power Windows",
+    "Front Express Power Windows",
+    "Front Aluminum/Alloy Wheels",
+    "Rear Aluminum/Alloy Wheels",
+    "Front Wheel Diameter (16 in)",
+    "Rear Wheel Diameter (16 in)",
+    "Front Wheel Width (6.5 in)",
+    "Rear Wheel Width (6.5 in)",
+    "Under Body-Spare Wheel",
+    "Under Body-Spacesaver Spare Wheel",
+    "Under Body-Steel Spare Wheel",
+    "Compass",
+    "Disc Brakes",
+    "Disc Brakes-4",
+    "Ventilated Disc Brakes-2",
+    "ABS Brakes-4-Wheel",
+    "Electronic Brake Distribution",
+    "Brake Assist",
+    "Height Adjustable Pedals",
+    "Garage Door Opener",
+    "Coming Home Device",
+    "Low Tire Pressure Monitor",
+    "Engine-Immobilizer",
+    "Passenger Door-Front Hinged",
+    "Rear Driver Door-Sliding",
+    "Rear Passenger Door-Sliding",
+    "Rear Door-Lifting Gate",
+    "Rear Driver Power Door",
+    "Rear Passenger Power Door",
+    "Cruise Control",
+    "AUX Jack Front",
+    "Cargo Area Light",
+    "Illuminated Driver Vanity Mirror",
+    "Illuminated Passenger Vanity Mirror",
+    "Short Wheelbase",
+    "FWD",
+    "Electronic Traction Control",
+    "Traction Control",
+    "6 Person Seating Capacity",
+    "6-Cyl",
+    "V",
+    "Unleaded",
+    "Instrument Cluster",
+    "Service Interval Indicator"
+   ]
+  }
+ },
+ "epa_economy": null,
+ "mc_extra": {
+  "engine": "3.8L V6",
+  "transmission": "Automatic",
+  "drivetrain": "FWD",
+  "made_in": "USA"
+ }
+}

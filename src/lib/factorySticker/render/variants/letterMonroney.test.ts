@@ -2,9 +2,10 @@ import { writeFileSync } from "node:fs";
 import * as pdfLibModule from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import { buildRenderLayout, runRenderPipeline, type FactoryStickerRenderData } from "../contract";
-import { infinitiBenchmark, nissanBenchmark, themeFor } from "../__fixtures__/renderData";
+import { infinitiBenchmark, nissanBenchmark, qx55ClassFixture, themeFor } from "../__fixtures__/renderData";
 import { expectNoTextOverlap, pageStrings } from "../__fixtures__/layoutAsserts";
-import { PASSPORT_QR_CAPTION, REPRODUCTION_DISCLOSURE } from "../../reproduction";
+import { PASSPORT_QR_CAPTION, REPRODUCTION_DISCLOSURE, canonicalPassportUrl } from "../../reproduction";
+import { textBBox, type LayoutModel, type QrPrimitive } from "../layout";
 import { resolveReferenceVariant } from "../../oem/referenceVariants";
 
 const PRINTED_BANNER = "REPRODUCTION WINDOW STICKER - NOT AN ORIGINAL MANUFACTURER LABEL";
@@ -46,6 +47,36 @@ const variants: Array<[string, () => FactoryStickerRenderData, string, string]> 
 ];
 
 const isVariant = (strings: string[]): boolean => strings.includes("Standard Equipment Included at No Extra Charge");
+
+const passportQr = (model: LayoutModel): QrPrimitive => {
+  const qrs = model.pages[0].primitives.filter((p): p is QrPrimitive => p.kind === "qr");
+  expect(qrs).toHaveLength(1);
+  return qrs[0];
+};
+
+// The QR's own four-module quiet zone sits inside its square, so no text or
+// barcode may touch that square, and any ink under it must be covered by a
+// white panel before the QR is drawn, with no ink drawn over it afterwards.
+const expectQrClear = (model: LayoutModel, q: QrPrimitive): void => {
+  const hit = (x0: number, y0: number, x1: number, y1: number): boolean =>
+    Math.min(x1, q.x + q.size) - Math.max(x0, q.x) > 0.01 && Math.min(y1, q.y + q.size) - Math.max(y0, q.y) > 0.01;
+  let inkUnder = false;
+  let drawn = false;
+  for (const p of model.pages[0].primitives) {
+    if (p === q) { expect(inkUnder).toBe(false); drawn = true; continue; }
+    if (p.kind === "text") {
+      const b = textBBox(p);
+      expect(hit(b.x0, b.y0, b.x1, b.y1), p.str).toBe(false);
+    } else if (p.kind === "barcode") {
+      expect(hit(p.x, p.y, p.x + p.w, p.y + p.h)).toBe(false);
+    } else if (p.kind === "rect" && p.fill === "#ffffff") {
+      if (!drawn && p.x <= q.x && p.y <= q.y && p.x + p.w >= q.x + q.size && p.y + p.h >= q.y + q.size) inkUnder = false;
+    } else if (p.kind === "rect" && hit(p.x, p.y, p.x + p.w, p.y + p.h)) {
+      expect(drawn).toBe(false);
+      inkUnder = true;
+    }
+  }
+};
 
 describe("Letter reference variant layouts", () => {
   for (const [key, make, theme, ownership] of variants) {
@@ -93,6 +124,33 @@ describe("Letter reference variant layouts", () => {
         expect(none.pages.flatMap((p) => p.primitives).some((p) => p.kind === "qr")).toBe(false);
       });
 
+      it("prints one black 0.90in Passport QR, quiet zone included, in the pricing column with nothing drawn over it", () => {
+        const q = passportQr(model);
+        expect(q.size).toBeCloseTo(0.9 * 72, 6);
+        expect(q.color).toBe("#000000");
+        expect(q.payload).toBe(data.passportUrl);
+        expect(q.x).toBeGreaterThanOrEqual(287);
+        expect(q.x + q.size).toBeLessThanOrEqual(436);
+        expectQrClear(model, q);
+      });
+
+      it("shrinks the QR only to the room a long price list leaves, never over it, and stays on one page", () => {
+        const sizes: number[] = [];
+        for (const n of [0, 10, 20, 26, 30, 34, 38]) {
+          const options = Array.from({ length: n }, (_, i) => ({ name: `Factory Option Number ${i + 1}`, code: `X${i}`, msrp: 100 + i }));
+          const m = buildRenderLayout({ ...data, options }, themeFor(theme));
+          if (!isVariant(pageStrings(m, 0))) continue;
+          expect(m.pages).toHaveLength(1);
+          const q = passportQr(m);
+          expect(q.size).toBeLessThanOrEqual(0.9 * 72 + 1e-9);
+          expect(q.size).toBeGreaterThanOrEqual(32);
+          expectQrClear(m, q);
+          sizes.push(q.size);
+        }
+        expect(sizes[0]).toBeCloseTo(0.9 * 72, 6);
+        expect(sizes.some((s) => s < 0.9 * 72)).toBe(true);
+      });
+
       it("never claims to be the federal label or reuses source artwork text", () => {
         const all = model.drawnStrings.join(" ");
         expect(all).not.toMatch(/applied pursuant to Federal law/i);
@@ -103,19 +161,22 @@ describe("Letter reference variant layouts", () => {
         expectNoTextOverlap(model, 0);
       });
 
-      it("continues long equipment onto further pages without dropping items", () => {
+      it("never adds a second page for long equipment", () => {
         const extra = Array.from({ length: 260 }, (_, i) => `Variant Extended Line ${String(i).padStart(3, "0")}`);
         const long = buildRenderLayout(
           { ...data, standardEquipment: { ...data.standardEquipment, technology: extra } },
           themeFor(theme),
+          "full_only",
         );
-        expect(isVariant(long.drawnStrings)).toBe(true);
-        expect(long.pages.length).toBeGreaterThan(1);
-        const printed = long.drawnStrings.join("\n");
-        for (const line of extra) expect(printed).toContain(line);
-        const last = long.pages.length;
-        expect(pageStrings(long, last - 1)).toContain(`PAGE ${last} OF ${last}`);
-        for (let i = 0; i < last; i++) expect(pageStrings(long, i)).toContain(PRINTED_BANNER);
+        expect(long.pages.length).toBe(1);
+        expect(long.fit.ok).toBe(false);
+        expect(long.mode).toBe("REVIEW_REQUIRED");
+        const selected = buildRenderLayout(
+          { ...data, standardEquipment: { ...data.standardEquipment, technology: extra } },
+          themeFor(theme),
+        );
+        expect(selected.pages.length).toBe(1);
+        expect(selected.fit.ok && selected.fit.equipmentScope).toBe("selected");
       });
 
       it("draws the owner-authorized logo artwork in the master logo slot", () => {
@@ -131,16 +192,43 @@ describe("Letter reference variant layouts", () => {
     });
   }
 
-  it("keeps near-miss vehicles on the generic reproduction layout", () => {
+  it("routes INFINITI make-wide but keeps other near-miss makes and fuel classes on the generic layout", () => {
     const qx60 = qx60SportFixture();
     for (const changed of [
       { ...qx60, identity: { ...qx60.identity, trim: "AUTOGRAPH" } },
       { ...qx60, identity: { ...qx60.identity, year: "2025" } },
       { ...qx60, mechanical: { ...qx60.mechanical!, drivetrain: "FWD" } },
     ]) {
-      expect(isVariant(buildRenderLayout(changed, themeFor("infiniti")).drawnStrings)).toBe(false);
+      expect(isVariant(buildRenderLayout(changed, themeFor("infiniti")).drawnStrings)).toBe(true);
     }
-    expect(isVariant(buildRenderLayout(nissanBenchmark(), themeFor("nissan")).drawnStrings)).toBe(false);
+    const ev = { ...qx60, epa: { ...qx60.epa!, fuelType: "Electricity" } };
+    expect(isVariant(buildRenderLayout(ev, themeFor("infiniti")).drawnStrings)).toBe(false);
+  });
+
+  it("a QX55-class build (about 60 items, 3 options) fits the routed INFINITI master on one page at the floor or above", () => {
+    const data = qx55ClassFixture();
+    const m = buildRenderLayout(data, themeFor("infiniti"));
+    expect(isVariant(m.drawnStrings)).toBe(true);
+    expect(m.pages).toHaveLength(1);
+    expect(m.fit.ok).toBe(true);
+    expect(m.fit.ok && m.fit.equipmentFontPt).toBeGreaterThanOrEqual(5.5);
+    expect(m.width).toBe(792);
+    expect(m.height).toBe(612);
+    expect([...m.printedEquipment].sort()).toEqual(Object.values(data.standardEquipment).flat().sort());
+  });
+
+  it("routes a non-reference Nissan model make-wide and a second Pathfinder trim on the Nissan master", () => {
+    for (const trim of ["SV", "SL"]) {
+      const data = { ...pathfinderPlatinumFixture(), identity: { year: "2026", make: "Nissan", model: "Pathfinder", trim } };
+      const m = buildRenderLayout(data, themeFor("nissan"));
+      expect(isVariant(m.drawnStrings)).toBe(true);
+      expect(m.pages).toHaveLength(1);
+      expect(m.fit.ok).toBe(true);
+    }
+    const rogue = { ...pathfinderPlatinumFixture(), identity: { year: "2026", make: "Nissan", model: "Rogue", trim: "SV" } };
+    const m = buildRenderLayout(rogue, themeFor("nissan"));
+    expect(isVariant(m.drawnStrings)).toBe(true);
+    expect(m.pages).toHaveLength(1);
   });
 
   it("shows unrated and unavailable safety states distinctly, never as stars", () => {
@@ -156,5 +244,13 @@ describe("Letter reference variant layouts", () => {
       const r = await runRenderPipeline(make(), themeFor(theme), pdfLib);
       writeFileSync(`${process.env.WRITE_VARIANT_SAMPLES}/${key}.pdf`, r.pdfBytes);
     }
+  });
+});
+
+describe("canonical Passport QR payload", () => {
+  it("is the public autolabels.io host plus the listing slug, never a generating origin", () => {
+    expect(canonicalPassportUrl("2027-infiniti-qx80-452464")).toBe("https://autolabels.io/v/2027-infiniti-qx80-452464");
+    expect(canonicalPassportUrl(" JN8AZ3CC5T9624253 ")).toBe("https://autolabels.io/v/JN8AZ3CC5T9624253");
+    expect(canonicalPassportUrl("")).toBe("");
   });
 });

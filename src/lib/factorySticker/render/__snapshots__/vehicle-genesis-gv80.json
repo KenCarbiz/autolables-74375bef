@@ -73,10 +73,10 @@
     "2025 GENESIS GV80",
     "3.5T PRESTIGE AWD",
     "STANDARD EQUIPMENT",
-    "EXTERIOR",
-    "INTERIOR & COMFORT",
     "PERFORMANCE & MECHANICAL",
     "SAFETY & DRIVER ASSISTANCE",
+    "EXTERIOR",
+    "INTERIOR & COMFORT",
     "FACTORY OPTIONS",
     "DESTINATION & HANDLING",
     "1,395.00",
@@ -96,6 +96,6 @@
   ],
   "totalBand": "$79,145.00",
   "svgDigest": [
-    "a3c77106"
+    "06c1f726"
   ]
 }

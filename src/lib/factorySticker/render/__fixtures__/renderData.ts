@@ -185,8 +185,8 @@ export const noEpaFixture = (): FactoryStickerRenderData => ({
   barcodePayload: "2T3P1RFV8MW123456",
 });
 
-// Enough standard equipment to overflow page 1 and force a continuation
-// page; pricing, banner, VIN, and disclosures must remain on page 1.
+// Enough standard equipment that no readable one-page layout exists; the
+// sticker must flag REVIEW_REQUIRED rather than spill onto a second page.
 export const longEquipmentFixture = (): FactoryStickerRenderData => {
   const base = infinitiBenchmark();
   const categories = ["exterior", "interior", "safety_features", "mechanical", "technology", "comfort"];
@@ -199,6 +199,21 @@ export const longEquipmentFixture = (): FactoryStickerRenderData => {
     });
   }
   return { ...base, standardEquipment, keyFeatures: {} };
+};
+
+// QX55-class build: about 60 standard items and three options, the size of
+// the owner's one-page INFINITI reference sticker. Must fit one page at or
+// above the equipment floor.
+export const qx55ClassFixture = (): FactoryStickerRenderData => {
+  const base = infinitiBenchmark();
+  const groups: Record<string, string[]> = {
+    mechanical: ["2.0L VC-Turbo 4-cylinder engine", "9-speed automatic transmission", "Intelligent all-wheel drive", "Paddle shifters", "Drive mode selector", "Hill start assist", "Electric power steering", "Four-wheel independent suspension", "Engine start/stop system", "Active trace control", "Vehicle dynamic control", "Anti-lock braking system"],
+    exterior: ["LED headlights with auto-leveling", "LED daytime running lights", "LED taillights", "Power moonroof", "Roof rails", "Heated power mirrors", "Rain-sensing wipers", "Rear spoiler", "19-inch aluminum-alloy wheels", "Intelligent auto high beams", "Chrome exhaust finishers", "Power liftgate"],
+    interior: ["Leather-appointed seats", "Heated front seats", "Power driver seat with memory", "Dual-zone automatic climate control", "Push-button start", "Leather-wrapped steering wheel", "Heated steering wheel", "Ambient interior lighting", "Rear seat 60/40 split fold", "Remote engine start", "Rear privacy glass", "Wireless phone charging"],
+    audio: ["8-inch touch-screen display", "Wireless Apple CarPlay", "Android Auto", "Bose premium audio system", "SiriusXM satellite radio", "Bluetooth hands-free phone", "USB-A and USB-C ports", "Voice recognition", "InTouch connected services", "Navigation system"],
+    safety: ["Forward emergency braking", "Blind spot warning", "Rear cross traffic alert", "Lane departure warning", "Intelligent cruise control", "Driver attention alert", "Around view monitor", "Advanced air bag system", "Tire pressure monitoring", "Rear door child safety locks", "Immobilizer anti-theft system", "Front and rear parking sensors", "Traffic sign recognition"],
+  };
+  return { ...base, standardEquipment: groups, keyFeatures: {} };
 };
 
 // Second OEM profile proof: same engine and arithmetic, visibly different

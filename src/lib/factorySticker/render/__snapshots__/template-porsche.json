@@ -1,15 +1,15 @@
 {
-  "pages": 2,
+  "pages": 1,
   "geometry": "792x612",
-  "mode": "CONTINUATION_REQUIRED",
+  "mode": "DENSE",
   "fonts": "\"Helvetica Neue\", \"Segoe UI\", Helvetica, Arial, sans-serif | \"Helvetica Neue\", Helvetica, Arial, sans-serif | \"Helvetica Neue\", \"Arial Narrow\", Arial, sans-serif",
   "primitivesByKind": {
     "barcode": 1,
-    "path": 71,
+    "path": 72,
     "qr": 2,
     "rect": 31,
-    "rule": 14,
-    "text": 252
+    "rule": 15,
+    "text": 265
   },
   "fills": [
     "#0a0a0a",
@@ -97,7 +97,6 @@
   ],
   "totalBand": "$95,695.00",
   "svgDigest": [
-    "bd158fac",
-    "da465608"
+    "75e29ff2"
   ]
 }

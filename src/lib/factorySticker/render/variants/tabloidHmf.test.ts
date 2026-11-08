@@ -117,21 +117,22 @@ describe("Tabloid reproduction layouts (Hyundai, Mitsubishi, Ford)", () => {
         expectNoTextOverlap(proven, 0);
       });
 
-      it("continues long equipment onto further pages without dropping items", () => {
+      it("is exactly one page, with a validated equipment size at or above the floor", () => {
+        expect(model!.pages.length).toBe(1);
+        expect(model!.fit.ok).toBe(true);
+        expect(pageStrings(model!, 0)).toContain("PAGE 1 OF 1");
+        expect(model!.printedEquipment.length).toBeGreaterThan(0);
+        for (const p of model!.pages[0].primitives) {
+          if (p.kind === "text") expect(p.size).toBeGreaterThanOrEqual(5.2);
+        }
+      });
+
+      it("never adds a page: equipment that cannot fit one page returns null", () => {
         const extra = Array.from({ length: 300 }, (_, i) => `Variant Extended Line ${String(i).padStart(3, "0")}`);
         const long = run(
           build, { ...fixture, standardEquipment: { ...fixture.standardEquipment, technology: extra } }, displayMake,
-        )!;
-        expect(long.pages.length).toBeGreaterThan(1);
-        const printed = long.drawnStrings.join("\n").toUpperCase();
-        for (const line of extra) expect(printed).toContain(line.toUpperCase());
-        const last = long.pages.length;
-        expect(pageStrings(long, last - 1)).toContain(`PAGE ${last} OF ${last}`);
-        for (let i = 0; i < last; i++) {
-          expect(pageStrings(long, i)).toContain(PRINTED_BANNER);
-          expect(norm(pageStrings(long, i).join(" "))).toContain(norm(REPRODUCTION_DISCLOSURE));
-        }
-        expectNoTextOverlap(long, 1);
+        );
+        expect(long).toBeNull();
       });
 
       it("never prints a zero for unknown values", () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildRenderLayout } from "./contract";
 import { layoutToSvg } from "./previewSvg";
-import { infinitiBenchmark, longEquipmentFixture, themeFor } from "./__fixtures__/renderData";
+import { infinitiBenchmark, qx55ClassFixture, themeFor } from "./__fixtures__/renderData";
 
 describe("previewSvg", () => {
   const model = buildRenderLayout(infinitiBenchmark(), themeFor("infiniti"));
@@ -27,13 +27,14 @@ describe("previewSvg", () => {
     expect(svg).not.toMatch(/\bundefined\b|\bNaN\b/);
   });
 
-  it("stacks continuation pages vertically", () => {
-    const two = layoutToSvg(buildRenderLayout(longEquipmentFixture(), themeFor("infiniti")));
-    expect(two).toContain('data-page="1"');
-    expect(two).toContain('data-page="2"');
-    const doc = new DOMParser().parseFromString(two, "image/svg+xml");
-    expect(two).toContain('data-page="3"');
-    expect(Number(doc.documentElement.getAttribute("height"))).toBe(612 * 3 + 12 * 2);
+  it("draws a single page and refuses a multi-page model", () => {
+    const one = layoutToSvg(buildRenderLayout(qx55ClassFixture(), themeFor("infiniti")));
+    expect(one).toContain('data-page="1"');
+    expect(one).not.toContain('data-page="2"');
+    const doc = new DOMParser().parseFromString(one, "image/svg+xml");
+    expect(Number(doc.documentElement.getAttribute("height"))).toBe(612);
+    const model = buildRenderLayout(qx55ClassFixture(), themeFor("infiniti"));
+    expect(() => layoutToSvg({ ...model, pages: [model.pages[0], model.pages[0]] })).toThrow(/one_page_only/);
   });
 
   it("is deterministic", () => {

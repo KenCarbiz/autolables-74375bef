@@ -114,6 +114,16 @@ describe("reference variant registry", () => {
     expect(normalizePowertrain("Hybrid")).toBe("HYBRID");
     expect(normalizePowertrain("Flex Fuel (E85)")).toBe("FLEX_FUEL_E85");
     expect(normalizePowertrain("Electric")).toBeNull();
+    // FuelEconomy.gov fuelType values as stored on epa_economy.
+    expect(normalizePowertrain("Premium")).toBe("GASOLINE");
+    expect(normalizePowertrain("Regular")).toBe("GASOLINE");
+    expect(normalizePowertrain("Premium Gasoline")).toBe("GASOLINE");
+    expect(normalizePowertrain("Premium and Electricity")).toBe("PLUG_IN_HYBRID");
+    expect(normalizePowertrain("Regular Gas and Electricity")).toBe("PLUG_IN_HYBRID");
+    expect(normalizePowertrain("Gasoline or E85")).toBe("FLEX_FUEL_E85");
+    expect(normalizePowertrain("Electricity")).toBeNull();
+    expect(normalizePowertrain("Diesel")).toBeNull();
+    expect(normalizePowertrain("Premium Diesel")).toBeNull();
   });
 });
 

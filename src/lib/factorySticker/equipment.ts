@@ -89,6 +89,28 @@ export function categorizeEquipmentItem(name: string): EquipmentCategory {
   return "OTHER";
 }
 
+// Second pass for items the primary rules leave in OTHER. First match wins;
+// the item text is never changed, only which group it prints under.
+const FALLBACK_RULES: Array<[EquipmentCategory, RegExp]> = [
+  ["SAFETY_SECURITY", /\b(brakes?|braking|belts?|pre-?tensioners?|restraints?|lane|collision|warning|stability|hill (hold|holder|start)|vehicle dynamic|pressure monitor|child|avoidance|pedestrian|cyclist|junction|theft|immobili[sz]ation|find my car|geo-?fencing|breakdown|accident|speed (alert|limiter|assist)|sign recognition|autonomous|automation|highway assist|traffic jam|parking (assistance|distance|device)|blind|operates (above|below)|without turn signal)\b/i],
+  ["TECHNOLOGY", /\b(speakers?|subwoofer|sound|apps?|navigat\w*|screen|camera|sirius\w*|apple|google|alexa|android|connected|services?|phone|ports?|information|monitor|mobile|over air|ota|data (plan|feed)|speech|virtual assistant|diagnostics|driving history|instrument cluster|dashboard|send destination|compass|integration)\b/i],
+  ["POWERTRAIN", /\b(suspension|steering|stabilizer|gears?|displacement|liter|stop\/?start|start\/stop|torque|cyl|cylinders?|clutch|driveline|wheelbase|in-line|unleaded|fuel|driver modes?)\b/i],
+  ["COMFORT_CONVENIENCE", /\b(power (windows?|seats?|mirrors?|doors?|locks?)|locks?|locking|adjustable|heater|defogger|defroster|conditioning|outlet|12 volt|filter|smart (card|key)|remote|vehicle start|start button|tilt|closing|profiles?)\b/i],
+  ["EXTERIOR", /\b(doors?|hinged|liftgate|lifting gate|trunk|hatch|roof|panoramic|rails?|wipe|wipers?|dusk|high beam|coming home|fender|molding|moulding|lights?|lamps?|mudguards?)\b/i],
+  ["INTERIOR", /\b(mats?|visors?|mirror|vanity|storage|pockets?|lighting|seating)\b/i],
+];
+
+/** Group for a standard-equipment item whose source group name says nothing useful. */
+export function classifyStandardItem(name: string): EquipmentCategory {
+  if (/\bseat ?belts?\b|pre-?tensioners?/i.test(name)) return "SAFETY_SECURITY";
+  const primary = categorizeEquipmentItem(name);
+  if (primary !== "OTHER") return primary;
+  for (const [category, re] of FALLBACK_RULES) {
+    if (re.test(name)) return category;
+  }
+  return "OTHER";
+}
+
 const HINT_RULES: Array<[EquipmentCategory, RegExp]> = [
   ["SAFETY_SECURITY", /safety|security|adas|driver.?assist|airbag|brak/i],
   ["TECHNOLOGY", /tech|infotain|connect|audio|entertain|instrument|telematic|navigation/i],
