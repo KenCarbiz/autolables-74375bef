@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { Switch } from "@/components/ui/switch";
 import { Globe } from "lucide-react";
@@ -6,8 +7,31 @@ import { Globe } from "lucide-react";
 // Automation, surfaced in the Passport group where dealers look for
 // publishing config. One source of truth — both cards read and write the
 // same setting, and the dangerous-toggle confirm applies in both places.
-export default function PassportPublishingCard() {
+export default function PassportPublishingCard({ readOnly = false, value, manageTo }: { readOnly?: boolean; value?: boolean; manageTo?: string } = {}) {
   const { settings, updateSettings } = useDealerSettings();
+
+  if (readOnly) {
+    const on = value ?? settings.ingest_auto_publish !== false;
+    return (
+      <div id="passport-publishing" className="rounded-xl border border-adm-divider bg-adm-surface p-4 sm:p-5">
+        <div className="flex items-start gap-3">
+          <Globe className="w-6 h-6 text-adm-primary mt-0.5 shrink-0" aria-hidden="true" />
+          <div className="flex-1 min-w-0">
+            <h3 className="text-[16px] leading-[24px] font-semibold text-adm-ink">Passport publishing</h3>
+            <p className="text-[14px] leading-[20px] text-adm-muted mt-0.5">
+              Auto-publish on intake is <strong className="text-adm-ink">{on ? "on" : "off"}</strong>. {on ? "A passport goes live the moment a vehicle is ingested, before recon, K-208 or installs are done." : "A person publishes each vehicle from Inventory when it is ready."}
+            </p>
+            <p className="text-[13px] leading-[18px] text-adm-muted mt-2">Read only here. This is the same shared setting as Publishing, which owns it.</p>
+            {manageTo && (
+              <Link to={manageTo} className="mt-2 inline-flex items-center min-h-[44px] sm:min-h-0 font-semibold text-[14px] text-adm-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary rounded-sm">
+                Manage in Publishing, Effective policy
+              </Link>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div id="passport-publishing" className="rounded-2xl border border-border bg-card p-4">

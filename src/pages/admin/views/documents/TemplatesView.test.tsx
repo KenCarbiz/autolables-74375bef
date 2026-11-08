@@ -58,7 +58,7 @@ describe("TemplatesView", () => {
     expect(screen.getByText("Label defaults panel")).toBeInTheDocument();
     expect(screen.getByText("Factory sticker panel")).toBeInTheDocument();
     expect(screen.getByText("Sticker print templates")).toBeInTheDocument();
-    expect((screen.getByLabelText("Addendum paper size") as HTMLSelectElement).value).toBe("letter");
+    expect((screen.getByRole("combobox", { name: "Addendum paper size" }) as HTMLSelectElement).value).toBe("letter");
     await waitFor(() => expect(screen.getByText(/could not be read/)).toBeInTheDocument());
     expect(screen.getByText("Saves automatically")).toBeInTheDocument();
     expect(mocks.updateSettings).not.toHaveBeenCalled();

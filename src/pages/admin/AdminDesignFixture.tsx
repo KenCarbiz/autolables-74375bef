@@ -5,6 +5,7 @@ import { ADMIN_SECTIONS, resolveAdminTab } from "@/lib/admin/sections";
 import { AdminShell } from "@/components/admin/v2/AdminShell";
 import { AdminCategoryPage, AdminDirectory } from "@/components/admin/v3/AdminV3";
 import { findCategory } from "@/lib/admin/categories";
+import EditorGallery from "@/pages/admin/fixtures/EditorGallery";
 import { ADMIN_VIEWS } from "@/pages/admin/views";
 import { ADMIN_FIXTURES } from "@/pages/admin/fixtures";
 import { ADMIN_CHILD_ROUTE_ELEMENTS } from "@/pages/admin/childRoutes";
@@ -58,9 +59,9 @@ function FixtureChrome({ railWidth, children }: { railWidth: number; children: R
       />
       <div ref={drawer.backgroundRef} className="flex-1 min-w-0">
         <AppHeader
-          groupName="Harte Auto Group"
-          storeLocation="Hartford, CT"
-          storeName="Harte Honda"
+          groupName="Example Motors Group"
+          storeLocation="Sampleville"
+          storeName="Example Motors"
           renderRooftopMenu={(trigger) => <FixtureNote trigger={trigger} what="the rooftop switcher" />}
           onOpenSearch={() => setSearchNote(true)}
           isMac
@@ -99,11 +100,11 @@ export default function AdminDesignFixture() {
   const chrome = search.get("chrome") === "1" || (withDialogBackdrop && search.get("chrome") !== "0");
   // Administration V3: the settings directory (v3-home) and each category
   // page (v3-<category id>), drawn for an owner. Navigation only; no data.
-  const v3 = screen?.startsWith("v3-") ? screen.slice(3) : null;
+  const v3 = screen?.startsWith("v3-") && !ADMIN_FIXTURES[screen] ? screen.slice(3) : null;
   if (v3) {
     const ownerCtx = { role: "owner", isAdmin: false } as const;
     const category = findCategory(v3);
-    const page = v3 === "home" ? <AdminDirectory ctx={ownerCtx} canSeeOverview /> : category ? <AdminCategoryPage category={category} ctx={ownerCtx} /> : <p className="p-8 text-sm">Unknown category {v3}.</p>;
+    const page = v3 === "components" ? <EditorGallery /> : v3 === "home" ? <AdminDirectory ctx={ownerCtx} canSeeOverview /> : category ? <AdminCategoryPage category={category} ctx={ownerCtx} /> : <p className="p-8 text-sm">Unknown category {v3}.</p>;
     return (
       <div data-admin-fixture={screen} data-product-surface="dealer" className="min-h-screen bg-adm-workspace flex">
         <FixtureChrome railWidth={railWidth}>{page}</FixtureChrome>

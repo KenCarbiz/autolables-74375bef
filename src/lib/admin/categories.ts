@@ -191,7 +191,7 @@ export const ADMIN_CATEGORIES: readonly AdminCategory[] = [
         title: "Documents",
         rows: [
           { key: "document-defaults", title: "Document defaults", description: "Which templates each document uses by default.", tab: "document-defaults", aliases: ["defaults", "packet defaults", "signing presentation"] },
-          { key: "templates", title: "Template library", description: "Approved templates, versions and Buyers Guide languages.", tab: "templates", aliases: ["labels", "templates", "buyers guide", "versions"] },
+          { key: "templates", title: "Documents hub", description: "Document readiness, the template library, service documents and document settings.", tab: "templates", aliases: ["labels", "templates", "template library", "buyers guide", "versions", "documents"] },
         ],
       },
       {

@@ -185,6 +185,7 @@ export const ADMIN_CHILD_ROUTES = {
   escalation: "/admin/customer-experience/escalation",
   customerPreview: "/admin/customer-experience/preview",
   printCalibration: "/admin/documents/print-calibration",
+  serviceCatalog: "/admin/documents/service-catalog",
   paymentEstimator: "/admin/brand/payment-estimator",
   paymentAssumptions: "/admin/brand/payment-assumptions",
   storeIdentity: "/admin/brand/store-identity",

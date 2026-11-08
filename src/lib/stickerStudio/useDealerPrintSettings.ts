@@ -7,6 +7,41 @@ import { DEFAULT_CALIBRATION, normalizeCalibration, type PrintCalibration } from
 // per tenant for the default location). Resilient: select("*") so a not-yet-
 // migrated column never breaks the read, and the save falls back to the base
 // column set when the calibration-extras migration (20260620070000) is absent.
+// The single writer for dealer_print_settings. One row per (tenant, location);
+// the hook below saves the dealership default (location null) and the Admin
+// printer profiles save one row per rooftop through the same call, so a save
+// only ever names its own scope.
+export async function upsertPrintCalibration(tenantId: string, locationId: string | null, next: PrintCalibration): Promise<{ ok: boolean; error?: string }> {
+  const cal = normalizeCalibration(next);
+  // deno-lint-ignore no-explicit-any
+  const sb = supabase as any;
+  const base = {
+    tenant_id: tenantId,
+    location_id: locationId,
+    window_label_size: "8.5x11",
+    addendum_label_size: "4.5x11",
+    label_mode: cal.labelMode,
+    x_offset_inches: cal.xOffsetIn,
+    y_offset_inches: cal.yOffsetIn,
+    scale_percentage: cal.scalePct,
+    printer_name: cal.printerName || null,
+  };
+  const extras = {
+    top_safe_margin_inches: cal.topSafeMarginIn,
+    left_safe_margin_inches: cal.leftSafeMarginIn,
+    show_crop_marks: cal.showCropMarks,
+    show_safe_area: cal.showSafeArea,
+  };
+  try {
+    let { error } = await sb.from("dealer_print_settings").upsert({ ...base, ...extras }, { onConflict: "tenant_id,location_id" });
+    if (error) {
+      // Calibration-extras migration not applied yet — persist the base set.
+      ({ error } = await sb.from("dealer_print_settings").upsert(base, { onConflict: "tenant_id,location_id" }));
+    }
+    return { ok: !error, error: error?.message };
+  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : "save_failed" }; }
+}
+
 export function useDealerPrintSettings() {
   const { tenant } = useTenant();
   const tenantId = tenant?.id;
@@ -50,31 +85,7 @@ export function useDealerPrintSettings() {
     const cal = normalizeCalibration(next);
     setCalibration(cal); // optimistic
     if (!tenantId) return { ok: false, error: "no_tenant" };
-    const base = {
-      tenant_id: tenantId,
-      location_id: null,
-      window_label_size: "8.5x11",
-      addendum_label_size: "4.5x11",
-      label_mode: cal.labelMode,
-      x_offset_inches: cal.xOffsetIn,
-      y_offset_inches: cal.yOffsetIn,
-      scale_percentage: cal.scalePct,
-      printer_name: cal.printerName || null,
-    };
-    const extras = {
-      top_safe_margin_inches: cal.topSafeMarginIn,
-      left_safe_margin_inches: cal.leftSafeMarginIn,
-      show_crop_marks: cal.showCropMarks,
-      show_safe_area: cal.showSafeArea,
-    };
-    try {
-      let { error } = await sb().from("dealer_print_settings").upsert({ ...base, ...extras }, { onConflict: "tenant_id,location_id" });
-      if (error) {
-        // Calibration-extras migration not applied yet — persist the base set.
-        ({ error } = await sb().from("dealer_print_settings").upsert(base, { onConflict: "tenant_id,location_id" }));
-      }
-      return { ok: !error, error: error?.message };
-    } catch (e) { return { ok: false, error: e instanceof Error ? e.message : "save_failed" }; }
+    return upsertPrintCalibration(tenantId, null, cal);
   }, [tenantId]);
 
   return { calibration, setCalibration, save, loading };

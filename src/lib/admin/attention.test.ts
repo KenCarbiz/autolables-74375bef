@@ -41,4 +41,9 @@ describe("attention queue", () => {
     expect(q[0]).toMatchObject({ id: "feed", status: "needs_review", action: { href: "/admin?tab=inventory-feed" } });
     expect(q[1]).toMatchObject({ id: "routing", status: "incomplete", action: { href: "/admin/customer-experience/escalation" } });
   });
+
+  it("keeps the lower-bound marker when the vehicle count is capped (E3)", () => {
+    const q = buildAttentionQueue({ ...empty, exceptions: { instances: knownCount(2500), vehicles: { kind: "known", value: 1000, capped: true } } } as never);
+    expect(q.find((i) => i.id === "exceptions")?.count).toMatchObject({ value: 1000, atLeast: true });
+  });
 });

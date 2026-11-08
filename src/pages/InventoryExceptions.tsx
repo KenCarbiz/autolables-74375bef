@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -125,9 +126,16 @@ export default function InventoryExceptions() {
   // A failed load and an empty queue both leave `rows` empty. Only this tells
   // the dealer which one happened.
   const [loadError, setLoadError] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | Status>("open");
-  const [severityFilter, setSeverityFilter] = useState<"all" | Severity>("all");
-  const [typeFilter, setTypeFilter] = useState<"all" | string>("all");
+  const [urlParams] = useSearchParams();
+  const urlStatus = urlParams.get("status");
+  const urlSeverity = urlParams.get("severity");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | Status>(
+    urlStatus && ["all", "active", "open", "in_progress", "resolved", "dismissed"].includes(urlStatus) ? (urlStatus as "all" | "active" | Status) : "open",
+  );
+  const [severityFilter, setSeverityFilter] = useState<"all" | Severity>(
+    urlSeverity && ["critical", "high", "medium", "low", "info"].includes(urlSeverity) ? (urlSeverity as Severity) : "all",
+  );
+  const [typeFilter, setTypeFilter] = useState<"all" | string>(urlParams.get("type") || "all");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Exception | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -205,7 +213,7 @@ export default function InventoryExceptions() {
   const filtered = useMemo(() => {
     const q = search.trim().toUpperCase();
     return rows
-      .filter((r) => statusFilter === "all" ? true : r.status === statusFilter)
+      .filter((r) => statusFilter === "all" ? true : statusFilter === "active" ? r.status === "open" || r.status === "in_progress" : r.status === statusFilter)
       .filter((r) => severityFilter === "all" ? true : r.severity === severityFilter)
       .filter((r) => typeFilter === "all" ? true : r.exception_type === typeFilter)
       .filter((r) => !q ? true : r.vin.includes(q) || (r.stock_number || "").toUpperCase().includes(q))
@@ -253,7 +261,7 @@ export default function InventoryExceptions() {
             className="h-8 pl-8 pr-3 rounded-md border border-border bg-background text-xs w-52" />
         </div>
         <FilterSelect value={statusFilter} onChange={(v) => setStatusFilter(v as any)} label="Status"
-          options={[["all", "All"], ["open", "Open"], ["in_progress", "In progress"], ["resolved", "Resolved"], ["dismissed", "Dismissed"]]} />
+          options={[["all", "All"], ["active", "Open or in progress"], ["open", "Open"], ["in_progress", "In progress"], ["resolved", "Resolved"], ["dismissed", "Dismissed"]]} />
         <FilterSelect value={severityFilter} onChange={(v) => setSeverityFilter(v as any)} label="Severity"
           options={[["all", "All"], ["critical", "Critical"], ["high", "High"], ["medium", "Medium"], ["low", "Low"], ["info", "Info"]]} />
         <FilterSelect value={typeFilter} onChange={(v) => setTypeFilter(v)} label="Type"

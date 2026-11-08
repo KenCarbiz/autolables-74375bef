@@ -9,7 +9,7 @@ import { tenantIdOf } from "@/pages/admin/views/pricing/pricingData";
 import type { EstimatorFixture } from "./data";
 import { EstimatorIcon } from "./icons";
 
-type Summary =
+export type EstimatorSummary =
   | { kind: "loading" }
   | { kind: "unknown" }
   | { kind: "none" }
@@ -17,20 +17,20 @@ type Summary =
 
 type Db = { from: (t: string) => any }; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-function summarize(raw: { config: unknown; updatedAt: string | null } | null): Summary {
+function summarize(raw: { config: unknown; updatedAt: string | null } | null): EstimatorSummary {
   if (!raw) return { kind: "none" };
   const config = normalizeEstimatorConfig(raw.config);
   return { kind: "saved", enabled: config.enabled, ranges: config.rules.filter((r) => r.enabled).length, complete: validateEstimatorConfig({ ...config, enabled: true }).length === 0, updatedAt: raw.updatedAt };
 }
 
-/** Document defaults entry point: the selected store's estimator status and a link to configure it. Read-only. */
-export function PaymentEstimatorSummaryCard() {
+/** The selected store's saved estimator status, read from passport_payment_estimator_settings. Read-only. */
+export function useEstimatorSummary() {
   const fixture = useViewFixture<{ paymentEstimator?: EstimatorFixture }>("document-defaults");
   const { tenant, currentStore } = useTenant();
   const tenantId = tenantIdOf(tenant);
   const storeId = currentStore?.id ?? tenantId;
   const storeName = fixture?.paymentEstimator?.storeName ?? currentStore?.name ?? tenant?.name ?? "this store";
-  const [summary, setSummary] = useState<Summary>(() => fixture
+  const [summary, setSummary] = useState<EstimatorSummary>(() => fixture
     ? summarize(fixture.paymentEstimator?.published ? { config: fixture.paymentEstimator.published.config, updatedAt: fixture.paymentEstimator.published.updatedAt ?? null } : null)
     : { kind: "loading" });
 
@@ -42,7 +42,7 @@ export function PaymentEstimatorSummaryCard() {
         const { data, error } = await (supabase as unknown as Db).from("passport_payment_estimator_settings")
           .select("config, updated_at").eq("tenant_id", tenantId).eq("store_id", storeId).maybeSingle();
         if (!live) return;
-        setSummary(error ? { kind: "unknown" } : summarize(data ? { config: data.config, updatedAt: data.updated_at ?? null } : null));
+        setSummary(error ? { kind: "unknown" } as EstimatorSummary : summarize(data ? { config: data.config, updatedAt: data.updated_at ?? null } : null));
       } catch {
         if (live) setSummary({ kind: "unknown" });
       }
@@ -50,6 +50,12 @@ export function PaymentEstimatorSummaryCard() {
     return () => { live = false; };
   }, [fixture, tenantId, storeId]);
 
+  return { summary, storeName, isFixture: !!fixture };
+}
+
+/** Document defaults entry point: the selected store's estimator status and a link to configure it. Read-only. */
+export function PaymentEstimatorSummaryCard() {
+  const { summary, storeName } = useEstimatorSummary();
   const chip = summary.kind === "saved"
     ? (summary.enabled ? <StatusChip tone="success">On</StatusChip> : <StatusChip tone="neutral">Off</StatusChip>)
     : summary.kind === "none" ? <StatusChip tone="neutral">Not set up</StatusChip> : null;
