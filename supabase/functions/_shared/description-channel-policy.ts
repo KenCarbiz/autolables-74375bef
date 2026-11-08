@@ -333,7 +333,12 @@ export interface PolicyFinding {
   message: string;
 }
 
-export function checkChannelPolicy(content: string, p: ChannelPolicy): PolicyFinding[] {
+/**
+ * `opts.disclosure` is the store's approved legal text. It is the one place a
+ * fee amount may appear (Connecticut requires the conveyance fee amount), so
+ * the price rule reads the body without it.
+ */
+export function checkChannelPolicy(content: string, p: ChannelPolicy, opts: { disclosure?: string | null } = {}): PolicyFinding[] {
   const out: PolicyFinding[] = [];
   const text = content || "";
   const lc = text.toLowerCase();
@@ -380,7 +385,9 @@ export function checkChannelPolicy(content: string, p: ChannelPolicy): PolicyFin
   // A price where the destination forbids one is a compliance problem, not a
   // style problem: the marketplace shows its own price and a second, stale
   // figure in the copy is a misstatement to the shopper.
-  if (p.pricingPolicy === "never" && /\$\s?\d[\d,]{2,}/.test(text)) {
+  const legal = String(opts.disclosure ?? "").trim();
+  const priceText = legal ? text.split(legal).join(" ") : text;
+  if (p.pricingPolicy === "never" && /\$\s?\d[\d,]{2,}/.test(priceText)) {
     out.push({ code: "CHANNEL_PRICE_NOT_ALLOWED", severity: "blocking",
       message: `${p.label} publishes its own pricing; a price in the description body is not permitted.` });
   }
