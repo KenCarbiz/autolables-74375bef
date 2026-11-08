@@ -73,7 +73,7 @@ const IdentityOverride = ({ label, source, value, onChange, onClear, field, disa
         <div className="min-w-0">
           <p className="text-[14px] leading-[20px] font-medium text-adm-ink">{label}</p>
           <p className="text-[14px] leading-[20px] text-adm-ink break-words">{source || <span className="italic text-adm-muted">Not set in the dealership profile</span>}</p>
-          <p className="text-[13px] leading-[18px] text-adm-muted">Source: Dealership &amp; Brand, Identity</p>
+          <p className="text-[13px] leading-[18px] text-adm-muted max-sm:hidden">Source: Dealership &amp; Brand, Identity</p>
         </div>
         <Link to={adminTabHref("identity")} className="inline-flex items-center gap-1 min-h-[40px] max-sm:min-h-[44px] text-[14px] font-semibold text-adm-primary hover:underline">Edit source<AdminIcon name="chevron-right" size="inline" /></Link>
       </div>
@@ -111,15 +111,15 @@ export const BrandVoiceSection = ({ api, onEditPhrases }: { api: DescriptionSett
       </IdentityWrap>
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-5">
-        <FieldRow label="Default tone" htmlFor="desc-tone" error={e.default_tone} help="Changes wording only. It never adds a claim.">
+        <FieldRow label="Default tone" htmlFor="desc-tone" error={e.default_tone} help={narrow ? undefined : "Changes wording only. It never adds a claim."}>
           {(p) => <SelectField {...p} value={d.default_tone} disabled={off} onChange={(ev) => api.edit.set("default_tone", ev.target.value)}>{TONE_OPTIONS.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}</SelectField>}
         </FieldRow>
-        <FieldRow label="Brand voice" htmlFor="desc-voice" optional help="How the dealership sounds, in a few sentences. Guidance for the writer, not text that is copied into the output.">
+        <FieldRow label="Brand voice" htmlFor="desc-voice" optional help={narrow ? undefined : "How the dealership sounds, in a few sentences. Guidance for the writer, not text that is copied into the output."}>
           {(p) => <AutoTextarea {...p} value={d.brand_voice} disabled={off} onChange={(ev) => api.edit.set("brand_voice", ev.target.value)} />}
         </FieldRow>
       </div>
 
-      <FieldRow label="Call to action" htmlFor="desc-cta" optional error={e.cta_template} help="Added once at the end of each description that allows a call to action. Counted in every total.">
+      <FieldRow label="Call to action" htmlFor="desc-cta" optional error={e.cta_template} help={narrow ? undefined : "Added once at the end of each description that allows a call to action. Counted in every total."}>
         {(p) => <AutoTextarea {...p} value={d.cta_template} disabled={off} onChange={(ev) => api.edit.set("cta_template", ev.target.value)} />}
       </FieldRow>
 
@@ -192,8 +192,8 @@ export const OutputProfilesSection = ({ api, onEdit, onPreview, onValidate }: { 
                 <p className="text-[14px] leading-[20px] text-adm-ink">{pr.target ? `Target ${n(pr.target)}. ` : ""}Limit {n(pr.policy.characterLimit)}. Sample {sample.counts ? `${n(sample.counts.codePoints)} characters` : "cannot be built"}.</p>
               ) : (
                 <>
-                  <dl className="grid grid-cols-3 gap-3">
-                    <Row label="Target">{pr.target ? n(pr.target) : "None"}</Row>
+                  <dl className={cn("grid gap-3", pr.target ? "grid-cols-3" : "grid-cols-2")}>
+                    {pr.target && <Row label="Target">{n(pr.target)}</Row>}
                     <Row label={pr.target ? "Draft pool" : "Readable range"}>{n(range.min)} to {n(range.max)}</Row>
                     <Row label="Limit">{n(pr.policy.characterLimit)}</Row>
                   </dl>
@@ -205,10 +205,22 @@ export const OutputProfilesSection = ({ api, onEdit, onPreview, onValidate }: { 
                   </dl>
                 </>
               )}
-              <div className="mt-auto flex gap-2 pt-1">
+              <div className="mt-auto flex flex-wrap gap-2 pt-1">
                 <AdminButton variant="secondary" className="min-h-[44px] flex-1 min-w-0 px-2" onClick={() => onEdit(k)}>{api.canEdit ? "Edit" : "View"}</AdminButton>
-                <AdminButton variant="secondary" className="min-h-[44px] flex-1 min-w-0 px-2" onClick={() => onPreview(k)}>{!narrow && <AdminIcon name="eye" />}Sample</AdminButton>
-                <AdminButton variant="secondary" className="min-h-[44px] flex-1 min-w-0 px-2" onClick={() => onValidate(k)}>{!narrow && <AdminIcon name="shield-check" />}Validation</AdminButton>
+                {narrow ? (
+                  <details className="group relative flex-1 min-w-0">
+                    <summary className="list-none cursor-pointer min-h-[44px] flex items-center justify-center rounded-md border border-adm-border bg-adm-surface text-[14px] font-semibold text-adm-ink px-2 [&::-webkit-details-marker]:hidden">More</summary>
+                    <div className="absolute right-0 z-10 mt-1 w-44 rounded-lg border border-adm-divider bg-adm-surface shadow-lg p-1 flex flex-col">
+                      <button type="button" className="min-h-[44px] px-3 text-left text-[14px] font-medium text-adm-ink rounded-md hover:bg-adm-workspace" onClick={() => onPreview(k)}>Sample</button>
+                      <button type="button" className="min-h-[44px] px-3 text-left text-[14px] font-medium text-adm-ink rounded-md hover:bg-adm-workspace" onClick={() => onValidate(k)}>Validation</button>
+                    </div>
+                  </details>
+                ) : (
+                  <>
+                    <AdminButton variant="secondary" className="min-h-[44px] flex-1 min-w-0 px-2" onClick={() => onPreview(k)}><AdminIcon name="eye" />Sample</AdminButton>
+                    <AdminButton variant="secondary" className="min-h-[44px] flex-1 min-w-0 px-2" onClick={() => onValidate(k)}><AdminIcon name="shield-check" />Validation</AdminButton>
+                  </>
+                )}
               </div>
             </li>
           );
@@ -251,6 +263,7 @@ export const OutputProfilesSection = ({ api, onEdit, onPreview, onValidate }: { 
 
 export const ClaimsSection = ({ api }: { api: DescriptionSettingsApi }) => {
   const d = api.edit.draft!;
+  const narrow = useIsNarrow();
   return (
     <div className="space-y-4">
       <Banner tone="info" icon="shield-check" title="A permission is not proof">Turning a claim on lets descriptions use verified data about it. It never makes the claim true, and nothing is invented without the vehicle's own record.</Banner>
@@ -260,12 +273,12 @@ export const ClaimsSection = ({ api }: { api: DescriptionSettingsApi }) => {
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="min-w-0 flex-1 basis-[220px]"><p className="text-[15px] leading-[22px] font-semibold text-adm-ink">{c.label}</p><p className="text-[14px] leading-[20px] text-adm-muted max-sm:hidden">{c.help}</p></div>
               <div className="flex items-center gap-3">
-                <StatusBadge state={d[c.key] ? "enabled" : "disabled"} label={d[c.key] ? "Permitted" : "Not permitted"} />
-                <SwitchField label="" ariaLabel={`Allow ${c.label}`} checked={d[c.key]} disabled={!api.canEdit} onChange={(v) => api.edit.set(c.key, v)} />
+                <span className="max-sm:hidden"><StatusBadge state={d[c.key] ? "enabled" : "disabled"} label={d[c.key] ? "Permitted" : "Not permitted"} /></span>
+                <SwitchField label={narrow ? (d[c.key] ? "Permitted" : "Off") : ""} ariaLabel={`Allow ${c.label}`} checked={d[c.key]} disabled={!api.canEdit} onChange={(v) => api.edit.set(c.key, v)} />
               </div>
             </div>
             <details className="group">
-              <summary className="cursor-pointer min-h-[44px] flex items-center text-[14px] font-semibold text-adm-primary">What it still needs</summary>
+              <summary className="cursor-pointer min-h-[40px] flex items-center text-[14px] font-semibold text-adm-primary">What it still needs</summary>
               <dl className="space-y-1.5 pb-2">
                 <Row label="What it allows">{c.help}</Row>
                 <Row label="Still needs">{c.needs}</Row>

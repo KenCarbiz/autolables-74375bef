@@ -26,18 +26,22 @@ export const PolicyMatrix = ({ rows, selected, onSelect }: { rows: PublishingRow
   const narrow = useIsNarrow();
   if (narrow) {
     return (
-      <ul className="space-y-3" aria-label="Effective publishing policy by vehicle type">
+      <ul className="space-y-2" aria-label="Effective publishing policy by vehicle type">
         {rows.map((r) => {
           const on = r.vehicleClass === selected;
           return (
             <li key={r.vehicleClass}>
-              <button type="button" aria-pressed={on} onClick={() => onSelect(r.vehicleClass)} className={cn("w-full text-left rounded-xl border p-4 min-h-[44px] space-y-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary", on ? "border-adm-primary bg-adm-selected" : "border-adm-divider bg-adm-surface")}>
+              <button type="button" aria-pressed={on} onClick={() => onSelect(r.vehicleClass)} className={cn("w-full text-left rounded-xl border p-3 min-h-[44px] space-y-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary", on ? "border-adm-primary bg-adm-selected" : "border-adm-divider bg-adm-surface")}>
                 <span className="block text-[16px] leading-[22px] font-semibold text-adm-ink">{r.label}</span>
-                <dl className="grid grid-cols-1 gap-1.5">
-                  {([["Listing visibility", r.listingVisibility], ["Document publication", r.documentPublication], ["Retail readiness", r.retailReadiness], ["Overrides", r.overrides]] as Array<[string, PolicyCell]>).map(([k, c]) => (
-                    <div key={k} className="grid grid-cols-[130px_minmax(0,1fr)] gap-2 text-[14px] leading-[20px]"><dt className="text-adm-muted">{k}</dt><dd className="text-adm-ink break-words"><Cell cell={c} /></dd></div>
-                  ))}
-                </dl>
+                {on ? (
+                  <dl className="grid grid-cols-1 gap-1.5">
+                    {([["Listing visibility", r.listingVisibility], ["Document publication", r.documentPublication], ["Retail readiness", r.retailReadiness], ["Overrides", r.overrides]] as Array<[string, PolicyCell]>).map(([k, c]) => (
+                      <div key={k} className="grid grid-cols-[130px_minmax(0,1fr)] gap-2 text-[14px] leading-[20px]"><dt className="text-adm-muted">{k}</dt><dd className="text-adm-ink break-words"><Cell cell={c} /></dd></div>
+                    ))}
+                  </dl>
+                ) : (
+                  <span className="block text-[14px] leading-[20px] text-adm-muted">{r.listingVisibility.label}. Tap for the full rule.</span>
+                )}
               </button>
             </li>
           );
@@ -93,7 +97,7 @@ export const ConceptCard = ({ card, cell, extra, onDetails }: { card: ClassDetai
       </div>
       <div><StatusBadge state={CELL_STATE[cell.state].state} label={CELL_STATE[cell.state].label} /></div>
       <p className="text-[14px] leading-[20px] text-adm-ink">{card.summary}</p>
-      <p className="text-[14px] leading-[20px] text-adm-muted">{card.explanation}</p>
+      <p className="text-[14px] leading-[20px] text-adm-muted max-sm:hidden">{card.explanation}</p>
       {extra && <p className="text-[14px] leading-[20px] text-adm-ink">{extra}</p>}
     </li>
   );
