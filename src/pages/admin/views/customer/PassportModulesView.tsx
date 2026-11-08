@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { AdminIcon, ScopeLabel, SectionCard, StatusBadge, useIsNarrow } from "@/components/admin/v3/editor";
 import PassportPublishingCard from "@/components/admin/PassportPublishingCard";
 import { adminTabHref } from "@/lib/admin/sections";
 import { PACKET_MODULES } from "@/lib/packetModules";
 import { Banner } from "../brand/feeds/bits";
 import { useSettingsEditor } from "../brand/feeds/useSettingsEditor";
-import { ApplyChrome, LoadingBlock, OwnerLink, PreviewLayout, ToggleRow } from "./customerParts";
+import { ApplyChrome, LINK_ROW, LoadingBlock, PreviewLayout, ToggleRow } from "./customerParts";
 import { ModuleDrawer, ModuleRow, ModulesPreview, OemDrawer, OverrideDrawer, PublishImpact, RequiredList } from "./ModulesParts";
 import { ignoredValues, isOn, MODULE_GROUPS, MODULE_LABELS, moduleChangeRows, modulesToPatch, moduleById, readModules, setModule, unknownEntries, type ModulesDraft } from "./modulesModel";
 import { useOemStatus } from "./useOemStatus";
@@ -91,10 +92,10 @@ export default function PassportModulesView() {
           The Passport uses a fixed layout, so reordering is not offered.
         </Banner>
         <PassportPublishingCard readOnly value={autoPublish} manageTo={adminTabHref("effective-policy")} />
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 max-sm:flex-col max-sm:items-stretch">
           <button type="button" onClick={() => setOverrides(true)} className="inline-flex items-center gap-1 min-h-[44px] sm:min-h-[32px] font-semibold text-[14px] text-adm-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary rounded-sm"><AdminIcon name="help" size="compact" />How vehicle overrides work</button>
           <button type="button" onClick={() => setOemOpen(true)} className="inline-flex items-center gap-1 min-h-[44px] sm:min-h-[32px] font-semibold text-[14px] text-adm-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary rounded-sm"><AdminIcon name="shield-check" size="compact" />Manufacturer document permission</button>
-          <OwnerLink to={adminTabHref("customer-previews")}>Customer previews</OwnerLink>
+          <Link to={adminTabHref("customer-previews")} className={`${LINK_ROW} max-sm:w-full sm:min-h-[32px] sm:border-0 sm:bg-transparent sm:px-0`}>Customer previews<AdminIcon name="arrow-right" size="compact" /></Link>
         </div>
       </SectionCard>
 

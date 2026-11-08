@@ -33,20 +33,23 @@ export function SelectedActions({ cfg, ctx, canEdit, onReorder, onPrimary, onEdi
         const bad = unsafeDestination(b);
         const btn = "inline-flex items-center justify-center gap-1.5 min-h-[44px] sm:min-h-[40px] min-w-[44px] px-3 rounded-md border text-[13px] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-adm-primary disabled:opacity-60";
         return (
-          <div className="min-w-0 space-y-1">
+          <div className="min-w-0 space-y-1" data-selected-row="">
             <div className="flex items-start gap-2 min-w-0">
               {spec && <span className="max-sm:hidden"><AdminIconTile name={spec.icon} tone="neutral" /></span>}
               <div className="min-w-0 flex-1">
-                <p className="text-[14px] leading-[20px] font-semibold text-adm-ink break-words">{b.label}</p>
-                <p className="max-sm:hidden text-[13px] leading-[18px] text-adm-muted break-words">{spec?.destination ?? "Not a supported action"}</p>
+                <p className="text-[14px] leading-[20px] font-semibold text-adm-ink truncate sm:whitespace-normal sm:break-words">{b.label}</p>
+                <p className={cn("text-[13px] leading-[18px] truncate sm:whitespace-normal sm:break-words", av && av.state !== "enabled" ? "text-adm-warning" : "text-adm-muted")}>
+                  {primary && <span className="sm:hidden font-semibold text-adm-primary">Primary. </span>}
+                  {av && av.state !== "enabled" ? `${av.label}. ${av.reason}` : spec?.destination ?? "Not a supported action"}
+                </p>
                 {bad && <p role="alert" className="text-[13px] leading-[18px] font-medium text-adm-danger">{bad}</p>}
               </div>
-              {av && av.state !== "enabled" && <StatusBadge state={av.state} label={av.label} />}
+              {av && av.state !== "enabled" && <span className="max-sm:hidden"><StatusBadge state={av.state} label={av.label} /></span>}
             </div>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <button type="button" aria-pressed={primary} disabled={!canEdit} aria-label={`${primary ? "Primary button" : "Make primary"}: ${b.label}`} onClick={() => onPrimary(b.key)} className={cn(btn, primary ? "bg-adm-selected border-adm-primary text-adm-primary" : "bg-adm-surface border-adm-border text-adm-ink hover:bg-adm-workspace")}>
+            <div className="flex items-center gap-1.5">
+              <button type="button" aria-pressed={primary} disabled={!canEdit} aria-label={`${primary ? "Primary button" : "Make primary"}: ${b.label}`} onClick={() => onPrimary(b.key)} className={cn(btn, "max-sm:px-0 max-sm:w-11", primary ? "bg-adm-selected border-adm-primary text-adm-primary" : "bg-adm-surface border-adm-border text-adm-ink hover:bg-adm-workspace")}>
                 <AdminIcon name="star" size="compact" />
-                {primary ? "Primary" : "Make primary"}
+                <span className="max-sm:hidden">{primary ? "Primary" : "Make primary"}</span>
               </button>
               <IconButton name="edit" label={`Edit ${b.label}`} onClick={() => onEdit(b.key)} />
               <IconButton name="close" label={`Remove ${b.label}`} disabled={!canEdit} onClick={() => onRemove(b.key)} />
@@ -176,7 +179,7 @@ export function ActionEditorDrawer({ buttonKey, cfg, ctx, canEdit, count, onClos
               </dl>
             </div>
             <label className="flex items-center gap-3 min-h-[44px] text-[14px] text-adm-ink">
-              <input type="radio" name="primary-cta" className="w-5 h-5 accent-[var(--adm-primary,#2457D6)]" checked={cfg.primary_key === b.key} disabled={!canEdit} onChange={() => onPrimary(b.key)} />
+              <input type="radio" name="primary-cta" className="w-5 h-5 shrink-0 accent-[var(--adm-primary,#2457D6)]" checked={cfg.primary_key === b.key} disabled={!canEdit} onChange={() => onPrimary(b.key)} />
               Primary button. Exactly one button is primary.
             </label>
           </div>
@@ -226,8 +229,8 @@ export function StickyPreview({ cfg, mode }: { cfg: StickyBottomButtons; mode: "
             const isPrimary = b.key === primary;
             return (
               <span key={b.key} className={cn("min-h-[44px] rounded-xl inline-flex flex-col items-center justify-center gap-0.5 text-[13px] leading-[16px] font-bold px-1.5 py-1.5 min-w-0 text-center break-words", isPrimary ? "bg-[#1451c4] text-white" : "bg-[#F1F5F9] text-[#0F172A] border border-[#E6E8EC]")}>
-                {spec && <AdminIcon name={spec.icon} size="compact" className="flex-shrink-0" />}
-                <span className="min-w-0 [overflow-wrap:anywhere]">{b.label}</span>
+                {spec && items.length <= 2 && <AdminIcon name={spec.icon} size="compact" className="flex-shrink-0" />}
+                <span className="min-w-0 [overflow-wrap:break-word]">{b.label}</span>
               </span>
             );
           })}

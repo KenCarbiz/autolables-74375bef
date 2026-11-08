@@ -25,6 +25,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useViewFixture } from "@/lib/admin/dataSource";
 import { useOptionalDealerSettings } from "./optionalDealerSettings";
 import { DEFAULT_SETTINGS } from "@/contexts/DealerSettingsContext";
 import { adminTabHref, type AdminVisibilityContext } from "@/lib/admin/sections";
@@ -157,7 +158,9 @@ export const V3Header = ({
 );
 
 const StoreScope = () => {
-  const name = useOptionalDealerSettings()?.settings.dealer_name?.trim();
+  const fixtureName = useViewFixture<{ settings?: { dealer_name?: string } }>("brand")?.settings?.dealer_name?.trim();
+  const liveName = useOptionalDealerSettings()?.settings.dealer_name?.trim();
+  const name = fixtureName || liveName;
   if (!name || name === DEFAULT_SETTINGS.dealer_name) return null;
   return (
     <span className="inline-flex items-center gap-1.5">

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AdminButton } from "@/components/admin/v2/primitives";
-import { AdminIcon, AdminIconTile, FieldRow, INPUT_CLASS, ScopeLabel, SectionCard, SelectField, StatusBadge, type AdminIconName } from "@/components/admin/v3/editor";
+import { AdminIcon, AdvancedDisclosure, useIsNarrow, AdminIconTile, FieldRow, INPUT_CLASS, ScopeLabel, SectionCard, SelectField, StatusBadge, type AdminIconName } from "@/components/admin/v3/editor";
 import { useAdminNow } from "@/lib/admin/dataSource";
 import { deriveRoutingReadiness } from "@/lib/admin/effectivePolicy";
 import { routingApplyGate } from "@/lib/admin/routingDraft";
@@ -44,6 +44,7 @@ export default function RoutingView() {
   const { edit, canEdit, settings } = ed;
   const now = new Date(useAdminNow());
   const sections = useToggleSet();
+  const narrow = useIsNarrow();
   const [drawer, setDrawer] = useState<null | "rotation" | "escalation" | "simulate" | "afterhours">(null);
   const [person, setPerson] = useState<{ agent: PassportAgent; existing: boolean } | null>(null);
   const draft = edit.draft;
@@ -105,12 +106,14 @@ export default function RoutingView() {
               const st = unknown ? "unknown" : t.state;
               return (
                 <li key={t.key} data-tier={t.key} className="flex items-center gap-3 rounded-lg border border-adm-divider pl-3 pr-1 py-2 min-h-[64px]">
-                  <span aria-hidden="true" className="max-sm:hidden w-7 h-7 rounded-full bg-adm-workspace text-adm-ink text-[13px] font-semibold inline-grid place-items-center flex-shrink-0">{t.step || "-"}</span>
+                  <span aria-hidden="true" className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-adm-workspace text-adm-ink text-[13px] font-semibold inline-grid place-items-center flex-shrink-0">{t.step || "-"}</span>
                   <AdminIconTile name={TIER_ICON[t.detailKey]} tone="neutral" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{t.title}</p>
+                    <div className="flex items-center gap-x-2 gap-y-1 max-sm:flex-col max-sm:items-start sm:flex-wrap">
+                      <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{t.title}</p>
+                      <span className="sm:hidden"><TierBadge state={st} /></span>
+                    </div>
                     <p className="max-sm:hidden text-[13px] leading-[18px] text-adm-muted break-words">{t.note ?? (t.state === "needs_setup" || t.state === "off" ? t.ownerDetail : TIER_HELP[t.detailKey])}</p>
-                    <p className="sm:hidden mt-0.5 flex items-center gap-2 text-[13px] leading-[18px] text-adm-muted"><span>Step {t.step || "-"}</span><TierBadge state={st} /></p>
                   </div>
                   <span className="max-sm:hidden"><TierBadge state={st} /></span>
                   <button type="button" aria-label={`Open ${t.title} settings`} onClick={() => openFor(t)} className="inline-grid place-items-center w-11 h-11 rounded-md text-adm-muted hover:bg-adm-workspace focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-adm-primary flex-shrink-0">
@@ -124,8 +127,8 @@ export default function RoutingView() {
         </SectionCard>
 
         <SectionCard icon="checklist" title="Readiness" description="What the draft needs before every route ends somewhere that works.">
-          <ul aria-label="Readiness checks" className="divide-y divide-adm-divider rounded-lg border border-adm-divider">
-            {readiness.checks.map((c) => {
+          {(() => {
+            const row = (c: (typeof readiness.checks)[number]) => {
               const [label, state] = unknown ? (["Unknown", "unknown"] as const) : CHECK_LABEL_STATE[c.state];
               return (
                 <li key={c.key} className="flex items-start gap-3 px-3 py-2.5 min-h-[56px]">
@@ -136,8 +139,20 @@ export default function RoutingView() {
                   <StatusBadge state={state} label={label} />
                 </li>
               );
-            })}
-          </ul>
+            };
+            const list = (items: typeof readiness.checks, label: string) => <ul aria-label={label} className="divide-y divide-adm-divider rounded-lg border border-adm-divider">{items.map(row)}</ul>;
+            if (!narrow || unknown) return list(readiness.checks, "Readiness checks");
+            const ready = readiness.checks.filter((c) => c.state === "ok");
+            const attention = readiness.checks.filter((c) => c.state !== "ok");
+            return (
+              <div className="space-y-3">
+                {attention.length > 0 && list(attention, "Readiness checks that need attention")}
+                {ready.length > 0 && (
+                  <AdvancedDisclosure title={attention.length === 0 ? `All ${ready.length} ready` : `${ready.length} more ready`}>{list(ready, "Readiness checks that are ready")}</AdvancedDisclosure>
+                )}
+              </div>
+            );
+          })()}
           {gate && !gate.ok && ed.dirty && <p role="alert" className="text-[14px] leading-[20px] font-medium text-adm-danger">{gate.reason}{gate.newBlockers.length ? ` ${gate.newBlockers.join(" ")}` : ""}</p>}
           <AdminButton variant="secondary" className="w-full sm:w-auto" onClick={() => setDrawer("escalation")}><AdminIcon name="bell" />Response and escalation rules</AdminButton>
         </SectionCard>

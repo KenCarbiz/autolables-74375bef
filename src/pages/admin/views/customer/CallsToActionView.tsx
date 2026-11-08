@@ -94,7 +94,7 @@ export default function CallsToActionView() {
             <legend className="sr-only">Mobile slide-out style</legend>
             {SLIDEOUT_VARIANTS.map((v) => (
               <label key={v.id} className={`flex items-start gap-3 rounded-lg border px-3 py-3 min-h-[56px] cursor-pointer focus-within:outline focus-within:outline-2 focus-within:outline-adm-primary ${draft.mobile_slideout_cta_variant === v.id ? "border-adm-primary bg-adm-selected" : "border-adm-divider hover:bg-adm-workspace"}`}>
-                <input type="radio" name="slideout-variant" className="mt-1 w-5 h-5 accent-[var(--adm-primary,#2457D6)]" checked={draft.mobile_slideout_cta_variant === v.id} onChange={() => edit.set("mobile_slideout_cta_variant", v.id)} />
+                <input type="radio" name="slideout-variant" className="mt-0.5 w-5 h-5 min-w-5 min-h-5 shrink-0 accent-[var(--adm-primary,#2457D6)]" checked={draft.mobile_slideout_cta_variant === v.id} onChange={() => edit.set("mobile_slideout_cta_variant", v.id)} />
                 <span className="min-w-0">
                   <span className="block text-[14px] leading-[20px] font-semibold text-adm-ink">{v.label}</span>
                   <span className="block text-[13px] leading-[18px] text-adm-muted">{v.detail}</span>
