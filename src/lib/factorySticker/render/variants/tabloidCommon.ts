@@ -337,6 +337,12 @@ export function priceRows(d: FactoryStickerData, money: (n: number) => string = 
   ];
 }
 
+/** Price rows without the unpriced paint and trim entries the decoder lists as options; the colour rows already print them. */
+export function priceRowsWithoutColors(d: FactoryStickerData, money: (n: number) => string = formatMoney): PriceRow[] {
+  const colors = new Set([d.vehicle.exteriorColor, d.vehicle.interiorColor].filter((c): c is string => !!c).map((c) => c.trim().toUpperCase()));
+  return priceRows(d, money).filter((r) => !(r.amount === "N/A" && !r.features.length && colors.has(r.label.trim().toUpperCase())));
+}
+
 export function totalMsrp(d: FactoryStickerData): number | undefined {
   return d.pricing.sourceReportedTotalMsrp ?? d.pricing.calculatedTotalMsrp;
 }
@@ -369,9 +375,12 @@ export function paintSafetyPanel(p: Painter, d: FactoryStickerData, x: number, y
 
   const value = (n: number | undefined): number | string => {
     if (r.nhtsaStatus === "UNAVAILABLE") return "Not Available";
+    if (n === undefined && r.nhtsaDecodeOnly && r.nhtsaStatus !== "NOT_RATED") return "Not Available";
     if (r.nhtsaStatus === "NOT_RATED" || n === undefined || n <= 0) return "Not Rated";
     return Math.min(5, Math.round(n));
   };
+  const combinedFrontal = r.frontalRating !== undefined && r.frontalDriverRating === undefined && r.frontalPassengerRating === undefined;
+  const combinedSide = r.sideRating !== undefined && r.sideFrontRating === undefined && r.sideRearRating === undefined;
   const L = x + 9;
   const subX = x + w * o.subFrac;
   const valX = x + w * o.valFrac;
@@ -388,21 +397,31 @@ export function paintSafetyPanel(p: Painter, d: FactoryStickerData, x: number, y
   note("Based on the combined ratings of frontal, side and rollover.", 28);
   note("Should ONLY be compared to other vehicles of similar size and weight.", 40);
   rule(67);
-  tx(p, "Frontal", L, at(71), o.labelSize, "bold");
+  // A single combined rating is NHTSA's overall frontal (or side) rating and is
+  // labeled that way; it is never presented as a per-seat rating.
+  tx(p, combinedFrontal ? "Overall Frontal" : "Frontal", L, at(71), o.labelSize, "bold");
   tx(p, "Crash", L, at(95), o.labelSize, "bold");
-  tx(p, "Driver", subX, at(71), o.labelSize, "body");
-  tx(p, "Passenger", subX, at(95), o.labelSize, "body");
-  cell(value(r.frontalDriverRating), at(71));
-  cell(value(r.frontalPassengerRating), at(95));
+  if (combinedFrontal) {
+    cell(value(r.frontalRating), at(83));
+  } else {
+    tx(p, "Driver", subX, at(71), o.labelSize, "body");
+    tx(p, "Passenger", subX, at(95), o.labelSize, "body");
+    cell(value(r.frontalDriverRating), at(71));
+    cell(value(r.frontalPassengerRating), at(95));
+  }
   note("Based on the risk of injury in a frontal impact.", 113);
   note("Should ONLY be compared to other vehicles of similar size and weight.", 125);
   rule(145);
-  tx(p, "Side", L, at(149), o.labelSize, "bold");
+  tx(p, combinedSide ? "Overall Side" : "Side", L, at(149), o.labelSize, "bold");
   tx(p, "Crash", L, at(173), o.labelSize, "bold");
-  tx(p, "Front seat", subX, at(149), o.labelSize, "body");
-  tx(p, "Rear seat", subX, at(173), o.labelSize, "body");
-  cell(value(r.sideFrontRating), at(149));
-  cell(value(r.sideRearRating), at(173));
+  if (combinedSide) {
+    cell(value(r.sideRating), at(161));
+  } else {
+    tx(p, "Front seat", subX, at(149), o.labelSize, "body");
+    tx(p, "Rear seat", subX, at(173), o.labelSize, "body");
+    cell(value(r.sideFrontRating), at(149));
+    cell(value(r.sideRearRating), at(173));
+  }
   note("Based on the risk of injury in a side impact.", 189);
   rule(206);
   tx(p, "Rollover", L, at(210), o.labelSize, "bold");
@@ -439,6 +458,12 @@ export interface PartsFacts {
   engine?: { label: string; value: string };
   trans?: { label: string; value: string };
   assembly?: string;
+}
+
+/** Label for the final-assembly line: a country alone is never presented as a plant or city. */
+export function assemblyLabel(d: FactoryStickerData): string {
+  const country = d.factory.assemblyCountry;
+  return country && d.factory.finalAssemblyPoint === country ? "COUNTRY OF FINAL ASSEMBLY" : "FINAL ASSEMBLY POINT";
 }
 
 export function partsFacts(d: FactoryStickerData): PartsFacts {
@@ -503,6 +528,12 @@ export interface TabloidSpec {
   paintFirst: (p: Painter, ctx: FirstPageContext) => FirstPageResult | null;
   /** The approved master equipment type; the ladder never grows past it. */
   eqStyle: FlowStyle;
+  /**
+   * Keep the equipment at eqStyle in the template's own columns: no smaller
+   * type and no added columns. Equipment that does not fit is left to the
+   * significance selection, which prints the scope note.
+   */
+  fixedStyle?: boolean;
 }
 
 /** Tightest leading ratio found across the approved tabloid masters. */
@@ -536,8 +567,8 @@ export function assembleTabloid(input: VariantRenderInput, spec: TabloidSpec): L
   const disclosure = disclosureLines(input);
   const footerTop = footerTopFor(disclosure);
 
-  for (const style of styleLadder(spec.eqStyle)) {
-   for (let extraColumns = 0; extraColumns <= MAX_EXTRA_COLUMNS; extraColumns++) {
+  for (const style of spec.fixedStyle ? [spec.eqStyle] : styleLadder(spec.eqStyle)) {
+   for (let extraColumns = 0; extraColumns <= (spec.fixedStyle ? 0 : MAX_EXTRA_COLUMNS); extraColumns++) {
     const ctx: FirstPageContext = { input, d, footerTop, style, extraColumns };
     const probe = spec.paintFirst(new Painter(null), ctx);
     if (probe === null) return null;

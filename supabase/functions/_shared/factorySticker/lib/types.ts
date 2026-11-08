@@ -22,6 +22,8 @@ export interface StickerVehicle {
   transmission?: string;
   drivetrain?: string;
   fuelType?: string;
+  /** Verified evidence of CARB medium-duty class (see FactoryStickerRenderData.carbMediumDutyEvidence). */
+  carbMediumDutyEvidence?: string;
 }
 
 export type EquipmentCategory =
@@ -85,6 +87,8 @@ export interface StickerPricing {
   destinationCharge?: number;
   /** Federal gas-guzzler tax when applicable and source-backed. */
   gasGuzzlerTax?: number;
+  /** Import costs the manufacturer prints as its own line (e.g. Aston Martin); only when the price record states it. */
+  importCharge?: number;
   calculatedTotalMsrp?: number;
   sourceReportedTotalMsrp?: number;
   reconciliationDifference?: number;
@@ -108,8 +112,19 @@ export interface StickerRegulatory {
   smogRating?: number;
   evRangeMiles?: number;
   gasolineCombinedMpg?: number;
+  /** Electricity + gasoline combined MPGe of a plug-in hybrid, exactly as saved from the EPA row. */
+  combinedMpge?: number;
+  kwhPer100Miles?: number;
+  /** Hours on a 240V charger, exactly as saved from the EPA row. */
+  chargeTimeHours?: number;
+  /** Plug-in hybrid all-electric range; evRangeMiles carries the single range of the EPA row. */
+  electricRangeMiles?: number;
+  /** Total (electricity + gasoline) range of a plug-in hybrid. */
+  totalRangeMiles?: number;
   epaClassNote?: string;
   epaSourceReference?: string;
+  /** ISO time the saved fueleconomy.gov row (and its cost figures) was retrieved. */
+  epaRetrievedAt?: string;
   nhtsaStatus: NhtsaStatus;
   overallRating?: number;
   frontalDriverRating?: number;
@@ -117,6 +132,11 @@ export interface StickerRegulatory {
   sideFrontRating?: number;
   sideRearRating?: number;
   rolloverRating?: number;
+  /** Combined category values, for sources that give one frontal and one side rating. */
+  frontalRating?: number;
+  sideRating?: number;
+  /** The ratings come from NHTSA rows in the NeoVIN decode; a category the decode lacks is Not Available. */
+  nhtsaDecodeOnly?: boolean;
   nhtsaSourceReference?: string;
 }
 

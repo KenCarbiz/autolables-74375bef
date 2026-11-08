@@ -494,6 +494,23 @@ describe("missing or generic source information never becomes equipment", () => 
     expect(store.docs).toHaveLength(0);
   });
 
+  it("an option the decode marks unverified is never printed as installed, and the document is held with that reason", async () => {
+    const clean = await runOrchestrate(base(), newStore()) as Filed;
+    const sheet = base().mc_attributes.build_sheet as Record<string, unknown>;
+    const opts = (sheet.options as Array<Record<string, unknown>> | undefined) ?? [];
+    const name = "Illuminated Kick Plates (available)";
+    const l = strip(base(), (s) => ({ ...s, options: [...opts, { name, code: "ZZ9", msrp: 450, verified: false }] }));
+    const o = await runOrchestrate(l, newStore());
+    expect(o.autoPublish).toBe(false);
+    expect(o.kind).toBe("filed");
+    if (o.kind === "filed") {
+      expect(o.rendered.layout.drawnStrings.join(" ")).not.toContain(name);
+      expect(o.assessment.decision.blockers.map((b) => b.code)).toContain("option_install_unverified");
+      expect(o.assessment.decision.reviewReason).toContain(name);
+    }
+    expect(clean.assessment.decision.blockers.map((b) => b.code)).not.toContain("option_install_unverified");
+  });
+
   it("a generic (typical-for-trim) decode is labelled, graded LOW and never auto-published as VIN-specific", async () => {
     const l = strip(base(), (s) => ({ ...s, generic: true }));
     const o = await runOrchestrate(l, newStore());

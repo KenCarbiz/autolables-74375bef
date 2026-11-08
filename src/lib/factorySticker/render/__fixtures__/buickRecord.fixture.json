@@ -1,0 +1,121 @@
+{
+ "note": "SYNTHETIC stress record (no saved Buick vehicle_listings row exists; 2026-11-04 SELECT). Invented values for layout testing only; it is not a real vehicle and not a production candidate.",
+ "vin": "KL47LCEP0TB000001",
+ "slug": "synthetic-2026-buick-envista",
+ "ymm": "2026 Buick Envista",
+ "trim": "Avenir",
+ "condition": "new",
+ "body_type": "SUV",
+ "build_sheet": {
+  "colors": {
+   "exterior": {
+    "code": "GAZ",
+    "name": "Synthetic Ocean Blue"
+   },
+   "interior": {
+    "code": "H1Y",
+    "name": "Synthetic Pebble Gray"
+   }
+  },
+  "decoded_at": "2026-11-04T00:00:00.000Z",
+  "generic": false,
+  "key_features": {
+   "STANDARD": [
+    "Heated Steering Wheel",
+    "Wireless Charging"
+   ]
+  },
+  "options": [
+   {
+    "code": "CF",
+    "msrp": 795,
+    "name": "Synthetic Moonroof, Power, Tilt-Sliding"
+   },
+   {
+    "code": "AS",
+    "msrp": 795,
+    "name": "Synthetic Advanced Safety Package"
+   },
+   {
+    "code": "FM",
+    "msrp": 265,
+    "name": "Synthetic All-Weather Floor Liners"
+   }
+  ],
+  "packages": [],
+  "pricing": {
+   "base_msrp": 28900,
+   "destination_charge": 1725,
+   "total_msrp": 32480
+  },
+  "source": "neovin",
+  "standard": {
+   "STANDARD": [
+    "Keyless Open",
+    "Keyless Start",
+    "Remote Vehicle Starter System",
+    "Wireless Apple CarPlay",
+    "Wireless Android Auto",
+    "Wireless Charging",
+    "Bluetooth Audio Streaming",
+    "Rear Seat Reminder",
+    "6 Speakers",
+    "Driver Information Center",
+    "Stabilitrak Stability Control System",
+    "Tire Fill Alert",
+    "Tilt and Telescopic Steering Column",
+    "Windows, Power, Express Down",
+    "40/60 Split-Bench Rear Folding Seat",
+    "Automatic Climate Control",
+    "Cabin Humidity Sensor",
+    "Engine Air Filtration Monitor",
+    "Microfilter Technology",
+    "Heated Wrapped Flat Bottom Steering Wheel",
+    "Rear Window Defroster",
+    "Door Handles, Body Color",
+    "Mirror Caps, Body Color",
+    "Headlamps, LED",
+    "Daytime Running Lamps, LED",
+    "Rear Liftgate, Power",
+    "Tail Lamps, LED",
+    "Lane Keep Assist with Lane Departure Warning",
+    "Forward Collision Alert",
+    "Automatic Emergency Braking",
+    "Front Pedestrian Braking",
+    "HD Rear Vision Camera",
+    "Rear Park Assist",
+    "Rear Cross Traffic Alert",
+    "Lane Change Alert with Side Blind Zone Alert",
+    "Adaptive Cruise Control",
+    "Mirrors, Outside Heated",
+    "Wipers, Front Intermittent, Rainsense",
+    "Disc Brakes - 4",
+    "Front Wheel Drive",
+    "Gasoline",
+    "3-Cyl",
+    "Four Wheel Drive Type-Full And Part-Time",
+    "Overall Rating - 5"
+   ]
+  }
+ },
+ "epa_economy": {
+  "annualFuelCost": 1700,
+  "checkedAt": "2026-11-04T00:00:00.000Z",
+  "city": 28,
+  "co2TailpipeGpm": 301,
+  "combined": 30,
+  "fuelType": "Regular",
+  "ghgScore": 6,
+  "highway": 32,
+  "matchedOption": "synthetic",
+  "rangeMiles": null,
+  "source": "fueleconomy.gov",
+  "vehicleId": 0
+ },
+ "mc_extra": {
+  "engine": "1.2L I3 Turbo",
+  "transmission": "Automatic",
+  "drivetrain": "FWD",
+  "made_in": "South Korea"
+ }
+}

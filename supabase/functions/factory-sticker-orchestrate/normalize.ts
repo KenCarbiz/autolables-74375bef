@@ -5,8 +5,10 @@
 // dealer_profiles.settings. It performs NO provider calls and invents no
 // facts: missing fields stay null and lower the confidence grade.
 import { parseYmm } from "../_shared/factorySticker/lib/ymm.ts";
-import { decideDrivetrain, splitRatingMetadata, type DrivetrainEvidence } from "../_shared/factorySticker/lib/oem/sourceCorrections.ts";
+import { decideDrivetrain, isRatingMetadata, splitRatingMetadata, type DrivetrainEvidence } from "../_shared/factorySticker/lib/oem/sourceCorrections.ts";
 
+import { driveOf, listingPowertrain, litersOf, storedEpaConflict } from "../_shared/epaMatch.ts";
+import { hasBuiltCatalogTemplates } from "../_shared/factorySticker/lib/oem/templateCatalog.ts";
 import type { FactoryStickerRenderData } from "../_shared/factorySticker/lib/render/contract.ts";
 
 // deno-lint-ignore no-explicit-any
@@ -16,6 +18,8 @@ export interface NormalizeResult {
   data: FactoryStickerRenderData;
   confidence: "HIGH" | "MEDIUM" | "LOW";
   missing: string[];
+  /** Options and packages the decode marks verified=false: available for the model, not proven on this VIN. Never printed as installed. */
+  unverifiedOptions: string[];
   /** From build_sheet.pricing when present (sticker-grade fields). */
   baseMsrp: number | null;
   destinationCharge: number | null;
@@ -76,20 +80,30 @@ export function normalizeForSticker(
   };
   if (!identity.year || !identity.make || !identity.model) missing.push("identity");
 
-  const packages = (Array.isArray(sheet?.packages) ? sheet!.packages : []).map((p: AnyRow) => ({
+  // NeoVIN marks an option verified=false when it is only available for the
+  // model; printing it under installed options would misstate the build.
+  const unverifiedOptions: string[] = [];
+  const installed = (x: AnyRow): boolean => {
+    if (x?.verified !== false && x?.verified !== "false") return true;
+    const name = String(x?.name ?? "").trim();
+    if (name) unverifiedOptions.push(name);
+    return false;
+  };
+  const packages = (Array.isArray(sheet?.packages) ? sheet!.packages : []).filter(installed).map((p: AnyRow) => ({
     name: String(p?.name ?? ""),
     code: str(p?.code),
     msrp: num(p?.msrp),
     contents: (Array.isArray(p?.contents) ? p.contents : []).map((c: unknown) => String(c ?? "")).filter(Boolean),
   })).filter((p: { name: string }) => p.name);
 
-  const options = (Array.isArray(sheet?.options) ? sheet!.options : []).map((o: AnyRow) => ({
+  const options = (Array.isArray(sheet?.options) ? sheet!.options : []).filter(installed).map((o: AnyRow) => ({
     name: String(o?.name ?? ""),
     code: str(o?.code),
     msrp: num(o?.msrp),
   })).filter((o: { name: string }) => o.name);
 
   if (!sheet) missing.push("build_sheet");
+  if (unverifiedOptions.length) missing.push("option_install_unverified");
 
   // marketcheck-specs lifts base MSRP to the top level precisely so every
   // consumer can read it there, and DECODE_OWNED_KEYS preserves that copy
@@ -138,8 +152,34 @@ export function normalizeForSticker(
     fuelType: str(epaRow.fuelType),
     gallonsPer100Miles: epaCombined ? Math.round((100 / epaCombined) * 10) / 10 : null,
     co2TailpipeGpm: num(epaRow.co2TailpipeGpm),
+    // Plug-in and electric figures only when the saved row carries them; read for catalog makes only.
+    ...(hasBuiltCatalogTemplates(identity.make)
+      ? Object.fromEntries(
+        (["combinedMpge", "kwhPer100Miles", "chargeTimeHours", "electricRangeMiles", "totalRangeMiles", "smogScore"] as const)
+          .flatMap((k) => (num(epaRow[k]) !== null ? [[k, num(epaRow[k])]] : [])),
+      ) as { combinedMpge?: number; kwhPer100Miles?: number; chargeTimeHours?: number; electricRangeMiles?: number; totalRangeMiles?: number; smogScore?: number }
+      : {}),
+    // Cost figures are only comparable within one retrieval: the 5-year
+    // comparison is read only from a timestamped row, the same row as the
+    // annual cost, and keeps its sign (negative = spends more).
+    ...(hasBuiltCatalogTemplates(identity.make) && str(epaRow.checkedAt)
+      ? {
+        checkedAt: str(epaRow.checkedAt),
+        ...(Number.isFinite(Number(epaRow.fiveYearCostDifference)) && epaRow.fiveYearCostDifference !== null && epaRow.fiveYearCostDifference !== ""
+          ? { fiveYearCostDifference: Number(epaRow.fiveYearCostDifference) } : {}),
+      }
+      : {}),
   } : null;
   if (!epa) missing.push("epa_economy");
+  // The shared matcher's verdict on the saved EPA row against this car's own decode (catalog makes only).
+  const epaConflict = epa && hasBuiltCatalogTemplates(identity.make)
+    ? storedEpaConflict(epaRow, {
+      powertrain: listingPowertrain({ powertrainType: mc.powertrain_type, fuelType: mc.fuel_type, trim: listing.trim, model: identity.model }),
+      drive: driveOf(str(mc.drivetrain) ?? str(sheet?.mechanical?.drivetrain)),
+      liters: litersOf(str(mc.engine) ?? str(sheet?.mechanical?.engine)),
+      text: `${identity.model ?? ""} ${listing.trim ?? ""}`,
+    })
+    : null;
 
   const drive = decideDrivetrain({ ...identity, source: str(mc.drivetrain) ?? str(sheet?.mechanical?.drivetrain) });
   const mechanical = {
@@ -191,15 +231,33 @@ export function normalizeForSticker(
       assembly,
       mechanical,
       stockNumber,
+      bodyClass: str(mc.body_type),
       epa,
       dealer,
       passportUrl,
       barcodePayload: String(listing.vin || "").toUpperCase(),
       generic,
       disclaimers,
+      // Only makes with catalog templates carry the decode facts; every other
+      // make's data (and fingerprint) is unchanged.
+      ...(hasBuiltCatalogTemplates(identity.make)
+        ? {
+            neovin: {
+              ratingMetadata: [
+                ...standard.ratingMetadata,
+                ...Object.values(catMap(sheet?.key_features)).flat().filter(isRatingMetadata),
+              ],
+              madeIn: str(mc.made_in),
+              ...(/diesel/i.test(String(mc.fuel_type ?? "")) ? { fuelType: String(mc.fuel_type) } : {}),
+              ...(epaConflict ? { epaConflict } : {}),
+              ...(/^(HEV|FHEV)$/i.test(String(mc.powertrain_type ?? "").trim()) ? { hybridDecode: true as const } : {}),
+            },
+          }
+        : {}),
     },
     confidence,
     missing,
+    unverifiedOptions,
     baseMsrp,
     destinationCharge,
     optionsTotal,

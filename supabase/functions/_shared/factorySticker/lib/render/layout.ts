@@ -565,8 +565,10 @@ export class Painter {
     });
   }
 
-  image(png: string, assetId: string, x: number, y: number, w: number, h: number): void {
+  /** `printedText` records the words a wordmark image prints (a logo that reads "HYUNDAI"), so content checks can find them. */
+  image(png: string, assetId: string, x: number, y: number, w: number, h: number, printedText?: string): void {
     this.primitives.push({ kind: "image", png, assetId, x, y, w, h });
+    if (printedText && this.drawn) this.drawn.push(printedText);
   }
 }
 
@@ -1330,6 +1332,9 @@ function paintPricingSplit(p: Painter, y: number, ctx: BuildContext): number {
     ...(pricing.gasGuzzlerTax !== undefined
       ? [["GAS GUZZLER TAX", pricing.gasGuzzlerTax, false] as [string, number | undefined, boolean]]
       : []),
+    ...(pricing.importCharge !== undefined
+      ? [["IMPORT COSTS", pricing.importCharge, false] as [string, number | undefined, boolean]]
+      : []),
   ];
   for (const [label, amount, dollar] of rollup) {
     if (amount === undefined) continue;
@@ -1497,9 +1502,14 @@ function paintTotalBand(p: Painter, y: number, ctx: BuildContext): number {
 
 // ── Right column: EPA Fuel Economy & Environment ──────────────────────
 
+// FuelEconomy.gov files plug-in hybrids as "Premium and Electricity" or
+// "Regular Gas and Electricity"; those must never read as a pure EV.
+export const isPlugInFuel = (fuelType: string | null | undefined): boolean =>
+  /phev|plug/i.test(fuelType ?? "") || /(gas|gasoline|premium|regular|midgrade|diesel)\s+and\s+electricity/i.test(fuelType ?? "");
+
 export function fuelCategoryLabel(fuelType: string | undefined): string {
   const f = (fuelType || "").toLowerCase();
-  if (/phev|plug/.test(f)) return "Plug-In Hybrid";
+  if (isPlugInFuel(f)) return "Plug-In Hybrid";
   if (/hybrid/.test(f)) return "Hybrid Vehicle";
   if (/electric|\bev\b/.test(f)) return "Electric Vehicle";
   if (/diesel/.test(f)) return "Diesel Vehicle";
@@ -1571,7 +1581,7 @@ function paintEpaPanel(p: Painter, y: number, ctx: BuildContext): number {
   // never inherit gasoline-only structures; hybrids keep the gasoline shape
   // under a Hybrid Vehicle tag. Only verified fields are drawn.
   const fuel = (input.data.vehicle.fuelType || "").toLowerCase();
-  const isPhev = /phev|plug/.test(fuel);
+  const isPhev = isPlugInFuel(fuel);
   const isEv = /electric|\bev\b/.test(fuel) && !/hybrid|phev/.test(fuel) && !isPhev;
   const tagW = 70;
   let cy = bodyTop + 12;

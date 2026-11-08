@@ -1,0 +1,195 @@
+{
+  "vin": "1G1RC6S57JU110525",
+  "slug": "2018-chevrolet-volt-110525",
+  "ymm": "2018 Chevrolet Volt",
+  "trim": "LT",
+  "condition": "used",
+  "body_type": "Hatchback",
+  "build_sheet": {
+    "colors": {
+      "exterior": {
+        "code": "G1W",
+        "msrp": 995,
+        "name": "Iridescent Pearl Tricoat"
+      },
+      "interior": {
+        "code": "H1T",
+        "name": "Jet Black/Jet Black Cloth"
+      }
+    },
+    "decoded_at": "2026-08-01T00:00:00.000Z",
+    "generic": false,
+    "key_features": {
+      "STANDARD": [
+        "Parking Distance System",
+        "Premium Speakers",
+        "Satellite Radio",
+        "Bluetooth",
+        "Touch Screen Audio",
+        "Navigation",
+        "Hybrid",
+        "Plug-in Hybrid",
+        "Apple CarPlay",
+        "Android Auto",
+        "Electric"
+      ]
+    },
+    "options": [
+      {
+        "code": "PDB",
+        "msrp": 460,
+        "name": "Comfort Package"
+      },
+      {
+        "code": "VK3",
+        "msrp": 40,
+        "name": "Front License Plate Bracket"
+      },
+      {
+        "code": "62G",
+        "msrp": 275,
+        "name": "Illuminated Charge Port (Dealer)"
+      },
+      {
+        "code": "V7Z",
+        "msrp": 790,
+        "name": "LT Driver Confidence Package"
+      },
+      {
+        "code": "PCQ",
+        "msrp": 900,
+        "name": "Leather Appointed Seats"
+      },
+      {
+        "code": "SJH",
+        "msrp": 1895,
+        "name": "17\" Ultra Bright Machined Finish Wheels (Dealer)"
+      }
+    ],
+    "packages": [],
+    "pricing": {
+      "base_msrp": 33220,
+      "destination_charge": 875,
+      "total_msrp": 38455
+    },
+    "source": "neovin",
+    "standard": {
+      "STANDARD": [
+        "Height Adjustment Steering Wheel",
+        "Steering Wheel Telescopic Adjustment",
+        "Multi Function Steering Wheel",
+        "Rear Parking Distance System",
+        "Rear Parking Camera",
+        "Front Aluminum/Alloy Wheels",
+        "Front Wheel Diameter (17 in)",
+        "6 Speakers",
+        "Projector Beam Headlights",
+        "LED Headlights-Low Beam",
+        "Halogen Headlights-High Beam",
+        "Dusk Sensor",
+        "Daytime Running Lights",
+        "Satellite Radio",
+        "Color Screen Audio System",
+        "Bluetooth Connection",
+        "Touch Screen Audio",
+        "Premium Brand Audio",
+        "Side Curtain Airbag",
+        "Driver Airbag",
+        "Passenger Airbag",
+        "Front Side Airbag",
+        "Rear Side Airbag",
+        "Knee Airbags",
+        "Steering Wheel Mounted Audio Controls",
+        "All Season Tires",
+        "Cargo Area Cover/Rear Parcel Shelf",
+        "Cargo Area Light",
+        "Card Key Power Locks",
+        "Anti-Theft Protection",
+        "Paint-Metallic",
+        "Front Seats Head Restraints",
+        "Rear Seats Head Restraints",
+        "Driver Bucket Seat",
+        "Passenger Bucket Seat",
+        "Rear Seats Bench",
+        "Folding Rear Seats",
+        "Plastic Steering Wheel",
+        "Power Steering",
+        "12 Volt Power Outlet",
+        "Strut Suspension-Front",
+        "Torsion Beam Suspension-Rear",
+        "Automatic Transmission",
+        "CVT Transmission",
+        "Single Zone Air Conditioning",
+        "Automatic Air Conditioning",
+        "Rear View Mirror/Camera",
+        "Rear Spoiler",
+        "Rear Window Defogger",
+        "Tinted Glass",
+        "Front Power Windows",
+        "Rear Power Windows",
+        "Navigational Systems",
+        "Navigational Systems Screen Size (8 in)",
+        "Compass",
+        "Disc Brakes",
+        "ABS Brakes",
+        "Electronic Hand Brake",
+        "Brake Assist",
+        "Garage Door Opener",
+        "Remote Engine Starter",
+        "Low Tire Pressure Monitor",
+        "Smart Card / Smart Key",
+        "Remote Keyless Entry",
+        "Keyless Start",
+        "Voice Recognition",
+        "Telematics System",
+        "Standard-IIHS",
+        "Standard-NHTSA",
+        "Engine Start/Stop",
+        "Cruise Control",
+        "Front USB Connection",
+        "Energy Recuperation",
+        "Plug-In Hybrid",
+        "Electric Driven Wheels-Front",
+        "Selectable Driver Modes",
+        "Mode 2 Charging",
+        "Mode 3 Charging",
+        "Electric Motors-2",
+        "Battery Management-Includes Remote Charge Activation",
+        "Apple Carplay",
+        "Android Auto",
+        "10 Airbags",
+        "Type 1 (J1772)",
+        "FWD",
+        "Electronic Traction Control",
+        "Engine Displacement (1.5 Liters)",
+        "4-Cyl",
+        "In-Line",
+        "Electric Power Source",
+        "Lithium-Ion Battery",
+        "Electric"
+      ]
+    }
+  },
+  "epa_economy": {
+    "annualFuelCost": 1550,
+    "checkedAt": "2026-10-27T04:45:16.972Z",
+    "city": 43,
+    "co2TailpipeGpm": 51,
+    "combined": 42,
+    "fuelType": "Regular Gas or Electricity",
+    "ghgScore": 10,
+    "highway": 42,
+    "matchedOption": "2018 Chevrolet Volt \u2014 Auto (variable gear ratios), 4 cyl, 1.5 L",
+    "rangeMiles": 53,
+    "source": "fueleconomy.gov",
+    "vehicleId": 39190
+  },
+  "mc_extra": {
+    "drivetrain": "FWD",
+    "engine": "1.5L I4",
+    "fuel_type": "Electric / Premium Unleaded",
+    "made_in": "USA",
+    "powertrain_type": "PHEV",
+    "transmission": "Automatic"
+  }
+}

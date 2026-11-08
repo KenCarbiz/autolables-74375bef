@@ -30,7 +30,7 @@ import type { SelectionDowngrade, SelectionStatus } from "./oem/selection.ts";
 // Part of the generation fingerprint. Bumping it re-decides every record on
 // its next orchestration instead of letting a stale REVIEW_REQUIRED sit
 // behind a fingerprint that no longer reflects the policy that produced it.
-export const AUTO_PUBLISH_POLICY_VERSION = "2026-11-03.1";
+export const AUTO_PUBLISH_POLICY_VERSION = "2026-11-07.1";
 
 // ── Money ────────────────────────────────────────────────────────────
 // Every comparison below is integer cents. Dollar figures arrive as JSON
@@ -172,7 +172,10 @@ export type AutoPublishBlockerCode =
   | "page_geometry_failed"
   | "one_page_review_required"
   | "qa_failed"
-  | "low_confidence";
+  | "low_confidence"
+  | "option_install_unverified"
+  | "epa_record_missing"
+  | "epa_match_conflict";
 
 export interface AutoPublishBlocker {
   code: AutoPublishBlockerCode;
@@ -204,6 +207,12 @@ export interface AutoPublishInput {
   geometry: { pass: boolean; code: string; reasons: string[] };
   /** The sticker is one physical page; a failed fit is a hold, never a second page. */
   onePageFit?: { ok: boolean; detail: string };
+  /** Options the decode lists as available for the model but not verified on this VIN. */
+  unverifiedOptions?: string[];
+  /** False when no verified EPA fuel-economy row is saved for this VIN. */
+  epaAvailable?: boolean;
+  /** Set when the saved EPA match contradicts this VIN's decode: "powertrain", "drivetrain" or "engine". */
+  epaConflict?: string | null;
 }
 
 export interface AutoPublishDecision {
@@ -273,6 +282,24 @@ export function evaluateAutoPublish(input: AutoPublishInput): AutoPublishDecisio
   if (input.confidence !== "HIGH") {
     block("low_confidence",
       `the decoded record is graded ${input.confidence}, not HIGH`);
+  }
+
+  if (input.unverifiedOptions?.length) {
+    block("option_install_unverified",
+      `the decode lists ${list(input.unverifiedOptions)} as available but not verified on this VIN, `
+      + "so they are left off the installed options and the price table needs a manager's check");
+  }
+
+  if (input.epaAvailable === false) {
+    block("epa_record_missing",
+      "no verified EPA fuel economy record is saved for this VIN, so the fuel economy panel is left blank; "
+      + "a manager must confirm the vehicle is exempt (for example a heavy-duty truck over 8,500 lb) or add the EPA match");
+  }
+
+  if (input.epaConflict) {
+    block("epa_match_conflict",
+      `the saved EPA fuel economy match disagrees with this VIN's decoded ${input.epaConflict}, `
+      + "so the figures cannot be shown as verified until a manager confirms the right EPA configuration");
   }
 
   if (!input.completeness.pass) {
