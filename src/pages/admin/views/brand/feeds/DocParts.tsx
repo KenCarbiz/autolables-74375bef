@@ -49,7 +49,7 @@ export const NoPreview = ({ label = "No preview for this option", compact }: { l
  * with sample data, so it is exposed as one labelled image and its inner sample text is presentational.
  */
 export const Thumb = ({ entry, branding, size = "card" }: { entry: TemplateEntry; branding: StickerBranding; size?: "card" | "small" | "mini" | "tiny" }) => {
-  const dims = size === "tiny" ? { w: 64, h: 84, scale: 0.075 } : size === "card" ? { w: 168, h: 224, scale: 0.2 } : size === "small" ? { w: 120, h: 160, scale: 0.14 } : { w: 144, h: 192, scale: 0.17 };
+  const dims = size === "tiny" ? { w: 64, h: 84, scale: 0.075 } : size === "card" ? { w: 204, h: 272, scale: 0.243 } : size === "small" ? { w: 120, h: 160, scale: 0.14 } : { w: 144, h: 192, scale: 0.17 };
   return (
     <div className="rounded-lg border border-adm-divider bg-adm-workspace overflow-hidden flex items-center justify-center flex-shrink-0 mx-auto" style={{ width: dims.w, height: dims.h }} data-preview={entry.template ? "renderer" : "none"}
       {...(entry.template ? { role: "img", "aria-label": `Layout preview of ${entry.name}, drawn with sample data` } : {})}>
@@ -71,13 +71,13 @@ const Fact = ({ label, children }: { label: string; children: ReactNode }) => (
   </div>
 );
 
-export const EntryFacts = ({ entry }: { entry: TemplateEntry }) => (
+export const EntryFacts = ({ entry, part }: { entry: TemplateEntry; part?: "primary" | "rest" }) => (
   <dl>
-    <Fact label="Registry ID"><code className="text-[13px]">{entry.id}</code></Fact>
-    <Fact label="Version">{entry.version}</Fact>
-    <Fact label="Document type">{entry.documentType}</Fact>
-    <Fact label="Paper size">{entry.paper}</Fact>
-    <Fact label="Availability"><AvailabilityBadge availability={entry.availability} /></Fact>
+    {part !== "primary" && <Fact label="Registry ID"><code className="text-[13px]">{entry.id}</code></Fact>}
+    {part !== "primary" && <Fact label="Version">{entry.version}</Fact>}
+    {part !== "primary" && <Fact label="Document type">{entry.documentType}</Fact>}
+    {part !== "rest" && <Fact label="Paper size">{entry.paper}</Fact>}
+    {part !== "rest" && <Fact label="Availability"><AvailabilityBadge availability={entry.availability} /></Fact>}
   </dl>
 );
 
@@ -91,7 +91,7 @@ export const SlotCard = ({ resolved, slot, entry, branding, canEdit, onChange, o
     return (
       <li className={cn("rounded-xl border bg-adm-surface p-3 min-w-0", changed ? "border-adm-primary ring-1 ring-adm-primary/30" : "border-adm-divider")} data-slot={slot}>
         <div className="flex items-start gap-3">
-          {entry ? <Thumb entry={entry} branding={branding} size="tiny" /> : <div className="flex-shrink-0 w-16 h-[84px] rounded-lg border border-dashed border-adm-border bg-adm-workspace" aria-hidden="true" />}
+          <span role="img" aria-label={entry ? `${entry.name} template` : "No template chosen"} className="flex-shrink-0"><AdminIconTile name={def.kind === "window" ? "file" : "file-plus"} /></span>
           <div className="min-w-0 flex-1">
             <h3 className="text-[14px] leading-[20px] font-semibold text-adm-ink">{SLOT_TITLE[slot]}{changed && <span className="ml-2 align-middle"><StatusBadge state="overridden" label="Changed" /></span>}</h3>
             {entry ? (
@@ -110,6 +110,7 @@ export const SlotCard = ({ resolved, slot, entry, branding, canEdit, onChange, o
         {entry && (
           <DetailDrawer open={open} onClose={() => setOpen(false)} title={SLOT_TITLE[slot]} description={entry.name}
             footer={<AdminButton variant="secondary" onClick={() => { setOpen(false); onPreview(); }}><AdminIcon name="eye" />Preview</AdminButton>}>
+            <Thumb entry={entry} branding={branding} size="mini" />
             <div className="flex flex-wrap gap-1.5"><OriginBadge origin={entry.origin} /></div>
             <EntryFacts entry={entry} />
             <p className="text-[13px] leading-[18px] text-adm-muted">{SOURCE_TEXT[resolved.source]}.{entry.note ? ` ${entry.note}` : ""}</p>
@@ -128,10 +129,10 @@ export const SlotCard = ({ resolved, slot, entry, branding, canEdit, onChange, o
         </div>
         {changed && <StatusBadge state="overridden" label="Changed" />}
       </header>
-      <div className="p-4 grid grid-cols-[120px_minmax(0,1fr)] min-[520px]:grid-cols-[168px_minmax(0,1fr)] min-[520px]:grid-rows-[auto_auto_1fr] gap-x-4 gap-y-3 flex-1">
+      <div className="p-4 grid grid-cols-[120px_minmax(0,1fr)] min-[520px]:grid-cols-[204px_minmax(0,1fr)] min-[520px]:grid-rows-[auto_auto_1fr] gap-x-4 gap-y-3 flex-1">
         <div className="min-[520px]:row-span-3">
           {entry ? <><div className="hidden min-[520px]:block"><Thumb entry={entry} branding={branding} size="card" /></div><div className="min-[520px]:hidden"><Thumb entry={entry} branding={branding} size="small" /></div></> : (
-            <div className="rounded-lg border border-dashed border-adm-border bg-adm-workspace mx-auto w-[120px] h-[160px] min-[520px]:w-[168px] min-[520px]:h-[224px]"><NoPreview label={resolved.state === "missing" ? "Saved template not found" : "No default chosen"} compact /></div>
+            <div className="rounded-lg border border-dashed border-adm-border bg-adm-workspace mx-auto w-[120px] h-[160px] min-[520px]:w-[204px] min-[520px]:h-[272px]"><NoPreview label={resolved.state === "missing" ? "Saved template not found" : "No default chosen"} compact /></div>
           )}
         </div>
         {entry ? (
@@ -142,21 +143,12 @@ export const SlotCard = ({ resolved, slot, entry, branding, canEdit, onChange, o
               {narrow && <p className="mt-1 text-[13px] leading-[18px] text-adm-muted">{SOURCE_TEXT[resolved.source]}.</p>}
             </div>
             <div className="col-span-2 min-[520px]:col-span-1 min-w-0">
-              {narrow ? (
-                <details className="group">
-                  <summary className="flex items-center justify-between gap-2 min-h-[44px] cursor-pointer list-none text-[14px] font-semibold text-adm-primary">
-                    <span className="flex items-center gap-2 flex-wrap min-w-0"><OriginBadge origin={entry.origin} /></span>
-                    <span className="inline-flex items-center gap-1 flex-shrink-0">Details<AdminIcon name="chevron-down" className="group-open:rotate-180" /></span>
-                  </summary>
-                  <EntryFacts entry={entry} />
-                  {entry.note && <p className="mt-2 text-[13px] leading-[18px] text-adm-muted">{entry.note}</p>}
-                </details>
-              ) : (
-                <>
-                  <EntryFacts entry={entry} />
-                  <p className="mt-2 text-[13px] leading-[18px] text-adm-muted">{SOURCE_TEXT[resolved.source]}.{entry.note ? ` ${entry.note}` : ""}</p>
-                </>
-              )}
+              <EntryFacts entry={entry} part="primary" />
+              <p className="mt-2 text-[13px] leading-[18px] text-adm-muted">{SOURCE_TEXT[resolved.source]}.{entry.note ? ` ${entry.note}` : ""}</p>
+              <details className="group mt-1 border-t border-adm-divider">
+                <summary className="flex items-center justify-between min-h-[44px] cursor-pointer list-none text-[14px] font-semibold text-adm-primary">Details<AdminIcon name="chevron-down" className="group-open:rotate-180" /></summary>
+                <EntryFacts entry={entry} part="rest" />
+              </details>
             </div>
           </>
         ) : resolved.state === "missing" ? (

@@ -131,7 +131,7 @@ export default function WebsitesFeedsView() {
 >
             {!narrow && <div><StatusBadge state={savedProviders > 0 ? "enabled" : "setup_required"} label={`${savedProviders} of ${PROVIDERS.length} saved`} /></div>}
             {narrow ? <p className="text-[13px] leading-[18px] text-adm-muted">A saved address is not a connected account. No login or live link, and no price is verified until a crawler run.</p> : <Banner tone="neutral" icon="info" title="A saved address is not a connected account">{narrow ? "No login or live link. No price is verified until a crawler run." : "Each card lists what the address does today. AutoLabels holds no login or live link to any marketplace, and no price is marked verified until a crawler run or test reads it."}</Banner>}
-            <ul className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-3 sm:gap-4" aria-label="Marketplace providers">
+            <ul className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4" aria-label="Marketplace providers">
               {PROVIDERS.map((p) => (
                 <ProviderCard key={p.id} provider={p} value={(draft[p.key] as string) ?? ""} onChange={(v) => set(p.key, v)} error={err(p.key)} canEdit={canEdit} onDetails={() => setDrawer(p)} />
               ))}
