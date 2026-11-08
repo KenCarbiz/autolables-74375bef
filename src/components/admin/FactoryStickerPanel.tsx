@@ -15,6 +15,7 @@ import { useWindowSticker } from "@/hooks/useWindowSticker";
 import { freshFiledDocumentUrl } from "@/lib/filedDocumentUrl";
 import { AdminButton, StatusChip, type Tone } from "@/components/admin/v2/primitives";
 import { AdminIcon, SectionCard, SwitchField, useIsNarrow } from "@/components/admin/v3/editor";
+import { AccordionCard } from "@/pages/admin/views/documents/hub/AccordionCard";
 import { StackedRows } from "@/pages/admin/views/documents/hub/StackedRows";
 
 // Factory Build Record review panel (Admin > Label Templates). Tenant-wide
@@ -321,16 +322,16 @@ export default function FactoryStickerPanel() {
         )}
       </SectionCard>
 
-      <SectionCard id="factory-sticker-settings" icon="settings" title="Factory Build Record settings" description="Store-wide controls for how factory build records are generated and published.">
-        <ul className="divide-y divide-adm-divider">
+      <AccordionCard id="factory-sticker-settings" icon="settings" title="Factory Build Record settings" description="Store-wide controls for how factory build records are generated and published." summary={`${SETTING_ROWS.filter((r) => fs[r.key]).length} of ${SETTING_ROWS.length} settings on`}>
+        <ul className="grid gap-3 md:grid-cols-2">
           {SETTING_ROWS.map((s) => (
-            <li key={s.key} className="py-3 first:pt-0 last:pb-0">
+            <li key={s.key} className="rounded-lg border border-adm-divider px-3.5 py-2.5">
               <SwitchField label={s.title} checked={fs[s.key]} onChange={(next) => void changeSetting(s.key, next, s.title)} />
-              <p className="ml-[52px] text-[13px] leading-[18px] text-adm-muted">{s.detail}</p>
+              <p className="ml-[52px] pb-1 text-[13px] leading-[18px] text-adm-muted">{s.detail}</p>
             </li>
           ))}
         </ul>
-      </SectionCard>
+      </AccordionCard>
     </div>
   );
 }

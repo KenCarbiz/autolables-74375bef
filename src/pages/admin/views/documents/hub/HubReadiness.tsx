@@ -39,6 +39,32 @@ function VehicleCell({ row }: { row: HubRow }) {
   );
 }
 
+function MobileVehicleCard({ row: r, onOpen }: { row: HubRow; onOpen: () => void }) {
+  const [open, setOpen] = useState(false);
+  const items = r.facts.documents.length + (r.facts.service ? 1 : 0);
+  const ready = r.facts.documents.filter((d) => d.finished).length + (r.facts.service?.state === "signed" ? 1 : 0);
+  const panelId = useId();
+  return (
+    <li className="px-4 py-2.5">
+      <div className="flex items-start justify-between gap-2">
+        <button type="button" aria-label={`Open details for ${vehicleTitle(r)}`} onClick={onOpen} className="min-w-0 flex-1 min-h-[44px] text-left text-[15px] text-adm-primary rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary"><VehicleCell row={r} /></button>
+        <ReadinessChip value={r.facts.readiness} />
+      </div>
+      <button type="button" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between gap-2 min-h-[44px] text-left text-[14px] leading-[20px] text-adm-ink rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary">
+        <span>{ready} of {items} {items === 1 ? "document" : "documents"} ready</span>
+        <AdminIcon name={open ? "chevron-down" : "chevron-right"} className="text-adm-muted" />
+      </button>
+      {open && (
+        <div id={panelId} className="flex flex-wrap items-center gap-x-3 gap-y-1 pb-1">
+          {r.facts.documents.map((d) => <DocCellChip key={d.key} cell={d} short />)}
+          <ServiceCellChip service={r.facts.service} />
+        </div>
+      )}
+      <p className="text-[14px] leading-[20px]"><span className="text-adm-muted">Next: </span>{r.facts.nextAction}</p>
+    </li>
+  );
+}
+
 export default function HubReadiness() {
   const [params, setParams] = useSearchParams();
   const narrow = useIsNarrow();
@@ -134,7 +160,7 @@ export default function HubReadiness() {
       </div>
 
       {k208Conflict && <InlineNote tone="warning" title="K-208 does not apply to New">New vehicles are exempt from the K-208 inspection, so this combination matches nothing by design. Choose Used or CPO, or All conditions.</InlineNote>}
-      {table.error && page && <InlineNote tone="danger" title="Showing the last list that loaded" action={<AdminButton size="sm" onClick={table.refetch}>Try again</AdminButton>}>{table.error.message}</InlineNote>}
+      {table.error && page && <InlineNote tone="danger" title="Showing the last list that loaded" action={<AdminButton size="sm" className="min-h-[44px] sm:min-h-[32px]" onClick={table.refetch}>Try again</AdminButton>}>{table.error.message}</InlineNote>}
 
       <div data-table-state={state} data-total={page ? total : undefined} className="rounded-xl bg-adm-surface border border-adm-divider shadow-[0_1px_2px_rgba(27,43,59,0.06)]">
         {state === "loading" && (
@@ -144,7 +170,7 @@ export default function HubReadiness() {
           </div>
         )}
         {state === "error" && table.error && (
-          <EditorEmpty tone="danger" title={table.error.reason === "incomplete" ? "Too many records to filter exactly" : "Vehicles could not be read"} description={table.error.message} action={<AdminButton variant="secondary" onClick={table.refetch}>Try again</AdminButton>} />
+          <EditorEmpty tone="danger" title={table.error.reason === "incomplete" ? "Too many records to filter exactly" : "Vehicles could not be read"} description={table.error.message} action={<AdminButton variant="secondary" className="min-h-[44px] sm:min-h-[40px]" onClick={table.refetch}>Try again</AdminButton>} />
         )}
         {state === "empty" && <EditorEmpty artwork="documents" title="No active vehicles" description="Vehicles appear here once inventory is imported or added. Nothing is hidden by a filter." />}
         {state === "no-results" && <EditorEmpty artwork="search" title="No vehicles match" description="No vehicle matches these filters. The total is read from the server, not estimated." action={<AdminButton variant="secondary" onClick={clear}>Clear filters</AdminButton>} />}
@@ -154,17 +180,7 @@ export default function HubReadiness() {
             {narrow ? (
               <ul aria-label="Vehicle readiness" className="divide-y divide-adm-divider">
                 {page.rows.map((r) => (
-                  <li key={r.key} className="px-4 py-2.5">
-                    <div className="flex items-start justify-between gap-2">
-                      <button type="button" aria-label={`Open details for ${vehicleTitle(r)}`} onClick={() => openRow(r)} className="min-w-0 flex-1 min-h-[44px] text-left text-[15px] text-adm-primary rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary"><VehicleCell row={r} /></button>
-                      <ReadinessChip value={r.facts.readiness} />
-                    </div>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                      {r.facts.documents.map((d) => <DocCellChip key={d.key} cell={d} short />)}
-                      <ServiceCellChip service={r.facts.service} />
-                    </div>
-                    <p className="mt-1.5 text-[14px] leading-[20px]"><span className="text-adm-muted">Next: </span>{r.facts.nextAction}</p>
-                  </li>
+                  <MobileVehicleCard key={r.key} row={r} onOpen={() => openRow(r)} />
                 ))}
               </ul>
             ) : (

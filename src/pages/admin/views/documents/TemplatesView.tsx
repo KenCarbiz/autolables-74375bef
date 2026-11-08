@@ -13,6 +13,7 @@ import StickerPrintTemplates from "@/components/admin/StickerPrintTemplates";
 import { AdminButton, KeyValueList, StatusChip } from "@/components/admin/v2/primitives";
 import { DetailDrawer, SectionCard, SelectField, useIsNarrow } from "@/components/admin/v3/editor";
 import { StackedRows } from "./hub/StackedRows";
+import { AccordionCard } from "./hub/AccordionCard";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { adminTabHref } from "@/lib/admin/sections";
 import { documentRuleRows, rulesFromSettings, serviceGateContext } from "@/lib/admin/documentPolicy";
@@ -192,7 +193,7 @@ export default function TemplatesView({ section = "all" }: { section?: Templates
       )}
 
       {showLibrary && (
-        <SectionCard icon="layers" title="Template catalog versions" description="Platform templates and the version each one serves. History is read-only here.">
+        <AccordionCard icon="layers" title="Template catalog versions" description="Platform templates and the version each one serves. History is read-only here." summary={rows === undefined ? "Checking the catalog" : rows === null ? "Could not be read" : `${rows.length} ${rows.length === 1 ? "template" : "templates"}`}>
           {rows === undefined ? (
             <p className="text-[14px] text-adm-muted">Checking the template catalog</p>
           ) : rows === null ? (
@@ -224,7 +225,7 @@ export default function TemplatesView({ section = "all" }: { section?: Templates
               />
             </div>
           )}
-        </SectionCard>
+        </AccordionCard>
       )}
 
       {showLibrary && <FactoryStickerPanel />}

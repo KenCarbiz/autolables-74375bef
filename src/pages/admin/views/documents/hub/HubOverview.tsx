@@ -1,11 +1,11 @@
 import { Link } from "react-router-dom";
-import { AdminButton, InlineNote } from "@/components/admin/v2/primitives";
+import { AdminButton, InlineNote, StatusChip } from "@/components/admin/v2/primitives";
 import { AdminIcon, AdminIconTile, EditorEmpty, type AdminIconName } from "@/components/admin/v3/editor";
 import { adminTabHref } from "@/lib/admin/sections";
-import { OVERVIEW_CARD_FILTER, overlapStatement, overviewCounts, writeHubFilters, DEFAULT_HUB_FILTERS, type OverviewCardKey } from "@/lib/admin/documentsHubModel";
+import { BLOCKER_LABEL, type BlockerKey, OVERVIEW_CARD_FILTER, overlapStatement, overviewCounts, writeHubFilters, DEFAULT_HUB_FILTERS, type OverviewCardKey } from "@/lib/admin/documentsHubModel";
 import { cn } from "@/lib/utils";
 import { useHubOverview } from "./useHubData";
-import { ReadinessChip } from "./hubUi";
+
 import { useDocumentsReadiness } from "../readiness";
 
 const CARDS: Array<{ key: OverviewCardKey; label: string; hint: string; icon: AdminIconName; tone: string }> = [
@@ -22,6 +22,8 @@ const VALUE: Record<OverviewCardKey, "needsAttention" | "missingDocuments" | "se
   ready: "ready",
 };
 
+const attentionBlocker = (b: BlockerKey[]): BlockerKey => (["k208_failed", "rejected_document", "open_recall"] as const).find((k) => b.includes(k)) ?? b[0] ?? "rejected_document";
+
 export const hubHref = (view: string, filters: Partial<typeof DEFAULT_HUB_FILTERS> = {}, base = "?tab=templates"): string => {
   const params = writeHubFilters(new URLSearchParams(base), { ...DEFAULT_HUB_FILTERS, ...filters });
   params.set("view", view);
@@ -37,7 +39,7 @@ export default function HubOverview() {
 
   return (
     <div className="space-y-4">
-      {data.error && <InlineNote tone="danger" title="Vehicle counts could not be read" action={<AdminButton size="sm" onClick={data.refetch}>Try again</AdminButton>}>This is a failed read, not zero vehicles. The cards show Unknown until it succeeds.</InlineNote>}
+      {data.error && <InlineNote tone="danger" title="Vehicle counts could not be read" action={<AdminButton size="sm" className="min-h-[44px] sm:min-h-[32px]" onClick={data.refetch}>Try again</AdminButton>}>This is a failed read, not zero vehicles. The cards show Unknown until it succeeds.</InlineNote>}
       {partial && <InlineNote tone="warning" title="Counts are partial">This dealership has more vehicles or records than one read returns, so the cards show Unknown instead of a clipped total.</InlineNote>}
 
       <section aria-label="Documents and service summary" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -88,7 +90,7 @@ export default function HubOverview() {
                       <span className="block text-[14px] leading-[20px] font-semibold">{r.listing.ymm?.trim() || `VIN ${r.listing.vin}`}</span>
                       <span className="block text-[13px] leading-[18px] text-adm-muted">VIN {r.listing.vin}{r.stock ? ` . Stock ${r.stock}` : r.stockUnavailable ? " . Stock unavailable" : ""} . {r.facts.nextAction}</span>
                     </span>
-                    <ReadinessChip value={r.facts.readiness} />
+                    <StatusChip tone="danger" className="text-[13px] whitespace-nowrap">{BLOCKER_LABEL[attentionBlocker(r.facts.blockers)]}</StatusChip>
                   </Link>
                 </li>
               ))}
