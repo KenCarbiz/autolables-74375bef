@@ -59,9 +59,9 @@ function FixtureChrome({ railWidth, children }: { railWidth: number; children: R
       />
       <div ref={drawer.backgroundRef} className="flex-1 min-w-0">
         <AppHeader
-          groupName="Harte Auto Group"
-          storeLocation="Hartford, CT"
-          storeName="Harte Honda"
+          groupName="Example Motors Group"
+          storeLocation="Sampleville"
+          storeName="Example Motors"
           renderRooftopMenu={(trigger) => <FixtureNote trigger={trigger} what="the rooftop switcher" />}
           onOpenSearch={() => setSearchNote(true)}
           isMac
