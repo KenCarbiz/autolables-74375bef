@@ -37,7 +37,7 @@ export const sliceOf = (d: RoutingDraft): RoutingDraftSlice => ({ routing: assem
 export const routingToPatch = (changed: Partial<RoutingDraft>, settings: DealerSettings): Partial<DealerSettings> => {
   const { agents, ...routingChanged } = changed;
   const out: Partial<DealerSettings> = {};
-  if (Object.keys(routingChanged).length > 0) out.passport_contact_routing = { ...normalizeContactRouting(settings.passport_contact_routing), ...routingChanged } as CustomerPassportContactSettings;
+  if (Object.keys(routingChanged).length > 0) out.passport_contact_routing = { ...((settings.passport_contact_routing ?? {}) as object), ...routingChanged } as CustomerPassportContactSettings;
   if (agents) out.passport_agents = namedAgents(agents);
   return out;
 };
@@ -66,7 +66,7 @@ export const validateRouting = (d: RoutingDraft): DraftErrors<RoutingDraft> => {
   return e;
 };
 
-export type TierState = "ready" | "needs_setup" | "off" | "per_lead" | "not_in_order";
+export type TierState = "unknown" | "ready" | "needs_setup" | "off" | "per_lead" | "not_in_order";
 
 export interface TierRow extends Omit<RoutingOrderRow, "state"> {
   state: TierState;

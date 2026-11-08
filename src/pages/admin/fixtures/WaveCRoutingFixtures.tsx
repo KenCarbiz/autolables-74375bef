@@ -55,7 +55,7 @@ const withRouting = (r: Partial<CustomerPassportContactSettings>, agents: Passpo
   passport_agents: agents,
 });
 
-const fixture = (label: string, views: Record<string, unknown>): AdminFixture => ({ label, now: NOW, views: { brand: { ...brand, settings: BASE_SETTINGS }, ...views } });
+const fixture = (label: string, views: Record<string, unknown>): AdminFixture => ({ label, now: NOW, views: { brand: { ...brand, tenantName: "Example Motors", activeStoreId: "store-example-motors", stores: [{ ...(brand.stores as Record<string, unknown>[])[0], id: "store-example-motors", name: "Example Motors", slug: "example-motors" }], settings: BASE_SETTINGS }, ...views } });
 
 const routingFixture = fixture("Contact & Routing (v3)", {
   routing: {
@@ -90,7 +90,7 @@ const modulesFixture = fixture("Passport modules (v3)", {
 const ctasFixture = fixture("Calls to action (v3)", {
   ctas: {
     seeds: {
-      empty: { sticky_bottom_buttons: { enabled: true, primary_key: "", buttons: [] } },
+      empty: { sticky_bottom_buttons: { enabled: true, primary_key: "", buttons: ["call", "text", "contact_dealer", "test_drive"].map((key, i) => ({ key, label: "", enabled: false, order: i + 1 })) } },
       none: { sticky_bottom_buttons: { enabled: false, primary_key: "call", buttons: [{ key: "call", label: "Call", enabled: true, order: 1 }] } },
       invalid: {
         sticky_bottom_buttons: {

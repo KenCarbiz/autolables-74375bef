@@ -22,12 +22,14 @@ export function SortableList<T extends SortableItem>({
   renderItem,
   label,
   className,
+  disabled = false,
 }: {
   items: T[];
   onChange: (next: T[]) => void;
   renderItem?: (item: T) => ReactNode;
   label: string;
   className?: string;
+  disabled?: boolean;
 }) {
   const [announce, setAnnounce] = useState("");
   const [dragId, setDragId] = useState<string | null>(null);
@@ -42,7 +44,7 @@ export function SortableList<T extends SortableItem>({
   });
 
   const move = (index: number, to: number, kind: "handle" | "up" | "down") => {
-    if (to < 0 || to >= items.length) return;
+    if (disabled || to < 0 || to >= items.length) return;
     const item = items[index];
     refocus.current = { id: item.id, kind: to === 0 && kind === "up" ? "down" : to === items.length - 1 && kind === "down" ? "up" : kind };
     onChange(moveItem(items, index, to));
@@ -57,14 +59,14 @@ export function SortableList<T extends SortableItem>({
         {items.map((item, i) => (
           <li
             key={item.id}
-            draggable={dragId === item.id}
+            draggable={!disabled && dragId === item.id}
             onDragEnd={() => setDragId(null)}
-            onDragOver={(e) => { if (dragId) e.preventDefault(); }}
+            onDragOver={(e) => { if (dragId && !disabled) e.preventDefault(); }}
             onDrop={(e) => {
               e.preventDefault();
               const from = items.findIndex((x) => x.id === dragId);
               setDragId(null);
-              if (from >= 0 && from !== i) {
+              if (!disabled && from >= 0 && from !== i) {
                 onChange(moveItem(items, from, i));
                 setAnnounce(`${items[from].label} moved to position ${i + 1} of ${items.length}`);
               }
@@ -74,6 +76,7 @@ export function SortableList<T extends SortableItem>({
             <button
               type="button"
               ref={ref(`${item.id}:handle`)}
+              disabled={disabled}
               aria-label={`Reorder ${item.label}. Use the up and down arrow keys.`}
               onMouseDown={() => setDragId(item.id)}
               onMouseUp={() => setDragId(null)}
@@ -86,8 +89,8 @@ export function SortableList<T extends SortableItem>({
               <AdminIcon name="drag" />
             </button>
             <div className="min-w-0 flex-1 text-[14px] leading-[20px] text-adm-ink break-words">{renderItem ? renderItem(item) : item.label}</div>
-            <IconButton ref={ref(`${item.id}:up`)} name="arrow-up" label={`Move ${item.label} up`} disabled={i === 0} onClick={() => move(i, i - 1, "up")} />
-            <IconButton ref={ref(`${item.id}:down`)} name="arrow-down" label={`Move ${item.label} down`} disabled={i === items.length - 1} onClick={() => move(i, i + 1, "down")} />
+            <IconButton ref={ref(`${item.id}:up`)} name="arrow-up" label={`Move ${item.label} up`} disabled={disabled || i === 0} onClick={() => move(i, i - 1, "up")} />
+            <IconButton ref={ref(`${item.id}:down`)} name="arrow-down" label={`Move ${item.label} down`} disabled={disabled || i === items.length - 1} onClick={() => move(i, i + 1, "down")} />
           </li>
         ))}
       </ul>

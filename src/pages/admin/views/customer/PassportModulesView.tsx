@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
-import { AdminIcon, ScopeLabel, SectionCard, StatusBadge } from "@/components/admin/v3/editor";
+import { AdminIcon, ScopeLabel, SectionCard, StatusBadge, useIsNarrow } from "@/components/admin/v3/editor";
 import PassportPublishingCard from "@/components/admin/PassportPublishingCard";
 import { adminTabHref } from "@/lib/admin/sections";
 import { PACKET_MODULES } from "@/lib/packetModules";
 import { Banner } from "../brand/feeds/bits";
 import { useSettingsEditor } from "../brand/feeds/useSettingsEditor";
-import { ApplyChrome, LoadingBlock, OwnerLink, ToggleRow } from "./customerParts";
-import { ModuleDrawer, ModuleRow, OemDrawer, OverrideDrawer, PublishImpact, RequiredList } from "./ModulesParts";
+import { ApplyChrome, LoadingBlock, OwnerLink, PreviewLayout, ToggleRow } from "./customerParts";
+import { ModuleDrawer, ModuleRow, ModulesPreview, OemDrawer, OverrideDrawer, PublishImpact, RequiredList } from "./ModulesParts";
 import { ignoredValues, isOn, MODULE_GROUPS, MODULE_LABELS, moduleChangeRows, modulesToPatch, moduleById, readModules, setModule, unknownEntries, type ModulesDraft } from "./modulesModel";
 import { useOemStatus } from "./useOemStatus";
 
@@ -21,6 +21,7 @@ export default function PassportModulesView() {
   const ed = useSettingsEditor<ModulesDraft>(OPTIONS);
   const { edit, canEdit, settings } = ed;
   const oem = useOemStatus();
+  const narrow = useIsNarrow();
   const [openId, setOpenId] = useState<string | null>(null);
   const [overrides, setOverrides] = useState(false);
   const [oemOpen, setOemOpen] = useState(false);
@@ -35,17 +36,19 @@ export default function PassportModulesView() {
   const ignored = ignoredValues(defaults);
   const toggle = (id: string, on: boolean) => edit.set("packet_module_defaults", setModule(defaults, baseline.packet_module_defaults, id, on));
   const api = { ...ed, rows };
+  const unknownState = ed.unreadable;
   const autoPublish = settings.ingest_auto_publish !== false;
 
   return (
+    <PreviewLayout previewLabel="Passport preview" preview={<ModulesPreview defaults={defaults} historyOn={draft.history_report_links_enabled} unknown={unknownState} />}>
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
         <ScopeLabel scope="all_rooftops" />
-        <p className="text-[13px] leading-[18px] text-adm-muted">{PACKET_MODULES.length - offCount} of {PACKET_MODULES.length} optional modules on by default. Saved once for the account.</p>
+        <p className="text-[13px] leading-[18px] text-adm-muted">{unknownState ? "Module status is not available until settings load." : `${PACKET_MODULES.length - offCount} of ${PACKET_MODULES.length} optional modules on by default. Saved once for the account.`}</p>
       </div>
       {!canEdit && <Banner tone="neutral" icon="lock" title="You can view these defaults but not change them">Changing Passport modules needs the manage settings permission. Ask an owner or manager to make the change.</Banner>}
       {ed.unreadable && <Banner tone="danger" title="Settings could not be read">Switches are not shown as saved and nothing can be applied until settings load.</Banner>}
-      {!draft.history_report_links_enabled && <Banner tone="warning" icon="lock" title="History report links are off for the whole store">Shoppers never see a CARFAX or AutoCheck link, whatever the module switch says. Turn the store-wide switch back on below when the subscription is active.</Banner>}
+      {!unknownState && !draft.history_report_links_enabled && <Banner tone="warning" icon="lock" title="History report links are off for the whole store">Shoppers never see a CARFAX or AutoCheck link, whatever the module switch says. Turn the store-wide switch back on below when the subscription is active.</Banner>}
       {(unknown.length > 0 || ignored.length > 0) && (
         <Banner tone="warning" title="Some saved entries are not recognized">
           {unknown.length > 0 && <>Not a current module: {unknown.join(", ")}. </>}
@@ -54,24 +57,25 @@ export default function PassportModulesView() {
         </Banner>
       )}
 
+      <p className="text-[13px] leading-[18px] text-adm-muted">A module shows only when the vehicle has the data. Details on each row explain what it needs.</p>
       <SectionCard icon="lock" title="Required by policy" description="These always show. They are not modules and have no switch.">
         <RequiredList />
       </SectionCard>
 
       {MODULE_GROUPS.map((g) => (
-        <SectionCard key={g.id} id={`modules-${g.id}`} icon={g.icon} title={g.title} description={g.description}>
-          <ul aria-label={g.title} className="space-y-2">
+        <SectionCard key={g.id} id={`modules-${g.id}`} icon={g.icon} title={g.title} description={narrow ? undefined : g.description}>
+          <ul aria-label={g.title} className="space-y-1.5">
             {g.ids.map((id) => {
               const m = moduleById(id);
               if (!m) return null;
-              return <ModuleRow key={id} m={m} on={isOn(defaults, id)} canEdit={canEdit} historyOff={!draft.history_report_links_enabled} onToggle={(v) => toggle(id, v)} onOpen={() => setOpenId(id)} />;
+              return <ModuleRow key={id} m={m} on={isOn(defaults, id)} canEdit={canEdit} historyOff={!draft.history_report_links_enabled} unknown={unknownState} onToggle={(v) => toggle(id, v)} onOpen={() => setOpenId(id)} />;
             })}
           </ul>
           {g.id === "documents" && (
             <div className="rounded-lg border border-adm-divider p-3 space-y-1">
               <ToggleRow
                 label="History report links, store-wide"
-                description="Store-wide kill switch for your dealer-paid CARFAX or AutoCheck links. Turn it off if the subscription lapses so shoppers never land on a paywall. It overrides the module switch above and applies to used, certified and demo vehicles."
+                description={narrow ? "Kill switch for dealer-paid CARFAX or AutoCheck links. Overrides the module switch." : "Store-wide kill switch for your dealer-paid CARFAX or AutoCheck links. Turn it off if the subscription lapses so shoppers never land on a paywall. It overrides the module switch above and applies to used, certified and demo vehicles."}
                 checked={draft.history_report_links_enabled}
                 disabled={!canEdit}
                 onChange={(v) => edit.set("history_report_links_enabled", v)}
@@ -84,7 +88,7 @@ export default function PassportModulesView() {
 
       <SectionCard icon="layers" title="Order and publishing" description="What this page does not change.">
         <Banner tone="neutral" icon="info" title="Module order is not configurable">
-          The Passport arranges its modules in a fixed layout and there is no saved order setting, so reordering is not offered here.
+          The Passport uses a fixed layout, so reordering is not offered.
         </Banner>
         <PassportPublishingCard readOnly value={autoPublish} manageTo={adminTabHref("effective-policy")} />
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -105,5 +109,6 @@ export default function PassportModulesView() {
       <OverrideDrawer open={overrides} onClose={() => setOverrides(false)} draft={draft} />
       <OemDrawer open={oemOpen} onClose={() => setOemOpen(false)} state={oem.state} brands={oem.brands} />
     </div>
+    </PreviewLayout>
   );
 }

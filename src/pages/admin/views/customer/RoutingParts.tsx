@@ -399,12 +399,12 @@ export function CustomerPreview({ routing, agents, now, timezone }: { routing: C
         {tab("closed", "Closed", hours === "closed", () => setHours("closed"))}
       </div>
       {r ? (
-        <div className="rounded-xl bg-[#2563EB] text-white p-4 space-y-3" data-preview-surface="">
+        <div className="rounded-xl bg-[#1d4fd7] text-white p-4 space-y-3" data-preview-surface="">
           <div className="flex items-center gap-3">
             <span className="w-10 h-10 rounded-full bg-white/15 inline-grid place-items-center flex-shrink-0"><AdminIcon name={r.afterHours ? "clock" : r.displayMode === "agent" ? "user" : "users"} size="control" /></span>
             <div className="min-w-0">
               <p className="text-[14px] leading-[20px] font-bold break-words">{r.afterHours ? "We're closed right now." : r.displayName}</p>
-              <p className="text-[13px] leading-[18px] text-white/85 break-words">{r.afterHours ? r.afterHoursMessage : r.displaySubtitle}</p>
+              <p className="text-[13px] leading-[18px] text-white break-words">{r.afterHours ? r.afterHoursMessage : r.displaySubtitle}</p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2">

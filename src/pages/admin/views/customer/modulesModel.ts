@@ -30,6 +30,11 @@ export const MODULE_GROUPS: ModuleGroup[] = [
   { id: "tools", title: "Shopper tools", description: "Interactive helpers.", icon: "calculator", ids: ["payment"] },
 ];
 
+export const MODULE_ICONS: Record<string, AdminIconName> = {
+  insights: "chart", marketValue: "dollar", programs: "award", factoryOptions: "list", description: "file", photos: "image", videos: "video",
+  recon: "wrench", warranty: "shield-check", oemSticker: "tag", documents: "folder", historyReport: "history", brochure: "book", ownersManual: "book", payment: "calculator",
+};
+
 export const OEM_MODULE_IDS = ["oemSticker", "brochure", "ownersManual"];
 
 export const DATA_NEED: Record<string, string> = {
