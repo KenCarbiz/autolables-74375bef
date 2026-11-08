@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { AdminButton } from "@/components/admin/v2/primitives";
-import { AdminIcon, AdminIconTile, ChipInput, DetailDrawer, FieldRow, INPUT_CLASS, SortableList, StatusBadge, type StatusState } from "@/components/admin/v3/editor";
+import { AdminIcon, AdminIconTile, ChipInput, DetailDrawer, FieldRow, INPUT_CLASS, SortableList, StatusBadge, useIsNarrow, type StatusState } from "@/components/admin/v3/editor";
 import { checkUrl, conditionRows, parseLabels, type ProviderSpec } from "./websitesModel";
 import { reasonText, type PriceTestResult } from "./priceTest";
 import { Banner } from "./bits";
@@ -17,11 +17,16 @@ export const UrlField = ({ id, label, value, onChange, error, disabled, placehol
   id: string; label: string; value: string; onChange: (v: string) => void; error?: string; disabled?: boolean; placeholder?: string; hosts?: string[]; name?: string; help?: string;
 }) => {
   const check = checkUrl(value, hosts, name);
+  const narrow = useIsNarrow();
   return (
     <FieldRow label={label} htmlFor={id} error={error} help={error ? undefined : check.state === "valid" && check.mismatch ? undefined : help}>
       {(p) => (
         <>
-          <input {...p} type="text" inputMode="url" autoComplete="off" value={value} disabled={disabled} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className={INPUT_CLASS} />
+          {narrow ? (
+            <textarea {...p} rows={2} inputMode="url" autoComplete="off" spellCheck={false} value={value} disabled={disabled} placeholder={placeholder} onChange={(e) => onChange(e.target.value.replace(/\s+/g, ""))} className={cn(INPUT_CLASS, "h-auto min-h-[56px] py-2 break-all resize-none")} />
+          ) : (
+            <input {...p} type="text" inputMode="url" autoComplete="off" value={value} disabled={disabled} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className={INPUT_CLASS} />
+          )}
           {check.state === "valid" && check.mismatch && (
             <p className="mt-1.5 flex items-start gap-1.5 text-[13px] leading-[18px] text-adm-warning font-medium">
               <AdminIcon name="alert" size="inline" className="mt-px" />
@@ -55,13 +60,24 @@ export const ProviderCapabilities = ({ provider, value }: { provider: ProviderSp
 
 export const ProviderCard = ({ provider, value, onChange, error, canEdit, onDetails }: { provider: ProviderSpec; value: string; onChange: (v: string) => void; error?: string; canEdit: boolean; onDetails: () => void }) => {
   const check = checkUrl(value, provider.hosts, provider.name);
+  const narrow = useIsNarrow();
+  const actions = (
+    <div className="flex items-center gap-2 flex-wrap">
+      <AdminButton variant="secondary" onClick={onDetails}>Capabilities</AdminButton>
+      {check.state === "valid" && (
+        <a href={check.href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 min-h-[40px] max-sm:min-h-[44px] px-2 text-[14px] font-semibold text-adm-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary rounded-md">
+          Open page <AdminIcon name="external-link" size="inline" /><span className="sr-only">(opens in a new tab)</span>
+        </a>
+      )}
+    </div>
+  );
   return (
-    <li className="rounded-xl border border-adm-divider bg-adm-surface p-4 flex flex-col gap-3 min-w-0" data-provider={provider.id}>
-      <div className="space-y-2">
-        <span aria-hidden="true" data-logo-slot="" className="flex items-center justify-center w-[144px] h-12 rounded-md border border-adm-divider bg-adm-workspace text-adm-muted">
+    <li className="rounded-xl border border-adm-divider bg-adm-surface p-4 max-sm:p-3 flex flex-col gap-3 max-sm:gap-2 min-w-0" data-provider={provider.id}>
+      <div className="flex items-center gap-3 flex-wrap">
+        <span aria-hidden="true" data-logo-slot="" className="flex flex-shrink-0 items-center justify-center w-36 min-w-[144px] h-12 min-h-[48px] rounded-md border border-adm-divider bg-adm-workspace text-adm-muted">
           <AdminIcon name="link" />
         </span>
-        <div className="flex items-center gap-x-3 gap-y-1 flex-wrap">
+        <div className="min-w-0 flex flex-col gap-1 items-start">
           <h3 className="text-[16px] leading-[22px] font-semibold text-adm-ink">{provider.name}</h3>
           <UrlStatus value={value} hosts={provider.hosts} name={provider.name} />
         </div>
@@ -74,15 +90,18 @@ export const ProviderCard = ({ provider, value, onChange, error, canEdit, onDeta
           <p className="mt-1 text-[14px] break-all text-adm-ink">{value.trim() || <span className="italic text-adm-muted">Not set</span>}</p>
         </div>
       )}
-      <ProviderCapabilities provider={provider} value={value} />
-      <div className="flex items-center gap-2 flex-wrap mt-auto">
-        <AdminButton variant="secondary" onClick={onDetails}>Capabilities</AdminButton>
-        {check.state === "valid" && (
-          <a href={check.href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 min-h-[40px] max-sm:min-h-[44px] px-2 text-[14px] font-semibold text-adm-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary rounded-md">
-            Open page <AdminIcon name="external-link" size="inline" /><span className="sr-only">(opens in a new tab)</span>
-          </a>
-        )}
-      </div>
+      {narrow ? (
+        <details className="group border-t border-adm-divider">
+          <summary className="flex items-center justify-between min-h-[44px] cursor-pointer text-[14px] font-semibold text-adm-primary list-none">Details<AdminIcon name="chevron-down" className="group-open:rotate-180" /></summary>
+          <ProviderCapabilities provider={provider} value={value} />
+          <div className="pt-2">{actions}</div>
+        </details>
+      ) : (
+        <>
+          <ProviderCapabilities provider={provider} value={value} />
+          <div className="mt-auto">{actions}</div>
+        </>
+      )}
     </li>
   );
 };
@@ -209,6 +228,7 @@ export const PriceTestResultPanel = ({ result, labels }: { result: PriceTestResu
 };
 
 export const ConditionMapping = ({ terms, onChange, canEdit }: { terms: string[]; onChange: (next: string[]) => void; canEdit: boolean }) => {
+  const narrow = useIsNarrow();
   const rows = conditionRows(terms);
   const unmapped = rows.filter((r) => !r.canonical).length;
   return (
@@ -216,6 +236,18 @@ export const ConditionMapping = ({ terms, onChange, canEdit }: { terms: string[]
       {canEdit && <ChipInput label="Condition terms your team uses" values={terms} onChange={onChange} placeholder="Type a term and press Enter" />}
       {rows.length === 0 ? (
         <p className="rounded-lg border border-dashed border-adm-border bg-adm-workspace px-4 py-4 text-[14px] text-adm-muted">No terms saved. AutoLabels falls back to New, Demo, Used and CPO when this list is empty.</p>
+      ) : narrow ? (
+        <ul aria-label="Condition term mapping" className="grid grid-cols-1 gap-2">
+          {rows.map((r, i) => (
+            <li key={`${i}:${r.term}`} className="rounded-lg border border-adm-divider px-3 py-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[14px] font-semibold text-adm-ink break-words min-w-0">{r.term}</span>
+                {r.canonical ? <StatusBadge state={r.canonical === "new" ? "visible_with_data" : "enabled"} label={r.canonical === "cpo" ? "CPO (used)" : r.canonical === "new" ? "New" : "Used"} /> : <StatusBadge state="failed" label="Not mapped" />}
+              </div>
+              {!r.canonical && <p className="mt-1 text-[13px] leading-[18px] text-adm-muted">{r.note}</p>}
+            </li>
+          ))}
+        </ul>
       ) : (
         <div role="table" aria-label="Condition term mapping" className="rounded-lg border border-adm-divider divide-y divide-adm-divider overflow-hidden">
           <div role="row" className="hidden md:grid grid-cols-[minmax(0,180px)_minmax(0,160px)_minmax(0,1fr)] gap-4 bg-adm-workspace px-4 py-2 text-[13px] font-semibold text-adm-muted">
@@ -231,7 +263,7 @@ export const ConditionMapping = ({ terms, onChange, canEdit }: { terms: string[]
         </div>
       )}
       {unmapped > 0 && <Banner tone="warning" title={unmapped === 1 ? "One term has no mapping" : `${unmapped} terms have no mapping`}>Terms the rules do not recognise are never guessed. Rename them to include New, Used, Certified or CPO.</Banner>}
-      <p className="text-[13px] leading-[18px] text-adm-muted">The mapping follows fixed rules and cannot be edited term by term. This list only decides which labels your team can pick; it never changes your feed.</p>
+      <p className="max-sm:hidden text-[13px] leading-[18px] text-adm-muted">The mapping follows fixed rules and cannot be edited term by term. This list only decides which labels your team can pick; it never changes your feed.</p>
     </div>
   );
 };

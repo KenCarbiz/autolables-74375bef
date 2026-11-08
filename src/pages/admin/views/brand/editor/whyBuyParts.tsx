@@ -165,14 +165,7 @@ export interface GroupTab { id: string; label: string; count: number | null; iss
 export function GroupNav({ tabs, value, onChange }: { tabs: GroupTab[]; value: string; onChange: (id: string) => void }) {
   return (
     <div className="lg:sticky lg:top-0 z-10 bg-adm-workspace/95 backdrop-blur lg:py-2 -mx-1 px-1">
-      <div className="lg:hidden">
-        <FieldRow label="Section" htmlFor="why-buy-section">
-          <SelectField id="why-buy-section" value={value} onChange={(e) => onChange(e.target.value)}>
-            {tabs.map((t) => <option key={t.id} value={t.id}>{t.label}{t.count !== null ? ` (${t.count})` : ""}{t.issue ? " - needs attention" : ""}</option>)}
-          </SelectField>
-        </FieldRow>
-      </div>
-      <div role="tablist" aria-label="Why buy sections" className="hidden lg:flex flex-wrap gap-2">
+      <div role="tablist" aria-label="Why buy sections" className="flex gap-2 overflow-x-auto lg:overflow-visible [scrollbar-width:none] pb-1">
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -182,7 +175,7 @@ export function GroupNav({ tabs, value, onChange }: { tabs: GroupTab[]; value: s
             aria-selected={value === t.id}
             aria-controls={`why-buy-panel-${t.id}`}
             onClick={() => onChange(t.id)}
-            className={`inline-flex items-center gap-2 min-h-[40px] px-3.5 rounded-lg border text-[14px] leading-[20px] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary ${value === t.id ? "bg-adm-surface border-adm-primary text-adm-primary" : "bg-adm-surface border-adm-divider text-adm-ink hover:bg-adm-workspace"}`}
+            className={`inline-flex flex-shrink-0 items-center gap-2 min-h-[44px] lg:min-h-[40px] px-3.5 whitespace-nowrap rounded-lg border text-[14px] leading-[20px] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary ${value === t.id ? "bg-adm-surface border-adm-primary text-adm-primary" : "bg-adm-surface border-adm-divider text-adm-ink hover:bg-adm-workspace"}`}
           >
             {t.label}
             {t.count !== null && <span className="rounded-full bg-adm-workspace px-2 text-[13px] leading-[20px] text-adm-muted">{t.count}</span>}

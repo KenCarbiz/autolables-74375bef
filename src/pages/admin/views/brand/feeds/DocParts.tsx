@@ -85,6 +85,7 @@ export const SlotCard = ({ resolved, slot, entry, branding, canEdit, onChange, o
   resolved: ResolvedSlot; slot: LabelSlot; entry: TemplateEntry | null; branding: StickerBranding; canEdit: boolean; onChange: () => void; onPreview: () => void; changed: boolean;
 }) => {
   const def = slotDef(slot);
+  const narrow = useIsNarrow();
   return (
     <li className={cn("rounded-xl border bg-adm-surface flex flex-col min-w-0", changed ? "border-adm-primary ring-1 ring-adm-primary/30" : "border-adm-divider")} data-slot={slot}>
       <header className="flex items-start gap-3 px-4 pt-4">
@@ -105,11 +106,25 @@ export const SlotCard = ({ resolved, slot, entry, branding, canEdit, onChange, o
           <>
             <div className="min-w-0">
               <p className="text-[16px] leading-[22px] font-semibold text-adm-ink break-words">{entry.name}</p>
-              <div className="mt-1.5 flex flex-wrap gap-1.5"><OriginBadge origin={entry.origin} /></div>
+              {!narrow && <div className="mt-1.5 flex flex-wrap gap-1.5"><OriginBadge origin={entry.origin} /></div>}
+              {narrow && <p className="mt-1 text-[13px] leading-[18px] text-adm-muted">{SOURCE_TEXT[resolved.source]}.</p>}
             </div>
             <div className="col-span-2 min-[520px]:col-span-1 min-w-0">
-              <EntryFacts entry={entry} />
-              <p className="mt-2 text-[13px] leading-[18px] text-adm-muted">{SOURCE_TEXT[resolved.source]}.{entry.note ? ` ${entry.note}` : ""}</p>
+              {narrow ? (
+                <details className="group">
+                  <summary className="flex items-center justify-between gap-2 min-h-[44px] cursor-pointer list-none text-[14px] font-semibold text-adm-primary">
+                    <span className="flex items-center gap-2 flex-wrap min-w-0"><OriginBadge origin={entry.origin} /></span>
+                    <span className="inline-flex items-center gap-1 flex-shrink-0">Details<AdminIcon name="chevron-down" className="group-open:rotate-180" /></span>
+                  </summary>
+                  <EntryFacts entry={entry} />
+                  {entry.note && <p className="mt-2 text-[13px] leading-[18px] text-adm-muted">{entry.note}</p>}
+                </details>
+              ) : (
+                <>
+                  <EntryFacts entry={entry} />
+                  <p className="mt-2 text-[13px] leading-[18px] text-adm-muted">{SOURCE_TEXT[resolved.source]}.{entry.note ? ` ${entry.note}` : ""}</p>
+                </>
+              )}
             </div>
           </>
         ) : resolved.state === "missing" ? (

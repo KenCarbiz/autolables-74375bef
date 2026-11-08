@@ -17,8 +17,8 @@ export const GroupCard = ({ group, draft, settings, changes, canEdit, onOpen }: 
   const narrow = useIsNarrow();
   const sum = summarize(group, draft, settings);
   const rows = group.items.filter((i): i is Extract<Item, { kind: "switch" | "linked" | "status" }> => i.kind === "switch" || i.kind === "linked" || i.kind === "status");
-  const lines = narrow ? sum.lines.slice(0, 1) : sum.lines.slice(0, 2);
-  const shown = narrow ? (lines.length ? [] : rows.slice(0, 1)) : rows.slice(0, 4);
+  const shown = narrow ? rows.slice(0, 2) : rows.slice(0, 4);
+  const lines = narrow ? (shown.length ? [] : sum.lines.slice(0, 2)) : sum.lines.slice(0, 2);
   const more = narrow ? rows.length + sum.lines.length - lines.length - shown.length : rows.length - shown.length;
   return (
     <li className={cn("rounded-xl border bg-adm-surface p-4 sm:p-5 flex flex-col gap-3 sm:gap-4 min-w-0 h-full", changes ? "border-adm-primary ring-1 ring-adm-primary/30" : "border-adm-divider")} data-group={group.id}>
@@ -26,7 +26,7 @@ export const GroupCard = ({ group, draft, settings, changes, canEdit, onOpen }: 
         <AdminIconTile name={group.icon} />
         <div className="min-w-0 flex-1">
           <h2 className="text-[16px] leading-[22px] font-semibold text-adm-ink">{group.title}</h2>
-          <p className="hidden sm:block text-[13px] leading-[18px] text-adm-muted">{group.blurb}</p>
+          <p className="text-[13px] leading-[18px] text-adm-muted">{group.blurb}</p>
         </div>
       </div>
       <div className="flex items-center gap-2 flex-wrap">

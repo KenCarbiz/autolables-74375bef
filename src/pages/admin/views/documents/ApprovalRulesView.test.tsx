@@ -87,7 +87,7 @@ describe("ApprovalRulesView", () => {
     const table = screen.getByRole("table", { name: "Approval rules by document" });
     expect(within(table).getAllByRole("row")).toHaveLength(5);
     expect(within(table).getByText("Inspection record")).toBeInTheDocument();
-    expect(within(table).getByText("Authorized signer (Service Manager)")).toBeInTheDocument();
+    expect(within(table).getByText(/Selected roles:.*Service Manager/)).toBeInTheDocument();
     expect(screen.getByText("Version 4")).toBeInTheDocument();
     expect(screen.getByText("Needs test")).toBeInTheDocument();
     expect(screen.getByText("4 configured")).toBeInTheDocument();
@@ -127,7 +127,7 @@ describe("ApprovalRulesView", () => {
     };
     renderView(fixture);
     expect(screen.getAllByText("Unknown")).toHaveLength(3);
-    expect(screen.getAllByText("Could not be read")).toHaveLength(3);
+    expect(screen.getAllByText(/Could not be read/)).toHaveLength(3);
     expect(screen.queryByText(/^0 /)).toBeNull();
     expect(screen.getByText("In effect")).toBeInTheDocument();
   });
@@ -139,7 +139,7 @@ describe("ApprovalRulesView", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Edit Addendum rules" }));
     const sw = screen.getByRole("switch", { name: "Require manager approval before printing" });
-    expect(sw).toHaveAttribute("aria-checked", "false");
+    expect(sw).not.toBeChecked();
     fireEvent.click(sw);
     expect(screen.getByText("Pending review")).toBeInTheDocument();
     expect(screen.getByText("1 change pending review")).toBeInTheDocument();
@@ -231,7 +231,7 @@ describe("ApprovalRulesView", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(screen.getByText("Pending review")).toBeInTheDocument();
-    expect(screen.getByRole("switch", { name: "Require manager approval before printing" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("switch", { name: "Require manager approval before printing" })).toBeChecked();
     expect(screen.getByRole("button", { name: "Review policy changes" })).toBeEnabled();
     expect(mocks.updateSettings).not.toHaveBeenCalled();
     expect(mocks.log).not.toHaveBeenCalled();
@@ -262,9 +262,31 @@ describe("ApprovalRulesView", () => {
 
   it("lets a salesperson read the rules but not change them", () => {
     mocks.role = "salesperson";
-    renderView(readOnlyFixture());
+    renderView();
     fireEvent.click(screen.getByRole("button", { name: "Edit Addendum rules" }));
     expect(screen.getByRole("switch", { name: "Require manager approval before printing" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Review policy changes" })).toBeDisabled();
+  });
+
+  it("has no switch that turns off preserving signed versions", () => {
+    renderView();
+    fireEvent.click(screen.getByRole("button", { name: "Edit Addendum rules" }));
+    expect(screen.getByText("Signed versions are always kept")).toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: /signed version/i })).toBeNull();
+  });
+
+  it("keeps price changes and sold or removed as separate consequences", () => {
+    renderView();
+    fireEvent.click(screen.getByRole("button", { name: "Edit Addendum rules" }));
+    expect(screen.getByText("Price changed")).toBeInTheDocument();
+    expect(screen.getByText("Vehicle sold or removed")).toBeInTheDocument();
+  });
+
+  it("read-only fixture state disables every rule control", () => {
+    const fx = FIXTURE_11.fixture;
+    const view = { ...(fx.views["approval-rules"] as Record<string, unknown>), canEdit: false };
+    renderView({ ...fx, views: { ...fx.views, "approval-rules": view } });
+    fireEvent.click(screen.getByRole("button", { name: "Edit Addendum rules" }));
+    for (const sw of screen.getAllByRole("switch")) expect(sw).toBeDisabled();
   });
 });
