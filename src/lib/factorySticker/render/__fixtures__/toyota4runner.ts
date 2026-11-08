@@ -26,7 +26,7 @@ export function toyota4runnerReferenceMatchData(base: FactoryStickerRenderData):
     passportUrl: "",
     title: "Reference match (side-by-side comparison only)",
     condition: "new",
-    identity: { year: "2026", make: "Toyota", model: "4Runner", trim: "TRD Sport" },
+    identity: { year: "2026", make: "Toyota", model: "4Runner", trim: "SR5" },
     bodyClass: "SUV",
     mechanical: { engine: "i-FORCE 2.4L 4cyl Turbocharged Engine", transmission: "8-Spd Automatic Transmission", drivetrain: "4WD" },
     pricing: { baseMsrp: 44270, destinationCharge: 1595, optionsTotal: 1358, totalMsrp: 47223 },

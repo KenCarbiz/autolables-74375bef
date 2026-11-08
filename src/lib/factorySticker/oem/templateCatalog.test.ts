@@ -22,7 +22,7 @@ describe("template catalog", () => {
     }
   });
 
-  it("adds four gasoline heavy-duty requests: 32 entries, each blocked without a genuine OEM gasoline label", () => {
+  it("adds four gasoline heavy-duty requests: 32 entries, none built; only verified labels clear the reference blocker", () => {
     expect(CATALOG_ENTRY_COUNT).toBe(32);
     expect(BLOCKED_VARIANT_REQUESTS.map((b) => b.id)).toEqual([
       "ford_2026_f250_gas", "chevrolet_2026_silverado_2500hd_gas", "gmc_2026_sierra_3500hd_gas", "ram_2026_2500_gas",
@@ -32,11 +32,24 @@ describe("template catalog", () => {
     for (const b of BLOCKED_VARIANT_REQUESTS) {
       expect(b.approval).toBe("pending_owner_approval");
       expect(b.layoutStatus).toBe("not_started");
-      expect(b.blockers).toContain("missing_oem_gasoline_reference");
+      expect(b.blockers).toContain("layout_not_built");
+      expect(b.blockers.includes("missing_oem_gasoline_reference")).toBe(!b.reference);
+      if (b.reference) expect(b.reference.sha256).toMatch(/^[0-9a-f]{64}$/);
       expect(b.match.fuelClasses).toEqual(["gasoline"]);
       const diesel = getCatalogTemplate(b.dieselTemplateId)!;
       expect(diesel.match.fuelClasses).toEqual(["diesel"]);
       expect(diesel.canonicalMake).toBe(b.canonicalMake);
+    }
+  });
+
+  it("records the verified Ram label as standard retail and the GMC label as altered", () => {
+    const ram = BLOCKED_VARIANT_REQUESTS.find((b) => b.id === "ram_2026_2500_gas")!;
+    const gmc = BLOCKED_VARIANT_REQUESTS.find((b) => b.id === "gmc_2026_sierra_3500hd_gas")!;
+    expect(ram.reference).toMatchObject({ vin: "3C6UR5DJ7TG302125", kind: "standard_retail" });
+    expect(gmc.reference).toMatchObject({ vin: "1GT3USE75TF129680", kind: "altered_commercial" });
+    expect(gmc.blockers).toContain("reference_altered_vehicle");
+    for (const id of ["ford_2026_f250_gas", "chevrolet_2026_silverado_2500hd_gas"]) {
+      expect(BLOCKED_VARIANT_REQUESTS.find((b) => b.id === id)!.reference).toBeUndefined();
     }
   });
 
@@ -48,7 +61,7 @@ describe("template catalog", () => {
       expect(r.status, model).toBe("configuration_unsupported");
       expect(r.template, model).toBeNull();
       expect(r.flags, model).toEqual(["template_configuration_unsupported"]);
-      expect(r.reasons.some((x) => x.includes("_gas: matches the configuration, but no genuine OEM gasoline label exists")), model).toBe(true);
+      expect(r.reasons.some((x) => /_gas: matches the configuration.*no layout is built/.test(x)), model).toBe(true);
       expect(resolveCatalogTemplate({ ...v, fuelClass: "diesel" }).status, model).toBe("pending_match");
       expect(hasBuiltCatalogTemplates(make)).toBe(true);
     }

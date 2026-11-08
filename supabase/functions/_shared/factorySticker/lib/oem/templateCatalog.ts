@@ -64,7 +64,8 @@ export type CatalogBlockerCode =
   | "parts_content_not_wired"
   | "warranty_terms_not_wired"
   | "ev_figures_not_wired"
-  | "missing_oem_gasoline_reference";
+  | "missing_oem_gasoline_reference"
+  | "reference_altered_vehicle";
 
 export interface CatalogMatchRule {
   modelYears: readonly number[];
@@ -457,7 +458,7 @@ export const TEMPLATE_CATALOG: readonly CatalogTemplate[] = [
     id: "toyota_2026_4runner_trd_sport",
     brand: "Toyota",
     canonicalMake: "TOYOTA",
-    source: { modelYear: 2026, model: "4Runner", trim: "TRD Sport" },
+    source: { modelYear: 2026, model: "4Runner", trim: "SR5" },
     referenceStatus: "2026_marked_online_copy",
     page: { widthPt: 1224, heightPt: 792, orientation: "landscape" },
     referencePdf: "Toyota_2026_4Runner_TRD_Sport.pdf",
@@ -514,6 +515,14 @@ export interface CatalogVariantRequest {
   layoutStatus: "not_started";
   blockers: readonly CatalogBlockerCode[];
   requiredFromReference: readonly string[];
+  /** A located OEM gasoline label, recorded once its VIN, source and checksum are verified (gas-hd-references/provenance.json). */
+  reference?: {
+    file: string;
+    vin: string;
+    sha256: string;
+    source: string;
+    kind: "standard_retail" | "altered_commercial";
+  };
 }
 
 const GAS_HD_REQUIRED = [
@@ -528,6 +537,10 @@ const GAS_HD_REQUIRED = [
 const GAS_HD_BLOCKERS: readonly CatalogBlockerCode[] = [
   "missing_oem_gasoline_reference", "layout_not_built", "owner_exact_match_not_approved",
   "carb_panel_pending", "powertrain_rule_unverified",
+];
+
+const GAS_HD_BLOCKERS_WITH_REFERENCE: readonly CatalogBlockerCode[] = [
+  "layout_not_built", "owner_exact_match_not_approved", "carb_panel_pending",
 ];
 
 export const BLOCKED_VARIANT_REQUESTS: readonly CatalogVariantRequest[] = [
@@ -547,13 +560,24 @@ export const BLOCKED_VARIANT_REQUESTS: readonly CatalogVariantRequest[] = [
     id: "gmc_2026_sierra_3500hd_gas", brand: "GMC", canonicalMake: "GMC",
     source: { modelYear: 2026, model: "Sierra 3500HD", trim: null }, dieselTemplateId: "gmc_2026_sierra_3500_denali_ultimate",
     match: { modelYears: [2026], modelPattern: "^sierra3500", bodyClasses: ["PICKUP"], fuelClasses: ["gasoline"] },
-    approval: "pending_owner_approval", layoutStatus: "not_started", blockers: GAS_HD_BLOCKERS, requiredFromReference: GAS_HD_REQUIRED,
+    approval: "pending_owner_approval", layoutStatus: "not_started",
+    blockers: ["reference_altered_vehicle", ...GAS_HD_BLOCKERS_WITH_REFERENCE], requiredFromReference: GAS_HD_REQUIRED,
+    reference: {
+      file: "gas-hd-references/GMC_2026_Sierra_3500_Pro_Gas_ALTERED_1GT3USE75TF129680.pdf", vin: "1GT3USE75TF129680",
+      sha256: "f9d23805a840aed834d01bf001900f18143661e0885349254184144253515c56", source: "dealer-hosted GM label (Springfield GMC)",
+      kind: "altered_commercial",
+    },
   },
   {
     id: "ram_2026_2500_gas", brand: "Ram", canonicalMake: "RAM",
     source: { modelYear: 2026, model: "2500", trim: null }, dieselTemplateId: "ram_2026_2500_limited",
     match: { modelYears: [2026], modelPattern: "^(ram)?2500(pickup)?$", bodyClasses: ["PICKUP"], fuelClasses: ["gasoline"] },
-    approval: "pending_owner_approval", layoutStatus: "not_started", blockers: GAS_HD_BLOCKERS, requiredFromReference: GAS_HD_REQUIRED,
+    approval: "pending_owner_approval", layoutStatus: "not_started", blockers: GAS_HD_BLOCKERS_WITH_REFERENCE, requiredFromReference: GAS_HD_REQUIRED,
+    reference: {
+      file: "gas-hd-references/Ram_2026_2500_Big_Horn_Gas_3C6UR5DJ7TG302125.pdf", vin: "3C6UR5DJ7TG302125",
+      sha256: "faac3bd17acf838ce68a15a7515f3df6092b7fe3cbe8c71a78cfd1e85876bd4d", source: "Stellantis window-sticker service (manufacturer)",
+      kind: "standard_retail",
+    },
   },
 ];
 
@@ -673,7 +697,9 @@ export function resolveCatalogTemplate(v: CatalogVehicleInput): CatalogResolutio
   }
   for (const b of BLOCKED_VARIANT_REQUESTS) {
     if (b.canonicalMake === make && evaluateCatalogTemplate(b, v).matched) {
-      reasons.push(`${b.id}: matches the configuration, but no genuine OEM gasoline label exists, so no layout is built`);
+      reasons.push(b.reference
+        ? `${b.id}: matches the configuration; OEM gasoline label verified but no layout is built`
+        : `${b.id}: matches the configuration, but no genuine OEM gasoline label exists, so no layout is built`);
     }
   }
   return { status: "configuration_unsupported", template: null, flags: ["template_configuration_unsupported"], candidates, reasons };
