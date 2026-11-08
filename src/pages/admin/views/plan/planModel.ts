@@ -141,7 +141,7 @@ export interface UsageSnapshot {
 
 export type UsageState = { kind: "loading" } | { kind: "failed"; reason: string } | { kind: "ready"; snapshot: UsageSnapshot };
 
-export type LimitView = { kind: "unlimited" } | { kind: "limited"; soft: number; hard: number } | { kind: "undefined" };
+export type LimitView = { kind: "unknown" } | { kind: "unlimited" } | { kind: "limited"; soft: number; hard: number } | { kind: "undefined" };
 
 export const limitView = (tier: PlanTier, key: MetricKey): LimitView => {
   const l = limitFor(tier, key);
@@ -160,9 +160,9 @@ export interface MetricModel {
   quota: QuotaState | null;
 }
 
-export function buildMetrics(usage: UsageState, tier: PlanTier): MetricModel[] {
+export function buildMetrics(usage: UsageState, tier: PlanTier, planKnown = true): MetricModel[] {
   return METRIC_SPECS.map((spec) => {
-    const limit = limitView(tier, spec.key);
+    const limit: LimitView = planKnown ? limitView(tier, spec.key) : { kind: "unknown" };
     let value: number | null = null;
     let reason: string | null = null;
     let reading: MetricReading | null = null;
@@ -173,7 +173,7 @@ export function buildMetrics(usage: UsageState, tier: PlanTier): MetricModel[] {
       reading = usage.snapshot.metrics[spec.key] ?? { value: 0, events: 0, lastEventAt: null };
       value = reading.value;
     }
-    const percent = value !== null && limit.kind === "limited" ? Math.min(100, Math.round((value / limit.hard) * 100)) : null;
+    const percent = value !== null && limit.kind === "limited" && limit.hard > 0 ? Math.min(100, Math.round((value / limit.hard) * 100)) : null;
     const quota = value !== null && limit.kind === "limited" ? quotaState(tier, spec.key, value) : null;
     return { spec, value, reason, reading, limit, percent, quota };
   });
@@ -236,6 +236,7 @@ export interface FeatureContext {
   accessActive: boolean;
   isPlatformAdmin: boolean;
   settings: FeatureSettings | null;
+  planKnown?: boolean;
 }
 
 export function featureRow(key: FeatureKey, ctx: FeatureContext): FeatureRow {
@@ -247,6 +248,7 @@ export function featureRow(key: FeatureKey, ctx: FeatureContext): FeatureRow {
       ? { key, label, status: "included", detail: "Available to platform administrators.", link }
       : { key, label, status: "platform_only", detail: "Platform staff only. It is not part of any dealer plan.", link: null };
   }
+  if (ctx.planKnown === false) return { key, label, status: "unavailable", detail: "Plan could not be loaded.", link: null };
   if (!ctx.accessActive) return { key, label, status: "unavailable", detail: "Not available while the plan is not active.", link: null };
   if (rankOf(ctx.tier) < rankOf(required)) return { key, label, status: "requires_upgrade", detail: `Requires the ${planLabel(required)} plan.`, link: null };
   const setup = unmetSetup(key, ctx.settings);

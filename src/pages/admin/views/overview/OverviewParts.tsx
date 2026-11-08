@@ -139,7 +139,7 @@ const SeverityChip = ({ status }: { status: AttentionItem["status"] }) => {
   );
 };
 
-const countText = (c: AttentionItem["count"]): string => (c ? plural(c.value, c.unit, `${c.unit}s`) : "");
+const countText = (c: AttentionItem["count"]): string => (c ? (c.atLeast ? `${c.value.toLocaleString()}+ ${c.unit}s` : plural(c.value, c.unit, `${c.unit}s`)) : "");
 
 export function AttentionQueue({ items, loading, failed }: { items: AttentionItem[]; loading: boolean; failed: boolean }) {
   const narrow = useIsNarrow();

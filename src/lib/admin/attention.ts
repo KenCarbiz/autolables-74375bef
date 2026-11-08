@@ -25,7 +25,7 @@ export interface AttentionItem {
   status: AttentionStatus;
   action: { label: string; href: string };
   /** What the number counts, so a vehicle count is never read as an issue count. */
-  count?: { value: number; unit: "vehicle" | "case" | "issue" } | null;
+  count?: { value: number; unit: "vehicle" | "case" | "issue"; atLeast?: boolean } | null;
 }
 
 export interface AttentionInput {
@@ -96,7 +96,7 @@ export function buildAttentionQueue(input: AttentionInput): AttentionItem[] {
         detail: v ? `${plural(instances.value, "open issue", "open issues")} across ${plural(v.value, "vehicle", "vehicles")}${v.capped ? " or more" : ""}.` : `${plural(instances.value, "open issue", "open issues")}.`,
         owner: "Store admin",
         status: "review_required",
-        count: v ? { value: v.value, unit: "vehicle" } : { value: instances.value, unit: "issue" },
+        count: v ? { value: v.value, unit: "vehicle", atLeast: v.capped } : { value: instances.value, unit: "issue" },
         action: { label: "Open exceptions", href: EXCEPTIONS_HREF },
       });
     }

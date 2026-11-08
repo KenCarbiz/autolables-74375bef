@@ -94,4 +94,14 @@ describe("compare plans and the reporting month", () => {
     expect(zonedMonthStart(Date.parse("2026-11-01T02:00:00Z"), "America/New_York").label).toBe("October 2026");
     expect(zonedMonthStart(Date.parse("2026-12-15T00:00:00Z"), "UTC").end.toISOString()).toBe("2027-01-01T00:00:00.000Z");
   });
+  it("gives no percent when the limit is zero or the plan is unknown (E1, E2)", () => {
+    const zero: UsageState = { kind: "ready", snapshot: { monthLabel: "November 2026", timeZone: "UTC", scope: "x", updatedAt: "2026-11-08T00:00:00Z", metrics: {} } };
+    const none = buildMetrics(zero, "none")[0];
+    expect(none.percent).toBeNull();
+    const unknown = buildMetrics(zero, "none", false);
+    expect(unknown.every((x) => x.limit.kind === "unknown" && x.percent === null)).toBe(true);
+    const rows = buildFeatureGroups({ tier: "none", accessActive: false, isPlatformAdmin: false, settings: DEFAULT_SETTINGS, planKnown: false }).flatMap((g) => g.rows);
+    const dealer = rows.filter((r) => r.status !== "platform_only");
+    expect(dealer.every((r) => r.status === "unavailable" && r.detail === "Plan could not be loaded.")).toBe(true);
+  });
 });

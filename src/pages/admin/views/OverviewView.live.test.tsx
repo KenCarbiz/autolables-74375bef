@@ -45,7 +45,7 @@ describe("Overview against live reads", () => {
     expect(within(summary).getByText(/3 open issues in total/)).toBeTruthy();
     const audit = spyCalls.find((c) => c.kind === "table" && c.table === "audit_log" && c.op === "not");
     expect(audit).toBeTruthy();
-    expect((audit as { args: unknown[] }).args).toEqual(["action", "ilike", "%view%"]);
+    expect((audit as { args: unknown[] }).args).toEqual(["action", "in", "(listing_viewed,addendum_viewed,window_sticker.view)"]);
   });
 
   it("starts no sync, function or write on mount", async () => {
