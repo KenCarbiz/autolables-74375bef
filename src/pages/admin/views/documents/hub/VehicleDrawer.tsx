@@ -63,7 +63,7 @@ export function VehicleDrawer({ row, open, onClose }: { row: HubRow | null; open
       open={open}
       onClose={onClose}
       title={title}
-      description={`VIN ${vinKey(listing.vin)}${row.stock ? `, stock ${row.stock}` : ""}`}
+      description={`VIN ${vinKey(listing.vin)}${row.stock ? `, stock ${row.stock}` : row.stockUnavailable ? ", stock unavailable" : ""}`}
       footer={
         <>
           <AdminLinkButton to={`/vehicle-file/${listing.id}?tab=documents`} variant="primary">

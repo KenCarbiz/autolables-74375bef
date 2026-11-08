@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   role: "owner" as string,
   count: 3 as number | null,
   settings: {} as Record<string, unknown>,
+  fresh: null as { settings: Record<string, unknown> } | null,
+  freshError: false,
 }));
 
 vi.mock("sonner", () => ({ toast: Object.assign(() => {}, { info: () => {}, error: () => {}, success: () => {} }) }));
@@ -31,7 +33,7 @@ vi.mock("@/integrations/supabase/client", () => {
       in: () => c,
       order: () => c,
       limit: () => c,
-      maybeSingle: () => Promise.resolve({ data: null, error: null }),
+      maybeSingle: () => Promise.resolve({ data: mocks.fresh, error: mocks.freshError ? { message: "read failed" } : null }),
       then: (resolve: (v: unknown) => unknown) => resolve({ data: null, error: null, count: mocks.count }),
     });
     return c;
@@ -79,6 +81,8 @@ describe("ApprovalRulesView", () => {
     mocks.role = "owner";
     mocks.count = 3;
     mocks.settings = baseSettings();
+    mocks.fresh = null;
+    mocks.freshError = false;
   });
 
   it("renders the fixture rows and rail without writing anything", () => {
@@ -137,7 +141,7 @@ describe("ApprovalRulesView", () => {
     await screen.findByText("Needs setup");
     expect(mocks.updateSettings).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit Addendum rules" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Edit rule\s*,?\s*Addendum/ }));
     const sw = screen.getByRole("switch", { name: "Require manager approval before printing" });
     expect(sw).not.toBeChecked();
     fireEvent.click(sw);
@@ -167,7 +171,7 @@ describe("ApprovalRulesView", () => {
   it("blocks apply while the impact count is unavailable", async () => {
     mocks.count = null;
     renderView();
-    fireEvent.click(screen.getByRole("button", { name: "Edit Window sticker rules" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Edit rule\s*,?\s*Window sticker/ }));
     fireEvent.click(screen.getByRole("switch", { name: "Track QR scans" }));
     fireEvent.click(screen.getByRole("button", { name: "Review policy changes" }));
     const dialog = await screen.findByRole("dialog");
@@ -181,13 +185,13 @@ describe("ApprovalRulesView", () => {
     await screen.findByText("Needs setup");
     expect(screen.queryByText(/^Rules for /)).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit Window sticker rules" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Edit rule\s*,?\s*Window sticker/ }));
     expect(screen.getByRole("heading", { name: "Window sticker approval" })).toBeInTheDocument();
     expect(screen.getByText("Rules for window sticker")).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "Track QR scans" })).toBeInTheDocument();
     expect(screen.queryByRole("switch", { name: "Require manager approval before sending an addendum packet" })).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit Addendum rules" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Edit rule\s*,?\s*Addendum/ }));
     expect(screen.getByRole("heading", { name: "Addendum approval" })).toBeInTheDocument();
     expect(screen.getByText("Rules for addendum")).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "Require manager approval before sending an addendum packet" })).toBeInTheDocument();
@@ -208,7 +212,7 @@ describe("ApprovalRulesView", () => {
     await screen.findByText("Needs setup");
     const reviewButton = () => screen.getByRole("button", { name: "Review policy changes" });
     expect(reviewButton()).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "Edit Addendum rules" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Edit rule\s*,?\s*Addendum/ }));
     const sw = screen.getByRole("switch", { name: "Require manager approval before printing" });
     fireEvent.click(sw);
     expect(reviewButton()).toBeEnabled();
@@ -223,7 +227,7 @@ describe("ApprovalRulesView", () => {
   it("keeps the pending change when the review is cancelled, without writing", async () => {
     renderView();
     await screen.findByText("Needs setup");
-    fireEvent.click(screen.getByRole("button", { name: "Edit Addendum rules" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Edit rule\s*,?\s*Addendum/ }));
     fireEvent.click(screen.getByRole("switch", { name: "Require manager approval before printing" }));
     fireEvent.click(screen.getByRole("button", { name: "Review policy changes" }));
     const dialog = await screen.findByRole("dialog");
@@ -244,7 +248,7 @@ describe("ApprovalRulesView", () => {
     arrange();
     renderView();
     await screen.findByText("Needs setup");
-    fireEvent.click(screen.getByRole("button", { name: "Edit Addendum rules" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Edit rule\s*,?\s*Addendum/ }));
     fireEvent.click(screen.getByRole("switch", { name: "Require manager approval before printing" }));
     fireEvent.click(screen.getByRole("button", { name: "Review policy changes" }));
     const dialog = await screen.findByRole("dialog");
@@ -263,21 +267,21 @@ describe("ApprovalRulesView", () => {
   it("lets a salesperson read the rules but not change them", () => {
     mocks.role = "salesperson";
     renderView();
-    fireEvent.click(screen.getByRole("button", { name: "Edit Addendum rules" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Edit rule\s*,?\s*Addendum/ }));
     expect(screen.getByRole("switch", { name: "Require manager approval before printing" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Review policy changes" })).toBeDisabled();
   });
 
   it("has no switch that turns off preserving signed versions", () => {
     renderView();
-    fireEvent.click(screen.getByRole("button", { name: "Edit Addendum rules" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Edit rule\s*,?\s*Addendum/ }));
     expect(screen.getByText("Signed versions are always kept")).toBeInTheDocument();
     expect(screen.queryByRole("switch", { name: /signed version/i })).toBeNull();
   });
 
   it("keeps price changes and sold or removed as separate consequences", () => {
     renderView();
-    fireEvent.click(screen.getByRole("button", { name: "Edit Addendum rules" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Edit rule\s*,?\s*Addendum/ }));
     expect(screen.getByText("Price changed")).toBeInTheDocument();
     expect(screen.getByText("Vehicle sold or removed")).toBeInTheDocument();
   });
@@ -286,7 +290,43 @@ describe("ApprovalRulesView", () => {
     const fx = FIXTURE_11.fixture;
     const view = { ...(fx.views["approval-rules"] as Record<string, unknown>), canEdit: false };
     renderView({ ...fx, views: { ...fx.views, "approval-rules": view } });
-    fireEvent.click(screen.getByRole("button", { name: "Edit Addendum rules" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Edit rule\s*,?\s*Addendum/ }));
     for (const sw of screen.getAllByRole("switch")) expect(sw).toBeDisabled();
+  });
+
+  const toggleAndReview = async () => {
+    renderView();
+    fireEvent.click(screen.getByRole("button", { name: /^Edit rule\s*,?\s*Addendum/ }));
+    fireEvent.click(screen.getByRole("switch", { name: "Require manager approval before printing" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review policy changes" }));
+    const dialog = await screen.findByRole("dialog");
+    const apply = within(dialog).getByRole("button", { name: "Apply" });
+    await waitFor(() => expect(apply).toBeEnabled());
+    fireEvent.click(apply);
+    return dialog;
+  };
+
+  it("merges onto the document_rules stored on the server, so a Publishing save made after load is kept", async () => {
+    mocks.fresh = { settings: { document_rules: { autoPublishApprovedWindow: true } } };
+    await toggleAndReview();
+    await waitFor(() => expect(mocks.updateSettings).toHaveBeenCalledTimes(1));
+    const payload = mocks.updateSettings.mock.calls[0][0] as { document_rules: typeof DEFAULT_DOCUMENT_RULES };
+    expect(payload.document_rules.autoPublishApprovedWindow).toBe(true);
+    expect(payload.document_rules.requireApprovalBeforePrint).toBe(true);
+  });
+
+  it("refuses with a conflict when a key it changed was also changed on the server", async () => {
+    mocks.fresh = { settings: { document_rules: { requireApprovalBeforePrint: true } } };
+    const dialog = await toggleAndReview();
+    expect(await within(dialog).findByText("Changed elsewhere")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Reload" })).toBeInTheDocument();
+    expect(mocks.updateSettings).not.toHaveBeenCalled();
+  });
+
+  it("writes nothing when the stored rules cannot be re-read", async () => {
+    mocks.freshError = true;
+    const dialog = await toggleAndReview();
+    expect(await within(dialog).findByText(/could not be read again/)).toBeInTheDocument();
+    expect(mocks.updateSettings).not.toHaveBeenCalled();
   });
 });

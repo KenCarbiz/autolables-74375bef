@@ -55,7 +55,13 @@ export default function HubService() {
           );
         })}
       </ul>
-      <p className="text-[13px] leading-[18px] text-adm-muted">Per-user signer grants and the overdue threshold live in <Link className="font-semibold text-adm-primary hover:underline" to="/service/settings">Service Desk settings</Link>. The Get-Ready service catalog is on <Link className="font-semibold text-adm-primary hover:underline" to={adminTabHref("service-policy", "getready-catalog")}>Service policy</Link>.</p>
+      <div className="rounded-xl border border-adm-divider bg-adm-surface px-4 py-3">
+        <p className="text-[13px] leading-[18px] text-adm-muted">Per-user signer grants and the overdue threshold live in Service Desk settings. The Get-Ready service catalog is on Service policy.</p>
+        <div className="mt-1 flex flex-wrap gap-x-5">
+          <Link className="inline-flex items-center min-h-[44px] text-[14px] font-semibold text-adm-primary hover:underline" to="/service/settings">Service Desk settings</Link>
+          <Link className="inline-flex items-center min-h-[44px] text-[14px] font-semibold text-adm-primary hover:underline" to={adminTabHref("service-policy", "getready-catalog")}>Service policy</Link>
+        </div>
+      </div>
     </div>
   );
 }

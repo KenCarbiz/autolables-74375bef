@@ -10,8 +10,9 @@ import { describeAge } from "@/lib/admin/health";
 import LabelDefaultsPanel from "@/components/admin/LabelDefaultsPanel";
 import FactoryStickerPanel from "@/components/admin/FactoryStickerPanel";
 import StickerPrintTemplates from "@/components/admin/StickerPrintTemplates";
-import { AdminButton, AdminCard, AdminTable, KeyValueList, StatusChip, Td, Th } from "@/components/admin/v2/primitives";
-import { DetailDrawer } from "@/components/admin/v3/editor";
+import { AdminButton, KeyValueList, StatusChip } from "@/components/admin/v2/primitives";
+import { DetailDrawer, SectionCard, SelectField, useIsNarrow } from "@/components/admin/v3/editor";
+import { StackedRows } from "./hub/StackedRows";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { adminTabHref } from "@/lib/admin/sections";
 import { documentRuleRows, rulesFromSettings, serviceGateContext } from "@/lib/admin/documentPolicy";
@@ -104,115 +105,127 @@ export default function TemplatesView({ section = "all" }: { section?: Templates
   const showSettings = section !== "library";
   const matrix = useMemo(() => documentRuleRows(rulesFromSettings(settings), serviceGateContext(settings)), [settings]);
 
+  const narrow = useIsNarrow();
+  const bare = "-mx-4 sm:-mx-6 -my-5";
+  const editRules = <Link to={adminTabHref("approval-rules")} className="inline-flex items-center min-h-[44px] sm:min-h-[32px] text-[14px] font-semibold text-adm-primary hover:underline whitespace-nowrap">Edit rules</Link>;
+  const openCalibration = <Link to={adminTabHref("print-calibration")} className="inline-flex items-center min-h-[44px] sm:min-h-[32px] text-[14px] font-semibold text-adm-primary hover:underline whitespace-nowrap">Open calibration</Link>;
   return (
     <div className="flex flex-col gap-4">
       {showLibrary && <LabelDefaultsPanel />}
 
-      {showSettings && <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
-        <AdminCard title="Approval matrix" flush inset="sm" action={<Link to={adminTabHref("approval-rules")} className="text-[14px] font-semibold text-adm-primary hover:underline">Edit rules</Link>}>
-          <AdminTable caption="Approval matrix" minWidth={460}>
-            <thead>
-              <tr>
-                <Th>Document</Th>
-                <Th>Approval</Th>
-                <Th>Refresh after</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {matrix.map((r) => (
-                <tr key={r.family}>
-                  <Td className="whitespace-nowrap font-medium">{r.document}</Td>
-                  <Td className="max-w-[200px] truncate">{r.approval}</Td>
-                  <Td className="max-w-[180px] truncate text-adm-muted">{r.refreshAfter}</Td>
-                </tr>
-              ))}
-            </tbody>
-          </AdminTable>
-        </AdminCard>
+      {showSettings && (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+          <SectionCard
+            icon="clipboard-check"
+            title="Approval matrix"
+            description="Who approves each document and what sends it back for review."
+            actions={narrow ? undefined : editRules}
+          >
+            {narrow && <div>{editRules}</div>}
+            <div className={bare}>
+              <StackedRows
+                caption="Approval matrix"
+                rows={matrix}
+                rowKey={(r) => r.family}
+                columns={[
+                  { id: "document", header: "Document", primary: true, cell: (r) => r.document, className: "font-medium" },
+                  { id: "approval", header: "Approval", cell: (r) => r.approval },
+                  { id: "refresh", header: "Refresh after", cell: (r) => <span className="text-adm-muted">{r.refreshAfter}</span> },
+                ]}
+              />
+            </div>
+          </SectionCard>
 
-        <AdminCard title="Print & calibration readiness" flush inset="sm" action={<Link to={adminTabHref("print-calibration")} className="text-[14px] font-semibold text-adm-primary hover:underline">Open calibration</Link>}>
-          <AdminTable caption="Readiness" minWidth={420}>
-            <thead>
-              <tr>
-                <Th>Check</Th>
-                <Th>Status</Th>
-                <Th>Detail</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {readiness.items.map((it) => (
-                <tr key={it.key}>
-                  <Td className="whitespace-nowrap font-medium">{it.label}</Td>
-                  <Td><StatusChip tone={it.state === "ok" ? "success" : it.state === "needs" ? "warning" : "neutral"}>{it.chip}</StatusChip></Td>
-                  <Td className="max-w-[200px] truncate text-adm-muted">{it.detailValue}</Td>
-                </tr>
-              ))}
-            </tbody>
-          </AdminTable>
-        </AdminCard>
-      </div>}
-
-      {showSettings && <AdminCard id="paper-size" title="Addendum paper size" description="The addendum scales to this size. The FTC Buyers Guide stays at its federally mandated minimum (11 x 7.25 in, 16 CFR 455)." action={<SaveStatus status={paper.status} />}>
-        <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,320px)_1fr_1fr] gap-3 items-end">
-          <div>
-            <label htmlFor="paper-size-select" className={FIELD_LABEL}>Paper size</label>
-            <select id="paper-size-select" aria-label="Addendum paper size" value={paper.draft.addendum_paper_size ?? ""} disabled={!canEdit} onChange={(e) => paper.patch({ addendum_paper_size: e.target.value as PaperSize })} className={INPUT_CLASS}>
-              {PAPER_SIZES.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
-            </select>
-          </div>
-          {paper.draft.addendum_paper_size === "custom" && (
-            <>
-              <div>
-                <label htmlFor="paper-width" className={FIELD_LABEL}>Width (in)</label>
-                <input id="paper-width" type="number" step="0.1" value={paper.draft.addendum_custom_width ?? ""} disabled={!canEdit} onChange={(e) => paper.patch({ addendum_custom_width: e.target.value })} className={INPUT_CLASS} />
-              </div>
-              <div>
-                <label htmlFor="paper-height" className={FIELD_LABEL}>Height (in)</label>
-                <input id="paper-height" type="number" step="0.1" value={paper.draft.addendum_custom_height ?? ""} disabled={!canEdit} onChange={(e) => paper.patch({ addendum_custom_height: e.target.value })} className={INPUT_CLASS} />
-              </div>
-            </>
-          )}
+          <SectionCard
+            icon="printer"
+            title="Print & calibration readiness"
+            description="A printing issue does not block digital approval."
+            actions={narrow ? undefined : openCalibration}
+          >
+            {narrow && <div>{openCalibration}</div>}
+            <div className={bare}>
+              <StackedRows
+                caption="Readiness"
+                rows={readiness.items}
+                rowKey={(it) => it.key}
+                columns={[
+                  { id: "check", header: "Check", primary: true, cell: (it) => it.label, className: "font-medium" },
+                  { id: "status", header: "Status", cell: (it) => <StatusChip tone={it.state === "ok" ? "success" : it.state === "needs" ? "warning" : "neutral"} className="text-[13px]">{it.chip}</StatusChip> },
+                  { id: "detail", header: "Detail", cell: (it) => <span className="text-adm-muted">{it.detailValue}</span> },
+                ]}
+              />
+            </div>
+          </SectionCard>
         </div>
-      </AdminCard>}
+      )}
 
-      {showLibrary && <AdminCard title="Template catalog versions" description="Platform templates and the version each one serves. History is read-only here." flush>
-        {rows === undefined ? (
-          <p className="px-6 pb-6 text-[13px] text-adm-muted">Checking the template catalog</p>
-        ) : rows === null ? (
-          <p className="px-6 pb-6 text-[13px] text-adm-muted">The template catalog could not be read. Versions show as Unknown, not as missing.</p>
-        ) : rows.length === 0 ? (
-          <p className="px-6 pb-6 text-[13px] text-adm-muted">No templates are published in the catalog. The built-in templates still render.</p>
-        ) : (
-          <AdminTable caption="Template catalog versions" minWidth={560}>
-            <thead>
-              <tr>
-                <Th>Template</Th>
-                <Th>Size</Th>
-                <Th>Version</Th>
-                <Th>Status</Th>
-                <Th>Details</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id}>
-                  <Td>
-                    <span className="block font-semibold">{r.name}</span>
-                    <span className="block text-[12px] text-adm-muted">{r.type}</span>
-                  </Td>
-                  <Td>{r.size}</Td>
-                  <Td>
-                    <span className="block tabular-nums">v{r.currentVersion}</span>
-                    <span className="block text-[12px] text-adm-muted">{r.publishedAt ? `Published ${describeAge(r.publishedAt, now)}` : "Version not recorded"}</span>
-                  </Td>
-                  <Td><StatusChip tone={r.active ? "success" : "neutral"}>{r.active ? "Active" : "Inactive"}</StatusChip></Td>
-                  <Td><AdminButton size="sm" aria-label={`Details for ${r.name}`} onClick={() => setDetail(r)}>Details</AdminButton></Td>
-                </tr>
-              ))}
-            </tbody>
-          </AdminTable>
-        )}
-      </AdminCard>}
+      {showSettings && (
+        <SectionCard
+          id="paper-size"
+          icon="file"
+          title="Addendum paper size"
+          description="The addendum scales to this size. The FTC Buyers Guide stays at its federally mandated minimum (11 x 7.25 in, 16 CFR 455)."
+          actions={<SaveStatus status={paper.status} />}
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,320px)_1fr_1fr] gap-3 items-end">
+            <div>
+              <label htmlFor="paper-size-select" className={FIELD_LABEL}>Paper size</label>
+              <SelectField id="paper-size-select" aria-label="Addendum paper size" value={paper.draft.addendum_paper_size ?? ""} disabled={!canEdit} onChange={(e) => paper.patch({ addendum_paper_size: e.target.value as PaperSize })}>
+                {PAPER_SIZES.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+              </SelectField>
+            </div>
+            {paper.draft.addendum_paper_size === "custom" && (
+              <>
+                <div>
+                  <label htmlFor="paper-width" className={FIELD_LABEL}>Width (in)</label>
+                  <input id="paper-width" type="number" step="0.1" value={paper.draft.addendum_custom_width ?? ""} disabled={!canEdit} onChange={(e) => paper.patch({ addendum_custom_width: e.target.value })} className={INPUT_CLASS} />
+                </div>
+                <div>
+                  <label htmlFor="paper-height" className={FIELD_LABEL}>Height (in)</label>
+                  <input id="paper-height" type="number" step="0.1" value={paper.draft.addendum_custom_height ?? ""} disabled={!canEdit} onChange={(e) => paper.patch({ addendum_custom_height: e.target.value })} className={INPUT_CLASS} />
+                </div>
+              </>
+            )}
+          </div>
+          {!canEdit && <p className="text-[13px] leading-[18px] text-adm-muted">Your role can view the paper size but not change it. Changing it needs the settings roles.</p>}
+        </SectionCard>
+      )}
+
+      {showLibrary && (
+        <SectionCard icon="layers" title="Template catalog versions" description="Platform templates and the version each one serves. History is read-only here.">
+          {rows === undefined ? (
+            <p className="text-[14px] text-adm-muted">Checking the template catalog</p>
+          ) : rows === null ? (
+            <p className="text-[14px] text-adm-muted">The template catalog could not be read. Versions show as Unknown, not as missing.</p>
+          ) : rows.length === 0 ? (
+            <p className="text-[14px] text-adm-muted">No templates are published in the catalog. The built-in templates still render.</p>
+          ) : (
+            <div className={bare}>
+              <StackedRows
+                caption="Template catalog versions"
+                rows={rows}
+                rowKey={(r) => r.id}
+                columns={[
+                  { id: "template", header: "Template", primary: true, cell: (r) => <><span className="block font-semibold">{r.name}</span><span className="block text-[13px] leading-[18px] font-normal text-adm-muted">{r.type}</span></> },
+                  { id: "size", header: "Size", cell: (r) => r.size },
+                  {
+                    id: "version",
+                    header: "Version",
+                    cell: (r) => (
+                      <>
+                        <span className="block tabular-nums">v{r.currentVersion}</span>
+                        <span className="block text-[13px] leading-[18px] text-adm-muted">{r.publishedAt ? `Published ${describeAge(r.publishedAt, now)}` : "Version not recorded"}</span>
+                      </>
+                    ),
+                  },
+                  { id: "status", header: "Status", cell: (r) => <StatusChip tone={r.active ? "success" : "neutral"} className="text-[13px]">{r.active ? "Active" : "Inactive"}</StatusChip> },
+                  { id: "details", header: "Details", cell: (r) => <AdminButton size="sm" className="min-h-[44px] sm:min-h-[32px]" aria-label={`Details for ${r.name}`} onClick={() => setDetail(r)}>Details</AdminButton> },
+                ]}
+              />
+            </div>
+          )}
+        </SectionCard>
+      )}
 
       {showLibrary && <FactoryStickerPanel />}
       {showLibrary && <StickerPrintTemplates />}

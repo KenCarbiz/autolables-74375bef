@@ -51,4 +51,15 @@ describe("hub data layer", () => {
     const { db } = mockDb(() => ({ data: null, error: { message: "boom" } }));
     await expect(loadRangePage(db, "t1", DEFAULT_HUB_FILTERS)).rejects.toMatchObject({ reason: "failed" });
   });
+
+  it("marks stock as unavailable, not blank, when the stock read fails", async () => {
+    const { db } = mockDb((c) => {
+      if (c.table === "vehicle_listings") return { data: [{ ...listing(1), vehicle_file_id: "f1" }], count: 1 };
+      if (c.table === "vehicle_files") return { data: null, error: { message: "boom" } };
+      return { data: [] };
+    });
+    const page = await loadRangePage(db, "t1", DEFAULT_HUB_FILTERS);
+    expect(page.rows[0].stock).toBeNull();
+    expect(page.rows[0].stockUnavailable).toBe(true);
+  });
 });

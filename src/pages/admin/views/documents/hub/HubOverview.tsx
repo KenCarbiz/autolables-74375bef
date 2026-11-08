@@ -48,7 +48,6 @@ export default function HubOverview() {
             <Link
               key={c.key}
               to={hubHref("readiness", OVERVIEW_CARD_FILTER[c.key])}
-              aria-label={`${c.label}: ${value === null ? "unknown" : value}. Open the filtered vehicle list.`}
               className="group rounded-xl border border-adm-divider bg-adm-surface p-4 sm:p-5 flex items-start gap-3 min-w-0 hover:bg-adm-workspace focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary"
             >
               <span aria-hidden="true" className={cn("inline-grid place-items-center w-11 h-11 rounded-[10px] flex-shrink-0", c.tone)}><AdminIcon name={c.icon} size="card" /></span>
@@ -57,6 +56,7 @@ export default function HubOverview() {
                 <span className={cn("block tabular-nums", value === null ? "text-[22px] leading-[30px] font-semibold text-adm-muted" : "text-[28px] leading-[34px] font-bold text-adm-ink")}>{data.loading && !data.rows ? "…" : value === null ? "Unknown" : value.toLocaleString()}</span>
                 <span className="block text-[13px] leading-[18px] text-adm-muted">{empty ? "No active vehicles" : c.hint}</span>
               </span>
+              <span className="sr-only">. Opens the filtered vehicle list.</span>
               <AdminIcon name="chevron-right" className="mt-1 text-adm-muted group-hover:text-adm-ink flex-shrink-0" />
             </Link>
           );
@@ -86,7 +86,7 @@ export default function HubOverview() {
                   <Link to={hubHref("readiness", { q: r.listing.vin }) + `&vehicle=${encodeURIComponent(r.listing.id)}`} className="flex items-center gap-3 px-4 sm:px-6 py-3 min-h-[56px] hover:bg-adm-workspace focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-adm-primary">
                     <span className="min-w-0 flex-1">
                       <span className="block text-[14px] leading-[20px] font-semibold">{r.listing.ymm?.trim() || `VIN ${r.listing.vin}`}</span>
-                      <span className="block text-[13px] leading-[18px] text-adm-muted">VIN {r.listing.vin}{r.stock ? ` . Stock ${r.stock}` : ""} . {r.facts.nextAction}</span>
+                      <span className="block text-[13px] leading-[18px] text-adm-muted">VIN {r.listing.vin}{r.stock ? ` . Stock ${r.stock}` : r.stockUnavailable ? " . Stock unavailable" : ""} . {r.facts.nextAction}</span>
                     </span>
                     <ReadinessChip value={r.facts.readiness} />
                   </Link>

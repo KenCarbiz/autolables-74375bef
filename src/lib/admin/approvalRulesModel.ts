@@ -1,7 +1,7 @@
 import type { AuditLogEntry } from "@/types/tenant";
 import type { AdminIconName } from "@/components/admin/v3/editor";
 import type { DocumentRules } from "@/lib/documentRules";
-import { DOCUMENT_RULE_LABELS, roleLabelFor, type DocumentFamily, type ServiceGateContext } from "@/lib/admin/documentPolicy";
+import { DOCUMENT_RULE_LABELS, familyDef, roleLabelFor, type DocumentFamily, type ServiceGateContext } from "@/lib/admin/documentPolicy";
 
 // Read models for the Approval rules screen. document_rules is one
 // tenant-wide object; these helpers only project it per document and describe
@@ -97,6 +97,32 @@ export function changeConsequences(rules: DocumentRules): Consequence[] {
         : "A sold or removed vehicle is not flagged. Its public copy stays up.",
     },
   ];
+}
+
+/** Real, mounted destinations for "Preview document"; the policy table's own links include one that is not routed. */
+export const PREVIEW_TARGET: Record<DocumentFamily, { to: string; opens: string }> = {
+  window_sticker: { to: "/sticker-studio", opens: "Opens Sticker Studio" },
+  buyers_guide: { to: "/print-center", opens: "Opens the print center" },
+  addendum: { to: "/addendum", opens: "Opens the addendum builder" },
+  inspection_record: { to: "/service", opens: "Opens the service desk" },
+};
+
+/** One plain sentence about what moves a document back to review, in human wording. */
+export function familySentence(family: DocumentFamily, rules: DocumentRules, gates: ServiceGateContext): string {
+  if (family === "inspection_record") {
+    return gates.k208Required ? "Inspection records are required before customer signing on Used and CPO vehicles." : "A completed inspection is not required before customer signing.";
+  }
+  const name = familyDef(family).label;
+  const reasons = [
+    rules.staleOnPriceChange ? "a price change" : null,
+    rules.staleOnMsrpChange ? "an MSRP change" : null,
+    family === "addendum" && rules.staleOnAddendumChange ? "a change to addendum items" : null,
+    family === "window_sticker" && rules.staleOnMileageChange ? "a mileage change" : null,
+  ].filter((x): x is string => !!x);
+  const parts: string[] = [];
+  if (reasons.length) parts.push(`${name} documents go back for review after ${list(reasons)}.`);
+  if (rules.staleOnSoldRemoved) parts.push(`A sold or removed vehicle flags the document${rules.autoUnpublishStale ? " and withdraws its public copy" : ""}.`);
+  return parts.length ? parts.join(" ") : `${name} documents are not marked for review by vehicle changes.`;
 }
 
 export const SIGNED_VERSIONS_INVARIANT = "Signed and approved versions are always preserved. A replacement is saved as a new version linked to the one it replaces, and no setting turns this off.";

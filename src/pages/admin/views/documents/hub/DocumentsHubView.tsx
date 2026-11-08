@@ -16,6 +16,14 @@ const TemplatesView = lazy(() => import("../TemplatesView"));
 
 const VIEW_ICON: Record<HubView, AdminIconName> = { overview: "grid", library: "file", readiness: "car", service: "wrench", settings: "settings" };
 
+const VIEW_HEADING: Record<HubView, { title: string; subtitle: string }> = {
+  overview: { title: "Documents overview", subtitle: "Where document and service readiness stands across active vehicles. Read only." },
+  library: { title: "Templates and factory records", subtitle: "Default templates by condition, the platform catalog, factory build records and pre-printed stock." },
+  readiness: { title: "Vehicle readiness", subtitle: "Every active vehicle with its documents, K-208 status and next action. Read only." },
+  service: { title: "Service requirements", subtitle: "What the service policy requires before a vehicle can be signed. Edited in Service policy." },
+  settings: { title: "Document settings", subtitle: "Addendum paper size, a summary of the approval rules and print readiness. Rules are edited on their own pages." },
+};
+
 const PANEL_VIEW: Record<string, HubView> = { "factory-sticker": "library", "factory-sticker-settings": "library", "paper-size": "settings", "print-settings": "settings" };
 
 /** A legacy link that names a panel and no view opens the view that holds that panel. */
@@ -46,10 +54,10 @@ export default function DocumentsHubView() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <ScopeLabel scope="all_rooftops" />
-        <p className="text-[13px] leading-[18px] text-adm-muted">{rooftop ? `Vehicles listed for ${rooftop} and the rest of the dealer group. ` : ""}Read only: nothing on this page changes a document.</p>
+        {rooftop && <p className="text-[13px] leading-[18px] text-adm-muted">Vehicles listed for {rooftop} and the rest of the dealer group.</p>}
       </div>
 
-      <div role="tablist" aria-label="Documents and service views" className="flex gap-1 overflow-x-auto border-b border-adm-divider -mb-px">
+      <div role="tablist" aria-label="Documents and service views" className="flex flex-wrap gap-2 sm:gap-1 sm:border-b sm:border-adm-divider">
         {HUB_VIEWS.map((v, i) => {
           const active = v === view;
           return (
@@ -64,7 +72,7 @@ export default function DocumentsHubView() {
               tabIndex={active ? 0 : -1}
               onClick={() => select(v)}
               onKeyDown={(e) => onKey(e, i)}
-              className={cn("inline-flex items-center gap-2 px-4 min-h-[44px] text-[14px] leading-[20px] font-semibold whitespace-nowrap border-b-2 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-adm-primary", active ? "border-adm-primary text-adm-primary" : "border-transparent text-adm-muted hover:text-adm-ink")}
+              className={cn("inline-flex items-center gap-2 px-4 min-h-[44px] text-[14px] leading-[20px] font-semibold whitespace-nowrap max-sm:rounded-full max-sm:border sm:border-b-2 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-adm-primary", active ? "border-adm-primary text-adm-primary max-sm:bg-adm-selected" : "border-transparent max-sm:border-adm-border text-adm-muted hover:text-adm-ink")}
             >
               <AdminIcon name={VIEW_ICON[v]} />
               {HUB_VIEW_LABEL[v]}
@@ -73,7 +81,11 @@ export default function DocumentsHubView() {
         })}
       </div>
 
-      <div role="tabpanel" id={`hub-panel-${view}`} aria-labelledby={`hub-tab-${view}`} tabIndex={-1}>
+      <div role="tabpanel" id={`hub-panel-${view}`} aria-labelledby={`hub-tab-${view}`} tabIndex={-1} className="space-y-4">
+        <div>
+          <h2 className="text-[20px] leading-[28px] font-bold text-adm-ink">{VIEW_HEADING[view].title}</h2>
+          <p className="text-[14px] leading-[20px] text-adm-muted">{VIEW_HEADING[view].subtitle}</p>
+        </div>
         {view === "overview" && <HubOverview />}
         {view === "readiness" && <HubReadiness />}
         {view === "service" && <HubService />}

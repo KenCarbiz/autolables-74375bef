@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { useDealerSettings, type DealerSettings } from "@/contexts/DealerSettingsContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -45,7 +46,9 @@ export interface SettingsReviewOptions<T extends object> {
   describe: (field: keyof T & string, before: unknown, after: unknown) => ReviewRow;
   validate?: (draft: T) => string[];
   warnings?: (before: T, after: T) => string[];
-  toPayload: (draft: T, changed: Array<keyof T & string>) => Partial<DealerSettings>;
+  toPayload: (draft: T, changed: Array<keyof T & string>, fresh?: DealerSettings) => Partial<DealerSettings>;
+  /** Re-reads the stored settings from the server just before the write. A nested object is replaced wholesale by merge_dealer_settings, so the payload must be built on the stored copy, not the one loaded with the page. */
+  readFresh?: (tenantId: string) => Promise<DealerSettings | null>;
   canEdit: boolean;
   fixtureImpact?: ImpactFixture | null;
   /** A draft edit to start from, so a fixture can depict a change pending review. */
@@ -70,6 +73,17 @@ export interface SettingsReview<T extends object> {
   gate: ApplyGate;
 }
 
+/** The stored dealer settings straight from the server, or null when they cannot be read. */
+export async function readStoredSettings(tenantId: string): Promise<DealerSettings | null> {
+  try {
+    const { data, error } = await supabase.from("dealer_profiles").select("settings").eq("tenant_id", tenantId).maybeSingle();
+    if (error) return null;
+    return (((data as { settings?: unknown } | null)?.settings ?? {}) as DealerSettings);
+  } catch {
+    return null;
+  }
+}
+
 const EXCLUSIONS = ["Approved and signed documents keep their current version.", "Archived vehicles are not changed."];
 
 const asRecord = (v: object): Record<string, unknown> => v as unknown as Record<string, unknown>;
@@ -77,7 +91,7 @@ const pickKeys = (v: object, keys: string[]): Record<string, unknown> => Object.
 const changedKeys = <T extends object>(a: T, b: T): Array<keyof T & string> => diffFields(asRecord(a), asRecord(b)).map((d) => d.field as keyof T & string);
 
 export function useSettingsReview<T extends object>(o: SettingsReviewOptions<T>): SettingsReview<T> {
-  const { settings, updateSettings } = useDealerSettings();
+  const { settings, updateSettings, reload } = useDealerSettings();
   const { tenant } = useTenant();
   const { user } = useAuth();
   const { log } = useAudit();
@@ -185,9 +199,12 @@ export function useSettingsReview<T extends object>(o: SettingsReviewOptions<T>)
     setOpen(false);
     const s = stateRef.current;
     if (s.phase === "applied") dispatch({ type: "reset" });
-    else if (s.phase === "conflict") dispatch({ type: "reset", original: optionsRef.current.read(settingsRef.current) });
+    else if (s.phase === "conflict") {
+      void Promise.resolve(reload()).catch(() => undefined);
+      dispatch({ type: "reset", original: optionsRef.current.read(settingsRef.current) });
+    }
     else if (s.phase !== "editing") dispatch({ type: "edit", draft: s.draft });
-  }, []);
+  }, [reload]);
 
   const apply = useCallback(async () => {
     const s = stateRef.current;
@@ -204,11 +221,26 @@ export function useSettingsReview<T extends object>(o: SettingsReviewOptions<T>)
       dispatch({ type: "error", message: "No dealership is selected." });
       return;
     }
-    const current = opts.read(settingsRef.current);
-    const elsewhere = changedKeys(s.original, current);
-    if (elsewhere.length) {
-      dispatch({ type: "conflict", changedFields: elsewhere });
-      return;
+    const changed = changedKeys(s.original, s.draft);
+    let fresh: DealerSettings | undefined;
+    if (opts.readFresh) {
+      const stored = await opts.readFresh(tenantId);
+      if (!stored) {
+        dispatch({ type: "error", message: "The stored policy could not be read again, so nothing was written. Try again." });
+        return;
+      }
+      fresh = stored;
+      const clash = changedKeys(s.original, opts.read(stored)).filter((k) => changed.includes(k));
+      if (clash.length) {
+        dispatch({ type: "conflict", changedFields: clash });
+        return;
+      }
+    } else {
+      const elsewhere = changedKeys(s.original, opts.read(settingsRef.current));
+      if (elsewhere.length) {
+        dispatch({ type: "conflict", changedFields: elsewhere });
+        return;
+      }
     }
     let currentVersion: number | null | undefined;
     if (versionCheck === "ok") {
@@ -221,8 +253,7 @@ export function useSettingsReview<T extends object>(o: SettingsReviewOptions<T>)
       return;
     }
     dispatch({ type: "apply" });
-    const changed = changedKeys(s.original, s.draft);
-    const payload = opts.toPayload(s.draft, changed);
+    const payload = opts.toPayload(s.draft, changed, fresh);
     let ok = false;
     try {
       ok = await updateSettings(payload);
@@ -289,9 +320,9 @@ export function SettingsReviewDialog<T extends object>({ review, title, descript
           <AdminTable caption="Changes under review">
             <thead>
               <tr>
-                <Th>Setting</Th>
-                <Th>Before</Th>
-                <Th>After</Th>
+                <Th className="text-[13px]">Setting</Th>
+                <Th className="text-[13px]">Before</Th>
+                <Th className="text-[13px]">After</Th>
               </tr>
             </thead>
             <tbody>
@@ -307,11 +338,11 @@ export function SettingsReviewDialog<T extends object>({ review, title, descript
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="rounded-[6px] border border-adm-border px-4 py-3">
-              <p className="text-[12px] leading-[18px] text-adm-muted">Active vehicles that follow the policy going forward</p>
+              <p className="text-[13px] leading-[18px] text-adm-muted">Active vehicles that follow the policy going forward</p>
               <p className="text-[20px] leading-[28px] font-bold text-adm-ink tabular-nums">{activeLabel}</p>
             </div>
             <div className="rounded-[6px] border border-adm-border px-4 py-3">
-              <p className="text-[12px] leading-[18px] text-adm-muted">Policy version at review</p>
+              <p className="text-[13px] leading-[18px] text-adm-muted">Policy version at review</p>
               <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{versionLabel(versionCheck, impact?.version, computing)}</p>
             </div>
           </div>
@@ -320,7 +351,7 @@ export function SettingsReviewDialog<T extends object>({ review, title, descript
             <InlineNote key={w} tone="warning">{w}</InlineNote>
           ))}
 
-          <ul className="text-[12px] leading-[18px] text-adm-muted list-disc pl-5">
+          <ul className="text-[13px] leading-[18px] text-adm-muted list-disc pl-5">
             {(impact?.exclusions ?? EXCLUSIONS).map((x) => <li key={x}>{x}</li>)}
           </ul>
 
@@ -336,7 +367,7 @@ export function SettingsReviewDialog<T extends object>({ review, title, descript
         </div>
 
         <DialogFooter className="px-6 py-4 border-t border-adm-border sm:justify-between gap-3">
-          <p className="text-[12px] leading-[18px] text-adm-muted self-center">
+          <p className="text-[13px] leading-[18px] text-adm-muted self-center">
             {!applied && !computing && !gate.ok && phase !== "conflict" ? gate.reason : ""}
             {computing ? "Computing impact…" : ""}
           </p>

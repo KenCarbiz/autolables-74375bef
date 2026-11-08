@@ -159,4 +159,20 @@ describe("ServicePolicyView", () => {
     expect(screen.getByText(/Your role can view this policy but not change it/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Review policy changes" })).toBeDisabled();
   });
+
+  it("limits a service manager to the K-208 signing keys, matching the server key classes", () => {
+    mocks.role = "service_manager";
+    const { unmount } = renderView("inspection");
+    expect(screen.getByRole("switch", { name: "Require K-208 before customer signing" })).toBeEnabled();
+    expect(screen.getByRole("switch", { name: "Require install verification before customer signing" })).toBeDisabled();
+    expect(screen.getByText(/Limited to the signing gates/)).toBeInTheDocument();
+    expect(screen.getByText(/Read only for your role: this key is limited to/)).toBeInTheDocument();
+    unmount();
+    const recon = renderView("recon");
+    expect(screen.getByRole("radio", { name: /Require approval for every amount/ })).toBeDisabled();
+    recon.unmount();
+    renderView("title");
+    expect(screen.getByRole("radio", { name: /Rotate: one recipient at a time/ })).toBeDisabled();
+    expect(mocks.updateSettings).not.toHaveBeenCalled();
+  });
 });
