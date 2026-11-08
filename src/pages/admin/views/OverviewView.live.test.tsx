@@ -33,9 +33,9 @@ describe("Overview against live reads", () => {
 
   it("counts unique vehicles apart from issues and keeps view events out of recent activity", async () => {
     const rows = [
-      { id: "a", vehicle_listing_id: "v1", vin: "X1", severity: "high", exception_type: "price_changed", title: "t" },
-      { id: "b", vehicle_listing_id: "v1", vin: "X1", severity: "low", exception_type: "missing_field", title: "t" },
-      { id: "c", vehicle_listing_id: "v2", vin: "X2", severity: "low", exception_type: "missing_field", title: "t" },
+      { id: "a", vehicle_listing_id: "v1", vin: "X1", severity: "high", exception_type: "price_change", title: "t" },
+      { id: "b", vehicle_listing_id: "v1", vin: "X1", severity: "low", exception_type: "missing_required_field", title: "t" },
+      { id: "c", vehicle_listing_id: "v2", vin: "X2", severity: "low", exception_type: "missing_required_field", title: "t" },
     ];
     spyResponses.tables.vehicle_exceptions = { data: rows, count: 3, error: null };
     spyResponses.tables.vehicle_listings = { data: null, count: 40, error: null };
