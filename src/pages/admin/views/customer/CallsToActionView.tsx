@@ -1,14 +1,13 @@
 import { useMemo, useState } from "react";
 import { AdminButton } from "@/components/admin/v2/primitives";
-import { AdminIcon, EditorLayout, ScopeLabel, SectionCard, StatusBadge } from "@/components/admin/v3/editor";
+import { AdminIcon, ScopeLabel, SectionCard, StatusBadge } from "@/components/admin/v3/editor";
 import { useAdminNow } from "@/lib/admin/dataSource";
-import { adminTabHref } from "@/lib/admin/sections";
 import { MAX_STICKY_BUTTONS, STICKY_LABELS, type StickyButton } from "@/lib/stickyButtons";
 import { Banner } from "../brand/feeds/bits";
 import { useSettingsEditor } from "../brand/feeds/useSettingsEditor";
-import { ApplyChrome, LoadingBlock, OwnerLink, ToggleRow } from "./customerParts";
+import { ApplyChrome, LoadingBlock, PreviewLayout, ToggleRow } from "./customerParts";
 import { ActionEditorDrawer, ActionLibrary, AfterHoursCtaDrawer, SelectedActions, StickyPreview } from "./CtaParts";
-import { CTA_LABELS, ctaContextFrom, ctaToPatch, describeCta, readCtas, selectedOf, SLIDEOUT_VARIANTS, specOf, validateCtas, withSelected, type CtaDraft } from "./ctaModel";
+import { CTA_LABELS, ctaContextFrom, ctaToPatch, describeCta, readCtas, selectedOf, SLIDEOUT_VARIANTS, validateCtas, withSelected, type CtaDraft } from "./ctaModel";
 
 const OPTIONS = {
   read: readCtas,
@@ -28,6 +27,7 @@ export default function CallsToActionView() {
   const [mode, setMode] = useState<"mobile" | "desktop">("mobile");
   const draft = edit.draft;
   const ctx = useMemo(() => ctaContextFrom(settings), [settings]);
+  const namedAgents = useMemo(() => (settings.passport_agents ?? []).filter((a) => a.name.trim()), [settings.passport_agents]);
   if (!draft) return <LoadingBlock label="Loading calls to action" />;
 
   const cfg = draft.sticky_bottom_buttons;
@@ -41,7 +41,6 @@ export default function CallsToActionView() {
   };
   const remove = (key: string) => setCfg(withSelected(cfg, selected.filter((b) => b.key !== key)));
   const setLabel = (key: string, label: string) => setCfg({ ...cfg, buttons: cfg.buttons.map((b) => (b.key === key ? { ...b, label } : b)) });
-  const creditSelected = selected.filter((b) => specOf(b.key)?.needs === "financing" && !ctx.financingOn);
   const variant = SLIDEOUT_VARIANTS.find((v) => v.id === draft.mobile_slideout_cta_variant);
 
   return (
@@ -52,13 +51,7 @@ export default function CallsToActionView() {
       </div>
       {!canEdit && <Banner tone="neutral" icon="lock" title="You can view these buttons but not change them">Changing calls to action needs the manage settings permission. Ask an owner or manager to make the change.</Banner>}
       {ed.unreadable && <Banner tone="danger" title="Settings could not be read">Nothing is shown as saved and nothing can be applied until settings load.</Banner>}
-      {creditSelected.length > 0 && (
-        <Banner tone="warning" title="Credit actions are selected but financing is off">
-          {creditSelected.map((b) => b.label).join(" and ")} {creditSelected.length === 1 ? "is" : "are"} still saved. Remove {creditSelected.length === 1 ? "it" : "them"}, or turn Financing on-site on in <OwnerLink to={adminTabHref("why-buy")}>Why Buy</OwnerLink>.
-        </Banner>
-      )}
-
-      <EditorLayout
+      <PreviewLayout
         previewLabel="Passport preview"
         preview={(
           <SectionCard icon="eye" title="Live preview" description="An approximation of the Passport bottom bar for this draft.">
@@ -77,8 +70,8 @@ export default function CallsToActionView() {
           icon="layers"
           title="Sticky bottom bar"
           description="Up to four buttons on phones and tablets. Exactly one is the primary action."
-          actions={<StatusBadge state={selected.length > MAX_STICKY_BUTTONS ? "failed" : "enabled"} label={`${selected.length} of ${MAX_STICKY_BUTTONS} selected`} />}
         >
+          <StatusBadge state={selected.length > MAX_STICKY_BUTTONS ? "failed" : "enabled"} label={`${selected.length} of ${MAX_STICKY_BUTTONS} selected`} className="self-start" />
           <ToggleRow label="Show the sticky bottom bar" description={cfg.enabled ? "Shoppers on phones and tablets see the bar." : "Off: no bar appears on the Passport."} checked={cfg.enabled} disabled={!canEdit} onChange={(v) => setCfg({ ...cfg, enabled: v })} />
           {errors.sticky_bottom_buttons && <p role="alert" className="flex items-start gap-1.5 text-[14px] leading-[20px] font-medium text-adm-danger"><AdminIcon name="alert" className="mt-0.5" />{errors.sticky_bottom_buttons}</p>}
           <SelectedActions
@@ -111,7 +104,7 @@ export default function CallsToActionView() {
           </fieldset>
           {!variant && <p role="alert" className="text-[14px] font-medium text-adm-danger">{errors.mobile_slideout_cta_variant ?? "Choose one of the four styles."}</p>}
         </SectionCard>
-      </EditorLayout>
+      </PreviewLayout>
 
       <ApplyChrome
         api={ed}
@@ -120,8 +113,8 @@ export default function CallsToActionView() {
         impact={<p className="text-[14px] text-adm-muted">Only the buttons and style listed change. The Passport layout is not changed, and no message is sent.</p>}
       />
 
-      <ActionEditorDrawer buttonKey={editing} cfg={cfg} ctx={ctx} canEdit={canEdit} count={selected.length} onClose={() => setEditing(null)} onLabel={setLabel} onPrimary={(k) => setCfg({ ...cfg, primary_key: k })} />
-      <AfterHoursCtaDrawer open={afterHours} onClose={() => setAfterHours(false)} cfg={cfg} ctx={ctx} routingRaw={settings.passport_contact_routing} agents={(settings.passport_agents ?? []).filter((a) => a.name.trim())} now={now} />
+      <ActionEditorDrawer buttonKey={editing} cfg={cfg} ctx={ctx} canEdit={canEdit} count={selected.length} onClose={() => setEditing(null)} onLabel={setLabel} onPrimary={(k) => setCfg({ ...cfg, primary_key: k })} afterHours={{ routingRaw: settings.passport_contact_routing, agents: namedAgents, now }} />
+      <AfterHoursCtaDrawer open={afterHours} onClose={() => setAfterHours(false)} cfg={cfg} ctx={ctx} routingRaw={settings.passport_contact_routing} agents={namedAgents} now={now} />
     </div>
   );
 }

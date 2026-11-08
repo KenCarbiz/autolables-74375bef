@@ -25,7 +25,7 @@ const clone = (c: StickyBottomButtons): StickyBottomButtons => JSON.parse(JSON.s
 
 export const normalizeSticky = (raw: unknown): StickyBottomButtons => {
   const s = raw as Partial<StickyBottomButtons> | null | undefined;
-  if (!s || !Array.isArray(s.buttons)) return clone(DEFAULT_STICKY_BUTTONS);
+  if (!s || !Array.isArray(s.buttons) || s.buttons.length === 0) return clone(DEFAULT_STICKY_BUTTONS);
   return clone({ enabled: s.enabled !== false, primary_key: s.primary_key ?? "", buttons: s.buttons as StickyButton[] });
 };
 
@@ -34,8 +34,8 @@ export const readCtas = (s: DealerSettings): CtaDraft => ({
   mobile_slideout_cta_variant: s.mobile_slideout_cta_variant || "dealer_availability",
 });
 
-export const selectedOf = (cfg: StickyBottomButtons): StickyButton[] => cfg.buttons.filter((b) => b.enabled !== false).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
-const hiddenOf = (cfg: StickyBottomButtons): StickyButton[] => cfg.buttons.filter((b) => b.enabled === false);
+export const selectedOf = (cfg: StickyBottomButtons): StickyButton[] => cfg.buttons.filter((b) => !!b.enabled).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+const hiddenOf = (cfg: StickyBottomButtons): StickyButton[] => cfg.buttons.filter((b) => !b.enabled);
 
 /** Replaces the selected list, renumbers it, keeps switched-off stored entries, and keeps exactly one primary. */
 export const withSelected = (cfg: StickyBottomButtons, selected: StickyButton[], primary?: string): StickyBottomButtons => {
@@ -161,7 +161,6 @@ export interface Availability { state: StatusState; label: string; reason: strin
 export interface CtaContext {
   phone: string;
   address: string;
-  financingOn: boolean;
 }
 
 const digits = (v: string) => v.replace(/\D/g, "").length;
@@ -171,7 +170,6 @@ export const ctaContextFrom = (s: DealerSettings): CtaContext => {
   return {
     phone: (routing.dealershipDefaultContact.salesPhone || s.dealer_phone || "").trim(),
     address: (s.dealer_address || "").trim(),
-    financingOn: s.dealer_financing === "yes",
   };
 };
 
@@ -184,7 +182,7 @@ export function availabilityOf(spec: ActionSpec, ctx: CtaContext): Availability 
     return ctx.address ? { state: "enabled", label: "Enabled", reason: "Uses the store address." } : { state: "setup_required", label: "Not configured", reason: "No store address is on file, so the panel has nothing to show." };
   }
   if (spec.needs === "financing") {
-    return ctx.financingOn ? { state: "enabled", label: "Enabled", reason: "Financing on-site is on." } : { state: "unavailable", label: "Hidden", reason: "Financing on-site is off, so credit actions are not offered." };
+    return { state: "enabled", label: "Enabled", reason: "Opens the payment sheet. No credit application is collected." };
   }
   if (spec.caution) return { state: "stale", label: "Check label", reason: spec.caution };
   return { state: "enabled", label: "Enabled", reason: "Opens a Passport flow that is always available." };

@@ -81,10 +81,11 @@ describe("Calls to action editor", () => {
     expect(screen.getAllByRole("button", { name: /^Primary button/ })).toHaveLength(1);
     expect(screen.getAllByRole("button", { name: /^Add / }).every((b) => (b as HTMLButtonElement).disabled)).toBe(true);
   });
-  it("hides credit actions when financing is off", () => {
+  it("keeps credit actions available because the Passport never hides them", () => {
     show("v3-ctas", <CallsToActionView />, "partial");
-    expect(screen.getByText(/Credit actions are selected but financing is off/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Add Apply for Financing" })).toBeNull();
+    expect(screen.queryByText(/Credit actions are selected but financing is off/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Add Apply for Financing" })).toBeInTheDocument();
+    expect(document.querySelector("[data-credit-note]")).not.toBeNull();
   });
   it("reorders with the keyboard", () => {
     show("v3-ctas", <CallsToActionView />);

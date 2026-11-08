@@ -2,7 +2,7 @@ import { useId, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
-  AdminIcon, AdminIconTile, DraftActionBar, LeaveGuardDialog, ReviewChangesDialog, StatusBadge,
+  AdminIcon, AdminIconTile, AdvancedDisclosure, DraftActionBar, EditorLayout, useIsNarrow, LeaveGuardDialog, ReviewChangesDialog, StatusBadge,
   type AdminIconName, type DraftBarState, type ReviewChangeRow, type StatusState,
 } from "@/components/admin/v3/editor";
 import type { SavePhase } from "@/lib/admin/useSaveFlow";
@@ -107,9 +107,9 @@ export function OwnerLink({ to, children }: { to: string; children: ReactNode })
   );
 }
 
-export const TierBadge = ({ state }: { state: "ready" | "needs_setup" | "off" | "per_lead" | "not_in_order" }) => {
+export const TierBadge = ({ state }: { state: "ready" | "needs_setup" | "off" | "per_lead" | "not_in_order" | "unknown" }) => {
   const map: Record<typeof state, [StatusState, string]> = {
-    ready: ["enabled", "Ready"], needs_setup: ["setup_required", "Needs setup"], off: ["disabled", "Off"], per_lead: ["waiting_for_data", "Per lead"], not_in_order: ["unavailable", "Skipped"],
+    unknown: ["unknown", "Unknown"], ready: ["enabled", "Ready"], needs_setup: ["setup_required", "Needs setup"], off: ["disabled", "Off"], per_lead: ["waiting_for_data", "Per lead"], not_in_order: ["unavailable", "Skipped"],
   };
   return <StatusBadge state={map[state][0]} label={map[state][1]} />;
 };
@@ -122,3 +122,19 @@ export function useToggleSet(initial: string[] = []) {
     show: (id: string) => setOpen((s) => new Set(s).add(id)),
   };
 }
+
+/** Desktop: the preview is a sticky right rail. Mobile: a Preview disclosure at the top, as on the brand editors. */
+export function PreviewLayout({ preview, previewLabel, children }: { preview: ReactNode; previewLabel: string; children: ReactNode }) {
+  const narrow = useIsNarrow();
+  if (narrow) {
+    return (
+      <div className="space-y-4">
+        <AdvancedDisclosure title="Preview" className="bg-adm-surface"><div className="space-y-4 pt-3">{preview}</div></AdvancedDisclosure>
+        {children}
+      </div>
+    );
+  }
+  return <EditorLayout preview={preview} previewLabel={previewLabel}>{children}</EditorLayout>;
+}
+
+export const LINK_ROW = "flex items-center justify-between gap-3 min-h-[44px] px-3 rounded-lg border border-adm-divider bg-adm-surface text-[14px] font-semibold text-adm-primary hover:bg-adm-workspace focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary";
