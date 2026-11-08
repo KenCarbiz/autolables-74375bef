@@ -108,6 +108,7 @@ export function MetricCards({ metrics, usage, plan, onOpen }: { metrics: MetricM
               <p className="mt-2 text-[28px] leading-[34px] font-bold text-adm-ink tabular-nums">{m.value.toLocaleString()}</p>
             )}
             <div className="mt-2 text-[14px] leading-[20px] text-adm-muted">
+              {m.limit.kind === "unknown" && <p>Plan limit: Unknown</p>}
               {m.limit.kind === "unlimited" && <p>Unlimited on this plan.</p>}
               {m.limit.kind === "undefined" && <p>No monthly limit is set for this activity.</p>}
               {m.limit.kind === "limited" && (
@@ -134,7 +135,7 @@ export function MetricCards({ metrics, usage, plan, onOpen }: { metrics: MetricM
   );
 }
 
-const limitText = (m: MetricModel): string => (m.limit.kind === "unlimited" ? "Unlimited" : m.limit.kind === "limited" ? `${m.limit.hard.toLocaleString()} per month` : "No limit set");
+const limitText = (m: MetricModel): string => (m.limit.kind === "unknown" ? "Unknown" : m.limit.kind === "unlimited" ? "Unlimited" : m.limit.kind === "limited" ? `${m.limit.hard.toLocaleString()} per month` : "No limit set");
 
 export function LimitsAndQuotas({ metrics }: { metrics: MetricModel[] }) {
   const providers = BUDGET_PROVIDERS.filter((p) => p.id !== "*");
@@ -197,7 +198,7 @@ const FeatureLine = ({ row }: { row: FeatureRow }) => (
   </li>
 );
 
-export function FeatureGroups({ groups }: { groups: FeatureGroup[] }) {
+export function FeatureGroups({ groups, planUnknown = false }: { groups: FeatureGroup[]; planUnknown?: boolean }) {
   const counts = featureCounts(groups);
   return (
     <SectionCard title="Features" icon="list" description={<span className="max-sm:hidden">Included, setup required, requires upgrade and unavailable are four different things.</span>}>
@@ -207,7 +208,7 @@ export function FeatureGroups({ groups }: { groups: FeatureGroup[] }) {
             <FeatureMark status={s} />
             <span className="min-w-0">
               <span className="block text-[14px] leading-[20px] font-semibold text-adm-ink">{STATUS_COPY[s].label}: {counts[s]}</span>
-              <span className="block text-[13px] leading-[18px] text-adm-muted max-sm:hidden">{STATUS_COPY[s].blurb}</span>
+              <span className="block text-[13px] leading-[18px] text-adm-muted max-sm:hidden">{s === "unavailable" && planUnknown ? "Plan could not be loaded." : STATUS_COPY[s].blurb}</span>
             </span>
           </li>
         ))}
@@ -239,7 +240,7 @@ export function CompareDrawer({ open, onClose, current }: { open: boolean; onClo
             <div>
               <p className="text-[14px] font-semibold text-adm-ink">{i === 0 ? "Includes" : `Everything in ${cols[i - 1].label}, plus`}</p>
               <ul className="mt-1 space-y-1">
-                {c.features.map((f) => (<li key={f} className="flex items-start gap-2 text-[14px] leading-[20px]"><AdminIcon name="check" size="inline" className="mt-0.5 text-adm-success" />{f}</li>))}
+                {c.features.map((f) => (<li key={f} className="flex items-start gap-2 text-[14px] leading-[20px]"><AdminIcon name="check" size="inline" className={cn("mt-0.5", current.tier === c.tier && current.accessActive ? "text-adm-success" : "text-adm-muted")} />{f}</li>))}
               </ul>
             </div>
             <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-[14px] leading-[20px] border-t border-adm-divider pt-3">
@@ -260,10 +261,11 @@ export function MetricDrawer({ metric, usage, onClose }: { metric: MetricModel |
     ? [
         ["Reporting month", snap ? `${snap.monthLabel} (${snap.timeZone})` : "Not available"],
         ["Scope", snap ? snap.scope : "All rooftops in this account"],
+        ["How it is counted", "The month follows the dealer time zone. Plan-limit enforcement uses the browser month, so counts near a month boundary can differ. A recorded quantity of zero counts as 0."],
         ["Count", metric.value === null ? "Unavailable" : metric.value.toLocaleString()],
         ["Recorded events", metric.reading ? metric.reading.events.toLocaleString() : "Unavailable"],
         ["Latest event", metric.reading ? (metric.reading.lastEventAt ? formatDateTime(metric.reading.lastEventAt, { timeZone: snap?.timeZone, withYear: true, withZone: true }) : "None this month") : "Unavailable"],
-        ["Plan limit", metric.limit.kind === "unlimited" ? "Unlimited" : metric.limit.kind === "limited" ? `${metric.limit.hard.toLocaleString()} per month (recommended ${metric.limit.soft.toLocaleString()})` : "No limit set"],
+        ["Plan limit", metric.limit.kind === "unknown" ? "Unknown" : metric.limit.kind === "unlimited" ? "Unlimited" : metric.limit.kind === "limited" ? `${metric.limit.hard.toLocaleString()} per month (recommended ${metric.limit.soft.toLocaleString()})` : "No limit set"],
         ["Source", metric.spec.unmetered ? "No source records this activity yet" : "Usage events recorded by the app (autolabels_usage_events)"],
         ["Last updated", snap ? formatDateTime(snap.updatedAt, { timeZone: snap.timeZone, withYear: true, withZone: true }) : "Not available"],
       ]

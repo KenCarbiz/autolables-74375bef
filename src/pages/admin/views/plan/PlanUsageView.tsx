@@ -39,7 +39,7 @@ export default function PlanUsageView() {
       />
       <MetricCards metrics={state.metrics} usage={state.usage} plan={state.plan} onOpen={(k) => setPanel(`metric-${k}`)} />
       <LimitsAndQuotas metrics={state.metrics} />
-      <FeatureGroups groups={state.features} />
+      <FeatureGroups groups={state.features} planUnknown={state.entitlementUnreadable} />
       <CompareDrawer open={panel === "compare"} onClose={() => setPanel(null)} current={state.plan} />
       <MetricDrawer metric={metric} usage={state.usage} onClose={() => setPanel(null)} />
     </div>

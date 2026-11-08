@@ -114,8 +114,8 @@ export function usePlanData(): PlanState {
   const isPlatformAdmin = seeded ? seeded.isPlatformAdmin : isAdmin;
   const canManageBilling = seeded ? seeded.canManageBilling : hasDealerCapability(member?.role, "can_manage_billing", isAdmin);
   const canManageInvoices = seeded ? seeded.canManageInvoices ?? seeded.canManageBilling : hasDealerCapability(member?.role, "can_manage_invoices", isAdmin);
-  const metrics = useMemo(() => buildMetrics(usage, plan.tier), [usage, plan.tier]);
-  const features = useMemo(() => buildFeatureGroups({ tier: plan.tier, accessActive: plan.accessActive, isPlatformAdmin, settings }), [plan.tier, plan.accessActive, isPlatformAdmin, settings]);
+  const metrics = useMemo(() => buildMetrics(usage, plan.tier, !unreadable), [usage, plan.tier, unreadable]);
+  const features = useMemo(() => buildFeatureGroups({ tier: plan.tier, accessActive: plan.accessActive, isPlatformAdmin, settings, planKnown: !unreadable }), [plan.tier, plan.accessActive, isPlatformAdmin, settings, unreadable]);
 
   const place = [settings.dealer_city, settings.dealer_state].filter(Boolean).join(", ");
   const name = settings.dealer_name && settings.dealer_name !== "Your Dealership" ? settings.dealer_name : tenant?.name || "this account";

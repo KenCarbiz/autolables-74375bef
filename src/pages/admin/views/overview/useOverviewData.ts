@@ -12,7 +12,7 @@ import { deriveRoutingReadiness } from "@/lib/admin/effectivePolicy";
 import type { DescriptionPolicy } from "@/lib/admin/publishingPolicy";
 import { publishingSlice } from "../publishing/usePublishingData";
 import { useWaveEVariant, type WaveEVariant } from "../waveEVariant";
-import { ADMIN_EVENT_EXCLUDE, FAILED_EXCEPTIONS, setupItems, setupProgress, summarizeExceptions, type ExceptionRow, type ExceptionStats, type SetupItem, type SetupProgress } from "./overviewModel";
+import { ADMIN_VIEW_ACTIONS, FAILED_EXCEPTIONS, setupItems, setupProgress, summarizeExceptions, type ExceptionRow, type ExceptionStats, type SetupItem, type SetupProgress } from "./overviewModel";
 
 export interface ActivityEvent {
   id: string;
@@ -92,7 +92,7 @@ const AUDIT_COLUMNS = "id, action, entity_type, user_id, user_email, created_at"
 export async function loadAdminEvents(tenantId: string, limit: number): Promise<ActivityEvent[] | null> {
   try {
     const db = supabase as unknown as { from: (t: string) => any };
-    const { data, error } = await db.from("audit_log").select(AUDIT_COLUMNS).eq("store_id", tenantId).not("action", "ilike", ADMIN_EVENT_EXCLUDE).order("created_at", { ascending: false }).limit(limit);
+    const { data, error } = await db.from("audit_log").select(AUDIT_COLUMNS).eq("store_id", tenantId).not("action", "in", `(${ADMIN_VIEW_ACTIONS.join(",")})`).order("created_at", { ascending: false }).limit(limit);
     if (error) return null;
     return ((data as AuditLike[]) ?? []).map(toActivityEvent);
   } catch {

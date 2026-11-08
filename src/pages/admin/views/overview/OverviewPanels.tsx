@@ -52,6 +52,7 @@ export function ExceptionsPanel({ stats, failed }: { stats: ExceptionStats | nul
       />
       {!unavailable && (
         <SectionCard title="By severity" description="Issues and the vehicles they sit on. Select a severity to filter." icon="filter">
+          {stats!.vehicles.kind === "known" && stats!.vehicles.capped && <p className="text-[14px] leading-[20px] text-adm-muted">Based on the first 1,000 open issues.</p>}
           <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
             <li>
               <Link to={overviewHref("exceptions")} aria-current={!activeSeverity ? "true" : undefined} className={cn("block rounded-lg border px-3 py-3 min-h-[44px]", !activeSeverity ? "border-adm-primary bg-adm-selected" : "border-adm-divider hover:bg-adm-workspace")}>
@@ -150,18 +151,22 @@ export function PolicyPanel({ concepts }: { concepts: PolicyConcept[] }) {
   );
 }
 
+const ACTIVITY_LIMIT = 500;
+
 export function ActivityPanel({ tenantId, fixtureEvents, timeZone }: { tenantId: string | null; fixtureEvents: ActivityEvent[] | null | undefined; timeZone: string | null }) {
   const live = useQuery({
     queryKey: ["admin-v3", "overview-activity", tenantId],
     enabled: fixtureEvents === undefined && !!tenantId,
     staleTime: 30_000,
     queryFn: async () => {
-      const rows = await loadAdminEvents(tenantId as string, 500);
+      const rows = await loadAdminEvents(tenantId as string, ACTIVITY_LIMIT + 1);
       if (rows === null) throw new Error("activity unavailable");
       return rows;
     },
   });
-  const rows = fixtureEvents !== undefined ? fixtureEvents ?? undefined : live.data;
+  const allRows = fixtureEvents !== undefined ? fixtureEvents ?? undefined : live.data;
+  const truncated = !!allRows && allRows.length > ACTIVITY_LIMIT;
+  const rows = truncated ? allRows!.slice(0, ACTIVITY_LIMIT) : allRows;
   const failed = fixtureEvents !== undefined ? fixtureEvents === null : live.isError;
   const columns: DataColumn<ActivityEvent>[] = [
     { id: "when", header: "When", cell: (e) => <time dateTime={e.at}>{formatDateTime(e.at, { timeZone, withYear: true })}</time> },
@@ -172,6 +177,7 @@ export function ActivityPanel({ tenantId, fixtureEvents, timeZone }: { tenantId:
   return (
     <div className="space-y-4">
       <PanelBack title="Administration activity" description="Changes made in Administration and system events for this account, newest first. Customer listing views are not included." />
+      {truncated && <p className="text-[14px] leading-[20px] text-adm-muted">Showing the newest {ACTIVITY_LIMIT} events. Older events are not listed here.</p>}
       <DataTable
         caption="Administration activity"
         columns={columns}
