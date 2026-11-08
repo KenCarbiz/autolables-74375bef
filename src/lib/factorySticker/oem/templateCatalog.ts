@@ -278,9 +278,9 @@ export const TEMPLATE_CATALOG: readonly CatalogTemplate[] = [
     referencePdf: "Hyundai_2026_Tucson_SE_AWD.pdf",
     design: { fileKey: "ri3E33YzTgPc8RYJl6NEOn", masterNodeId: "1:393" },
     match: { modelYears: [2026], modelPattern: "^tucson$", excludedModelPattern: "^tucsonhybrid|^tucsonplug", bodyClasses: ["SUV"], fuelClasses: ["gasoline"], },
-    approval: "pending_owner_approval",
-    layoutStatus: "sample_ready",
-    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "epa_scale_scan_rebuilt", "hope_on_wheels_artwork_not_reproduced", "parts_content_not_wired", "warranty_terms_not_wired"],
+    approval: "approved",
+    layoutStatus: "approved",
+    blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "epa_scale_scan_rebuilt", "hope_on_wheels_artwork_not_reproduced", "parts_content_not_wired", "warranty_terms_not_wired"],
   },
   {
     id: "jeep_2026_wrangler_willys_392",

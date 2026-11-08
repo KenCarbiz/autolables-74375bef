@@ -10,8 +10,8 @@ const tucson = (over: Partial<CatalogVehicleInput> = {}): CatalogVehicleInput =>
   fuelClass: "gasoline", drivetrain: "AWD", ...over,
 });
 
-// Ken approved every template the review board listed as Ready for review on 2026-11-08, except the
-// Tucson, which stays pending until its 11x17 physical print and phone QR scan pass.
+// Ken approved every template the review board listed as Ready for review on 2026-11-08, and the
+// same day approved the Tucson without waiting for its physical print test.
 const OWNER_APPROVED_2026_11_08: readonly string[] = [
   "alfa_romeo_2026_giulia_veloce",
   "aston_martin_2026_vantage_roadster",
@@ -20,6 +20,7 @@ const OWNER_APPROVED_2026_11_08: readonly string[] = [
   "dodge_2026_durango_gt_blacktop",
   "fiat_2025_500e_giorgio_armani",
   "genesis_2026_gv80_3.5t_prestige",
+  "hyundai_2026_tucson_se_awd",
   "jeep_2026_wrangler_willys_392",
   "kia_2026_sorento_lx",
   "lamborghini_2026_urus_se",
@@ -32,7 +33,7 @@ const OWNER_APPROVED_2026_11_08: readonly string[] = [
 ];
 
 describe("owner decision of 2026-11-08", () => {
-  it("approves the 16 ready templates other than the Tucson; the rest stay held", () => {
+  it("approves exactly the 17 templates that were ready for review; the rest stay held", () => {
     for (const t of TEMPLATE_CATALOG) {
       if (OWNER_APPROVED_2026_11_08.includes(t.id)) {
         expect([t.approval, t.layoutStatus], t.id).toEqual(["approved", "approved"]);
@@ -47,8 +48,9 @@ describe("owner decision of 2026-11-08", () => {
     for (const b of BLOCKED_VARIANT_REQUESTS) expect([b.id, b.approval, b.layoutStatus]).toEqual([b.id, "pending_owner_approval", "not_started"]);
   });
 
-  it("keeps the Tucson pending until its physical print test passes", () => {
-    expect(resolveCatalogTemplate(tucson())).toMatchObject({ status: "pending_match", flags: ["template_pending_owner_approval"] });
+  it("routes a matching approved configuration to its template", () => {
+    expect(resolveCatalogTemplate(tucson())).toMatchObject({ status: "approved_match", flags: [] });
+    expect(resolveCatalogTemplate(tucson()).template?.id).toBe("hyundai_2026_tucson_se_awd");
   });
 });
 
