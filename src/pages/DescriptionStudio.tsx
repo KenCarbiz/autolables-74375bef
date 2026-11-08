@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { ADMIN_CHILD_ROUTES } from "@/lib/admin/sections";
 import { useTenant } from "@/contexts/TenantContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useDescriptionCase, useDescriptionPermissions } from "@/hooks/useDescriptionOps";
@@ -156,7 +157,16 @@ const DescriptionStudio = () => {
   }, [channels, enabledChannels]);
 
   // ── Actions ────────────────────────────────────────────────────────
+  // vAuto text is released only by the server export gate after approval.
+  const vautoGated = () => {
+    if (channel !== "vauto") return false;
+    toast.error("vAuto text is released only after server approval in the Description Engine.");
+    navigate(`${ADMIN_CHILD_ROUTES.descriptionEngine}?vehicle=${encodeURIComponent(vehicleId)}`);
+    return true;
+  };
+
   const copy = async () => {
+    if (vautoGated()) return;
     if (!content) return toast.error("There is no saved description to copy.");
     await navigator.clipboard.writeText(content);
     setCopied(true);
@@ -170,6 +180,7 @@ const DescriptionStudio = () => {
   };
 
   const download = async () => {
+    if (vautoGated()) return;
     if (!content) return toast.error("There is no saved description to download.");
     const safe = `${String(vehicle?.vin || "vehicle")}-${channel}`.replace(/[^A-Za-z0-9_-]/g, "");
     const blob = new Blob([content], { type: "text/plain" });
@@ -186,6 +197,7 @@ const DescriptionStudio = () => {
   };
 
   const saveToVehicle = async () => {
+    if (vautoGated()) return;
     if (!displayed?.master_version_id) return toast.error("There is no saved version to attach.");
     setSaving(true);
     const { data, error } = await (supabase as any).rpc("record_description_output_use", {

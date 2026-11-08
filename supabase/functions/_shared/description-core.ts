@@ -1209,7 +1209,7 @@ export function validateContentV3(
   }
 
   if (policy) {
-    for (const p of checkChannelPolicy(content, policy)) {
+    for (const p of checkChannelPolicy(content, policy, { disclosure: settings?.required_legal_text })) {
       out.push({ validator_code: p.code, severity: p.severity, blocking: p.severity === "blocking",
         message: p.message, fact_path: `channel:${policy.key}`,
         source_reference: policy.policyVersion });
