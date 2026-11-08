@@ -113,7 +113,8 @@ describe("Destinations and automation", () => {
 
   it("description settings: invalid values show errors and the engine notice uses dealer wording", () => {
     fixture("v3-description-settings", "invalid");
-    expect(screen.getByText("Managed in the Description Engine (coming soon)")).toBeInTheDocument();
+    expect(screen.getByText("Per-channel description rules are edited here")).toBeInTheDocument();
+    expect(screen.getByText(/separate change that has not shipped/)).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/PR #?45/);
     expect(screen.getAllByText(/The maximum cannot be below the minimum/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/contains the prohibited phrase/).length).toBeGreaterThan(0);

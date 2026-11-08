@@ -56,9 +56,8 @@ export const AutoTextarea = ({ value, className, ...rest }: TextareaHTMLAttribut
 };
 
 export const Managed45Notice = () => (
-  <Banner tone="info" icon="eye" title="Managed in the Description Engine (coming soon)">
-    <span className="sm:hidden">This page edits only the settings that exist today.</span>
-    <span className="max-sm:hidden">The vehicle Description Engine, the vAuto export gate and per-rooftop description profiles are not part of this build. This page edits only the settings that exist today and does not duplicate the engine.</span>
+  <Banner tone="info" icon="info" title="Per-channel description rules are edited here">
+    The Description Engine page is a separate change that has not shipped.
   </Banner>
 );
 
@@ -131,7 +130,7 @@ export const BrandVoiceSection = ({ api, onEditPhrases }: { api: DescriptionSett
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="min-w-0">
             <p className="text-[14px] leading-[20px] font-medium text-adm-ink">Prohibited phrases</p>
-            <p className="text-[13px] leading-[18px] text-adm-muted">A match blocks publication. Matching ignores capitals and finds the phrase anywhere in the text, including inside a longer word.</p>
+            <p className="text-[13px] leading-[18px] text-adm-muted max-sm:hidden">A match blocks publication. Matching ignores capitals and finds the phrase anywhere in the text, including inside a longer word.</p>
           </div>
           <AdminButton variant="secondary" className="min-h-[44px]" onClick={onEditPhrases}>{off ? "View phrases" : "Edit phrases"}</AdminButton>
         </div>
@@ -162,6 +161,7 @@ const PROVENANCE: Record<string, string> = {
 export const OutputProfilesSection = ({ api, onEdit, onPreview, onValidate }: { api: DescriptionSettingsApi; onEdit: (k: string) => void; onPreview: (k: string) => void; onValidate: (k: string) => void }) => {
   const d = api.edit.draft!;
   const narrow = useIsNarrow();
+  const [openKey, setOpenKey] = useState<string | null>("vauto");
   const latest = useMemo(() => {
     const m: Record<string, { count: number | null; at: string }> = {};
     for (const c of api.cached.data) m[c.channel] ??= { count: c.character_count, at: c.created_at };
@@ -179,6 +179,28 @@ export const OutputProfilesSection = ({ api, onEdit, onPreview, onValidate }: { 
           const warned = sample.findings.some((f) => f.severity === "warning");
           const saved = latest[k];
           const range = displayRange(pr);
+          if (narrow) {
+            const open = openKey === k;
+            return (
+              <li key={k} data-profile={k} className={cn("rounded-xl border bg-adm-surface min-w-0", pr.target ? "border-adm-primary/40" : "border-adm-divider")}>
+                <button type="button" aria-expanded={open} aria-controls={`profile-${k}`} onClick={() => setOpenKey(open ? null : k)} className="w-full min-h-[56px] px-3 flex items-center gap-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary">
+                  <span className="min-w-0 flex-1 truncate text-[15px] leading-[22px] font-semibold text-adm-ink">{pr.label}</span>
+                  {blocking ? <StatusBadge state="failed" label={problems.length ? "Invalid" : "Blocked"} /> : warned ? <StatusBadge state="stale" label="Warnings" /> : <StatusBadge state="enabled" label="Passes" />}
+                  <AdminIcon name="chevron-down" size="inline" className={cn("flex-shrink-0 text-adm-muted transition-transform", open && "rotate-180")} />
+                </button>
+                {open && (
+                  <div id={`profile-${k}`} className="px-3 pb-3 space-y-2 border-t border-adm-divider pt-2">
+                    <p className="text-[14px] leading-[20px] text-adm-ink">{pr.target ? `Target ${n(pr.target)}. ` : ""}Limit {n(pr.policy.characterLimit)}. Sample {sample.counts ? `${n(sample.counts.codePoints)} characters` : "cannot be built"}.</p>
+                    <div className="flex gap-2">
+                      <AdminButton variant="secondary" className="min-h-[44px] flex-1 min-w-0 px-2" onClick={() => onEdit(k)}>{api.canEdit ? "Edit" : "View"}</AdminButton>
+                      <AdminButton variant="secondary" className="min-h-[44px] flex-1 min-w-0 px-2" onClick={() => onPreview(k)}>Sample</AdminButton>
+                      <AdminButton variant="secondary" className="min-h-[44px] flex-1 min-w-0 px-2" onClick={() => onValidate(k)}>Validation</AdminButton>
+                    </div>
+                  </div>
+                )}
+              </li>
+            );
+          }
           return (
             <li key={k} data-profile={k} className={cn("rounded-xl border bg-adm-surface p-3 sm:p-4 flex flex-col gap-2 sm:gap-3 min-w-0 h-full", pr.target ? "border-adm-primary/40" : "border-adm-divider")}>
               <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -266,10 +288,10 @@ export const ClaimsSection = ({ api }: { api: DescriptionSettingsApi }) => {
   const narrow = useIsNarrow();
   return (
     <div className="space-y-4">
-      <Banner tone="info" icon="shield-check" title="A permission is not proof">Turning a claim on lets descriptions use verified data about it. It never makes the claim true, and nothing is invented without the vehicle's own record.</Banner>
+      <Banner tone="info" icon="shield-check" title="A permission is not proof">{narrow ? "It lets descriptions use verified data. It never makes a claim true." : "Turning a claim on lets descriptions use verified data about it. It never makes the claim true, and nothing is invented without the vehicle's own record."}</Banner>
       <ul className="divide-y divide-adm-divider rounded-xl border border-adm-divider" aria-label="Claim permissions">
         {CLAIMS.map((c) => (
-          <li key={c.key} className="px-4 py-2 sm:py-3 space-y-0.5" data-claim={c.key}>
+          <li key={c.key} className="px-4 py-1 sm:py-3 space-y-0.5" data-claim={c.key}>
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="min-w-0 flex-1 basis-[220px]"><p className="text-[15px] leading-[22px] font-semibold text-adm-ink">{c.label}</p><p className="text-[14px] leading-[20px] text-adm-muted max-sm:hidden">{c.help}</p></div>
               <div className="flex items-center gap-3">
@@ -277,17 +299,25 @@ export const ClaimsSection = ({ api }: { api: DescriptionSettingsApi }) => {
                 <SwitchField label={narrow ? (d[c.key] ? "Permitted" : "Off") : ""} ariaLabel={`Allow ${c.label}`} checked={d[c.key]} disabled={!api.canEdit} onChange={(v) => api.edit.set(c.key, v)} />
               </div>
             </div>
-            <details className="group">
+            {!narrow && (<details className="group">
               <summary className="cursor-pointer min-h-[40px] flex items-center text-[14px] font-semibold text-adm-primary">What it still needs</summary>
               <dl className="space-y-1.5 pb-2">
                 <Row label="What it allows">{c.help}</Row>
                 <Row label="Still needs">{c.needs}</Row>
                 <Row label="When off">{c.off}</Row>
               </dl>
-            </details>
+            </details>)}
           </li>
         ))}
       </ul>
+      {narrow && (
+        <details className="rounded-xl border border-adm-divider">
+          <summary className="cursor-pointer min-h-[44px] px-4 flex items-center text-[15px] font-semibold text-adm-ink">What each permission still needs</summary>
+          <dl className="px-4 pb-3 space-y-2">
+            {CLAIMS.map((c) => <Row key={c.key} label={c.label}>{c.needs}</Row>)}
+          </dl>
+        </details>
+      )}
     </div>
   );
 };
