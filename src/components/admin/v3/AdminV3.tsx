@@ -26,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useOptionalDealerSettings } from "./optionalDealerSettings";
+import { DEFAULT_SETTINGS } from "@/contexts/DealerSettingsContext";
 import { adminTabHref, type AdminVisibilityContext } from "@/lib/admin/sections";
 import {
   categoryHref,
@@ -157,7 +158,7 @@ export const V3Header = ({
 
 const StoreScope = () => {
   const name = useOptionalDealerSettings()?.settings.dealer_name?.trim();
-  if (!name) return null;
+  if (!name || name === DEFAULT_SETTINGS.dealer_name) return null;
   return (
     <span className="inline-flex items-center gap-1.5">
       <Building2 className="w-4 h-4" aria-hidden="true" />
