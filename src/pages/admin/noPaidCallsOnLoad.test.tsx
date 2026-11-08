@@ -23,7 +23,7 @@ vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ user: { id: "user-1
 vi.mock("@/contexts/TenantContext", () => ({
   useTenant: () => ({ tenant: { id: "tenant-1", name: "Example Motors" }, currentStore: { id: "store-1", name: "Example Motors" }, stores: [{ id: "store-1", name: "Example Motors" }], loading: false, setCurrentStore: () => {} }),
 }));
-vi.mock("@/hooks/useEntitlements", () => ({ useEntitlements: () => ({ tenant: { id: "tenant-1" }, member: { role: "owner" }, profile: null, entitlements: [], loading: false }) }));
+vi.mock("@/hooks/useEntitlements", () => ({ useEntitlements: () => ({ tenant: { id: "tenant-1" }, member: { role: "owner" }, profile: null, entitlements: [], entitlementFor: () => null, error: null, loading: false }) }));
 vi.mock("@/contexts/AuditContext", () => ({ useAudit: () => ({ log: vi.fn(), entries: [] }) }));
 vi.mock("@/contexts/DealerSettingsContext", async (importOriginal) => {
   const mod = await importOriginal<typeof import("@/contexts/DealerSettingsContext")>();
@@ -54,6 +54,24 @@ describe("opening an Administration screen starts no edge function", () => {
   it.each(Object.keys(ADMIN_VIEWS))("view %s", async (id) => {
     const View = ADMIN_VIEWS[id];
     const { container } = renderAdmin(<Suspense fallback={null}><View /></Suspense>, { route: adminTabHref(id) });
+    await settle(container);
+    expect(functionCalls()).toEqual([]);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    adminTabHref("overview"),
+    adminTabHref("overview", "exceptions"),
+    adminTabHref("overview", "setup"),
+    adminTabHref("overview", "policy"),
+    adminTabHref("overview", "activity"),
+    adminTabHref("plan-features"),
+    adminTabHref("plan-features", "compare"),
+    adminTabHref("plan-features", "metric-stickers_generated"),
+  ])("wave E screen %s", async (url) => {
+    const tab = new URL(url, "http://x").searchParams.get("tab") as string;
+    const View = ADMIN_VIEWS[tab];
+    const { container } = renderAdmin(<Suspense fallback={null}><View /></Suspense>, { route: url });
     await settle(container);
     expect(functionCalls()).toEqual([]);
     expect(fetchSpy).not.toHaveBeenCalled();

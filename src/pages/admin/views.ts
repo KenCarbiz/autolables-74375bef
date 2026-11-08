@@ -40,4 +40,5 @@ export const ADMIN_VIEWS: Readonly<Record<string, LazyExoticComponent<ComponentT
   "approval-rules": lazy(() => import("./views/documents/ApprovalRulesView")),
   "print-calibration": lazy(() => import("./views/documents/PrintCalibrationView")),
   "service-policy": lazy(() => import("./views/documents/ServicePolicyView")),
+  "plan-features": lazy(() => import("./views/plan/PlanUsageView")),
 };

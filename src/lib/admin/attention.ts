@@ -24,6 +24,8 @@ export interface AttentionItem {
   owner: string | null;
   status: AttentionStatus;
   action: { label: string; href: string };
+  /** What the number counts, so a vehicle count is never read as an issue count. */
+  count?: { value: number; unit: "vehicle" | "case" | "issue" } | null;
 }
 
 export interface AttentionInput {
@@ -34,7 +36,13 @@ export interface AttentionInput {
   recall: HealthVerdict | null;
   publishing: { incomplete: string[] } | null;
   documents: { missingTemplates: string[] } | null;
+  exceptions?: { instances: CountValue; vehicles: CountValue } | null;
 }
+
+export const EXCEPTIONS_HREF = "/admin/exceptions?status=active";
+
+/** Provider status codes belong in the diagnostics, not in the overview summary. */
+export const stripTechnicalCode = (text: string): string => text.replace(/\s*\((?:HTTP\s*)?\d{3}\)/gi, "").trim();
 
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 
@@ -45,7 +53,7 @@ export function buildAttentionQueue(input: AttentionInput): AttentionItem[] {
     const status: AttentionStatus = input.feed.state === "down" ? "blocked" : input.feed.state === "unknown" ? "unknown" : "needs_review";
     items.push({
       id: "feed",
-      title: input.feed.state === "unknown" ? "Inventory feed health could not be checked" : `Review inventory feed: ${input.feed.headline}`,
+      title: input.feed.state === "unknown" ? "Inventory feed health could not be checked" : `Review inventory feed: ${stripTechnicalCode(input.feed.headline)}`,
       detail: input.feed.detail,
       owner: "Inventory manager",
       status,
@@ -59,10 +67,10 @@ export function buildAttentionQueue(input: AttentionInput): AttentionItem[] {
       items.push({ id: "price-unknown", title: "Price evidence could not be checked", detail: "The price audit did not load, so no vehicle is confirmed.", owner: "Store admin", status: "unknown", action: { label: "Review pricing", href: adminTabHref("price-rules", "price-consistency") } });
     } else {
       if (mismatched.kind === "known" && mismatched.value > 0) {
-        items.push({ id: "price-mismatch", title: "Resolve advertised price mismatches", detail: `${plural(mismatched.value, "vehicle", "vehicles")} where the website price and the stored price disagree.`, owner: "Store admin", status: "review_required", action: { label: "Review pricing", href: adminTabHref("price-rules", "price-consistency") } });
+        items.push({ id: "price-mismatch", title: "Resolve advertised price mismatches", detail: `${plural(mismatched.value, "vehicle", "vehicles")} where the website price and the stored price disagree.`, owner: "Store admin", status: "review_required", count: { value: mismatched.value, unit: "vehicle" }, action: { label: "Review pricing", href: adminTabHref("price-rules", "price-consistency") } });
       }
       if (missing.kind === "known" && missing.value > 0) {
-        items.push({ id: "price-missing", title: "Confirm price evidence", detail: `${plural(missing.value, "vehicle", "vehicles")} missing supporting price evidence.`, owner: "Store admin", status: "review_required", action: { label: "Review pricing", href: adminTabHref("price-rules", "price-consistency") } });
+        items.push({ id: "price-missing", title: "Confirm price evidence", detail: `${plural(missing.value, "vehicle", "vehicles")} missing supporting price evidence.`, owner: "Store admin", status: "review_required", count: { value: missing.value, unit: "vehicle" }, action: { label: "Review pricing", href: adminTabHref("price-rules", "price-consistency") } });
       }
     }
   }
@@ -72,7 +80,25 @@ export function buildAttentionQueue(input: AttentionInput): AttentionItem[] {
     if (b.kind === "failed") {
       items.push({ id: "descriptions-unknown", title: "Description cases could not be checked", detail: "The description queue did not load.", owner: "Merchandising", status: "unknown", action: { label: "Open queue", href: "/description-operations" } });
     } else if (b.kind === "known" && b.value > 0) {
-      items.push({ id: "descriptions", title: "Recover description cases", detail: `${plural(b.value, "vehicle", "vehicles")} with blocked or incomplete descriptions.`, owner: "Merchandising", status: "blocked", action: { label: "Open queue", href: "/description-operations?status=blocked" } });
+      items.push({ id: "descriptions", title: "Recover description cases", detail: `${plural(b.value, "vehicle", "vehicles")} with blocked or incomplete descriptions.`, owner: "Merchandising", status: "blocked", count: { value: b.value, unit: "vehicle" }, action: { label: "Open queue", href: "/description-operations?status=blocked" } });
+    }
+  }
+
+  if (input.exceptions) {
+    const { instances, vehicles } = input.exceptions;
+    if (instances.kind === "failed") {
+      items.push({ id: "exceptions-unknown", title: "Vehicle exceptions could not be checked", detail: "The exceptions queue did not load, so no count is shown.", owner: "Store admin", status: "unknown", action: { label: "Open exceptions", href: EXCEPTIONS_HREF } });
+    } else if (instances.kind === "known" && instances.value > 0) {
+      const v = vehicles.kind === "known" ? vehicles : null;
+      items.push({
+        id: "exceptions",
+        title: "Work the open exceptions queue",
+        detail: v ? `${plural(instances.value, "open issue", "open issues")} across ${plural(v.value, "vehicle", "vehicles")}${v.capped ? " or more" : ""}.` : `${plural(instances.value, "open issue", "open issues")}.`,
+        owner: "Store admin",
+        status: "review_required",
+        count: v ? { value: v.value, unit: "vehicle" } : { value: instances.value, unit: "issue" },
+        action: { label: "Open exceptions", href: EXCEPTIONS_HREF },
+      });
     }
   }
 
