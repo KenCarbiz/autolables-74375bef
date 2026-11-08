@@ -35,7 +35,7 @@ import {
 } from "@/lib/admin/servicePolicyModel";
 import { AdminButton, AdminCard, AdminLinkButton, InlineNote } from "@/components/admin/v2/primitives";
 import { ADMIN_CHILD_ROUTES } from "@/lib/admin/sections";
-import { AdminIcon, AdminIconTile, ChipInput, DetailDrawer, DraftActionBar, ScopeLabel, SectionCard, StatusBadge, SwitchField, deriveDraftBarState, type AdminIconName } from "@/components/admin/v3/editor";
+import { AdminIcon, AdminIconTile, ChipInput, useIsNarrow, DetailDrawer, DraftActionBar, ScopeLabel, SectionCard, StatusBadge, SwitchField, deriveDraftBarState, type AdminIconName } from "@/components/admin/v3/editor";
 import { useWaveCVariant } from "@/pages/admin/views/publishing/waveCVariant";
 import { cn } from "@/lib/utils";
 import { useFixtureDirty } from "./fixtureDirty";
@@ -94,6 +94,7 @@ export default function ServicePolicyView() {
   const fixture = useViewFixture<ServicePolicyFixture>("service-policy");
   const variant = useWaveCVariant(!!fixture);
   const seedDirty = useFixtureDirty(!!fixture);
+  const narrow = useIsNarrow();
   const { settings } = useDealerSettings();
   const { isAdmin } = useAuth();
   const { member } = useEntitlements();
@@ -196,12 +197,12 @@ export default function ServicePolicyView() {
             return (
               <li key={g.id}>
                 <div className={cn("h-full rounded-xl border p-4 flex flex-col gap-3", open ? "border-adm-primary bg-adm-selected" : "border-adm-divider bg-adm-surface")}>
-                  <div className="flex flex-col sm:flex-row items-start gap-3">
-                    <AdminIconTile name={g.icon as AdminIconName} tone={open ? "primary" : "neutral"} />
-                    <div className="min-w-0 w-full sm:flex-1">
-                      <h2 className="text-[16px] leading-[24px] font-semibold text-adm-ink">{g.title}</h2>
-                      <StatusBadge state={STATE_BADGE[s.state]} label={STATE_LABEL[s.state]} className="mt-1" />
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <AdminIconTile name={g.icon as AdminIconName} tone={open ? "primary" : "neutral"} />
+                      <h2 className="min-w-0 flex-1 text-[16px] leading-[24px] font-semibold text-adm-ink">{g.title}</h2>
                     </div>
+                    <StatusBadge state={STATE_BADGE[s.state]} label={STATE_LABEL[s.state]} className="mt-2" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[14px] leading-[20px] font-medium text-adm-ink">{s.headline}</p>
@@ -363,11 +364,12 @@ export default function ServicePolicyView() {
         id="getready-catalog"
         title="Get-Ready service catalog"
         description="Internal services you can add to any Get-Ready, routed to a responsible party. Never billed to the buyer."
-        action={<AdminLinkButton to={ADMIN_CHILD_ROUTES.serviceCatalog} variant="outline">Open service catalog</AdminLinkButton>}
+        action={narrow ? undefined : <AdminLinkButton to={ADMIN_CHILD_ROUTES.serviceCatalog} variant="outline">Open service catalog</AdminLinkButton>}
       >
         <p className="text-[13px] leading-[18px] text-adm-muted">
           {services.length === 0 ? "No services configured." : services.length === 1 ? "1 service configured." : `${services.length} services configured.`} Add, edit or remove services, and see who each is assigned to, in the catalog.
         </p>
+        {narrow && <AdminLinkButton to={ADMIN_CHILD_ROUTES.serviceCatalog} variant="outline" className="mt-3 w-full min-h-[44px] justify-center">Open service catalog</AdminLinkButton>}
       </AdminCard>
 
       <DraftActionBar

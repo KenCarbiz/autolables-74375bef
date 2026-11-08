@@ -335,7 +335,7 @@ export default function ApprovalRulesView() {
         </section>
 
         {!narrow && (
-          <aside aria-label="Selected rule" className="rounded-xl bg-adm-surface border border-adm-divider min-w-0">
+          <aside aria-label="Selected rule" className="rounded-xl bg-adm-surface border border-adm-divider min-w-0 xl:sticky xl:top-4">
           <header className="px-4 sm:px-6 pt-5 pb-4 border-b border-adm-divider flex items-start gap-3">
             <AdminIconTile name={RULE_FAMILY_ICON[selected]} />
             <div className="min-w-0 flex-1">
@@ -349,9 +349,9 @@ export default function ApprovalRulesView() {
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 text-[13px] leading-[18px] text-adm-muted">
+      {!narrow && <div className="flex flex-wrap items-center justify-between gap-2 text-[13px] leading-[18px] text-adm-muted">
         <span>{review.dirty ? `${changes.length} change${changes.length === 1 ? "" : "s"} pending review` : "No changes pending"}</span>
-      </div>
+      </div>}
 
       {narrow && (
         <DetailDrawer open={!!rawRule} onClose={() => setParams((p) => { const n = new URLSearchParams(p); n.delete("rule"); n.delete("edit"); return n; }, { replace: true })} title={`${family.label} approval`} description="Selected rule">

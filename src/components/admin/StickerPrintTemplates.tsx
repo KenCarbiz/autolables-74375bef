@@ -2,7 +2,8 @@ import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Move } from "lucide-react";
 import { AdminButton } from "@/components/admin/v2/primitives";
-import { AdminIcon, INPUT_CLASS, SectionCard, SwitchField } from "@/components/admin/v3/editor";
+import { AccordionCard } from "@/pages/admin/views/documents/hub/AccordionCard";
+import { AdminIcon, INPUT_CLASS, SwitchField } from "@/components/admin/v3/editor";
 import {
   useDealerSettings,
   STICKER_DOC_LABELS,
@@ -97,11 +98,12 @@ export default function StickerPrintTemplates() {
   const HELP = "text-[13px] leading-[18px] text-adm-muted";
 
   return (
-    <SectionCard
+    <AccordionCard
       id="sticker-print-templates"
       icon="printer"
       title="Window-sticker print templates"
       description="Set how each document physically prints onto your label stock. Print the full designed sticker on blank stock, or fill only the empty space on your own pre-printed stock."
+      summary={`${DOC_ORDER.length} document types, ${tpl.mode === "preprinted" ? "pre-printed stock" : "blank stock"} for ${STICKER_DOC_LABELS[active].toLowerCase()}`}
     >
       <div role="group" aria-label="Document type" className="flex flex-wrap gap-2">
         {DOC_ORDER.map((d) => (
@@ -265,6 +267,6 @@ export default function StickerPrintTemplates() {
           )}
         </>
       )}
-    </SectionCard>
+    </AccordionCard>
   );
 }
