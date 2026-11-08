@@ -21,19 +21,22 @@ export const GroupCard = ({ group, draft, settings, changes, canEdit, onOpen }: 
   const lines = narrow ? (shown.length ? [] : sum.lines.slice(0, 2)) : sum.lines.slice(0, 2);
   const more = narrow ? rows.length + sum.lines.length - lines.length - shown.length : rows.length - shown.length;
   return (
-    <li className={cn("rounded-xl border bg-adm-surface p-4 sm:p-5 flex flex-col gap-3 sm:gap-4 min-w-0 h-full", changes ? "border-adm-primary ring-1 ring-adm-primary/30" : "border-adm-divider")} data-group={group.id}>
+    <li className={cn("rounded-xl border bg-adm-surface p-4 sm:p-5 flex flex-col gap-3 min-w-0", changes ? "border-adm-primary ring-1 ring-adm-primary/30" : "border-adm-divider")} data-group={group.id}>
       <div className="flex items-start gap-3">
         <AdminIconTile name={group.icon} />
         <div className="min-w-0 flex-1">
           <h2 className="text-[16px] leading-[22px] font-semibold text-adm-ink">{group.title}</h2>
           <p className="text-[13px] leading-[18px] text-adm-muted">{group.blurb}</p>
         </div>
+        <AdminButton variant={canEdit && group.id !== "integrations" ? "primary" : "secondary"} onClick={onOpen} className="flex-shrink-0" aria-label={`${group.id === "integrations" || !canEdit ? "View details" : "Configure"}: ${group.title}`}>
+          {group.id === "integrations" || !canEdit ? "View" : "Configure"}
+        </AdminButton>
       </div>
       <div className="flex items-center gap-2 flex-wrap">
         {sum.total > 0 && <StatusBadge state={sum.on > 0 ? "enabled" : "disabled"} label={`${sum.on} of ${sum.total} on`} />}
         {changes > 0 && <StatusBadge state="overridden" label={changes === 1 ? "1 change" : `${changes} changes`} />}
       </div>
-      <ul className="space-y-1.5 flex-1" aria-label={`${group.title} summary`}>
+      <ul className="space-y-1.5" aria-label={`${group.title} summary`}>
         {lines.map((l) => <li key={l} className="text-[14px] leading-[20px] text-adm-ink">{l}</li>)}
         {shown.map((r) => {
           const on = r.kind === "switch" ? draft[r.key] : r.read(settings);
@@ -46,11 +49,6 @@ export const GroupCard = ({ group, draft, settings, changes, canEdit, onOpen }: 
         })}
         {more > 0 && <li className="text-[13px] leading-[18px] text-adm-muted">and {more} more</li>}
       </ul>
-      <div className="mt-auto">
-        <AdminButton variant={canEdit && group.id !== "integrations" ? "primary" : "secondary"} onClick={onOpen} aria-label={`${group.id === "integrations" || !canEdit ? "View details" : "Configure"}: ${group.title}`}>
-          {group.id === "integrations" || !canEdit ? "View details" : "Configure"} <AdminIcon name="chevron-right" />
-        </AdminButton>
-      </div>
     </li>
   );
 };

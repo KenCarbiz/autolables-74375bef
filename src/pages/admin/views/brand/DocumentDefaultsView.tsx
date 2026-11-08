@@ -165,7 +165,7 @@ function DocumentDefaultsBody({ registry }: { registry: RegistryState }) {
             ))}
           </ul>
         )}
-        <p className="text-[13px] leading-[18px] text-adm-muted">Thumbnails are drawn by the live template renderer with sample vehicle data. A builder with no stored preview shows a placeholder, never a made-up image. The same default is also editable under Documents &amp; Service, Templates (linked below); both write the same stored setting.</p>
+        <p className="max-sm:hidden text-[13px] leading-[18px] text-adm-muted">Thumbnails are drawn by the live template renderer with sample vehicle data. A builder with no stored preview shows a placeholder, never a made-up image. The same default is also editable under Documents &amp; Service, Templates (linked below); both write the same stored setting.</p>
       </SectionCard>
 
       <SectionCard icon="book" title="Buyers Guide default" description="The FTC Used Car Rule form has one prescribed layout, so only its default warranty designation is chosen here.">
