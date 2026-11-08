@@ -101,7 +101,7 @@ const approvalBase = (): ApprovalRulesFixture => ({
   selected: "window_sticker",
   lastChange: { at: iso(4), by: "owner@example.com", action: "settings_updated" },
   impact: { activeVehicles: knownCount(64), policyVersion: 12 },
-  pendingDraft: { autoUnpublishStale: true },
+  dirtyDraft: { autoUnpublishStale: true },
   invalidDraft: { requireApprovalBeforePublish: false, autoPublishApprovedWindow: true },
   canEdit: true,
   history: [
@@ -140,7 +140,7 @@ function servicePolicyBase(): ServicePolicyFixture {
     impact: { activeVehicles: knownCount(64), policyVersion: 12 },
     canEdit: true,
     canEditOps: true,
-    pendingDraft: { recon_approval_email: "used-cars@example.com, gm@example.com, controller@example.com" },
+    dirtyDraft: { recon_approval_email: "used-cars@example.com, gm@example.com, controller@example.com" },
     invalidDraft: { k208_authority_roles: [], recon_approval_email: "used-cars@example.com, not-an-email" },
     products: [
       { id: "fx-prod-0001", name: "Mud flaps installed", badge_type: "installed" },

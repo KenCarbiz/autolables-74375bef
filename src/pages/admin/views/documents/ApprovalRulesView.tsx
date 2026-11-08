@@ -18,7 +18,6 @@ import {
   documentRuleRows,
   documentRuleWarnings,
   familyDef,
-  familyPolicySentence,
   latestPolicyChange,
   rulesFromSettings,
   serviceGateContext,
@@ -28,10 +27,11 @@ import {
   type ReadinessState,
   type ServiceGateContext,
 } from "@/lib/admin/documentPolicy";
-import { RULE_FAMILY_ICON, policyChangeLines, ruleComboWarnings, ruleEffect, whoApprovesWhen } from "@/lib/admin/approvalRulesModel";
+import { PREVIEW_TARGET, RULE_FAMILY_ICON, familySentence, policyChangeLines, ruleComboWarnings, ruleEffect, whoApprovesWhen } from "@/lib/admin/approvalRulesModel";
 import { useWaveCVariant } from "@/pages/admin/views/publishing/waveCVariant";
 import { cn } from "@/lib/utils";
-import { PendingChip, SettingsReviewDialog, useSettingsReview, type ImpactFixture } from "./SettingsReviewApply";
+import { useFixtureDirty } from "./fixtureDirty";
+import { PendingChip, SettingsReviewDialog, readStoredSettings, useSettingsReview, type ImpactFixture } from "./SettingsReviewApply";
 import { useDocumentsReadiness } from "./readiness";
 import { AppliesTo, ApprovalToggles, ConsequenceList, EditorSection, InspectionRuleSummary, SignedVersionsNotice, SignerRoleDetails } from "./ApprovalRuleParts";
 
@@ -50,6 +50,7 @@ export interface ApprovalRulesFixture {
   impact: ImpactFixture;
   /** A draft edit the fixture depicts as pending review. */
   pendingDraft?: Partial<DocumentRules>;
+  dirtyDraft?: Partial<DocumentRules>;
   /** A draft the ?state=invalid variant depicts. */
   invalidDraft?: Partial<DocumentRules>;
   /** Fixture viewers may edit; production reads the member's capability. */
@@ -75,6 +76,7 @@ const dateLabel = (iso: string) => new Date(iso).toLocaleDateString("en-US", { m
 export default function ApprovalRulesView() {
   const fixture = useViewFixture<ApprovalRulesFixture>("approval-rules");
   const variant = useWaveCVariant(!!fixture);
+  const seedDirty = useFixtureDirty(!!fixture);
   const now = useAdminNow();
   const { settings } = useDealerSettings();
   const { isAdmin } = useAuth();
@@ -91,12 +93,14 @@ export default function ApprovalRulesView() {
     describe: (field, before, after) => ({ field, label: DOCUMENT_RULE_LABELS[field], before: before ? "On" : "Off", after: after ? "On" : "Off" }),
     warnings: (b, a) => [...documentRuleWarnings(b, a), ...ruleComboWarnings(a)],
     // merge_dealer_settings replaces a nested object, so the payload carries the
-    // current rules with only the reviewed keys changed; Publishing writes its
-    // own keys of the same object the same way.
-    toPayload: (draft, changed) => ({ document_rules: { ...rulesFromSettings(settings), ...Object.fromEntries(changed.map((k) => [k, draft[k]])) } }),
+    // rules re-read from the server just before the write with only the reviewed
+    // keys changed. Publishing writes its own keys of the same object, so a stale
+    // copy would silently revert them.
+    toPayload: (draft, changed, fresh) => ({ document_rules: { ...rulesFromSettings(fresh ?? settings), ...Object.fromEntries(changed.map((k) => [k, draft[k]])) } }),
+    readFresh: readStoredSettings,
     canEdit,
     fixtureImpact: fixture?.impact ?? null,
-    initialDraft: variant === "invalid" ? fixture?.invalidDraft ?? null : variant === "default" ? fixture?.pendingDraft ?? null : null,
+    initialDraft: variant === "invalid" ? fixture?.invalidDraft ?? null : variant === "default" ? fixture?.pendingDraft ?? (seedDirty ? fixture?.dirtyDraft ?? null : null) : null,
   });
 
   const rawRule = params.get("rule");
@@ -122,91 +126,10 @@ export default function ApprovalRulesView() {
   const toggle = (key: keyof DocumentRules, next: boolean) => review.edit((d) => ({ ...d, [key]: next }));
   const readFailed = variant === "error";
 
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <ScopeLabel scope="all_rooftops" />
-        <p className="text-[13px] leading-[18px] text-adm-muted">Saved once for the whole dealer group.{canEdit ? "" : " Your role can view these rules but not change them."}</p>
-      </div>
-      {readFailed && <InlineNote tone="danger" title="Setup checks could not be read">Printing, templates and disclosures show Unknown, not Ready. The rules themselves are unaffected.</InlineNote>}
+  const panelBody = (
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(440px,520px)] gap-4 items-start">
-        <section aria-labelledby="rules-table-h" className="rounded-xl bg-adm-surface border border-adm-divider min-w-0">
-          <header className="px-4 sm:px-6 pt-5 pb-4 border-b border-adm-divider">
-            <h2 id="rules-table-h" className="text-[18px] leading-[26px] font-semibold text-adm-ink">Approval rules by document</h2>
-            <p className="mt-0.5 text-[14px] leading-[20px] text-adm-muted">Who must approve each document type, and when. Pick a row to read its rule or press Edit.</p>
-          </header>
-          {narrow ? (
-            <ul aria-label="Approval rules by document" className="divide-y divide-adm-divider">
-              {rows.map((r) => {
-                const isSelected = r.family === selected;
-                const ww = whoApprovesWhen(r.family, review.draft, gates);
-                return (
-                  <li key={r.family} aria-current={isSelected ? "true" : undefined} className={cn("px-4 py-3.5 space-y-2", isSelected && "bg-adm-selected")}>
-                    <button type="button" onClick={() => select(r.family, false)} aria-label={`Show ${r.document} rule`} className="flex w-full items-center gap-3 text-left min-h-[48px] rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary">
-                      <AdminIconTile name={RULE_FAMILY_ICON[r.family]} tone={isSelected ? "primary" : "neutral"} />
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-[15px] leading-[22px] font-semibold">{r.document}</span>
-                        <span className="block text-[13px] leading-[18px] text-adm-muted">{r.appliesTo}</span>
-                      </span>
-                    </button>
-                    <p className="text-[14px] leading-[20px] font-medium">{ww.who}</p>
-                    <p className="text-[13px] leading-[18px] text-adm-muted">{ww.when}</p>
-                    <AdminButton variant="outline" size="sm" className="min-h-[44px]" aria-label={`Edit ${r.document} rules`} onClick={() => select(r.family, true)}><AdminIcon name="edit" />Edit rule</AdminButton>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <table className="w-full border-collapse text-left text-[14px] leading-[20px] text-adm-ink">
-              <caption className="sr-only">Approval rules by document</caption>
-              <thead>
-                <tr>
-                  <th scope="col" className="bg-adm-workspace px-4 pl-6 py-2.5 text-[13px] font-semibold text-adm-muted border-b border-adm-divider">Document</th>
-                  <th scope="col" className="bg-adm-workspace px-4 py-2.5 text-[13px] font-semibold text-adm-muted border-b border-adm-divider">Applies to</th>
-                  <th scope="col" className="bg-adm-workspace px-4 py-2.5 text-[13px] font-semibold text-adm-muted border-b border-adm-divider">Who approves &amp; when</th>
-                  <th scope="col" className="bg-adm-workspace px-4 pr-6 py-2.5 text-[13px] font-semibold text-adm-muted border-b border-adm-divider"><span className="sr-only">Action</span></th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => {
-                  const isSelected = r.family === selected;
-                  const ww = whoApprovesWhen(r.family, review.draft, gates);
-                  return (
-                    <tr key={r.family} aria-selected={isSelected} onClick={(e) => { if (!(e.target as Element).closest("button")) select(r.family, false); }} className={cn("border-b border-adm-divider last:border-b-0 cursor-pointer", isSelected ? "bg-adm-selected" : "hover:bg-adm-workspace")}>
-                      <td className="pl-6 pr-4 py-3.5 align-middle">
-                        <button type="button" onClick={() => select(r.family, false)} aria-label={`Show ${r.document} rule`} className="flex items-center gap-3 text-left rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary">
-                          <AdminIconTile name={RULE_FAMILY_ICON[r.family]} tone={isSelected ? "primary" : "neutral"} />
-                          <span className={cn("text-[15px] leading-[22px] whitespace-nowrap", isSelected ? "font-bold" : "font-semibold")}>{r.document}</span>
-                        </button>
-                      </td>
-                      <td className="px-4 py-3.5 align-middle text-adm-muted">{r.appliesTo}</td>
-                      <td className="px-4 py-3.5 align-middle"><span className="block font-medium">{ww.who}</span><span className="block text-[13px] leading-[18px] text-adm-muted">{ww.when}</span></td>
-                      <td className="px-4 pr-6 py-3.5 align-middle">
-                        <AdminButton variant="outline" size="sm" className="min-h-[40px]" aria-label={`Edit ${r.document} rules`} onClick={() => select(r.family, true)}><AdminIcon name="edit" />Edit rule</AdminButton>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-          <div className="px-4 sm:px-6 py-3 border-t border-adm-divider text-[13px] leading-[18px] text-adm-muted">
-            Publication keys are also shown on <Link className="font-semibold text-adm-primary hover:underline" to={adminTabHref("approvals")}>Publishing approvals</Link>; edit them here.
-          </div>
-        </section>
-
-        <aside aria-label="Selected rule" className="rounded-xl bg-adm-surface border border-adm-divider min-w-0">
-          <header className="px-4 sm:px-6 pt-5 pb-4 border-b border-adm-divider flex items-start gap-3">
-            <AdminIconTile name={RULE_FAMILY_ICON[selected]} />
-            <div className="min-w-0 flex-1">
-              <p className="text-[13px] leading-[18px] text-adm-muted">Selected rule</p>
-              <h3 className="text-[20px] leading-[28px] font-bold text-adm-ink">{family.label} approval</h3>
-            </div>
-            <StatusChip tone="info" className="h-[26px] text-[13px]">{versionChip}</StatusChip>
-          </header>
-
-          <div className="px-4 sm:px-6 py-5 space-y-5">
+          <div className={narrow ? "space-y-5" : "px-4 sm:px-6 py-5 space-y-5"}>
+            {narrow && <div><StatusChip tone="info" className="h-[26px] text-[13px]">{versionChip}</StatusChip></div>}
             <div>
               <p data-parity="policy-changed" className="text-[14px] leading-[20px] text-adm-muted">
                 {lastChange ? `Changed ${describeAge(lastChange.at, now)}${lastChange.by ? ` by ${lastChange.by}` : ""}` : "No change recorded in the activity log"}
@@ -223,7 +146,7 @@ export default function ApprovalRulesView() {
                   <div className="py-2.5"><dt className="text-[13px] leading-[18px] text-adm-muted">Who approves &amp; when</dt><dd className="text-[14px] leading-[20px] font-medium">{who.who}</dd><dd className="text-[13px] leading-[18px] text-adm-muted">{who.when}</dd></div>
                   <div className="py-2.5"><dt className="text-[13px] leading-[18px] text-adm-muted">Refreshed after</dt><dd className="text-[14px] leading-[20px] font-medium">{rule.refreshAfter}</dd></div>
                 </dl>
-                <p className="text-[13px] leading-[18px] text-adm-muted">{familyPolicySentence(selected, review.draft, gates)}</p>
+                <p className="text-[13px] leading-[18px] text-adm-muted">{familySentence(selected, review.draft, gates)}</p>
                 <SignedVersionsNotice />
               </div>
             )}
@@ -232,7 +155,7 @@ export default function ApprovalRulesView() {
               <div className="space-y-6">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-[15px] leading-[22px] font-semibold text-adm-ink">Rules for {family.label.toLowerCase()}</p>
-                  <AdminButton size="sm" variant="ghost" onClick={() => select(selected, false)}>Done</AdminButton>
+                  <AdminButton size="sm" variant="ghost" className="min-h-[44px] sm:min-h-[32px]" onClick={() => select(selected, false)}>Done</AdminButton>
                 </div>
 
                 <EditorSection n={1} title="Applies to" id="rule-applies">
@@ -295,7 +218,7 @@ export default function ApprovalRulesView() {
                 ))}
               </ul>
             )}
-            <p className="text-[13px] leading-[18px] text-adm-muted">Changes apply to documents generated after you apply them. Approved and signed documents keep their current version.</p>
+            {!editing && <p className="text-[13px] leading-[18px] text-adm-muted">Changes apply to documents generated after you apply them. Approved and signed documents keep their current version.</p>}
 
             <section aria-labelledby="related-setup-h">
               <h4 id="related-setup-h" className="text-[16px] leading-[24px] font-semibold text-adm-ink">Related setup</h4>
@@ -316,23 +239,125 @@ export default function ApprovalRulesView() {
             </section>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <AdminLinkButton to={family.previewHref} variant="outline" className="min-h-[48px] text-[15px]">
-                <AdminIcon name="eye" size="card" />
-                Preview document
-              </AdminLinkButton>
+              {fixture ? (
+                <AdminButton variant="outline" disabled aria-describedby="preview-target" className="min-h-[48px] text-[15px]">
+                  <AdminIcon name="eye" size="card" />
+                  Preview document
+                </AdminButton>
+              ) : (
+                <AdminLinkButton to={PREVIEW_TARGET[selected].to} variant="outline" aria-describedby="preview-target" className="min-h-[48px] text-[15px]">
+                  <AdminIcon name="eye" size="card" />
+                  Preview document
+                </AdminLinkButton>
+              )}
               <AdminButton variant="primary" data-parity="review-policy" className="min-h-[48px] text-[15px]" onClick={() => void review.openReview()} disabled={!review.dirty || !canEdit}>
                 Review policy changes
               </AdminButton>
             </div>
-            {review.dirty && <div><AdminButton size="sm" variant="ghost" onClick={review.discard}>Discard changes</AdminButton></div>}
+            <p id="preview-target" className="text-[13px] leading-[18px] text-adm-muted">{PREVIEW_TARGET[selected].opens}{fixture ? ". Not available in the design fixture." : "."}</p>
+            {review.dirty && <div><AdminButton size="sm" variant="ghost" className="min-h-[44px] sm:min-h-[32px]" onClick={review.discard}>Discard changes</AdminButton></div>}
           </div>
-        </aside>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <ScopeLabel scope="all_rooftops" />
+        <p className="text-[13px] leading-[18px] text-adm-muted">Saved once for the whole dealer group.{canEdit ? "" : " Your role can view these rules but not change them."}</p>
+      </div>
+      {readFailed && <InlineNote tone="danger" title="Setup checks could not be read">Printing, templates and disclosures show Unknown, not Ready. The rules themselves are unaffected.</InlineNote>}
+
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.25fr)_minmax(400px,460px)] gap-4 items-start">
+        <section aria-labelledby="rules-table-h" className="rounded-xl bg-adm-surface border border-adm-divider min-w-0">
+          <header className="px-4 sm:px-6 pt-5 pb-4 border-b border-adm-divider">
+            <h2 id="rules-table-h" className="text-[18px] leading-[26px] font-semibold text-adm-ink">Approval rules by document</h2>
+            <p className="mt-0.5 text-[14px] leading-[20px] text-adm-muted">Who must approve each document type, and when. Pick a row to read its rule or press Edit.</p>
+          </header>
+          {narrow ? (
+            <ul aria-label="Approval rules by document" className="divide-y divide-adm-divider">
+              {rows.map((r) => {
+                const isSelected = r.family === selected;
+                const ww = whoApprovesWhen(r.family, review.draft, gates);
+                return (
+                  <li key={r.family} aria-current={isSelected ? "true" : undefined} className={cn("px-4 py-3.5 space-y-2", isSelected && "bg-adm-selected")}>
+                    <button type="button" onClick={() => select(r.family, false)} className="flex w-full items-center gap-3 text-left min-h-[48px] rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary">
+                      <AdminIconTile name={RULE_FAMILY_ICON[r.family]} tone={isSelected ? "primary" : "neutral"} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[15px] leading-[22px] font-semibold">{r.document}</span>
+                        <span className="block text-[13px] leading-[18px] text-adm-muted">{r.appliesTo}</span>
+                      </span>
+                    </button>
+                    <p className="text-[14px] leading-[20px] font-medium">{ww.who}</p>
+                    <p className="text-[13px] leading-[18px] text-adm-muted">{ww.when}</p>
+                    <AdminButton variant="outline" size="sm" className="min-h-[44px]" onClick={() => select(r.family, true)}><AdminIcon name="edit" /><span className="whitespace-nowrap">Edit rule</span><span className="sr-only">, {r.document}</span></AdminButton>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <table className="w-full border-collapse text-left text-[14px] leading-[20px] text-adm-ink">
+              <caption className="sr-only">Approval rules by document</caption>
+              <thead>
+                <tr>
+                  <th scope="col" className="bg-adm-workspace px-4 pl-6 py-2.5 w-[26%] text-[13px] font-semibold text-adm-muted border-b border-adm-divider">Document</th>
+                  <th scope="col" className="bg-adm-workspace px-4 py-2.5 w-[14%] text-[13px] font-semibold text-adm-muted border-b border-adm-divider">Applies to</th>
+                  <th scope="col" className="bg-adm-workspace px-4 py-2.5 text-[13px] font-semibold text-adm-muted border-b border-adm-divider">Who approves &amp; when</th>
+                  <th scope="col" className="bg-adm-workspace px-4 pr-6 py-2.5 w-[148px] text-[13px] font-semibold text-adm-muted border-b border-adm-divider"><span className="sr-only">Action</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => {
+                  const isSelected = r.family === selected;
+                  const ww = whoApprovesWhen(r.family, review.draft, gates);
+                  return (
+                    <tr key={r.family} aria-selected={isSelected} onClick={(e) => { if (!(e.target as Element).closest("button")) select(r.family, false); }} className={cn("border-b border-adm-divider last:border-b-0 cursor-pointer", isSelected ? "bg-adm-selected" : "hover:bg-adm-workspace")}>
+                      <td className="pl-6 pr-4 py-3.5 align-middle">
+                        <button type="button" onClick={() => select(r.family, false)} className="flex items-center gap-3 text-left rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary">
+                          <AdminIconTile name={RULE_FAMILY_ICON[r.family]} tone={isSelected ? "primary" : "neutral"} />
+                          <span className={cn("text-[15px] leading-[22px] whitespace-nowrap", isSelected ? "font-bold" : "font-semibold")}>{r.document}</span>
+                        </button>
+                      </td>
+                      <td className="px-4 py-3.5 align-middle text-adm-muted">{r.appliesTo}</td>
+                      <td className="px-4 py-3.5 align-middle"><span className="block font-medium">{ww.who}</span><span className="block text-[13px] leading-[18px] text-adm-muted">{ww.when}</span></td>
+                      <td className="px-4 pr-6 py-3.5 align-middle">
+                        <AdminButton variant="outline" size="sm" className="min-h-[40px] min-w-[116px] whitespace-nowrap" onClick={() => select(r.family, true)}><AdminIcon name="edit" /><span className="whitespace-nowrap">Edit rule</span><span className="sr-only">, {r.document}</span></AdminButton>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+          <div className="px-4 sm:px-6 py-3 border-t border-adm-divider text-[13px] leading-[18px] text-adm-muted">
+            Publication keys are also shown, read only, on Publishing approvals; edit them here.
+            <Link className="flex items-center min-h-[44px] font-semibold text-adm-primary hover:underline" to={adminTabHref("approvals")}>Open Publishing approvals</Link>
+          </div>
+        </section>
+
+        {!narrow && (
+          <aside aria-label="Selected rule" className="rounded-xl bg-adm-surface border border-adm-divider min-w-0">
+          <header className="px-4 sm:px-6 pt-5 pb-4 border-b border-adm-divider flex items-start gap-3">
+            <AdminIconTile name={RULE_FAMILY_ICON[selected]} />
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] leading-[18px] text-adm-muted">Selected rule</p>
+              <h3 className="text-[20px] leading-[28px] font-bold text-adm-ink">{family.label} approval</h3>
+            </div>
+            <StatusChip tone="info" className="h-[26px] text-[13px]">{versionChip}</StatusChip>
+          </header>
+            {panelBody}
+          </aside>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-[13px] leading-[18px] text-adm-muted">
         <span>{review.dirty ? `${changes.length} change${changes.length === 1 ? "" : "s"} pending review` : "No changes pending"}</span>
-        <span>{familyPolicySentence(selected, review.draft, gates)}</span>
       </div>
+
+      {narrow && (
+        <DetailDrawer open={!!rawRule} onClose={() => setParams((p) => { const n = new URLSearchParams(p); n.delete("rule"); n.delete("edit"); return n; }, { replace: true })} title={`${family.label} approval`} description="Selected rule">
+          {panelBody}
+        </DetailDrawer>
+      )}
 
       <DetailDrawer open={drawer === "impact"} onClose={() => setDrawer(null)} title="Impact of pending changes" description="Before and after, and what each change does. Nothing is saved from here.">
         <ul className="space-y-3">

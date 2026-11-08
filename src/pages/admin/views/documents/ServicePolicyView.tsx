@@ -38,6 +38,7 @@ import { ADMIN_CHILD_ROUTES } from "@/lib/admin/sections";
 import { AdminIcon, AdminIconTile, ChipInput, DetailDrawer, DraftActionBar, ScopeLabel, SectionCard, StatusBadge, SwitchField, deriveDraftBarState, type AdminIconName } from "@/components/admin/v3/editor";
 import { useWaveCVariant } from "@/pages/admin/views/publishing/waveCVariant";
 import { cn } from "@/lib/utils";
+import { useFixtureDirty } from "./fixtureDirty";
 import { SettingsReviewDialog, useSettingsReview, type ImpactFixture } from "./SettingsReviewApply";
 import { FIELD_LABEL, INPUT_CLASS, usePanelAnchor } from "./controls";
 import { ReconRoutePreview, ReminderHistory, TaskPicker, TitleRequestPreview, type ProductOption, type ReminderRow } from "./ServicePolicyDrawers";
@@ -61,6 +62,7 @@ export interface ServicePolicyFixture {
   canEdit?: boolean;
   canEditOps?: boolean;
   pendingDraft?: Partial<ServiceDraft>;
+  dirtyDraft?: Partial<ServiceDraft>;
   invalidDraft?: Partial<ServiceDraft>;
   products?: ProductOption[] | null;
   reminders?: ReminderRow[] | null;
@@ -80,7 +82,7 @@ const STATE_LABEL = { on: "In effect", off: "Not required", attention: "Setup ne
 
 const RadioOption = ({ name, checked, onChange, disabled, title, detail }: { name: string; checked: boolean; onChange: () => void; disabled?: boolean; title: string; detail: string }) => (
   <label className={cn("flex items-start gap-3 rounded-lg border px-3.5 py-3 min-h-[56px] cursor-pointer", checked ? "border-adm-primary bg-adm-selected" : "border-adm-border hover:bg-adm-workspace", disabled && "opacity-60 cursor-not-allowed")}>
-    <input type="radio" name={name} checked={checked} onChange={onChange} disabled={disabled} className="mt-1 w-5 h-5 accent-[var(--adm-primary,#1D5FD0)]" />
+    <input type="radio" name={name} checked={checked} onChange={onChange} disabled={disabled} className="mt-0.5 w-5 h-5 shrink-0 accent-[var(--adm-primary,#1D5FD0)]" />
     <span className="min-w-0">
       <span className="block text-[14px] leading-[20px] font-semibold text-adm-ink">{title}</span>
       <span className="block text-[13px] leading-[18px] text-adm-muted">{detail}</span>
@@ -91,15 +93,19 @@ const RadioOption = ({ name, checked, onChange, disabled, title, detail }: { nam
 export default function ServicePolicyView() {
   const fixture = useViewFixture<ServicePolicyFixture>("service-policy");
   const variant = useWaveCVariant(!!fixture);
+  const seedDirty = useFixtureDirty(!!fixture);
   const { settings } = useDealerSettings();
   const { isAdmin } = useAuth();
   const { member } = useEntitlements();
   const [params, setParams] = useSearchParams();
   usePanelAnchor();
   const liveCanEdit = hasDealerCapability(member?.role, "can_manage_service_settings", isAdmin);
-  const liveCanOps = liveCanEdit || hasDealerCapability(member?.role, "can_manage_settings", isAdmin);
-  const canEdit = fixture ? (fixture.canEdit ?? true) && variant !== "readonly" && variant !== "blocked" : liveCanEdit;
-  const canEditOps = fixture ? (fixture.canEditOps ?? true) && variant !== "readonly" : liveCanOps;
+  // merge_dealer_settings classes only the K-208 keys as service keys; the
+  // install gate is a publishing key and the recon, technician and title keys
+  // are unclassified, so those need the settings roles.
+  const liveCanOps = hasDealerCapability(member?.role, "can_manage_settings", isAdmin);
+  const canEdit = fixture ? (fixture.canEdit ?? true) && variant !== "readonly" : liveCanEdit;
+  const canEditOps = fixture ? (fixture.canEditOps ?? true) && variant !== "readonly" && variant !== "blocked" : liveCanOps;
 
   const rawGroup = params.get("group");
   const panel = params.get("panel");
@@ -120,9 +126,9 @@ export default function ServicePolicyView() {
     validate: (d) => [...servicePolicyValidation(d), ...titlePolicyValidation(d), ...(signerSelectionError(d.require_safety_inspection, signerRef.current, d.k208_authority_roles) ? [signerSelectionError(d.require_safety_inspection, signerRef.current, d.k208_authority_roles) as string] : [])],
     warnings: (b, a) => [...servicePolicyWarnings(b, a), ...titlePolicyWarnings(b, a)],
     toPayload: (draft, changed) => Object.fromEntries(changed.map((k) => [k, draft[k]])) as Partial<DealerSettings>,
-    canEdit: canEditOps,
+    canEdit: canEdit || canEditOps,
     fixtureImpact: fixture?.impact ?? null,
-    initialDraft: variant === "invalid" ? fixture?.invalidDraft ?? null : variant === "default" ? fixture?.pendingDraft ?? null : null,
+    initialDraft: variant === "invalid" ? fixture?.invalidDraft ?? null : variant === "default" ? fixture?.pendingDraft ?? (seedDirty ? fixture?.dirtyDraft ?? null : null) : null,
   });
   const d = review.draft;
   const stored = review.state.original;
@@ -178,8 +184,9 @@ export default function ServicePolicyView() {
         <ScopeLabel scope="all_rooftops" />
         <p className="text-[13px] leading-[18px] text-adm-muted">Saved once for the whole dealer group. Changes apply to vehicles going forward; signed inspections and disclosures are not changed.</p>
       </div>
-      {!canEditOps && <InlineNote tone="warning">Your role can view this policy but not change it. The summaries below are read from the saved policy.</InlineNote>}
-      {canEditOps && !canEdit && <InlineNote tone="warning">Your role can change recon and title settings but not the signing gates or technician rules. The server enforces this; the disabled fields cannot be unlocked here.</InlineNote>}
+      {!canEdit && !canEditOps && <InlineNote tone="warning">Your role can view this policy but not change it. The summaries below are read from the saved policy.</InlineNote>}
+      {canEdit && !canEditOps && <InlineNote tone="warning" title="Limited to the signing gates">Your role can change the K-208 signing keys. The install verification, technician, recon and title settings are limited to owners, admins, general managers, GSMs and managers, so they are read only for you. The server enforces this.</InlineNote>}
+      {!canEdit && canEditOps && <InlineNote tone="warning">Your role cannot change the K-208 signing keys. The other settings are editable.</InlineNote>}
 
       <section aria-label="Service policy summary">
         <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -189,9 +196,9 @@ export default function ServicePolicyView() {
             return (
               <li key={g.id}>
                 <div className={cn("h-full rounded-xl border p-4 flex flex-col gap-3", open ? "border-adm-primary bg-adm-selected" : "border-adm-divider bg-adm-surface")}>
-                  <div className="flex items-start gap-3">
+                  <div className="flex flex-col sm:flex-row items-start gap-3">
                     <AdminIconTile name={g.icon as AdminIconName} tone={open ? "primary" : "neutral"} />
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 w-full sm:flex-1">
                       <h2 className="text-[16px] leading-[24px] font-semibold text-adm-ink">{g.title}</h2>
                       <StatusBadge state={STATE_BADGE[s.state]} label={STATE_LABEL[s.state]} className="mt-1" />
                     </div>
@@ -233,7 +240,7 @@ export default function ServicePolicyView() {
                       const on = roles.includes(r.key);
                       return (
                         <label key={r.key} className={cn("flex items-center gap-3 min-h-[44px] px-1 text-[14px]", gatesDisabled ? "opacity-60" : "cursor-pointer")}>
-                          <input type="checkbox" className="w-5 h-5 accent-[var(--adm-primary,#1D5FD0)]" checked={on} disabled={gatesDisabled} onChange={() => set("k208_authority_roles", on ? roles.filter((x) => x !== r.key) : [...roles, r.key])} />
+                          <input type="checkbox" className="w-5 h-5 shrink-0 accent-[var(--adm-primary,#1D5FD0)]" checked={on} disabled={gatesDisabled} onChange={() => set("k208_authority_roles", on ? roles.filter((x) => x !== r.key) : [...roles, r.key])} />
                           {r.label}
                         </label>
                       );
@@ -241,17 +248,17 @@ export default function ServicePolicyView() {
                     {signerError && <p role="alert" className="flex items-start gap-1.5 text-[13px] leading-[18px] font-medium text-adm-danger"><AdminIcon name="alert" size="inline" className="mt-px" />{signerError}</p>}
                   </div>
                 )}
-                <AdminButton size="sm" onClick={() => setDrawer("signers")}>Signer role details</AdminButton>
+                <AdminButton size="sm" className="min-h-[44px] sm:min-h-[32px]" onClick={() => setDrawer("signers")}>Signer role details</AdminButton>
               </fieldset>
             )}
             {d.require_safety_inspection && (
               <SwitchField label="Also require licensee certification" checked={d.require_k208_licensee_certification} onChange={(v) => set("require_k208_licensee_certification", v)} disabled={gatesDisabled} />
             )}
             <div>
-              <SwitchField label="Require install verification before customer signing" checked={d.require_install_verification} onChange={(v) => set("require_install_verification", v)} disabled={gatesDisabled} />
-              <p className="ml-[52px] -mt-1 text-[13px] leading-[18px] text-adm-muted">Evidence required: a verified install with a photo and a signature for every pre-installed product. Signing is blocked until each one is verified.</p>
+              <SwitchField label="Require install verification before customer signing" checked={d.require_install_verification} onChange={(v) => set("require_install_verification", v)} disabled={opsDisabled} />
+              <p className="ml-[52px] -mt-1 text-[13px] leading-[18px] text-adm-muted">Evidence required: a verified install with a photo and a signature for every pre-installed product. Signing is blocked until each one is verified.{opsDisabled && canEdit ? " Read only for your role: this key is limited to owners, admins, general managers, GSMs and managers." : ""}</p>
             </div>
-            <p className="text-[13px] leading-[18px] text-adm-muted">Per-user signer grants and the overdue threshold live in <Link to="/service/settings" className="font-semibold text-adm-primary hover:underline">Service Desk settings</Link>.</p>
+            <div><p className="text-[13px] leading-[18px] text-adm-muted">Per-user signer grants and the overdue threshold live in Service Desk settings.</p><Link to="/service/settings" className="inline-flex items-center min-h-[44px] text-[14px] font-semibold text-adm-primary hover:underline">Open Service Desk settings</Link></div>
           </div>
         </SectionCard>
       )}
@@ -259,12 +266,14 @@ export default function ServicePolicyView() {
       {group === "technician" && (
         <SectionCard id={GROUP_PANEL.technician} icon="wrench" title="Technician requirements" description="Rules for the QR work-event flow on the vehicle's prep page.">
           <div className="space-y-5">
-            <SwitchField label="Require RO number on Service Install sign-offs" checked={d.prep_require_ro} onChange={(v) => set("prep_require_ro", v)} disabled={gatesDisabled} />
-            <SwitchField label="Require photos on Initial Inventory Detail" checked={d.prep_detail_photos_required} onChange={(v) => set("prep_detail_photos_required", v)} disabled={gatesDisabled} />
+            <div className="divide-y divide-adm-divider rounded-lg border border-adm-divider px-3.5">
+              <div className="py-1.5"><SwitchField label="Require RO number on Service Install sign-offs" checked={d.prep_require_ro} onChange={(v) => set("prep_require_ro", v)} disabled={opsDisabled} /></div>
+              <div className="py-1.5"><SwitchField label="Require photos on Initial Inventory Detail" checked={d.prep_detail_photos_required} onChange={(v) => set("prep_detail_photos_required", v)} disabled={opsDisabled} /></div>
+            </div>
             <div className="space-y-2">
-              <ChipInput label="Service tasks that require photo proof" values={tasks} onChange={(next) => set("prep_service_photo_tasks", joinList(next))} placeholder="Type a task label and press Enter" validate={(v) => (v.includes(",") ? "A task label cannot contain a comma." : null)} disabled={gatesDisabled} />
+              <ChipInput label="Service tasks that require photo proof" values={tasks} onChange={(next) => set("prep_service_photo_tasks", joinList(next))} placeholder="Type a task label and press Enter" validate={(v) => (v.includes(",") ? "A task label cannot contain a comma." : null)} disabled={opsDisabled} />
               <div className="flex items-center gap-3 flex-wrap">
-                <AdminButton size="sm" onClick={() => setDrawer("tasks")}><AdminIcon name="list" />Pick from catalog</AdminButton>
+                <AdminButton size="sm" className="min-h-[44px] sm:min-h-[32px]" onClick={() => setDrawer("tasks")}><AdminIcon name="list" />Pick from catalog</AdminButton>
                 <span className="text-[13px] leading-[18px] text-adm-muted">Matching Service Install tasks block submit until a photo is attached.</span>
               </div>
               <InlineNote tone="neutral">Tasks are matched by their exact label today. Renaming a product ends the match until the label here is updated; stable task IDs are not stored by the current schema.</InlineNote>
@@ -279,13 +288,13 @@ export default function ServicePolicyView() {
             <fieldset className="space-y-3">
               <legend className="text-[15px] leading-[22px] font-semibold text-adm-ink">Per line-item approval</legend>
               <div className="grid gap-3 md:grid-cols-2">
-                <RadioOption name="recon-mode" checked={!everyAmount} onChange={() => chooseEvery(false)} disabled={gatesDisabled} title="Auto-approve up to an amount" detail="A line item at or under the amount clears without a manager." />
-                <RadioOption name="recon-mode" checked={everyAmount} onChange={() => chooseEvery(true)} disabled={gatesDisabled} title="Require approval for every amount" detail="Every line item routes to the manager. Saved as an auto-approve amount of 0." />
+                <RadioOption name="recon-mode" checked={!everyAmount} onChange={() => chooseEvery(false)} disabled={opsDisabled} title="Auto-approve up to an amount" detail="A line item at or under the amount clears without a manager." />
+                <RadioOption name="recon-mode" checked={everyAmount} onChange={() => chooseEvery(true)} disabled={opsDisabled} title="Require approval for every amount" detail="Every line item routes to the manager. Saved as an auto-approve amount of 0." />
               </div>
               {!everyAmount && (
                 <div className="max-w-[260px]">
                   <label htmlFor="recon-amount" className={FIELD_LABEL}>Auto-approve up to ($)</label>
-                  <input id="recon-amount" type="number" inputMode="numeric" min={1} step={50} value={thresholdInput} onChange={(e) => changeThreshold(e.target.value)} disabled={gatesDisabled} aria-invalid={amountError ? true : undefined} className={cn(INPUT_CLASS, "min-h-[44px]")} />
+                  <input id="recon-amount" type="number" inputMode="numeric" min={1} step={50} value={thresholdInput} onChange={(e) => changeThreshold(e.target.value)} disabled={opsDisabled} aria-invalid={amountError ? true : undefined} className={cn(INPUT_CLASS, "min-h-[44px]")} />
                   {amountError && <p role="alert" className="mt-1 text-[13px] leading-[18px] font-medium text-adm-danger">{amountError}</p>}
                 </div>
               )}
@@ -298,14 +307,14 @@ export default function ServicePolicyView() {
               </div>
             </div>
             <div className="space-y-2">
-              <ChipInput label="Used-car manager email(s) for approvals" values={approvers} onChange={(next) => set("recon_approval_email", joinList(next))} placeholder="Type an email and press Enter" validate={emailValidate} disabled={gatesDisabled} />
+              <ChipInput label="Used-car manager email(s) for approvals" values={approvers} onChange={(next) => set("recon_approval_email", joinList(next))} placeholder="Type an email and press Enter" validate={emailValidate} disabled={opsDisabled} />
               {approvers.length === 0 ? (
                 <InlineNote tone="warning" title="No approver named">The approve or decline link goes to the dealership main contact email. Add a named approver so the right person is asked.</InlineNote>
               ) : (
                 <p className="text-[13px] leading-[18px] text-adm-muted">If no one responds there is no automatic escalation; the dealership main contact email is the fallback only when this list is empty.</p>
               )}
             </div>
-            <div><AdminButton size="sm" onClick={() => setDrawer("route")}><AdminIcon name="route" />Approval route preview</AdminButton></div>
+            <div><AdminButton size="sm" className="min-h-[44px] sm:min-h-[32px]" onClick={() => setDrawer("route")}><AdminIcon name="route" />Approval route preview</AdminButton></div>
           </div>
         </SectionCard>
       )}
@@ -342,8 +351,8 @@ export default function ServicePolicyView() {
               )}
             </div>
             <div className="flex items-center gap-3 flex-wrap">
-              <AdminButton size="sm" onClick={() => setDrawer("titlePreview")}><AdminIcon name="mail" />Preview request</AdminButton>
-              <AdminButton size="sm" onClick={() => setDrawer("reminders")}><AdminIcon name="history" />Reminder history</AdminButton>
+              <AdminButton size="sm" className="min-h-[44px] sm:min-h-[32px]" onClick={() => setDrawer("titlePreview")}><AdminIcon name="mail" />Preview request</AdminButton>
+              <AdminButton size="sm" className="min-h-[44px] sm:min-h-[32px]" onClick={() => setDrawer("reminders")}><AdminIcon name="history" />Reminder history</AdminButton>
               <span className="text-[13px] leading-[18px] text-adm-muted">Preview and history never send a message.</span>
             </div>
           </div>
@@ -367,10 +376,10 @@ export default function ServicePolicyView() {
         onDiscard={() => { review.discard(); setSignerModeState(signerModeFor(stored.k208_authority_roles)); setEveryAmount(!(stored.recon_auto_approve_amount > 0)); setThresholdInput(stored.recon_auto_approve_amount > 0 ? String(stored.recon_auto_approve_amount) : ""); }}
         onReview={() => void review.openReview()}
       />
-      {review.dirty && !canEditOps && <InlineNote tone="warning">Your role can review this policy but not apply it.</InlineNote>}
+      {review.dirty && !canEdit && !canEditOps && <InlineNote tone="warning">Your role can review this policy but not apply it.</InlineNote>}
 
       <ReconRoutePreview open={drawer === "route"} onClose={() => setDrawer(null)} threshold={d.recon_auto_approve_amount} approvers={approvers} />
-      <TaskPicker open={drawer === "tasks"} onClose={() => setDrawer(null)} tasks={tasks} onToggle={(label) => set("prep_service_photo_tasks", joinList(tasks.some((t) => t.toLowerCase() === label.toLowerCase()) ? tasks.filter((t) => t.toLowerCase() !== label.toLowerCase()) : [...tasks, label]))} disabled={gatesDisabled} fixtureProducts={fixture?.products} fixtureActive={!!fixture} />
+      <TaskPicker open={drawer === "tasks"} onClose={() => setDrawer(null)} tasks={tasks} onToggle={(label) => set("prep_service_photo_tasks", joinList(tasks.some((t) => t.toLowerCase() === label.toLowerCase()) ? tasks.filter((t) => t.toLowerCase() !== label.toLowerCase()) : [...tasks, label]))} disabled={opsDisabled} fixtureProducts={fixture?.products} fixtureActive={!!fixture} />
       <TitleRequestPreview open={drawer === "titlePreview"} onClose={() => setDrawer(null)} policy={d} />
       <ReminderHistory open={drawer === "reminders"} onClose={() => setDrawer(null)} fixtureRows={fixture?.reminders} fixtureActive={!!fixture} />
       <SignerRolesDrawer open={drawer === "signers"} onClose={() => setDrawer(null)} ctx={gatesCtx} />

@@ -18,7 +18,8 @@ export const HUB_VIEW_LABEL: Record<HubView, string> = {
   settings: "Settings",
 };
 
-export const HUB_PAGE_SIZES = [25, 50, 100] as const;
+/** 10 is offered only on narrow screens, where it is the default. */
+export const HUB_PAGE_SIZES = [10, 25, 50, 100] as const;
 export type HubPageSize = (typeof HUB_PAGE_SIZES)[number];
 
 export const CONDITION_OPTIONS = ["all", "new", "used", "cpo"] as const;

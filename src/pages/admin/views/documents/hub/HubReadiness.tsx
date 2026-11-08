@@ -34,16 +34,27 @@ function VehicleCell({ row }: { row: HubRow }) {
   return (
     <span className="block text-left">
       <span className="block font-semibold">{vehicleTitle(row)}</span>
-      <span className="block text-[13px] leading-[18px] font-normal text-adm-muted">VIN {row.listing.vin}{row.stock ? ` . Stock ${row.stock}` : ""}</span>
+      <span className="block text-[13px] leading-[18px] font-normal text-adm-muted">VIN {row.listing.vin}{row.stock ? ` . Stock ${row.stock}` : row.stockUnavailable ? " . Stock unavailable" : ""}</span>
     </span>
   );
 }
 
 export default function HubReadiness() {
   const [params, setParams] = useSearchParams();
-  const filters = parseHubFilters(params);
-  const vehicleId = params.get("vehicle");
   const narrow = useIsNarrow();
+  const defaultSize: HubPageSize = narrow ? 10 : 25;
+  const effective = (p: URLSearchParams): HubFilters => {
+    const f = parseHubFilters(p);
+    return p.has("size") ? f : { ...f, size: defaultSize };
+  };
+  const commit = (p: URLSearchParams, f: HubFilters): URLSearchParams => {
+    const out = writeHubFilters(p, f);
+    if (f.size !== 25 || defaultSize !== 25) out.set("size", String(f.size));
+    if (f.size === 25 && defaultSize === 25) out.delete("size");
+    return out;
+  };
+  const filters = effective(params);
+  const vehicleId = params.get("vehicle");
   const baseId = useId();
   const table = useHubTable(filters, true);
   const [qInput, setQInput] = useState(filters.q);
@@ -51,14 +62,14 @@ export default function HubReadiness() {
   useEffect(() => setQInput(filters.q), [filters.q]);
   useEffect(() => {
     if (qInput === filters.q) return;
-    const t = setTimeout(() => setParams((p) => writeHubFilters(p, { ...parseHubFilters(p), q: qInput.slice(0, 64), page: 1 }), { replace: true }), 300);
+    const t = setTimeout(() => setParams((p) => commit(p, { ...effective(p), q: qInput.slice(0, 64), page: 1 }), { replace: true }), 300);
     return () => clearTimeout(t);
   }, [qInput, filters.q, setParams]);
 
-  const patch = (next: Partial<HubFilters>, resetPage = true) => setParams((p) => writeHubFilters(p, { ...parseHubFilters(p), ...next, ...(resetPage ? { page: 1 } : {}) }), { replace: true });
+  const patch = (next: Partial<HubFilters>, resetPage = true) => setParams((p) => commit(p, { ...effective(p), ...next, ...(resetPage ? { page: 1 } : {}) }), { replace: true });
   const clear = () => {
     setQInput("");
-    setParams((p) => writeHubFilters(p, { ...DEFAULT_HUB_FILTERS, size: filters.size }), { replace: true });
+    setParams((p) => commit(p, { ...DEFAULT_HUB_FILTERS, size: filters.size }), { replace: true });
   };
   const openRow = (r: HubRow) => setParams((p) => { const n = new URLSearchParams(p); n.set("vehicle", r.listing.id); return n; });
   const closeRow = () => setParams((p) => { const n = new URLSearchParams(p); n.delete("vehicle"); return n; }, { replace: false });
@@ -81,8 +92,8 @@ export default function HubReadiness() {
   return (
     <div className="space-y-4">
       <div data-hub-filters="" className="rounded-xl bg-adm-surface border border-adm-divider p-4">
-        <form role="search" aria-label="Filter vehicles" onSubmit={(e) => e.preventDefault()} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(220px,1.4fr)_repeat(4,minmax(140px,1fr))]">
-          <div>
+        <form role="search" aria-label="Filter vehicles" onSubmit={(e) => e.preventDefault()} className="grid grid-cols-2 gap-3 lg:grid-cols-[minmax(220px,1.4fr)_repeat(4,minmax(140px,1fr))]">
+          <div className="col-span-2 lg:col-span-1">
             <FieldLabel htmlFor={`${baseId}-q`}>VIN or stock number</FieldLabel>
             <div className="relative">
               <AdminIcon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-adm-muted pointer-events-none" />
@@ -143,14 +154,16 @@ export default function HubReadiness() {
             {narrow ? (
               <ul aria-label="Vehicle readiness" className="divide-y divide-adm-divider">
                 {page.rows.map((r) => (
-                  <li key={r.key} className="px-4 py-3 space-y-2">
-                    <button type="button" aria-label={`Open details for ${vehicleTitle(r)}`} onClick={() => openRow(r)} className="w-full min-h-[44px] text-left text-[15px] text-adm-primary rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary"><VehicleCell row={r} /></button>
-                    <div className="space-y-1.5">
-                      {r.facts.documents.map((d) => <div key={d.key}><DocCellChip cell={d} short /></div>)}
-                      <div><ServiceCellChip service={r.facts.service} /></div>
+                  <li key={r.key} className="px-4 py-2.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <button type="button" aria-label={`Open details for ${vehicleTitle(r)}`} onClick={() => openRow(r)} className="min-w-0 flex-1 min-h-[44px] text-left text-[15px] text-adm-primary rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary"><VehicleCell row={r} /></button>
+                      <ReadinessChip value={r.facts.readiness} />
                     </div>
-                    <div className="flex flex-wrap items-center gap-2"><ReadinessChip value={r.facts.readiness} /></div>
-                    <p className="text-[14px] leading-[20px]"><span className="text-adm-muted">Next: </span>{r.facts.nextAction}</p>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                      {r.facts.documents.map((d) => <DocCellChip key={d.key} cell={d} short />)}
+                      <ServiceCellChip service={r.facts.service} />
+                    </div>
+                    <p className="mt-1.5 text-[14px] leading-[20px]"><span className="text-adm-muted">Next: </span>{r.facts.nextAction}</p>
                   </li>
                 ))}
               </ul>
@@ -189,7 +202,7 @@ export default function HubReadiness() {
                 <label className="flex items-center gap-2">
                   <span>Rows per page</span>
                   <SelectField aria-label="Rows per page" value={filters.size} onChange={(e) => patch({ size: Number(e.target.value) as HubPageSize })} wrapperClassName="w-auto">
-                    {HUB_PAGE_SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
+                    {HUB_PAGE_SIZES.filter((n) => narrow || n !== 10).map((n) => <option key={n} value={n}>{n}</option>)}
                   </SelectField>
                 </label>
                 <nav aria-label="Vehicle pages" className="flex items-center gap-2">

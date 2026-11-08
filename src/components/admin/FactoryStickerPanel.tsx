@@ -13,9 +13,9 @@ import { toast } from "sonner";
 import { promptRegenerationReason } from "@/lib/factorySticker/regenerationReason";
 import { useWindowSticker } from "@/hooks/useWindowSticker";
 import { freshFiledDocumentUrl } from "@/lib/filedDocumentUrl";
-import {
-  AlertTriangle, CheckCircle2, ExternalLink, Globe, Loader2, RefreshCw,
-} from "lucide-react";
+import { AdminButton, StatusChip, type Tone } from "@/components/admin/v2/primitives";
+import { AdminIcon, SectionCard, SwitchField, useIsNarrow } from "@/components/admin/v3/editor";
+import { StackedRows } from "@/pages/admin/views/documents/hub/StackedRows";
 
 // Factory Build Record review panel (Admin > Label Templates). Tenant-wide
 // table of factory_sticker_records with the pipeline state, MSRP
@@ -56,32 +56,8 @@ interface DocRef {
 const humanize = (s: string) => s.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).trim();
 const fmtMoney = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
-const STATUS_TONE: Record<string, string> = {
-  PUBLISHED: "bg-emerald-50 text-emerald-700",
-  APPROVED: "bg-blue-50 text-blue-700",
-  REVIEW_REQUIRED: "bg-amber-50 text-amber-700",
-  PENDING_DATA: "bg-amber-50 text-amber-700",
-  READY_TO_GENERATE: "bg-blue-50 text-blue-700",
-  NORMALIZING: "bg-blue-50 text-blue-700",
-  VALIDATING: "bg-blue-50 text-blue-700",
-  GENERATING: "bg-blue-50 text-blue-700",
-  RUNNING_QA: "bg-blue-50 text-blue-700",
-  FAILED_RETRYABLE: "bg-rose-50 text-rose-700",
-  FAILED_PERMANENT: "bg-rose-50 text-rose-700",
-  SUPERSEDED: "bg-muted text-muted-foreground",
-  ARCHIVED: "bg-muted text-muted-foreground",
-};
-
-const RECON_TONE: Record<string, string> = {
-  MATCHED: "bg-emerald-50 text-emerald-700",
-  MINOR_VARIANCE: "bg-amber-50 text-amber-700",
-  REVIEW_REQUIRED: "bg-rose-50 text-rose-700",
-  INSUFFICIENT_DATA: "bg-muted text-muted-foreground",
-};
-
-const Pill = ({ tone, children }: { tone: string; children: React.ReactNode }) => (
-  <span className={`inline-flex text-al-meta font-bold uppercase tracking-wide px-1.5 py-0.5 rounded whitespace-nowrap ${tone}`}>{children}</span>
-);
+const statusTone = (s: string): Tone => (s === "PUBLISHED" ? "success" : s.startsWith("FAILED") ? "danger" : ["REVIEW_REQUIRED", "PENDING_DATA"].includes(s) ? "warning" : ["SUPERSEDED", "ARCHIVED"].includes(s) ? "neutral" : "info");
+const reconTone = (s: string): Tone => (s === "MATCHED" ? "success" : s === "MINOR_VARIANCE" ? "warning" : s === "REVIEW_REQUIRED" ? "danger" : "neutral");
 
 type RowAction = "approve_publish" | "unpublish" | "regenerate";
 
@@ -206,183 +182,155 @@ export default function FactoryStickerPanel() {
     if (ok) toast.success(`${title} updated`);
   };
 
-  const btn = "inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-semibold border transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+  const narrow = useIsNarrow();
+  const btn = "min-h-[44px] sm:min-h-[32px]";
+  const refresh = (
+    <AdminButton onClick={() => { setLoading(true); load(); }} className="min-h-[44px] sm:min-h-[36px]">
+      <AdminIcon name="refresh" /> Refresh
+    </AdminButton>
+  );
 
   return (
-    <div className="space-y-3">
-      <div id="factory-sticker" className="bg-card rounded-lg p-4 shadow-premium">
-        <div className="flex items-start justify-between gap-3 flex-wrap mb-1">
-          <div>
-            <h4 className="text-sm font-bold text-foreground">Factory Build Records</h4>
-            <p className="text-xs text-muted-foreground">
-              VIN-specific factory build and MSRP records, generated automatically at ingest. Approve and
-              publish decisions need print-approval authority; they run through the sticker orchestrator.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => { setLoading(true); load(); }}
-            className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg border border-border text-xs font-semibold hover:bg-muted"
-          >
-            <RefreshCw className="w-3.5 h-3.5" /> Refresh
-          </button>
-        </div>
-
+    <div className="space-y-4">
+      <SectionCard
+        id="factory-sticker"
+        icon="shield-check"
+        title="Factory Build Records"
+        description="VIN-specific factory build and MSRP records, generated automatically at ingest. Approve and publish decisions need print-approval authority; they run through the sticker orchestrator."
+        actions={narrow ? undefined : refresh}
+      >
+        {narrow && <div>{refresh}</div>}
         {loading ? (
-          <div className="space-y-2 mt-3 animate-pulse">
-            {[0, 1, 2].map((i) => <div key={i} className="h-9 bg-muted rounded" />)}
+          <div role="status" aria-busy="true" className="space-y-2 animate-pulse motion-reduce:animate-none">
+            <span className="sr-only">Loading factory build records</span>
+            {[0, 1, 2].map((i) => <div key={i} className="h-10 bg-adm-workspace rounded-md" aria-hidden="true" />)}
           </div>
         ) : loadError ? (
-          <p className="text-xs text-rose-600 mt-3 inline-flex items-center gap-1.5">
-            <AlertTriangle className="w-3.5 h-3.5" /> Couldn't load factory build records. Refresh to retry.
+          <p role="alert" className="inline-flex items-center gap-2 text-[14px] leading-[20px] font-medium text-adm-danger">
+            <AdminIcon name="alert" /> Couldn't load factory build records. Refresh to retry.
           </p>
         ) : rows.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border p-6 text-center mt-3">
-            <p className="text-xs font-semibold text-foreground">No factory build records yet.</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              Records are created automatically when a vehicle's factory build data arrives at ingest.
-            </p>
+          <div className="rounded-xl border border-dashed border-adm-border p-6 text-center">
+            <p className="text-[15px] leading-[22px] font-semibold text-adm-ink">No factory build records yet.</p>
+            <p className="text-[14px] leading-[20px] text-adm-muted mt-0.5">Records are created automatically when a vehicle's factory build data arrives at ingest.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto mt-3">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="text-[11px] font-semibold text-muted-foreground border-b border-border">
-                  <th scope="col" className="px-2.5 py-2">Vehicle</th>
-                  <th scope="col" className="px-2.5 py-2">Status</th>
-                  <th scope="col" className="px-2.5 py-2">MSRP Reconciliation</th>
-                  <th scope="col" className="px-2.5 py-2">Confidence</th>
-                  <th scope="col" className="px-2.5 py-2">Review Reason</th>
-                  <th scope="col" className="px-2.5 py-2">OEM</th>
-                  <th scope="col" className="px-2.5 py-2 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {rows.map((r) => {
-                  const doc = r.current_document_id ? docs[r.current_document_id] : undefined;
-                  const previewUrl = doc?.pdf_url || doc?.online_url || null;
-                  const rowBusy = busy?.id === r.id;
-                  const published = r.generation_status === "PUBLISHED";
-                  const canPublish = !!r.current_document_id && !published
-                    && !["SUPERSEDED", "ARCHIVED"].includes(r.generation_status);
-                  return (
-                    <tr key={r.id} className="align-top hover:bg-muted/30 transition-colors">
-                      <td className="px-2.5 py-2.5">
-                        <Link to={`/vehicle-file/${r.vehicle_id}?tab=documents`} className="font-mono font-semibold text-foreground hover:text-blue-600 hover:underline whitespace-nowrap">
-                          {r.vin}
-                        </Link>
-                        {doc && <p className="text-[10px] text-muted-foreground mt-0.5">v{doc.version} · {humanize(doc.document_status)}</p>}
-                      </td>
-                      <td className="px-2.5 py-2.5">
-                        <Pill tone={STATUS_TONE[r.generation_status] || "bg-muted text-muted-foreground"}>{humanize(r.generation_status)}</Pill>
-                        {r.last_error && ["FAILED_RETRYABLE", "FAILED_PERMANENT"].includes(r.generation_status) && (
-                          <p className="text-[10px] text-rose-600 mt-1 max-w-[220px]">{r.last_error}</p>
-                        )}
-                      </td>
-                      <td className="px-2.5 py-2.5">
-                        {r.reconciliation_status ? (
-                          <>
-                            <Pill tone={RECON_TONE[r.reconciliation_status] || "bg-muted text-muted-foreground"}>{humanize(r.reconciliation_status)}</Pill>
-                            {r.reconciliation_difference != null && r.reconciliation_difference > 0 && (
-                              <p className="text-[10px] text-muted-foreground mt-1 tabular-nums">off by {fmtMoney(r.reconciliation_difference)}</p>
-                            )}
-                          </>
-                        ) : <span className="text-muted-foreground">—</span>}
-                      </td>
-                      <td className="px-2.5 py-2.5">
-                        {r.confidence_level ? humanize(r.confidence_level) : "—"}
-                        {r.verification_status && (
-                          <p className="text-[10px] text-muted-foreground mt-0.5">{humanize(r.verification_status)}</p>
-                        )}
-                      </td>
-                      <td className="px-2.5 py-2.5 max-w-[240px]">
-                        {r.review_required
-                          ? <span className="text-amber-700">{r.review_reason || "Needs review"}</span>
-                          : <span className="text-muted-foreground">—</span>}
-                      </td>
-                      <td className="px-2.5 py-2.5 whitespace-nowrap">
-                        {r.detected_make_value || r.canonical_oem_id || "—"}
-                        {r.oem_theme_id && <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">{r.oem_theme_id}</p>}
-                      </td>
-                      <td className="px-2.5 py-2.5">
-                        <div className="flex items-center gap-1.5 justify-end flex-wrap">
+          <>
+            <div className="-mx-4 sm:-mx-6">
+              <StackedRows
+                caption="Factory build records"
+                rows={rows}
+                rowKey={(r) => r.id}
+                columns={[
+                  {
+                    id: "vehicle",
+                    header: "Vehicle",
+                    primary: true,
+                    cell: (r) => {
+                      const doc = r.current_document_id ? docs[r.current_document_id] : undefined;
+                      return (
+                        <>
+                          <Link to={`/vehicle-file/${r.vehicle_id}?tab=documents`} className="inline-flex items-center min-h-[44px] sm:min-h-0 font-mono font-semibold text-adm-primary hover:underline break-all">{r.vin}</Link>
+                          {doc && <span className="block text-[13px] leading-[18px] font-normal text-adm-muted">v{doc.version} . {humanize(doc.document_status)}</span>}
+                        </>
+                      );
+                    },
+                  },
+                  {
+                    id: "status",
+                    header: "Status",
+                    cell: (r) => (
+                      <>
+                        <StatusChip tone={statusTone(r.generation_status)} className="text-[13px]">{humanize(r.generation_status)}</StatusChip>
+                        {r.last_error && ["FAILED_RETRYABLE", "FAILED_PERMANENT"].includes(r.generation_status) && <span className="block mt-1 text-[13px] leading-[18px] text-adm-danger">{r.last_error}</span>}
+                      </>
+                    ),
+                  },
+                  {
+                    id: "recon",
+                    header: "MSRP reconciliation",
+                    cell: (r) =>
+                      r.reconciliation_status ? (
+                        <>
+                          <StatusChip tone={reconTone(r.reconciliation_status)} className="text-[13px]">{humanize(r.reconciliation_status)}</StatusChip>
+                          {r.reconciliation_difference != null && r.reconciliation_difference > 0 && <span className="block mt-1 text-[13px] leading-[18px] text-adm-muted tabular-nums">Off by {fmtMoney(r.reconciliation_difference)}</span>}
+                        </>
+                      ) : <span className="text-adm-muted">Not reconciled</span>,
+                  },
+                  {
+                    id: "confidence",
+                    header: "Confidence",
+                    cell: (r) => (
+                      <>
+                        {r.confidence_level ? humanize(r.confidence_level) : <span className="text-adm-muted">Not rated</span>}
+                        {r.verification_status && <span className="block text-[13px] leading-[18px] text-adm-muted">{humanize(r.verification_status)}</span>}
+                      </>
+                    ),
+                  },
+                  { id: "review", header: "Review reason", cell: (r) => (r.review_required ? <span className="text-adm-warning">{r.review_reason || "Needs review"}</span> : <span className="text-adm-muted">None</span>) },
+                  {
+                    id: "oem",
+                    header: "OEM",
+                    cell: (r) => (
+                      <>
+                        {r.detected_make_value || r.canonical_oem_id || <span className="text-adm-muted">Unknown</span>}
+                        {r.oem_theme_id && <span className="block font-mono text-[13px] leading-[18px] text-adm-muted break-all">{r.oem_theme_id}</span>}
+                      </>
+                    ),
+                  },
+                  {
+                    id: "actions",
+                    header: "Actions",
+                    cell: (r) => {
+                      const doc = r.current_document_id ? docs[r.current_document_id] : undefined;
+                      const previewUrl = doc?.pdf_url || doc?.online_url || null;
+                      const rowBusy = busy?.id === r.id;
+                      const published = r.generation_status === "PUBLISHED";
+                      const canPublish = !!r.current_document_id && !published && !["SUPERSEDED", "ARCHIVED"].includes(r.generation_status);
+                      return (
+                        <div className="flex items-center gap-2 flex-wrap">
                           {doc && (
-                            <button
-                              type="button"
-                              onClick={() => openPreview(r.vehicle_id, doc.id, previewUrl)}
-                              disabled={previewing === doc.id}
-                              className={`${btn} border-border text-foreground hover:bg-muted`}
-                            >
-                              {previewing === doc.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <ExternalLink className="w-3 h-3" />}
-                              Preview
-                            </button>
+                            <AdminButton size="sm" className={btn} onClick={() => openPreview(r.vehicle_id, doc.id, previewUrl)} disabled={previewing === doc.id}>
+                              <AdminIcon name={previewing === doc.id ? "refresh" : "external-link"} /> Preview
+                            </AdminButton>
                           )}
                           {manager && canPublish && (
-                            <button type="button" onClick={() => act(r, "approve_publish")} disabled={!!busy}
-                              className={`${btn} bg-blue-600 text-white border-blue-600 hover:bg-blue-700`}>
-                              {rowBusy && busy?.action === "approve_publish" ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
-                              Approve &amp; Publish
-                            </button>
+                            <AdminButton size="sm" variant="primary" className={btn} onClick={() => act(r, "approve_publish")} disabled={!!busy}>
+                              <AdminIcon name={rowBusy && busy?.action === "approve_publish" ? "refresh" : "check-circle"} /> Approve &amp; Publish
+                            </AdminButton>
                           )}
                           {manager && published && (
-                            <button type="button" onClick={() => act(r, "unpublish")} disabled={!!busy}
-                              className={`${btn} border-amber-200 text-amber-700 hover:bg-amber-50`}>
-                              {rowBusy && busy?.action === "unpublish" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Globe className="w-3 h-3" />}
-                              Unpublish
-                            </button>
+                            <AdminButton size="sm" className={btn} onClick={() => act(r, "unpublish")} disabled={!!busy}>
+                              <AdminIcon name={rowBusy && busy?.action === "unpublish" ? "refresh" : "globe"} /> Unpublish
+                            </AdminButton>
                           )}
                           {manager && (
-                            <button type="button" onClick={() => act(r, "regenerate")} disabled={!!busy}
-                              className={`${btn} border-border text-foreground hover:bg-muted`}>
-                              {rowBusy && busy?.action === "regenerate" ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                              Regenerate
-                            </button>
+                            <AdminButton size="sm" className={btn} onClick={() => act(r, "regenerate")} disabled={!!busy}>
+                              <AdminIcon name="refresh" /> Regenerate
+                            </AdminButton>
                           )}
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {!manager && (
-              <p className="text-[11px] text-muted-foreground mt-2">
-                Publish, unpublish and regenerate need print-approval authority — ask a manager to decide.
-              </p>
-            )}
-          </div>
+                      );
+                    },
+                  },
+                ]}
+              />
+            </div>
+            {!manager && <p className="text-[13px] leading-[18px] text-adm-muted">Publish, unpublish and regenerate need print-approval authority. Ask a manager to decide.</p>}
+          </>
         )}
-      </div>
+      </SectionCard>
 
-      <div id="factory-sticker-settings" className="bg-card rounded-lg p-4 shadow-premium">
-        <h4 className="text-sm font-bold text-foreground mb-1">Factory Build Record settings</h4>
-        <p className="text-xs text-muted-foreground mb-3">
-          Store-wide controls for how factory build records are generated and published.
-        </p>
-        <div className="space-y-3">
-          {SETTING_ROWS.map((s) => {
-            const on = fs[s.key];
-            return (
-              <div key={s.key} className="flex items-start justify-between gap-3">
-                <div className="pr-2">
-                  <p className="text-sm font-semibold text-foreground">{s.title}</p>
-                  <p className="text-xs text-muted-foreground">{s.detail}</p>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={on}
-                  aria-label={s.title}
-                  onClick={() => void changeSetting(s.key, !on, s.title)}
-                  className={`shrink-0 h-7 w-12 rounded-full transition-colors relative mt-0.5 ${on ? "bg-emerald-600" : "bg-muted"}`}
-                >
-                  <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      <SectionCard id="factory-sticker-settings" icon="settings" title="Factory Build Record settings" description="Store-wide controls for how factory build records are generated and published.">
+        <ul className="divide-y divide-adm-divider">
+          {SETTING_ROWS.map((s) => (
+            <li key={s.key} className="py-3 first:pt-0 last:pb-0">
+              <SwitchField label={s.title} checked={fs[s.key]} onChange={(next) => void changeSetting(s.key, next, s.title)} />
+              <p className="ml-[52px] text-[13px] leading-[18px] text-adm-muted">{s.detail}</p>
+            </li>
+          ))}
+        </ul>
+      </SectionCard>
     </div>
   );
 }

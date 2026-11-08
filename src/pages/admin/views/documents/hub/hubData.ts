@@ -48,6 +48,8 @@ export const liveDb = (): HubDb => supabase as unknown as HubDb;
 
 export interface HubRow extends HubRowLike {
   key: string;
+  /** The stock number could not be read for this vehicle. */
+  stockUnavailable?: boolean;
 }
 
 export interface HubPage {
@@ -91,15 +93,25 @@ function listingQuery(db: HubDb, tenantId: string, f: HubFilters, fileIds: strin
   return query.order("updated_at", { ascending: false });
 }
 
-async function readStock(db: HubDb, tenantId: string, listings: HubListing[]): Promise<Record<string, string>> {
+interface StockRead {
+  stock: Record<string, string>;
+  /** True when any stock-number read failed, so a blank stock is "unavailable", not "none". */
+  failed: boolean;
+}
+
+async function readStock(db: HubDb, tenantId: string, listings: HubListing[]): Promise<StockRead> {
   const ids = Array.from(new Set(listings.map((l) => l.vehicle_file_id).filter((x): x is string => !!x)));
   const out: Record<string, string> = {};
+  let failed = false;
   for (let i = 0; i < ids.length; i += STOCK_CHUNK) {
     const res = (await db.from("vehicle_files").select("id, stock_number").eq("tenant_id", tenantId).in("id", ids.slice(i, i + STOCK_CHUNK))) as Result<Array<{ id: string; stock_number: string | null }>>;
-    if (res.error || !Array.isArray(res.data)) continue;
+    if (res.error || !Array.isArray(res.data)) {
+      failed = true;
+      continue;
+    }
     for (const r of res.data) if (r.stock_number) out[r.id] = r.stock_number;
   }
-  return out;
+  return { stock: out, failed };
 }
 
 async function readPageEvidence(db: HubDb, tenantId: string, ids: string[]): Promise<{ docs: HubDocRow[]; inspections: HubInspectionRow[] }> {
@@ -111,7 +123,7 @@ async function readPageEvidence(db: HubDb, tenantId: string, ids: string[]): Pro
   return { docs: unwrap(d, "Documents").data, inspections: unwrap(i, "Inspections").data };
 }
 
-export function buildRows(listings: HubListing[], docs: HubDocRow[], inspections: HubInspectionRow[], stock: Record<string, string>): HubRow[] {
+export function buildRows(listings: HubListing[], docs: HubDocRow[], inspections: HubInspectionRow[], stock: Record<string, string>, stockFailed = false): HubRow[] {
   const docsBy = new Map<string, HubDocRow[]>();
   for (const d of docs) if (d.vehicle_id) (docsBy.get(d.vehicle_id) ?? docsBy.set(d.vehicle_id, []).get(d.vehicle_id)!).push(d);
   const inspBy = new Map<string, HubInspectionRow[]>();
@@ -120,6 +132,7 @@ export function buildRows(listings: HubListing[], docs: HubDocRow[], inspections
     key: listing.id,
     listing,
     stock: listing.vehicle_file_id ? stock[listing.vehicle_file_id] ?? null : null,
+    stockUnavailable: stockFailed && !!listing.vehicle_file_id && !stock[listing.vehicle_file_id],
     facts: resolveVehicleFacts(listing, docsBy.get(listing.id) ?? [], inspBy.get(listing.id) ?? []),
   }));
 }
@@ -142,8 +155,8 @@ export async function loadRangePage(db: HubDb, tenantId: string, f: HubFilters):
     res = await read(page);
     ({ data } = unwrap(res, "Vehicles"));
   }
-  const [stock, evidence] = await Promise.all([readStock(db, tenantId, data), readPageEvidence(db, tenantId, data.map((l) => l.id))]);
-  return { rows: buildRows(data, evidence.docs, evidence.inspections, stock), total, page, mode: "range" };
+  const [stockRead, evidence] = await Promise.all([readStock(db, tenantId, data), readPageEvidence(db, tenantId, data.map((l) => l.id))]);
+  return { rows: buildRows(data, evidence.docs, evidence.inspections, stockRead.stock, stockRead.failed), total, page, mode: "range" };
 }
 
 export interface HubSnapshot {
@@ -151,6 +164,7 @@ export interface HubSnapshot {
   docs: HubDocRow[];
   inspections: HubInspectionRow[];
   stock: Record<string, string>;
+  stockFailed?: boolean;
   /** False when a read hit its cap, so counts built from it would be partial. */
   complete: boolean;
   totalActive: number;
@@ -165,19 +179,21 @@ export async function loadSnapshot(db: HubDb, tenantId: string): Promise<HubSnap
   const listings = unwrap(l, "Vehicles");
   const docs = unwrap(d, "Documents");
   const inspections = unwrap(i, "Inspections");
-  const stock = await readStock(db, tenantId, listings.data);
+  const stockRead = await readStock(db, tenantId, listings.data);
+  const stock = stockRead.stock;
   const totalActive = listings.count ?? listings.data.length;
   return {
     listings: listings.data,
     docs: docs.data,
     inspections: inspections.data,
     stock,
+    stockFailed: stockRead.failed,
     complete: totalActive <= listings.data.length && (docs.count ?? 0) <= docs.data.length && (inspections.count ?? 0) <= inspections.data.length,
     totalActive,
   };
 }
 
-export const snapshotRows = (s: HubSnapshot): HubRow[] => buildRows(s.listings, s.docs, s.inspections, s.stock);
+export const snapshotRows = (s: HubSnapshot): HubRow[] => buildRows(s.listings, s.docs, s.inspections, s.stock, !!s.stockFailed);
 
 const matchesSearch = (row: HubRow, q: string, stockMatches: ReadonlySet<string>): boolean => {
   const needle = q.toLowerCase();

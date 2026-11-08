@@ -39,7 +39,7 @@ export function useServiceCatalog(): ServiceCatalog {
   const { member } = useEntitlements();
   const team = useTeamMembers();
 
-  const liveCanEdit = hasDealerCapability(member?.role, "can_manage_service_settings", isAdmin) || hasDealerCapability(member?.role, "can_manage_settings", isAdmin);
+  const liveCanEdit = hasDealerCapability(member?.role, "can_manage_settings", isAdmin);
   const canEdit = fixture ? variant !== "readonly" && variant !== "error" : liveCanEdit;
 
   const services = useMemo<GetReadyService[]>(() => {

@@ -1,6 +1,8 @@
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Printer, Upload, RotateCcw, Move } from "lucide-react";
+import { Move } from "lucide-react";
+import { AdminButton } from "@/components/admin/v2/primitives";
+import { AdminIcon, INPUT_CLASS, SectionCard, SwitchField } from "@/components/admin/v3/editor";
 import {
   useDealerSettings,
   STICKER_DOC_LABELS,
@@ -90,99 +92,75 @@ export default function StickerPrintTemplates() {
     window.addEventListener("pointerup", up);
   };
 
-  return (
-    <div className="bg-card rounded-lg p-6 shadow-sm space-y-4">
-      <div className="flex items-start gap-2">
-        <Printer className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
-        <div>
-          <h4 className="text-sm font-bold text-foreground">Window-sticker print templates</h4>
-          <p className="text-[11px] text-muted-foreground">
-            Set how each document physically prints onto your label stock. Print the full designed
-            sticker on blank stock, or fill only the empty space on your own pre-printed stock.
-          </p>
-        </div>
-      </div>
+  const pill = (on: boolean) => `inline-flex items-center justify-center min-h-[44px] px-4 rounded-full border text-[14px] leading-[20px] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary ${on ? "border-adm-primary bg-adm-selected text-adm-primary" : "border-adm-border bg-adm-surface text-adm-ink hover:bg-adm-workspace"}`;
+  const FIELD = "block text-[14px] leading-[20px] font-semibold text-adm-ink";
+  const HELP = "text-[13px] leading-[18px] text-adm-muted";
 
-      {/* Document-type selector */}
-      <div className="flex flex-wrap gap-1.5">
+  return (
+    <SectionCard
+      id="sticker-print-templates"
+      icon="printer"
+      title="Window-sticker print templates"
+      description="Set how each document physically prints onto your label stock. Print the full designed sticker on blank stock, or fill only the empty space on your own pre-printed stock."
+    >
+      <div role="group" aria-label="Document type" className="flex flex-wrap gap-2">
         {DOC_ORDER.map((d) => (
-          <button
-            key={d}
-            onClick={() => setActive(d)}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-              active === d
-                ? "bg-teal text-primary-foreground border-teal"
-                : "bg-background text-muted-foreground border-border hover:bg-muted"
-            }`}
-          >
+          <button key={d} type="button" aria-pressed={active === d} onClick={() => setActive(d)} className={pill(active === d)}>
             {STICKER_DOC_LABELS[d]}
           </button>
         ))}
       </div>
 
-      {/* Mode */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <div role="group" aria-label="Stock type" className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {([
           { v: "blank", t: "Blank label stock", d: "Print the full designed sticker." },
           { v: "preprinted", t: "Pre-printed stock", d: "Fill the empty area on your own printed stock." },
         ] as const).map((m) => (
           <button
             key={m.v}
+            type="button"
+            aria-pressed={tpl.mode === m.v}
             onClick={() => patch({ mode: m.v })}
-            className={`text-left p-3 rounded-lg border transition-colors ${
-              tpl.mode === m.v ? "border-teal bg-teal/5 ring-1 ring-teal" : "border-border bg-background hover:bg-muted"
-            }`}
+            className={`text-left px-4 py-3 min-h-[64px] rounded-lg border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary ${tpl.mode === m.v ? "border-adm-primary bg-adm-selected" : "border-adm-border bg-adm-surface hover:bg-adm-workspace"}`}
           >
-            <div className="text-xs font-bold text-foreground">{m.t}</div>
-            <div className="text-[11px] text-muted-foreground">{m.d}</div>
+            <span className="block text-[15px] leading-[22px] font-semibold text-adm-ink">{m.t}</span>
+            <span className={`block ${HELP}`}>{m.d}</span>
           </button>
         ))}
       </div>
 
-      {/* Label size */}
       <div>
-        <label className="text-xs font-semibold text-muted-foreground">Label size (inches)</label>
-        <div className="mt-1 flex items-center gap-2">
-          <input value={tpl.width} onChange={(e) => patch({ width: e.target.value })}
-            className="w-20 px-2 py-1.5 border border-border-custom rounded text-sm bg-background text-foreground" placeholder="8.5" />
-          <span className="text-muted-foreground text-sm">×</span>
-          <input value={tpl.height} onChange={(e) => patch({ height: e.target.value })}
-            className="w-20 px-2 py-1.5 border border-border-custom rounded text-sm bg-background text-foreground" placeholder="11" />
-          <span className="text-[11px] text-muted-foreground">W × H</span>
+        <span id="label-size-h" className={FIELD}>Label size (inches)</span>
+        <div className="mt-1.5 flex items-center gap-2 flex-wrap" role="group" aria-labelledby="label-size-h">
+          <input aria-label="Label width in inches" inputMode="decimal" value={tpl.width} onChange={(e) => patch({ width: e.target.value })} className={`${INPUT_CLASS} !w-24`} placeholder="8.5" />
+          <span aria-hidden="true" className="text-adm-muted">x</span>
+          <input aria-label="Label height in inches" inputMode="decimal" value={tpl.height} onChange={(e) => patch({ height: e.target.value })} className={`${INPUT_CLASS} !w-24`} placeholder="11" />
+          <span className={HELP}>Width by height</span>
         </div>
-        <div className="mt-1.5 flex flex-wrap gap-1.5">
+        <div className="mt-2 flex flex-wrap gap-2">
           {SIZE_PRESETS.map((p) => (
-            <button key={p.label} onClick={() => patch({ width: p.w, height: p.h })}
-              className="px-2 py-1 rounded border border-border text-[11px] text-muted-foreground hover:bg-muted">
-              {p.label}
-            </button>
+            <AdminButton key={p.label} size="sm" className="min-h-[44px] sm:min-h-[32px]" onClick={() => patch({ width: p.w, height: p.h })}>{p.label}</AdminButton>
           ))}
         </div>
       </div>
 
       {tpl.mode === "blank" ? (
-        <div className="rounded-lg border border-dashed border-border bg-muted/30 p-4 text-center">
-          <p className="text-xs text-muted-foreground">
-            Blank stock prints the full AutoLabels-designed sticker at {tpl.width}×{tpl.height}". No
-            alignment needed — switch to <span className="font-semibold">Pre-printed stock</span> to
-            position the fill on your own label artwork.
+        <div className="rounded-lg border border-dashed border-adm-border bg-adm-workspace p-4">
+          <p className="text-[14px] leading-[20px] text-adm-muted">
+            Blank stock prints the full AutoLabels-designed sticker at {tpl.width}x{tpl.height} inches. No alignment needed. Switch to <span className="font-semibold text-adm-ink">Pre-printed stock</span> to position the fill on your own label artwork.
           </p>
         </div>
       ) : (
         <>
-          {/* Artwork upload */}
           <div>
-            <label className="text-xs font-semibold text-muted-foreground">Pre-printed stock artwork</label>
-            <p className="text-[11px] text-muted-foreground">
-              Upload a scan or image of your blank pre-printed label, then drag the box over the empty
-              area you want AutoLabels to fill.
-            </p>
-            <div className="mt-1 flex items-center gap-3">
-              <label className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border bg-background text-xs font-semibold cursor-pointer hover:bg-muted/50 whitespace-nowrap">
-                <Upload className="w-3.5 h-3.5" />
+            <span className={FIELD}>Pre-printed stock artwork</span>
+            <p className={HELP}>Upload a scan or image of your blank pre-printed label, then drag the box over the empty area you want AutoLabels to fill.</p>
+            <div className="mt-2 flex items-center gap-3 flex-wrap">
+              <label className="inline-flex items-center gap-2 min-h-[44px] px-4 rounded-md border border-adm-border bg-adm-surface text-[14px] leading-[20px] font-semibold text-adm-ink cursor-pointer hover:bg-adm-workspace whitespace-nowrap focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-adm-primary">
+                <AdminIcon name="upload" />
                 {uploading ? "Uploading…" : tpl.artwork_url ? "Replace artwork" : "Upload artwork"}
                 <input
-                  type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={uploading}
+                  type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={uploading}
                   onChange={async (e) => {
                     const f = e.target.files?.[0];
                     if (!f) return;
@@ -199,114 +177,85 @@ export default function StickerPrintTemplates() {
                 />
               </label>
               {tpl.artwork_url && (
-                <button onClick={() => patch({ artwork_url: "" })}
-                  className="text-[11px] text-muted-foreground underline hover:text-foreground">Remove</button>
+                <AdminButton size="sm" variant="ghost" className="min-h-[44px] sm:min-h-[32px]" onClick={() => patch({ artwork_url: "" })}>Remove artwork</AdminButton>
               )}
             </div>
           </div>
 
-          {/* What fills the white space */}
           <div>
-            <label className="text-xs font-semibold text-muted-foreground">Fill content</label>
-            <p className="text-[11px] text-muted-foreground">
-              Vehicle ID and the QR always print. Choose what else fills the area.
-            </p>
-            <div className="mt-1.5 flex flex-wrap gap-2">
-              {([
-                { k: "fill_equipment" as const, l: "Equipment list" },
-                { k: "fill_pricing" as const, l: "Pricing" },
-              ]).map((o) => (
-                <button
-                  key={o.k}
-                  onClick={() => patch({ [o.k]: !tpl[o.k] } as Partial<StickerPrintTemplate>)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                    tpl[o.k] ? "bg-teal/10 border-teal text-teal" : "bg-background border-border text-muted-foreground hover:bg-muted"
-                  }`}
-                >
-                  <span className={`w-2 h-2 rounded-full ${tpl[o.k] ? "bg-teal" : "bg-muted-foreground/40"}`} />
-                  {o.l}
-                </button>
-              ))}
+            <span className={FIELD}>Fill content</span>
+            <p className={HELP}>Vehicle ID and the QR always print. Choose what else fills the area.</p>
+            <div className="mt-1 divide-y divide-adm-divider rounded-lg border border-adm-divider px-3.5">
+              <div className="py-1"><SwitchField label="Equipment list" checked={!!tpl.fill_equipment} onChange={(v) => patch({ fill_equipment: v })} /></div>
+              <div className="py-1"><SwitchField label="Pricing" checked={!!tpl.fill_pricing} onChange={(v) => patch({ fill_pricing: v })} /></div>
             </div>
           </div>
 
-          {/* Interactive alignment canvas */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_240px] gap-5">
             <div>
-              <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-label mb-1">
-                Position the fill area
-              </div>
-              {/* Literal white: this canvas stands in for printed paper, so it
-                  must not follow --card. */}
-              <div ref={canvasRef} className="relative w-full rounded border border-border bg-white select-none"
+              <p className={`${FIELD} mb-1.5`}>Position the fill area</p>
+              {/* Literal white: this canvas stands in for printed paper, so it must not follow the theme surface. */}
+              <div ref={canvasRef} className="relative w-full rounded border border-adm-border bg-white select-none"
                 style={{ aspectRatio: String(aspect), maxWidth: 480 }}>
                 {tpl.artwork_url ? (
                   <img src={tpl.artwork_url} alt="Label artwork" className="absolute inset-0 w-full h-full object-fill pointer-events-none" />
                 ) : (
-                  <div className="absolute inset-0 grid place-items-center text-[11px] text-muted-foreground">
+                  <div className="absolute inset-0 grid place-items-center text-[13px] text-adm-muted">
                     Upload artwork to align
                   </div>
                 )}
-                {/* Draggable content box */}
                 <div
                   onPointerDown={startDrag("move")}
-                  className="absolute border-2 border-teal bg-teal/10 cursor-move ring-1 ring-white/60"
+                  className="absolute border-2 border-adm-primary bg-adm-primary/10 cursor-move ring-1 ring-white/60"
                   style={{ left: `${area.x}%`, top: `${area.y}%`, width: `${area.width}%`, height: `${area.height}%` }}
                 >
-                  <div className="absolute -top-px left-1/2 -translate-x-1/2 -translate-y-full flex items-center gap-0.5 bg-teal text-primary-foreground text-[9px] font-semibold px-1.5 py-0.5 rounded-t">
-                    <Move className="w-2.5 h-2.5" /> Fill area
+                  <div className="absolute -top-px left-1/2 -translate-x-1/2 -translate-y-full flex items-center gap-1 bg-adm-primary text-white text-[13px] leading-[18px] font-semibold px-2 py-0.5 rounded-t whitespace-nowrap">
+                    <Move className="w-3.5 h-3.5" /> Fill area
                   </div>
                   <div className="w-full h-full overflow-hidden opacity-90 pointer-events-none">
                     <div style={{ containerType: "inline-size", width: "100%", height: "100%" } as React.CSSProperties}>
                       <StickerFillBlock data={SAMPLE_FILL} showEquipment={tpl.fill_equipment} showPricing={tpl.fill_pricing} />
                     </div>
                   </div>
-                  {/* Resize handle */}
                   <div
                     onPointerDown={startDrag("resize")}
-                    className="absolute -right-1.5 -bottom-1.5 w-3.5 h-3.5 rounded-sm bg-teal border-2 border-white cursor-nwse-resize"
+                    className="absolute -right-2 -bottom-2 w-5 h-5 rounded-sm bg-adm-primary border-2 border-white cursor-nwse-resize"
                   />
                 </div>
               </div>
-              <p className="text-[10px] text-muted-foreground mt-1">
-                Drag the box to move, drag the corner to resize. Sample data shown for alignment only.
-              </p>
+              <p className={`${HELP} mt-1.5`}>Drag the box to move, drag the corner to resize. Sample data shown for alignment only.</p>
             </div>
 
-            {/* Numeric controls */}
             <div className="space-y-2">
-              <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-label">Fill area (% of label)</div>
+              <p className={FIELD}>Fill area (% of label)</p>
               {([
                 { k: "x" as const, l: "Left" },
                 { k: "y" as const, l: "Top" },
                 { k: "width" as const, l: "Width" },
                 { k: "height" as const, l: "Height" },
               ]).map((f) => (
-                <div key={f.k} className="flex items-center gap-2 text-xs">
-                  <span className="w-14 text-muted-foreground">{f.l}</span>
+                <div key={f.k} className="flex items-center gap-2 text-[14px] leading-[20px]">
+                  <label htmlFor={`fill-${f.k}`} className="w-16 text-adm-muted">{f.l}</label>
                   <input
+                    id={`fill-${f.k}`}
                     type="number" min={0} max={100} value={Math.round(area[f.k])}
                     onChange={(e) => patchArea({ [f.k]: clamp(Number(e.target.value), 0, 100) } as Partial<StickerContentArea>)}
-                    className="w-20 px-2 py-1 border border-border-custom rounded bg-background text-foreground"
+                    className={`${INPUT_CLASS} !w-24`}
                   />
-                  <span className="text-[10px] text-muted-foreground">%</span>
+                  <span className={HELP}>%</span>
                 </div>
               ))}
-              <button
-                onClick={() => patchArea({ ...DEFAULT_CONTENT_AREA })}
-                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground mt-1"
-              >
-                <RotateCcw className="w-3 h-3" /> Reset fill area
-              </button>
+              <AdminButton size="sm" className="min-h-[44px] sm:min-h-[32px]" onClick={() => patchArea({ ...DEFAULT_CONTENT_AREA })}>
+                <AdminIcon name="rotate" /> Reset fill area
+              </AdminButton>
             </div>
           </div>
 
-          {/* True-to-print preview */}
           {tpl.artwork_url && (
             <div>
-              <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-label mb-1">Print preview</div>
+              <p className={`${FIELD} mb-1.5`}>Print preview</p>
               <div style={{ containerType: "inline-size", maxWidth: 360 }}>
-                <PrePrintedStickerFrame template={tpl} className="rounded border border-border shadow-sm">
+                <PrePrintedStickerFrame template={tpl} className="rounded border border-adm-border shadow-sm">
                   <div style={{ containerType: "inline-size", width: "100%", height: "100%" } as React.CSSProperties}>
                     <StickerFillBlock data={SAMPLE_FILL} showEquipment={tpl.fill_equipment} showPricing={tpl.fill_pricing} />
                   </div>
@@ -316,6 +265,6 @@ export default function StickerPrintTemplates() {
           )}
         </>
       )}
-    </div>
+    </SectionCard>
   );
 }
