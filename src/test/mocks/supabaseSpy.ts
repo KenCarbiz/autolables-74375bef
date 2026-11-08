@@ -31,7 +31,7 @@ export type SpyTableResponse = SpyResponse | ((ops: SpyOp[]) => SpyResponse);
 export const spyCalls: SpyCall[] = [];
 export const spyResponses: {
   tables: Record<string, SpyTableResponse>;
-  rpcs: Record<string, SpyResponse>;
+  rpcs: Record<string, SpyResponse | ((args: unknown) => SpyResponse)>;
   functions: Record<string, SpyResponse>;
 } = { tables: {}, rpcs: {}, functions: {} };
 
@@ -47,9 +47,12 @@ export const isSingleRead = (ops: SpyOp[]): boolean => ops.some((o) => o.op === 
 
 const WRITE_OPS = new Set(["insert", "update", "upsert", "delete"]);
 
-/** Table writes and every RPC: the set that must stay empty after a mount. */
+/** RPCs declared STABLE (read-only) in their migration. */
+export const READ_ONLY_RPCS = new Set(["inventory_scope_report", "inventory_group_view_access", "inventory_group_view_rows"]);
+
+/** Table writes and every RPC that can write: the set that must stay empty after a mount. */
 export const writeCalls = (): SpyCall[] =>
-  spyCalls.filter((c) => (c.kind === "table" && WRITE_OPS.has(c.op)) || c.kind === "rpc");
+  spyCalls.filter((c) => (c.kind === "table" && WRITE_OPS.has(c.op)) || (c.kind === "rpc" && !READ_ONLY_RPCS.has(c.fn)));
 
 /** Edge function invocations: the calls that can reach a paid provider or send mail. */
 export const functionCalls = (): string[] => spyCalls.filter((c): c is Extract<SpyCall, { kind: "function" }> => c.kind === "function").map((c) => c.fn);
@@ -93,7 +96,11 @@ export const supabaseSpy = {
   },
   rpc: (fn: string, args?: unknown) => {
     spyCalls.push({ kind: "rpc", fn, args });
-    return thenable(() => spyResponses.rpcs[fn] ?? missingFunction(fn), () => undefined);
+    return thenable(() => {
+      const r = spyResponses.rpcs[fn];
+      if (typeof r === "function") return r(args);
+      return r ?? missingFunction(fn);
+    }, () => undefined);
   },
   storage: {
     from: (bucket: string) => thenable(() => ({ data: null, error: null }), (op) => spyCalls.push({ kind: "storage", bucket, op })),

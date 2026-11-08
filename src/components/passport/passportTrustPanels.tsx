@@ -10,7 +10,7 @@ import { packetVisible } from "@/lib/packetModules";
 import { listingHero } from "@/lib/photos";
 import { historyReportName } from "@/lib/passportV2Data";
 import {
-  VERIFICATION_STATUS_LABEL, VERIFICATION_CHECK_SHORT_LABEL,
+  VERIFICATION_STATUS_LABEL, VERIFICATION_CHECK_SHORT_LABEL, verificationCountsLine,
   type ReportCheck, type VerificationStatus, type VerificationReport,
 } from "@/lib/passport/verificationSummary";
 import { resolveVehicleTruth, fmtMoney } from "@/lib/passport/vehicleTruth";
@@ -223,7 +223,7 @@ export function buildTrustPanel(key: PassportPanelKey, ctx: TrustPanelContext): 
     case "verification-categories":
       return {
         title: "Verification Categories",
-        subtitle: `${report.verifiedChecks} verified · ${report.totalChecks} checks total`,
+        subtitle: `${verificationCountsLine(report)} · ${report.totalChecks} checks total`,
         body: <CategoryList report={report} openPanel={openPanel} track={track} />,
         primary: askDealer,
         secondary: fullReport,

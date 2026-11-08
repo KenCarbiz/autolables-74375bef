@@ -22,6 +22,7 @@ import { usePublishedWindowSticker } from "@/hooks/usePublishedWindowSticker";
 import VehiclePriceBreakdown from "@/components/passport/VehiclePriceBreakdown";
 import AutoLabelsVerifiedCard from "@/components/passport/AutoLabelsVerifiedCard";
 import { buildPassportSaleCard } from "@/lib/passport/saleCard";
+import { availabilityCopy, readPassportAvailability, PURCHASE_ACTION_KEYS } from "../../supabase/functions/_shared/listingDisposition";
 import { previewEstimatorPayload } from "@/lib/payment/previewExample";
 import { CUSTOMER_UNAVAILABLE_MESSAGE, chargeTreatment, estimateAssumptionLine, formatPayment, resolveEstimate } from "@/lib/payment/estimator";
 import { readPaymentPrefs, clearPaymentPrefs, type PaymentPrefs } from "@/lib/passport/paymentPrefs";
@@ -471,6 +472,12 @@ export default function VehiclePassportGoverned() {
   // says it's verified — never on the lenient d.recallClear, which stays true even
   // under a cross-source conflict and would contradict the verified card.
   const recallVerified = report.checks.find((c) => c.key === "recall")?.status === "verified";
+  // Badges read the canonical report too. A market badge needs a verified
+  // market check, and a "Clean Title" badge needs an independent title
+  // result: a dealer's own no-branded-title policy is not one.
+  const marketVerified = report.checks.find((c) => c.key === "market")?.status === "verified";
+  const titleVerified = report.checks.find((c) => c.key === "title")?.status === "verified";
+  const historyOnRecord = report.checks.some((c) => (c.key === "history" || c.key === "ownership") && c.status !== "pending" && c.status !== "unavailable");
   // Phase E analytics — the specific event name rides in metadata.event on the
   // existing engagement pipeline (no new enum); ModuleView dedupes views. No PII.
   const firePhaseE = (event: string, extra: Record<string, unknown> = {}) =>
@@ -528,18 +535,47 @@ export default function VehiclePassportGoverned() {
   // Market Value anchor; the total is fee-inclusive and reconciles or the card
   // degrades to the headline alone — no invented discount, no doubled fee.
   const saleCard = buildPassportSaleCard(d, condition);
+  // A car that is sold, pending or no longer listed keeps its passport as a
+  // record, but nothing on it may offer to sell, hold or price it today.
+  const avail = readPassportAvailability(listing);
+  const purchasable = avail.purchasable;
+  const availCopy = availabilityCopy(avail, dealerName);
+  const availAsOf = avail.as_of && Number.isFinite(Date.parse(avail.as_of))
+    ? new Date(avail.as_of).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : null;
+  // The dealer's own photos can carry sale artwork baked into the image (the
+  // feed ships them as-is; AutoLabels adds no overlay). On a car that is no
+  // longer offered, the source photo is kept untouched and labeled instead.
+  const archivedPhotoNote = !purchasable ? (
+    <div data-archived-photo-note className="px-3 py-2 text-[11.5px] leading-snug border-t" style={{ background: "#F8FAFC", color: SUB, borderColor: BORDER }}>
+      Dealer photos from when this vehicle was advertised. Any sale or promotion shown in them is not a current offer.
+    </div>
+  ) : null;
+  const availNotice = availCopy ? (
+    <div className={`${CARD} px-4 py-3.5`} data-module="availability" data-availability={avail.disposition} role="status">
+      <span className="inline-flex items-center h-6 px-2.5 rounded-full text-[12px] font-bold" style={{ background: "#F1F5F9", color: NAVY }}>{availCopy.label}</span>
+      <p className="mt-2 text-[13px] leading-snug" style={{ color: NAVY }}>{availCopy.message}</p>
+    </div>
+  ) : null;
+  const lastAdvertised = (big: string) => availCopy ? (
+    <div data-price-status="last_advertised">
+      <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>{availCopy.priceLabel}</div>
+      <div className={`mt-0.5 ${big} font-extrabold tabular-nums leading-none`} style={{ color: SUB }}>{price != null ? fmt$(price) : "—"}</div>
+      <div className="mt-1 text-[12px]" style={{ color: SUB }}>Not a current offer{availAsOf ? ` · listing ended ${availAsOf}` : ""}</div>
+    </div>
+  ) : null;
 
   // Reflect the shopper's own payment scenario when they set one on the Today's
   // Price ladder — recomputed through the SAME shared resolver and this store's
   // rule, so the number matches the calculator exactly. Only when the store's
   // estimator is on and covers this vehicle. Still an illustration, never an
   // offer; Reset returns to the store default.
-  const estimatorOn = d.paymentEstimator != null;
+  const estimatorOn = purchasable && d.paymentEstimator != null;
   const customEstimate = payPrefs && d.paymentEstimator
     ? resolveEstimate(d.paymentEstimator, { modelYear: d.modelYear, sellingPrice: price }, { downPayment: payPrefs.down, termMonths: payPrefs.term, aprPercent: payPrefs.apr })
     : null;
   const customPayment = customEstimate?.status === "available" ? customEstimate : null;
-  const shownEstimate = customPayment ?? (d.paymentEstimate.status === "available" ? d.paymentEstimate : null);
+  const shownEstimate = !purchasable ? null : customPayment ?? (d.paymentEstimate.status === "available" ? d.paymentEstimate : null);
   const payMonthly = shownEstimate ? shownEstimate.monthlyPayment : null;
   const payAssumptions = shownEstimate ? estimateAssumptionLine(shownEstimate) : "";
   // On, but this vehicle has no matching rule, year or price: say so instead of a number.
@@ -550,12 +586,11 @@ export default function VehiclePassportGoverned() {
   // ── Intelligence chips: derive the 3 strongest vehicle-specific reasons.
   type Chip = { label: string; tone: "green" | "blue" | "amber"; icon: React.ElementType };
   const intelChips: Chip[] = [];
-  if (d.belowMarket != null && d.belowMarket > 250) intelChips.push({ label: `${fmt$(d.belowMarket)} Below Market`, tone: "green", icon: TrendingUp });
-  if (d.dealerVerified || (d.verifiedBy && d.verifiedBy.length > 0)) intelChips.push({ label: "Dealer Verified", tone: "blue", icon: ShieldCheck });
+  if (purchasable && d.belowMarket != null && d.belowMarket > 250) intelChips.push({ label: `${fmt$(d.belowMarket)} Below Market`, tone: "green", icon: TrendingUp });
   if (d.warrantyStr && !d.warrantyExpired) intelChips.push({ label: `Factory Warranty · ${d.warrantyStr}`, tone: "blue", icon: Award });
   if (intelChips.length < 3 && d.ownerCount === 1) intelChips.push({ label: "1-Owner", tone: "blue", icon: BadgeCheck });
   if (intelChips.length < 3 && recallVerified) intelChips.push({ label: "No Open Recalls", tone: "green", icon: CheckCircle2 });
-  if (intelChips.length < 3 && d.cleanTitle) intelChips.push({ label: "Clean Title", tone: "green", icon: CheckCircle2 });
+  if (intelChips.length < 3 && titleVerified) intelChips.push({ label: "Clean Title", tone: "green", icon: CheckCircle2 });
   if (intelChips.length < 3 && d.serviceCount > 0) intelChips.push({ label: `${d.serviceCount} Service Records`, tone: "blue", icon: Award });
   const chips = intelChips.slice(0, 3);
 
@@ -577,7 +612,7 @@ export default function VehiclePassportGoverned() {
   // ── Sticky CTA (existing dealer-configurable button set)
   const stickyResolved = resolveStickyButtons((listing as unknown as { sticky_bottom_buttons?: StickyBottomButtons }).sticky_bottom_buttons);
   // The payment-calculator button is an estimator CTA: it goes when the store's estimator is off.
-  const stickyCfg = { ...stickyResolved, items: stickyResolved.items.filter((b) => estimatorOn || b.key !== "calculate_payment") };
+  const stickyCfg = { ...stickyResolved, items: stickyResolved.items.filter((b) => (estimatorOn || b.key !== "calculate_payment") && (purchasable || !PURCHASE_ACTION_KEYS.has(b.key))) };
   const stickyAction = (k: string): { icon: React.ElementType; onClick: () => void } => {
     const tap = (cta: string) => trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta } });
     // Call / Text stay native; the no-phone fallback opens the governed V3
@@ -655,7 +690,7 @@ export default function VehiclePassportGoverned() {
             {!heroInView && (
               <div className="min-w-0 pl-2 border-l" style={{ borderColor: BORDER }}>
                 <div className="text-[12px] font-semibold truncate" style={{ color: NAVY }}>{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</div>
-                <div className="text-[11px] tabular-nums" style={{ color: BLUE }}>{price ? fmt$(price) : ""}</div>
+                <div className="text-[11px] tabular-nums" style={{ color: BLUE }}>{purchasable && price ? fmt$(price) : ""}</div>
               </div>
             )}
           </div>
@@ -685,12 +720,11 @@ export default function VehiclePassportGoverned() {
         const titleCheckStatus = report.checks.find((c) => c.key === "title")?.status;
         const trustBadges = [
           d.ownerCount === 1 ? "One Owner" : null,
-          titleCheckStatus === "verified" || titleCheckStatus === "dealer_attested" ? "Clean Title" : null,
+          titleCheckStatus === "verified" ? "Clean Title" : null,
           condition === "cpo" ? "CPO Certified" : null,
         ].filter(Boolean) as string[];
         for (const fallback of [
-          (d.dealerVerified || (d.verifiedBy && d.verifiedBy.length > 0)) ? "Dealer Verified" : null,
-          d.marketAvg != null ? "Market Data Verified" : null,
+          marketVerified ? "Market Data Verified" : null,
         ]) {
           if (fallback && trustBadges.length < 3) trustBadges.push(fallback);
         }
@@ -709,11 +743,10 @@ export default function VehiclePassportGoverned() {
         ].filter(Boolean) as { t: string; s: string }[];
 
         const strengths = ([
-          (d.dealerVerified || d.verifiedBy.length > 0) ? "Dealer-verified listing" : null,
           d.ownerCount === 1 ? `One owner reported${d.historyReport ? ` (${historyReportName(d.historyReport.provider)})` : ""}` : d.ownerCount != null && d.ownerCount > 1 ? `${d.ownerCount} owners reported` : null,
           listing.mileage != null ? `${listing.mileage.toLocaleString()} reported miles` : null,
           listing.trim ? `${listing.trim} trim` : null,
-          recallVerified ? "No open recalls (NHTSA)" : null,
+          recallVerified ? "No open recalls for this VIN" : null,
           d.warrantyStr ? "Factory warranty terms found — remaining coverage requires confirmation" : null,
         ].filter(Boolean) as string[]);
 
@@ -750,7 +783,7 @@ export default function VehiclePassportGoverned() {
         const b2b = showWarranty ? wCalc(w.factory_months, w.factory_miles) : null;
         const ptw = showWarranty && (w.powertrain_months != null || w.powertrain_miles != null) ? wCalc(w.powertrain_months, w.powertrain_miles) : null;
 
-        const watchEnabled = (listing as unknown as { price_drop_watch?: boolean }).price_drop_watch !== false;
+        const watchEnabled = purchasable && (listing as unknown as { price_drop_watch?: boolean }).price_drop_watch !== false;
         const actionTiles: { label: string; icon: React.ElementType; onClick: () => void; active?: boolean }[] = [
           { label: "Value My Trade", icon: RefreshCw, onClick: () => openTrade() },
           ...(estimatorOn ? [{ label: "Build My Payment", icon: DollarSign, onClick: () => { trackPassportEvent("payment_builder_started", { placement: "action_center" }); go("todays-price"); } }] : []),
@@ -814,6 +847,7 @@ export default function VehiclePassportGoverned() {
                 </button>
                 <button data-gallery-nav aria-label={`View all ${gallery.length} photos`} onClick={(e) => { e.stopPropagation(); setGalleryOpen(true); }} className="absolute bottom-3 left-3 h-9 px-3 rounded-full bg-black/60 text-white text-[12px] font-bold inline-flex items-center gap-1.5"><Eye className="w-4 h-4" /> All Photos</button>
               </div>
+              {archivedPhotoNote}
             </div>
             {/* 3 — thumbnail strip */}
             {gallery.length > 1 && (
@@ -849,7 +883,8 @@ export default function VehiclePassportGoverned() {
 
           {/* 5 — Today's Sale Price + itemized breakdown (new → MSRP, used/CPO → Market Value) */}
           <section className="px-4 pt-4" data-module="price">
-            {saleCard
+            {availNotice && <div className="mb-3">{availNotice}</div>}
+            {!purchasable ? lastAdvertised("text-[32px]") : saleCard
               ? <VehiclePriceBreakdown
                   card={saleCard}
                   heading="Current Price"
@@ -906,10 +941,12 @@ export default function VehiclePassportGoverned() {
           </section>
 
           {/* 7 — Primary + secondary actions (open the complete V2 destination pages) */}
-          <section className="px-4 pt-4" data-module="primary-actions">
-            <button onClick={() => { trackPassportEvent("test_drive_started", { placement: "action_center" }); go("test-drive"); }} className="w-full h-14 rounded-2xl inline-flex items-center justify-center gap-2 text-[15px] font-bold text-white" style={{ background: BLUE }}><Clock className="w-[22px] h-[22px]" /> Schedule Test Drive</button>
-            <button onClick={() => { trackPassportEvent("reservation_started", { placement: "action_center" }); go("reserve"); }} className="mt-2.5 w-full h-14 rounded-2xl border inline-flex items-center justify-center gap-2 text-[15px] font-bold" style={{ borderColor: BLUE, color: BLUE }}><BadgeCheck className="w-[22px] h-[22px]" /> Request Vehicle Hold</button>
-          </section>
+          {purchasable && (
+            <section className="px-4 pt-4" data-module="primary-actions">
+              <button onClick={() => { trackPassportEvent("test_drive_started", { placement: "action_center" }); go("test-drive"); }} className="w-full h-14 rounded-2xl inline-flex items-center justify-center gap-2 text-[15px] font-bold text-white" style={{ background: BLUE }}><Clock className="w-[22px] h-[22px]" /> Schedule Test Drive</button>
+              <button onClick={() => { trackPassportEvent("reservation_started", { placement: "action_center" }); go("reserve"); }} className="mt-2.5 w-full h-14 rounded-2xl border inline-flex items-center justify-center gap-2 text-[15px] font-bold" style={{ borderColor: BLUE, color: BLUE }}><BadgeCheck className="w-[22px] h-[22px]" /> Request Vehicle Hold</button>
+            </section>
+          )}
 
           {/* 8 — Supporting action tiles */}
           <section className="px-4 pt-3" data-module="action-tiles">
@@ -1212,8 +1249,8 @@ export default function VehiclePassportGoverned() {
           <section className="px-4 pt-6" data-module="next-steps">
             <H>Next Steps</H>
             <div className="mt-3 grid grid-cols-2 gap-2.5">
-              <button onClick={() => go("reserve")} className="h-12 rounded-2xl inline-flex items-center justify-center gap-2 text-[13px] font-bold text-white" style={{ background: BLUE }}><BadgeCheck className="w-[20px] h-[20px]" /> Request Hold</button>
-              <button onClick={() => go("test-drive")} className={`${CARD} h-12 inline-flex items-center justify-center gap-2 text-[13px] font-bold`} style={{ color: NAVY }}><Clock className="w-[20px] h-[20px]" style={{ color: BLUE }} /> Schedule Test Drive</button>
+              {purchasable && <button onClick={() => go("reserve")} className="h-12 rounded-2xl inline-flex items-center justify-center gap-2 text-[13px] font-bold text-white" style={{ background: BLUE }}><BadgeCheck className="w-[20px] h-[20px]" /> Request Hold</button>}
+              {purchasable && <button onClick={() => go("test-drive")} className={`${CARD} h-12 inline-flex items-center justify-center gap-2 text-[13px] font-bold`} style={{ color: NAVY }}><Clock className="w-[20px] h-[20px]" style={{ color: BLUE }} /> Schedule Test Drive</button>}
               <button onClick={() => go("contact")} className={`${CARD} h-12 inline-flex items-center justify-center gap-2 text-[13px] font-bold`} style={{ color: NAVY }}><MessageSquare className="w-[20px] h-[20px]" style={{ color: BLUE }} /> Contact Dealer</button>
               <button onClick={() => window.print()} className={`${CARD} h-12 inline-flex items-center justify-center gap-2 text-[13px] font-bold`} style={{ color: NAVY }}><Printer className="w-[20px] h-[20px]" style={{ color: BLUE }} /> Print Passport</button>
             </div>
@@ -1257,8 +1294,7 @@ export default function VehiclePassportGoverned() {
         // ── Hero trust badges — each shown only when its governed signal is real.
         const trustBadges = [
           d.ownerCount === 1 ? "One Owner" : null,
-          (d.dealerVerified || (d.verifiedBy && d.verifiedBy.length > 0)) ? "Dealer Verified" : null,
-          d.marketAvg != null ? "Market Data Verified" : null,
+          marketVerified ? "Market Data Verified" : null,
         ].filter(Boolean) as string[];
 
         // ── Fixed conversion action hierarchy (goal-locked). Each opens the
@@ -1287,7 +1323,7 @@ export default function VehiclePassportGoverned() {
           // Watch Price opens an inline email capture so the shopper gets price &
           // availability alerts — it does not just save to this device. Track the
           // open once (not the close), never a conversion until the RPC succeeds.
-          { label: "Watch Price", icon: Eye, onClick: () => { if (!watchOpen) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "watch_price" } }); setWatchOpen((v) => !v); } },
+          ...(purchasable ? [{ label: "Watch Price", icon: Eye, onClick: () => { if (!watchOpen) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "watch_price" } }); setWatchOpen((v) => !v); } }] : []),
         ];
         const label3 = "text-[11px] font-semibold uppercase tracking-wider";
         // Dollar amount the price sits ABOVE normalized market value (past a $250
@@ -1342,6 +1378,7 @@ export default function VehiclePassportGoverned() {
                         <button type="button" data-gallery-nav aria-label="Next photo" onClick={(e) => { e.preventDefault(); e.stopPropagation(); swipeHero(1); }} className="absolute right-2 top-1/2 -translate-y-1/2 z-20 h-11 w-11 grid place-items-center rounded-full bg-white/90 shadow hover:bg-white"><ChevronRight className="w-[22px] h-[22px]" style={{ color: NAVY }} /></button>
                       </>}
                     </div>
+                    {archivedPhotoNote && <div className="mt-2 rounded-lg overflow-hidden border border-t-0" style={{ borderColor: BORDER }}>{archivedPhotoNote}</div>}
                     {gallery.length > 1 && (
                       <div className="mt-2.5 flex gap-2">
                         {gallery.slice(0, 6).map((src, i) => (
@@ -1390,7 +1427,7 @@ export default function VehiclePassportGoverned() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="inline-flex items-center gap-2">
                       <span className="h-8 w-8 grid place-items-center rounded-full" style={{ background: vAllVerified ? "#DCFCE7" : "#FEF3C7" }}><CheckCircle2 className="w-4 h-4" style={{ color: vAllVerified ? GREEN : AMBER }} /></span>
-                      <div><div className="text-[14px] font-extrabold" style={{ color: NAVY }}>Verified Vehicle Data</div><div className="text-[12px]" style={{ color: SUB }}>{vAllVerified ? `All ${vTotal} checks verified` : `${vVerified} of ${vTotal} checks verified · ${vSummary}`}</div></div>
+                      <div><div className="text-[14px] font-extrabold" style={{ color: NAVY }}>Verified Vehicle Data</div><div className="text-[12px]" style={{ color: SUB }}>{vAllVerified ? `All ${vTotal} checks verified` : `${vVerified} of ${vTotal} checks independently verified · ${vSummary}`}</div></div>
                     </div>
                     <button onClick={() => openPanel("verification-categories")} className="text-[13px] font-bold inline-flex items-center gap-1 hover:underline" style={{ color: BLUE }}>View all categories <ChevronRight className="w-4 h-4" /></button>
                   </div>
@@ -1445,7 +1482,7 @@ export default function VehiclePassportGoverned() {
                   {[
                     { key: "factory-warranty" as const, icon: ShieldCheck, title: "Warranty", head: d.warrantyExpired ? "Coverage ended" : warrantyHead, sub: warrantySub },
                     { key: "equipment" as const, icon: Sparkles, title: "Features & Equipment", head: "Equipment analyzed", sub: "Premium, safety, tech & more" },
-                    { key: "ownership-timeline" as const, icon: FileText, title: "History & Ownership", head: d.cleanTitle ? "Clean title on record" : "History checked", sub: d.ownerCount != null ? `${d.ownerCount === 1 ? "One owner" : `${d.ownerCount} owners`} on record` : "View reported results" },
+                    { key: "ownership-timeline" as const, icon: FileText, title: "History & Ownership", head: titleVerified ? "Clean title on record" : historyOnRecord ? "History records found" : "No history report on file", sub: d.ownerCount != null ? `${d.ownerCount === 1 ? "One owner" : `${d.ownerCount} owners`} on record` : "View reported results" },
                     { key: "key-specs" as const, icon: Wrench, title: "Specifications", head: "Detailed specs", sub: "Engine, dimensions, capacity" },
                   ].map((m) => (
                     <button key={m.key} onClick={() => openPanel(m.key)} className={`${CARD} p-4 text-left hover:border-[#2563EB] transition-colors`} data-module={m.key === "factory-warranty" ? "warranty" : m.key === "equipment" ? "equipment" : m.key === "ownership-timeline" ? "history" : "specs"}>
@@ -1467,11 +1504,10 @@ export default function VehiclePassportGoverned() {
                         // Governed, exact-outcome strengths — sourced where the record
                         // names a provider; warranty/coverage stays "requires confirmation".
                         const strengths = [
-                          (d.dealerVerified || d.verifiedBy.length > 0) ? "Dealer-verified listing" : null,
-                          d.ownerCount === 1 ? `One owner reported${d.historyReport ? ` (${historyReportName(d.historyReport.provider)})` : ""}` : d.ownerCount != null && d.ownerCount > 1 ? `${d.ownerCount} owners reported` : null,
+                                          d.ownerCount === 1 ? `One owner reported${d.historyReport ? ` (${historyReportName(d.historyReport.provider)})` : ""}` : d.ownerCount != null && d.ownerCount > 1 ? `${d.ownerCount} owners reported` : null,
                           listing.mileage != null ? `${listing.mileage.toLocaleString()} reported miles` : null,
                           listing.trim ? `${listing.trim} trim` : null,
-                          recallVerified ? "No open recalls (NHTSA)" : null,
+                          recallVerified ? "No open recalls for this VIN" : null,
                           d.warrantyStr ? "Factory warranty terms found — remaining coverage requires confirmation" : null,
                         ].filter(Boolean) as string[];
                         return (strengths.length ? strengths : ["Details confirmed at the dealership"]).map((b, i) => (
@@ -1632,8 +1668,9 @@ export default function VehiclePassportGoverned() {
                   {/* Today's Sale Price + itemized breakdown. The ONE above-the-fold
                       price; the model reconciles vehiclePrice + fee to it exactly, so
                       the fee is never double-added (no $31,771). */}
+                  {availNotice && <div className="mt-3">{availNotice}</div>}
                   <div className="mt-3">
-                    {saleCard
+                    {!purchasable ? lastAdvertised("text-[32px]") : saleCard
                       ? <VehiclePriceBreakdown card={saleCard} />
                       : <>
                           <div className="text-[11px] font-bold uppercase tracking-wider" style={{ color: SUB }}>Today's Sale Price</div>
@@ -1651,11 +1688,11 @@ export default function VehiclePassportGoverned() {
                       {customPayment && <button onClick={resetPayment} className="ml-2 font-semibold underline" style={{ color: BLUE }}>Reset</button>}
                     </div>
                   )}
-                  <p className="mt-3 text-[11px] leading-snug" style={{ color: SUB }}>Sales tax, title, registration and dealer-installed options are not included.</p>
+                  {purchasable && <p className="mt-3 text-[11px] leading-snug" style={{ color: SUB }}>Sales tax, title, registration and dealer-installed options are not included.</p>}
 
                   {/* Fixed conversion hierarchy — each opens the complete existing V2 page. */}
-                  <button onClick={actPrimary.onClick} className="mt-4 w-full h-11 rounded-xl inline-flex items-center justify-center gap-2 text-[14px] font-bold text-white" style={{ background: BLUE }}><Clock className="w-4 h-4" /> {actPrimary.label}</button>
-                  <button onClick={actReserve.onClick} className="mt-2 w-full h-11 rounded-xl border inline-flex items-center justify-center gap-2 text-[14px] font-bold hover:bg-slate-50" style={{ borderColor: BLUE, color: BLUE }}><BadgeCheck className="w-4 h-4" /> {actReserve.label}</button>
+                  {purchasable && <button onClick={actPrimary.onClick} className="mt-4 w-full h-11 rounded-xl inline-flex items-center justify-center gap-2 text-[14px] font-bold text-white" style={{ background: BLUE }}><Clock className="w-4 h-4" /> {actPrimary.label}</button>}
+                  {purchasable && <button onClick={actReserve.onClick} className="mt-2 w-full h-11 rounded-xl border inline-flex items-center justify-center gap-2 text-[14px] font-bold hover:bg-slate-50" style={{ borderColor: BLUE, color: BLUE }}><BadgeCheck className="w-4 h-4" /> {actReserve.label}</button>}
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     {actGrid1.map((s) => <button key={s.label} onClick={s.onClick} className="h-10 rounded-xl border inline-flex items-center justify-center gap-1.5 text-[13px] font-bold hover:bg-slate-50" style={{ borderColor: BORDER, color: NAVY }}><s.icon className="w-4 h-4" style={{ color: BLUE }} /> {s.label}</button>)}
                   </div>
@@ -1670,7 +1707,7 @@ export default function VehiclePassportGoverned() {
                   </div>
                   {/* Inline price & availability alert capture (reuses the governed
                       watch_price RPC). Honors the dealer's price_drop_watch toggle. */}
-                  {watchOpen && (listing as unknown as { price_drop_watch?: boolean }).price_drop_watch !== false && (
+                  {purchasable && watchOpen && (listing as unknown as { price_drop_watch?: boolean }).price_drop_watch !== false && (
                     <div className="mt-3">
                       <PriceDropWatch slug={listing.slug || rawSlug} />
                     </div>
@@ -1696,7 +1733,7 @@ export default function VehiclePassportGoverned() {
                 low-friction next-step dock distinct from the sticky action rail.
                 Desktop-only (hidden lg:block); routes Reserve/Trade/Contact into
                 the complete V2 pages via go() and dials the dealer's real number. */}
-            {!actionCenterInView && <PassportCtaDock
+            {purchasable && !actionCenterInView && <PassportCtaDock
               go={go}
               dealerPhone={d.dealerPhone || undefined}
               reviewRating={d.reviewRating}

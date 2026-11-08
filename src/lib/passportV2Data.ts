@@ -1,4 +1,5 @@
 import { verifiedInServiceDate } from "@/lib/warranty/inServiceEvidence";
+import { storedEpaConflict, listingPowertrain, driveOf, litersOf } from "../../supabase/functions/_shared/epaMatch";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 import { deriveRecallView, type RecallView } from "@/lib/vehicleTruth/recallView";
 import { buildDiscountBreakdown, type PriceDisplayMode, type DiscountBreakdown } from "@/lib/priceModel";
@@ -724,7 +725,10 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
 
   const verifiedBy = [
     { label: "Vehicle History", on: typeof mc.carfax_clean_title === "boolean" || ownerCount != null },
-    { label: "Live Market Data", on: marketAvg != null || Object.keys(mc).length > 0 },
+    // A market source counts only when it returned a value. Any stored provider
+    // attribute (even a bookkeeping field such as specs_attempted_at) used to
+    // count, which listed "Live Market Data" for a car with no market result.
+    { label: "Live Market Data", on: marketAvg != null },
     { label: "NHTSA", on: hasRecallCheck },
   ].filter((x) => x.on).map((x) => x.label);
 
@@ -765,7 +769,15 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   ];
 
   // Structured key specs (goal's "Key Specifications" card) — real values only.
-  const epaRaw = (listing as unknown as { epa_economy?: Record<string, unknown> | null }).epa_economy || null;
+  const epaStored = (listing as unknown as { epa_economy?: Record<string, unknown> | null }).epa_economy || null;
+  const epaModel = String(listing.ymm ?? "").trim().split(/\s+/).slice(2).join(" ");
+  // A record that contradicts this car's own decode belongs to another vehicle.
+  const epaRaw = epaStored && storedEpaConflict(epaStored, {
+    powertrain: listingPowertrain({ powertrainType: mc.powertrain_type, fuelType: mc.fuel_type, trim: listing.trim, model: epaModel }),
+    drive: driveOf(ks.drivetrain),
+    liters: litersOf(ks.engine),
+    text: `${epaModel} ${listing.trim ?? ""}`,
+  }) === null ? epaStored : null;
   const epa = epaRaw && (epaRaw.combined != null || epaRaw.city != null) ? {
     city: (epaRaw.city as number) ?? null,
     highway: (epaRaw.highway as number) ?? null,
@@ -797,7 +809,6 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   if (belowMarket && belowMarket > 0) whyBuy.push(`${fmt$(belowMarket)} below market average`);
   if (warrantyStr && !warrantyExpired) whyBuy.push(isNew || warranty.in_service_date ? "Factory warranty remaining" : "Factory warranty terms on record");
   if (recall.vin.clearClaimAllowed) whyBuy.push("No open recalls");
-  if (dealerVerified) whyBuy.push("Dealer-verified listing");
   if (ownerCount === 1) whyBuy.push("One owner — personal use");
   if (listing.mileage != null && listing.mileage < 30000) whyBuy.push(`Low mileage — ${listing.mileage.toLocaleString()} mi`);
   if (listing.trim && /luxe|autograph|limited|platinum|premium|touring|sport|signature|reserve|titanium|sensory|denali/i.test(listing.trim)) whyBuy.push(`Premium trim — ${listing.trim}`);

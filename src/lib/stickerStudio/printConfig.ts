@@ -63,12 +63,30 @@ export function normalizeCalibration(c: Partial<PrintCalibration> | null | undef
   };
 }
 
+export interface CalibrationTransform {
+  xIn: number;
+  yIn: number;
+  scale: number;
+}
+
+// The one place the calibration becomes a transform. buildPrintCss applies it
+// to the real sheet and the calibration preview draws from it, so the two
+// cannot drift. Origin is the sheet's top-left corner; right and down are
+// positive; scale is applied before the translation.
+export function calibrationTransform(cal: Pick<PrintCalibration, "xOffsetIn" | "yOffsetIn" | "scalePct">): CalibrationTransform {
+  return { xIn: cal.xOffsetIn, yIn: cal.yOffsetIn, scale: cal.scalePct / 100 };
+}
+
+export function calibrationTransformCss(cal: Pick<PrintCalibration, "xOffsetIn" | "yOffsetIn" | "scalePct">): string {
+  const t = calibrationTransform(cal);
+  return `translate(${t.xIn}in, ${t.yIn}in) scale(${t.scale})`;
+}
+
 // CSS for the chrome-free print route: page sized to the exact paper, zero
 // margin, calibration applied as a transform on the sheet wrapper.
 export function buildPrintCss(type: StickerType, cal: PrintCalibration): string {
   const { widthIn, heightIn } = PAPER[type];
-  const scale = cal.scalePct / 100;
-  const transform = `translate(${cal.xOffsetIn}in, ${cal.yOffsetIn}in) scale(${scale})`;
+  const transform = calibrationTransformCss(cal);
   return `
     @page { size: ${widthIn}in ${heightIn}in; margin: 0; }
     @media print {

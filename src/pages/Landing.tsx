@@ -1065,7 +1065,7 @@ const HowItWorks = () => (
           ))}
         </div>
         <div className="mt-8 flex flex-wrap justify-center gap-2">
-          {["Itemized get-ready, not a sticky note.", "Nothing lists until it's ready.", "Every install is proven before it's advertised."].map((c) => (
+          {["Itemized get-ready, not a sticky note.", "Listed and ready are tracked separately, per VIN.", "Every install is proven before it's advertised."].map((c) => (
             <span key={c} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
               <CheckCircle2 className="h-3.5 w-3.5 text-blue-600" /> {c}
             </span>

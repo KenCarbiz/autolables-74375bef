@@ -22,9 +22,9 @@ interface AddendumRow {
   customer_name: string | null;
   cobuyer_name: string | null;
   content_hash: string | null;
-  signed_at: string | null;
-  token: string | null;
-  total_price: number | null;
+  customer_signed_at: string | null;
+  signing_token: string | null;
+  total_with_optional: number | null;
   accepted_at: string | null;
   getready_dispatched_at: string | null;
 }
@@ -39,7 +39,7 @@ const AddendumCard = ({ row, onOpen, onCopyLink, canAccept, accepting, onAccept,
   stale?: boolean;
   onUpdate?: () => void;
 }) => {
-  const signed = row.status === "signed" || !!row.signed_at;
+  const signed = row.status === "signed" || !!row.customer_signed_at;
   const accepted = !!row.accepted_at;
   return (
     <div className={`rounded-xl border bg-card p-4 flex items-center gap-4 ${stale ? "border-amber-300" : "border-border"}`}>
@@ -55,7 +55,7 @@ const AddendumCard = ({ row, onOpen, onCopyLink, canAccept, accepting, onAccept,
         </p>
         <div className="flex items-center gap-3 text-al-meta text-muted-foreground mt-0.5 flex-wrap">
           <span>{new Date(row.created_at).toLocaleDateString()}</span>
-          {typeof row.total_price === "number" && <span className="tabular-nums">${row.total_price.toLocaleString()}</span>}
+          {typeof row.total_with_optional === "number" && <span className="tabular-nums">${row.total_with_optional.toLocaleString()}</span>}
           {!signed && accepted && (
             <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold">
               <CheckCircle2 className="w-3 h-3" /> Accepted {new Date(row.accepted_at as string).toLocaleDateString()}
@@ -85,8 +85,8 @@ const AddendumCard = ({ row, onOpen, onCopyLink, canAccept, accepting, onAccept,
             {accepting ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />} Accept &amp; send
           </button>
         )}
-        {!signed && row.token && (
-          <button onClick={() => onCopyLink(row.token)} className={btn} title="Copy the signing link">
+        {!signed && row.signing_token && (
+          <button onClick={() => onCopyLink(row.signing_token)} className={btn} title="Copy the signing link">
             <Copy className="w-3 h-3" /> Link
           </button>
         )}
@@ -113,7 +113,7 @@ export const AddendumSection = ({ vehicle }: { vehicle: VehicleRow }) => {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const base = "id,created_at,updated_at,status,customer_name,cobuyer_name,content_hash,signed_at,token,total_price";
+    const base = "id,created_at,updated_at,status,customer_name,cobuyer_name,content_hash,customer_signed_at,signing_token,total_with_optional";
     // Resilient select: the acceptance columns may not be applied yet in a given
     // environment; fall back to the base column set rather than erroring to [].
     let data: AddendumRow[] | null = null;
@@ -148,8 +148,8 @@ export const AddendumSection = ({ vehicle }: { vehicle: VehicleRow }) => {
 
   useEffect(() => { load(); }, [load]);
 
-  const signed = rows.filter((r) => r.status === "signed" || !!r.signed_at);
-  const drafts = rows.filter((r) => !(r.status === "signed" || !!r.signed_at));
+  const signed = rows.filter((r) => r.status === "signed" || !!r.customer_signed_at);
+  const drafts = rows.filter((r) => !(r.status === "signed" || !!r.customer_signed_at));
 
   // Accept the draft, then dispatch the Get-Ready to the shop in the same click.
   // Acceptance is recorded even if the shop email is not configured; the

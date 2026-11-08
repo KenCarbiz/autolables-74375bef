@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { normalizeReceiptVin, projectVinDecodeReceipts, VIN_DECODE_RECEIPT_LIMIT, VIN_DECODE_RECEIPT_SELECT } from "../_shared/vinDecodeReceipt.ts";
 import { resolveCustomerPassportRouting, type PassportAgent } from "../_shared/passport-routing.ts";
 import { matchIihsAward, type IihsAward } from "../_shared/iihs-awards.ts";
 import { resolvePassportVersion } from "../_shared/passport-version.ts";
@@ -916,6 +917,25 @@ serve(async (req) => {
       delete row.comparables; delete row.market_meta; delete row.market_payload;
       delete row.blackbook; delete row.history_payload;
     }
+
+    // ── VIN decode receipts. The Passport's identity check verifies only
+    // against a decoder's own record of the VIN it decoded. Stored snapshots
+    // only: a read, never a decoder call and never a write. See
+    // _shared/vinDecodeReceipt.ts for what ships and what is dropped.
+    try {
+      const vinKey = normalizeReceiptVin(row.vin);
+      row.vin_decode_receipts = [];
+      if (vinKey) {
+        const { data: snaps } = await admin
+          .from("neovin_snapshots")
+          .select(VIN_DECODE_RECEIPT_SELECT)
+          .eq("vin", vinKey)
+          .gte("http_status", 200).lt("http_status", 300)
+          .order("fetched_at", { ascending: false })
+          .limit(VIN_DECODE_RECEIPT_LIMIT);
+        row.vin_decode_receipts = projectVinDecodeReceipts(snaps, vinKey);
+      }
+    } catch { row.vin_decode_receipts = []; }
 
     // ── Final deny sweep. The last thing that touches the payload. ─────────
     //

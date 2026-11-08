@@ -63,6 +63,8 @@ vi.mock("@/contexts/DealerSettingsContext", async (importOriginal) => {
 
 import EffectivePolicyView from "./EffectivePolicyView";
 import fixture10 from "@/pages/admin/fixtures/10";
+
+fixture10.fixture.views["effective-policy"] = { ...(fixture10.fixture.views["effective-policy"] as object), groupLabel: "Example Auto Group" };
 import type { PublishingFixture } from "./usePublishingData";
 
 const renderView = (withFixture: boolean) => {
@@ -91,10 +93,10 @@ describe("Publishing > Effective policy", () => {
 
   it("renders the rooftop matrix from the fixture without reading or writing anything", () => {
     renderView(true);
-    expect(screen.getByText("This rooftop")).toBeInTheDocument();
-    expect(screen.getByText(fixtureView.rooftopLabel).closest("p")).toHaveTextContent(`Policy applies to all vehicles at ${fixtureView.rooftopLabel}.`);
-    expect(screen.getByText("Draft proposal")).toBeInTheDocument();
-    expect(screen.getByText("Do-not-drive recall follows a separate blocking policy.")).toBeInTheDocument();
+    expect(screen.getByText("All rooftops")).toBeInTheDocument();
+    expect(screen.getByText(fixtureView.rooftopLabel).closest("p")).toHaveTextContent(`Stored once for Example Auto Group. ${fixtureView.rooftopLabel} follows it, and there is no rooftop-specific override.`);
+    expect(document.body).not.toHaveTextContent("applies to all vehicles at");
+    expect(screen.getByText(/Do-not-drive recalls follow a separate blocking policy/)).toBeInTheDocument();
 
     const expected = derivePublishingMatrix({ settings: fixtureView.settings, description: fixtureView.description });
     const table = screen.getByRole("table", { name: "Effective publishing policy by vehicle type" });
@@ -110,7 +112,7 @@ describe("Publishing > Effective policy", () => {
     expect(rows[1]).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Effective rule for Used")).toBeInTheDocument();
     expect(screen.getByText("Listing can be visible")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Review approval rules/ })).toHaveAttribute("href", expect.stringContaining("approval-rules"));
+    expect(screen.getByRole("link", { name: /Approval rules/ })).toHaveAttribute("href", expect.stringContaining("approval-rules"));
 
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(spies.from).not.toHaveBeenCalled();
@@ -132,14 +134,14 @@ describe("Publishing > Effective policy", () => {
 
   it("opens Review & Apply only on an explicit click and never applies from a fixture", () => {
     renderView(true);
-    fireEvent.click(screen.getByRole("button", { name: "Review changes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit policy" }));
     const dialog = screen.getByRole("dialog");
-    expect(within(dialog).getByText("Review publishing policy change")).toBeInTheDocument();
+    expect(within(dialog).getByText("Publishing policy")).toBeInTheDocument();
     const switches = within(dialog).getAllByRole("switch");
     expect(switches).toHaveLength(6);
     switches.forEach((s) => expect(s).toBeDisabled());
     fireEvent.click(within(dialog).getByRole("button", { name: "Continue to review" }));
-    expect(within(dialog).getByText("Nothing has changed. The policy in force is shown as the current state.")).toBeInTheDocument();
+    expect(within(dialog).getByText("The policy in force is shown as the current state.")).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Apply policy" })).toBeDisabled();
     expect(spies.updateSettings).not.toHaveBeenCalled();
     expect(spies.insert).not.toHaveBeenCalled();
@@ -149,13 +151,13 @@ describe("Publishing > Effective policy", () => {
     spies.readFails.value = true;
     renderView(false);
     expect(await screen.findByText("Some policy inputs could not be read")).toBeInTheDocument();
-    expect(screen.getByText("Active Unavailable · Published Unavailable")).toBeInTheDocument();
+    expect(document.querySelector('[data-parity="class-counts"]')).toHaveTextContent("Active listings Unavailable Published Unavailable");
     const table = screen.getByRole("table", { name: "Effective publishing policy by vehicle type" });
     expect(within(table).getAllByText(/\(descriptions unknown\)/)).toHaveLength(3);
-    expect(screen.getByText("Enforced policy · no pending changes")).toBeInTheDocument();
+    expect(screen.getByText("Enforced policy, no pending changes")).toBeInTheDocument();
 
     const tables = spies.from.mock.calls.map((c) => c[0]);
-    expect(new Set(tables)).toEqual(new Set(["description_settings", "vehicle_listings"]));
+    expect(new Set(tables)).toEqual(new Set(["description_settings", "vehicle_listings", "audit_log"]));
     expect(spies.rpc).not.toHaveBeenCalled();
     expect(spies.insert).not.toHaveBeenCalled();
     expect(spies.update).not.toHaveBeenCalled();
@@ -177,10 +179,10 @@ describe("Publishing > Effective policy draft, review and apply against live set
 
   const ready = async () => {
     await screen.findByRole("table", { name: "Effective publishing policy by vehicle type" });
-    await screen.findByText("Active 0 · Published 0");
+    await waitFor(() => expect(document.querySelector('[data-parity="class-counts"]')).toHaveTextContent("Active listings 0 Published 0"));
   };
   const openEdit = () => {
-    fireEvent.click(screen.getByRole("button", { name: "Review changes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit policy" }));
     return screen.getByRole("dialog");
   };
 
@@ -203,9 +205,9 @@ describe("Publishing > Effective policy draft, review and apply against live set
     await ready();
     let dialog = openEdit();
     fireEvent.click(within(dialog).getByRole("button", { name: "Continue to review" }));
-    expect(within(dialog).getByText("Nothing has changed. The policy in force is shown as the current state.")).toBeInTheDocument();
+    expect(within(dialog).getByText("The policy in force is shown as the current state.")).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Apply policy" })).toBeDisabled();
-    expect(within(dialog).getByText("Nothing has changed.")).toBeInTheDocument();
+    expect(within(dialog).getAllByText("Nothing has changed.").length).toBeGreaterThan(0);
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Back to edit" }));
     const sw = within(dialog).getByRole("switch", { name: APPROVAL });
@@ -227,23 +229,22 @@ describe("Publishing > Effective policy draft, review and apply against live set
   it("keeps an edit as a draft proposal when the dialog is cancelled, and Discard draft returns to the enforced policy", async () => {
     renderView(false);
     await ready();
-    expect(screen.getByText("Enforced policy · no pending changes")).toBeInTheDocument();
+    expect(screen.getByText("Enforced policy, no pending changes")).toBeInTheDocument();
     let dialog = openEdit();
     const sw = within(dialog).getByRole("switch", { name: APPROVAL });
-    const before = sw.getAttribute("aria-checked");
+    const before = (sw as HTMLInputElement).checked;
     fireEvent.click(sw);
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(screen.getByText("Draft proposal")).toBeInTheDocument();
-    expect(screen.getByText("Not yet applied")).toBeInTheDocument();
+    expect(screen.getByText("Draft proposal, not applied")).toBeInTheDocument();
 
     dialog = openEdit();
-    expect(within(dialog).getByRole("switch", { name: APPROVAL }).getAttribute("aria-checked")).not.toBe(before);
+    expect((within(dialog).getByRole("switch", { name: APPROVAL }) as HTMLInputElement).checked).not.toBe(before);
     fireEvent.click(within(dialog).getByRole("button", { name: "Discard draft" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(screen.getByText("Enforced policy · no pending changes")).toBeInTheDocument();
+    expect(screen.getByText("Enforced policy, no pending changes")).toBeInTheDocument();
     dialog = openEdit();
-    expect(within(dialog).getByRole("switch", { name: APPROVAL }).getAttribute("aria-checked")).toBe(before);
+    expect((within(dialog).getByRole("switch", { name: APPROVAL }) as HTMLInputElement).checked).toBe(before);
     expect(spies.updateSettings).not.toHaveBeenCalled();
     expect(spies.insert).not.toHaveBeenCalled();
   });
@@ -264,7 +265,7 @@ describe("Publishing > Effective policy draft, review and apply against live set
     expect(within(dialog).getByText("Change recorded in history")).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole("button", { name: "Done" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(screen.getByText("Enforced policy · no pending changes")).toBeInTheDocument();
+    expect(screen.getByText("Enforced policy, no pending changes")).toBeInTheDocument();
   });
 
   it("leaves Applying with Not applied, records nothing and keeps the draft when the save throws", async () => {
@@ -282,7 +283,7 @@ describe("Publishing > Effective policy draft, review and apply against live set
     expect(done).toBeEnabled();
     fireEvent.click(done);
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(screen.getByText("Draft proposal")).toBeInTheDocument();
+    expect(screen.getByText("Draft proposal, not applied")).toBeInTheDocument();
   });
 
   it("reports a refused save as Not applied, records nothing, and keeps the draft", async () => {
@@ -299,6 +300,6 @@ describe("Publishing > Effective policy draft, review and apply against live set
     expect(spies.insert).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByRole("button", { name: "Done" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(screen.getByText("Draft proposal")).toBeInTheDocument();
+    expect(screen.getByText("Draft proposal, not applied")).toBeInTheDocument();
   });
 });

@@ -943,7 +943,7 @@ const PrepSignOff = () => {
                   <li>All accessories installed per spec</li>
                   <li>Installation photos documented</li>
                   <li>Inspection passed</li>
-                  <li>Vehicle ready for public listing</li>
+                  <li>Vehicle prepared for retail</li>
                 </ul>
               </div>
 
@@ -954,12 +954,12 @@ const PrepSignOff = () => {
                   onChange={e => setAckCheckbox(e.target.checked)}
                   className="w-4 h-4"
                 />
-                <span className="text-sm text-adm-ink">I understand signing here unlocks this vehicle for public listing.</span>
+                <span className="text-sm text-adm-ink">I understand signing here records this vehicle as prepared for retail. Listing on the shopper portal follows the store's publishing policy.</span>
               </label>
 
               <SignaturePad
                 label="Foreman Signature"
-                subtitle="Sign to unlock listing"
+                subtitle="Sign to record retail preparation"
                 onChange={(data, type) => setForemanSig({ data, type })}
               />
 

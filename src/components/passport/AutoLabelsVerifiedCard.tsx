@@ -1,5 +1,5 @@
 import { ShieldCheck, ShieldAlert, TriangleAlert, Clock, CircleMinus, CircleCheck, ArrowRight, ChevronRight } from "lucide-react";
-import { isSettledCheck } from "@/lib/passport/verificationSummary";
+import { isSettledCheck, recallHeadline, verificationScopeLine, verificationStatusCounts } from "@/lib/passport/verificationSummary";
 import type { VerificationReport, ReportCheck, VerificationStatus } from "@/lib/passport/verificationSummary";
 
 
@@ -7,8 +7,8 @@ import type { VerificationReport, ReportCheck, VerificationStatus } from "@/lib/
 // AutoLabelsVerifiedCard — Option B "Balanced Status Dashboard".
 //
 // A self-contained summary of the SAME canonical VerificationReport the full
-// report renders: proof up front (a passed-check grid + Verified/Needs-review
-// totals) with each non-verified item isolated as one slim, calm row. It derives
+// report renders: proof up front (one count tile per status, summing to the
+// checks in scope) with each non-verified item isolated as one slim, calm row. It derives
 // NOTHING of its own — counts, statuses and labels all come from `report`. All
 // styling is locally scoped so it can never affect a neighboring section.
 //
@@ -50,18 +50,22 @@ const TONE_STYLE: Record<Tone, { bg: string; border: string; fg: string; Icon: R
 
 // One concise status line per attention item — evidence-derived, never alarmist.
 const attentionLine = (c: ReportCheck): string => {
-  if (c.key === "recall") {
-    if (c.status === "needs_confirmation") return "Needs confirmation";
-    if (c.highSeverity) return "Do-not-drive recall";
-    if (c.status === "needs_attention") return "Open recall found";
-    return "Recall check pending";
-  }
+  // Worded from the exact recall outcome: an unavailable lookup is never
+  // phrased as an open recall (L01).
+  if (c.key === "recall") return recallHeadline(c);
   switch (c.status) {
     case "needs_attention":
       return c.key === "title" ? "Title brand on record" : c.key === "history" ? "Reported accident history" : "Needs attention";
-    case "needs_confirmation": return "Needs confirmation";
-    case "pending": return "Still processing";
-    case "unavailable": return "Source data unavailable";
+    case "needs_confirmation":
+      return c.key === "odometer" ? "Mileage records require review" : c.key === "vin" ? "Identity needs confirmation" : "Needs confirmation";
+    case "pending": return "Pending · no result yet";
+    case "unavailable": {
+      const miles = typeof c.facts?.reportedMiles === "number" ? (c.facts.reportedMiles as number) : null;
+      if (c.key === "odometer" && miles != null) return `${miles.toLocaleString("en-US")} mi reported · history not verified`;
+      if (c.key === "vin" && c.facts?.formatValid) return "VIN on record · decode not verified";
+      if (c.key === "title" && c.facts?.dealerPolicy) return "Not available · dealer policy only";
+      return "Not available · no source data";
+    }
     default: return "";
   }
 };
@@ -79,11 +83,21 @@ interface Props {
 const CARD = "bg-white border border-[#E6EAF0] rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.04)]";
 
 const AutoLabelsVerifiedCard = ({ report, onOpenReport, onReview, className }: Props) => {
-  const total = report.totalChecks;
+  // Every number on this card comes from the canonical status inventory, so
+  // the tiles always add up to the checks in scope and match the report.
+  // Pending and not-available checks are never counted as "needs review".
   const verified = report.checks.filter((c) => isSettledCheck(c.status));
-  const verifiedCount = verified.length;
-  const reviewCount = total - verifiedCount;
-  const allClear = reviewCount === 0;
+  const reviewCount = report.needsAttentionChecks + report.needsConfirmationChecks;
+  const allVerified = report.totalChecks > 0 && report.verifiedChecks === report.totalChecks;
+  const tiles = verificationStatusCounts(report);
+  const highSeverity = report.checks.some((c) => c.highSeverity && c.status === "needs_attention");
+  const tileColor = (s: VerificationStatus): string =>
+    s === "verified" ? C.green
+      : s === "dealer_attested" ? "#0F766E"
+      : s === "needs_attention" ? (highSeverity ? C.red : C.amber)
+      : s === "needs_confirmation" ? C.amber
+      : s === "pending" ? C.blue
+      : C.gray;
 
   const attention = report.checks
     .filter((c) => !isSettledCheck(c.status))
@@ -97,32 +111,36 @@ const AutoLabelsVerifiedCard = ({ report, onOpenReport, onReview, className }: P
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
-          <span className="h-10 w-10 grid place-items-center rounded-full shrink-0" style={{ background: C.greenBg }}>
-            <ShieldCheck className="w-[22px] h-[22px]" style={{ color: C.green }} />
+          <span className="h-10 w-10 grid place-items-center rounded-full shrink-0" style={{ background: report.verifiedChecks > 0 ? C.greenBg : C.grayBg }}>
+            <ShieldCheck className="w-[22px] h-[22px]" style={{ color: report.verifiedChecks > 0 ? C.green : C.gray }} />
           </span>
           <div className="min-w-0">
-            <div className="text-[15px] font-extrabold leading-tight" style={{ color: C.navy }}>AutoLabels Verified</div>
-            <div className="text-[12px] leading-snug" style={{ color: C.muted }}>{total} data {total === 1 ? "check" : "checks"} completed</div>
+            <div className="text-[15px] font-extrabold leading-tight" style={{ color: C.navy }}>Vehicle data verification</div>
+            <div className="text-[12px] leading-snug" style={{ color: C.muted }}>{verificationScopeLine(report)}</div>
           </div>
         </div>
-        <span
-          className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold shrink-0"
-          style={allClear ? { background: C.greenBg, color: C.green } : { background: C.amberBg, color: C.amber }}
-        >
-          {allClear ? "All verified" : `${reviewCount} ${reviewCount === 1 ? "review" : "reviews"}`}
-        </span>
+        {(allVerified || reviewCount > 0) && (
+          <span
+            className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold shrink-0"
+            style={allVerified ? { background: C.greenBg, color: C.green } : { background: C.amberBg, color: C.amber }}
+          >
+            {allVerified ? "All verified" : `${reviewCount} to review`}
+          </span>
+        )}
       </div>
 
-      {/* Verified / Needs-review totals */}
-      <div className="mt-3 rounded-2xl border grid grid-cols-2" style={{ borderColor: C.border, background: "#FCFDFE" }}>
-        <div className="px-4 py-3 text-center">
-          <div className="text-[26px] font-extrabold tabular-nums leading-none" style={{ color: C.green }}>{verifiedCount}</div>
-          <div className="text-[12px] font-semibold mt-1" style={{ color: C.muted }}>Verified</div>
-        </div>
-        <div className="px-4 py-3 text-center border-l" style={{ borderColor: C.border }}>
-          <div className="text-[26px] font-extrabold tabular-nums leading-none" style={{ color: allClear ? C.gray : C.amber }}>{reviewCount}</div>
-          <div className="text-[12px] font-semibold mt-1" style={{ color: C.muted }}>Needs review</div>
-        </div>
+      {/* One tile per status present; the tiles sum to the checks in scope. */}
+      <div
+        className="mt-3 rounded-2xl border grid"
+        style={{ borderColor: C.border, background: "#FCFDFE", gridTemplateColumns: `repeat(${Math.max(1, tiles.length)}, minmax(0, 1fr))` }}
+        data-verification-tiles={tiles.map((t) => `${t.status}:${t.count}`).join(",")}
+      >
+        {tiles.map((t, i) => (
+          <div key={t.status} className={`px-2 py-3 text-center ${i > 0 ? "border-l" : ""}`} style={{ borderColor: C.border }}>
+            <div className="text-[24px] font-extrabold tabular-nums leading-none" style={{ color: tileColor(t.status) }}>{t.count}</div>
+            <div className="text-[11.5px] font-semibold mt-1 leading-tight" style={{ color: C.muted }}>{t.label}</div>
+          </div>
+        ))}
       </div>
 
       {/* Isolated attention rows */}
@@ -141,7 +159,7 @@ const AutoLabelsVerifiedCard = ({ report, onOpenReport, onReview, className }: P
               <div className="text-[13px] font-bold leading-tight" style={{ color: C.navy }}>{labelFor(c)}</div>
               <div className="text-[11.5px] leading-tight mt-0.5" style={{ color: C.muted }}>{attentionLine(c)}</div>
             </div>
-            <span className="text-[13px] font-bold inline-flex items-center gap-1 shrink-0" style={{ color: C.blue }}>Review <ArrowRight className="w-3.5 h-3.5" /></span>
+            <span className="text-[13px] font-bold inline-flex items-center gap-1 shrink-0" style={{ color: C.blue }}>{c.status === "needs_attention" || c.status === "needs_confirmation" ? "Review" : "Details"} <ArrowRight className="w-3.5 h-3.5" /></span>
           </button>
         );
       })}
@@ -151,8 +169,10 @@ const AutoLabelsVerifiedCard = ({ report, onOpenReport, onReview, className }: P
         <div className="mt-3 rounded-xl border px-3 py-2.5 grid grid-cols-2 max-[340px]:grid-cols-1 gap-x-3 gap-y-2" style={{ borderColor: C.border }}>
           {verified.map((c) => (
             <div key={c.key} className="flex items-center gap-2 min-w-0">
-              <CircleCheck className="w-[18px] h-[18px] shrink-0" style={{ color: C.green }} />
-              <span className="text-[13px] font-semibold truncate" style={{ color: C.navy }}>{labelFor(c)}</span>
+              {c.status === "dealer_attested"
+                ? <ShieldCheck className="w-[18px] h-[18px] shrink-0" style={{ color: "#0F766E" }} aria-label="Dealer attested" />
+                : <CircleCheck className="w-[18px] h-[18px] shrink-0" style={{ color: C.green }} aria-label="Verified" />}
+              <span className="text-[13px] font-semibold truncate" style={{ color: C.navy }}>{c.status === "dealer_attested" && c.key === "title" ? "Title (dealer)" : `${labelFor(c)}${c.status === "dealer_attested" ? " (dealer)" : ""}`}</span>
             </div>
           ))}
         </div>

@@ -70,7 +70,7 @@ describe("Administration V2 section registry", () => {
 
   it("redirects the tabs whose content lives on standalone screens", () => {
     expect(resolveAdminLocation("leads", owner)).toEqual({ kind: "redirect", to: "/leads" });
-    expect(Object.keys(LEGACY_TAB_REDIRECTS).sort()).toEqual(["analytics", "funnel", "leads", "queue"]);
+    expect(Object.keys(LEGACY_TAB_REDIRECTS).sort()).toEqual(["analytics", "funnel", "invoices", "leads", "queue"]);
     for (const id of Object.keys(LEGACY_TAB_REDIRECTS)) expect(ADMIN_TABS).toContain(id);
   });
 

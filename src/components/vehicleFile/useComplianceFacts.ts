@@ -15,11 +15,14 @@ export interface ComplianceFacts {
 
 const UNREAD: StatusFact = { label: "", value: "Reading", tone: "neutral" };
 
-export function useComplianceFacts(vehicle: VehicleRow): ComplianceFacts {
+export function useComplianceFacts(vehicle: VehicleRow | null, opts?: { enabled?: boolean }): ComplianceFacts {
   const [state, setState] = useState<Omit<ComplianceFacts, "loading"> | null>(null);
+  const enabled = opts?.enabled !== false;
 
   useEffect(() => {
+    if (!enabled || !vehicle) return;
     let cancelled = false;
+    setState(null);
     (async () => {
       const vin = (vehicle.vin || "").toUpperCase();
       const tenantId = vehicle.tenant_id;
@@ -77,7 +80,8 @@ export function useComplianceFacts(vehicle: VehicleRow): ComplianceFacts {
       setState({ price, safety, delivery, title });
     })().catch(() => undefined);
     return () => { cancelled = true; };
-  }, [vehicle.vin, vehicle.tenant_id, vehicle.condition, vehicle.price]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, vehicle?.vin, vehicle?.tenant_id, vehicle?.condition, vehicle?.price]);
 
   const unread = { ...UNREAD };
   return state

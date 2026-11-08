@@ -164,6 +164,9 @@ export const LEGACY_TAB_REDIRECTS: Readonly<Record<string, string>> = {
   funnel: "/dashboard/reports?tab=signings",
   leads: "/leads",
   queue: "/queue",
+  // Installer invoices are Get Ready operational work, not subscription
+  // billing (Admin V3 handoff). /invoices keeps its own capability gate.
+  invoices: "/invoices",
 };
 
 export const ADMIN_CHILD_ROUTES = {
@@ -182,10 +185,12 @@ export const ADMIN_CHILD_ROUTES = {
   escalation: "/admin/customer-experience/escalation",
   customerPreview: "/admin/customer-experience/preview",
   printCalibration: "/admin/documents/print-calibration",
+  serviceCatalog: "/admin/documents/service-catalog",
   paymentEstimator: "/admin/brand/payment-estimator",
   paymentAssumptions: "/admin/brand/payment-assumptions",
   storeIdentity: "/admin/brand/store-identity",
   descriptionEngine: "/admin/publishing/description-engine",
+  storeInventory: "/admin/integrations/store-inventory",
   syncRun: (runId: string) => `/admin/integrations/runs/${encodeURIComponent(runId)}`,
   providerDetail: (providerId: string) => `/admin/integrations/providers/${encodeURIComponent(providerId)}`,
   jobDetail: (jobId: string) => `/admin/integrations/jobs/${encodeURIComponent(jobId)}`,

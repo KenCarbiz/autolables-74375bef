@@ -22,6 +22,8 @@ import DocumentsTab from "@/components/vehicleFile/DocumentsTab";
 import GetReadyTab from "@/components/vehicleFile/GetReadyTab";
 import CustomerTab from "@/components/vehicleFile/CustomerTab";
 import ComplianceTab from "@/components/vehicleFile/ComplianceTab";
+import { useComplianceFacts } from "@/components/vehicleFile/useComplianceFacts";
+import { buildComplianceBlockers } from "@/components/vehicleFile/complianceBlockers";
 import EditVehicleSheet from "@/components/vehicleFile/EditVehicleSheet";
 import {
   readinessSummary, resolveTab, type TabId, type VehicleRow,
@@ -61,6 +63,9 @@ const VehicleFile = () => {
   // Open-recall service task (auto-raised by a DB trigger on every recall pull).
   const recall = useRecallTask(vehicle?.vin, vehicle?.tenant_id);
   const lifecycle = useVehicleLifecycle(vehicle?.tenant_id, vehicle?.id, vehicle?.condition);
+  // Read once for the whole file so the Overview card, the Compliance tab and
+  // the identity strip count the same compliance blockers (L05).
+  const complianceFacts = useComplianceFacts(vehicle);
 
   // Keep ?tab= in sync so deep links and refreshes land on the same tab. A
   // pre-consolidation tab name (deal, labels, addendum, scan, prep, sign,
@@ -218,7 +223,8 @@ const VehicleFile = () => {
   };
 
   const summary: StatusFact[] = [facts.publication, facts.retail, recallLine];
-  const lc = lifecycleFacts(vehicle, lifecycle, ready.blockers.length);
+  const blockers = buildComplianceBlockers({ vehicle, ready, cf: complianceFacts });
+  const lc = lifecycleFacts(vehicle, lifecycle, blockers.rows.length);
   const subPage = tab === "documents" || tab === "getready" || tab === "compliance";
   const strip = (
     <IdentityStrip
@@ -355,11 +361,11 @@ const VehicleFile = () => {
       {!subPage && <LocalTabs tabs={tabs} label="Vehicle file sections" />}
 
       <div>
-        {tab === "overview" && <OverviewTab vehicle={vehicle} ready={ready} lifecycle={lifecycle} stockNumber={stockNo} onTab={setTab} onReload={load} />}
+        {tab === "overview" && <OverviewTab vehicle={vehicle} ready={ready} blockers={blockers} lifecycle={lifecycle} stockNumber={stockNo} onTab={setTab} onReload={load} />}
         {tab === "documents" && <DocumentsTab vehicle={vehicle} onReload={load} strip={strip} />}
         {tab === "getready" && <GetReadyTab vehicle={vehicle} lifecycle={lifecycle} ready={ready} strip={strip} />}
         {tab === "customer" && <CustomerTab vehicle={vehicle} stockNumber={stockNo} />}
-        {tab === "compliance" && <ComplianceTab vehicle={vehicle} ready={ready} recall={recall} lifecycle={lifecycle} onReload={load} strip={strip} />}
+        {tab === "compliance" && <ComplianceTab vehicle={vehicle} ready={ready} recall={recall} lifecycle={lifecycle} onReload={load} strip={strip} cf={complianceFacts} />}
         {tab === "history" && <HistoryTab vehicle={vehicle} lifecycle={lifecycle} />}
       </div>
 

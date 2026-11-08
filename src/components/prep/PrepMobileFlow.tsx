@@ -984,7 +984,7 @@ const ManagerScreen = ({
     <>
       <ScreenHeader
         title="Manager Final Review"
-        subtitle="Approving unlocks this vehicle for listing."
+        subtitle="Approving records this vehicle as prepared for retail."
         onBack={onBack}
       />
       <VinPill vin={vin} ymm={ymm} />

@@ -5,7 +5,7 @@ import { Button, EmptyState, InlineNote, KeyValueList, Panel, StatusText, type T
 import { setControls, type InventoryFeedControls, type StoreOverview } from "@/lib/inventoryNetwork/api";
 import { NetIcon } from "@/components/inventoryNetwork/icons";
 import { inputClass, mcModeLabel, plural, storeAddress, useAct, useNet, when, humanize, STATUS_TONE } from "./shared";
-import { buildOverviewModel, type OverviewModel } from "./overviewModel";
+import { buildOverviewModel, overdueImports, type OverviewModel } from "./overviewModel";
 import { Al97Frame, ChipView, Glyph, type ScopePicker } from "@/components/admin/al97/al97ui";
 import { useLedgers } from "./ledgers";
 import connectionStages from "@/assets/inventoryNetwork/connection-stages.svg";
@@ -74,18 +74,25 @@ function ControlsPanel() {
   );
 }
 
-const feedHealth = (s: StoreOverview): { label: string; tone: Tone } => {
+// `overdue` is true when an import for this store is queued past due, null
+// when the job ledger was not read. An applied LAST snapshot only describes
+// the last import; it is never reported as "healthy" while newer work waits
+// or while the queue is unknown (L03).
+export const feedHealth = (s: StoreOverview, overdue: boolean | null): { label: string; tone: Tone } => {
   if (!s.store.inventory_feed_enabled) return { label: "Feed off", tone: "neutral" };
   if (s.store.feed_import_paused) return { label: "Import paused", tone: "warning" };
+  if (overdue) return { label: "Import overdue", tone: "warning" };
   const snap = s.last_snapshot;
   if (!snap) return { label: "No feed yet", tone: "neutral" };
-  const label = snap.status === "applied" ? "Feed healthy" : snap.status === "staged" ? "Processing" : snap.status === "superseded" ? "Superseded" : `Last feed ${snap.status}`;
-  return { label, tone: STATUS_TONE[snap.status] ?? "neutral" };
+  const label = snap.status === "applied"
+    ? (overdue === false ? "Last import applied" : "Last import applied, queue unknown")
+    : snap.status === "staged" ? "Processing" : snap.status === "superseded" ? "Superseded" : `Last feed ${snap.status}`;
+  return { label, tone: snap.status === "applied" && overdue !== false ? "neutral" : STATUS_TONE[snap.status] ?? "neutral" };
 };
 
-function StoreCard({ s }: { s: StoreOverview }) {
+function StoreCard({ s, overdue }: { s: StoreOverview; overdue: boolean | null }) {
   const { href } = useNet();
-  const health = feedHealth(s);
+  const health = feedHealth(s, overdue);
   const mc = mcModeLabel(s.policy);
   const st = s.store;
   const failedSince = s.state?.last_failure_at && (!s.state.last_applied_at || s.state.last_failure_at > s.state.last_applied_at);
@@ -125,8 +132,14 @@ function StoreCard({ s }: { s: StoreOverview }) {
 
 export default function OverviewDetail() {
   const { overview, stores, href, go } = useNet();
+  const now = useAdminNow();
+  const ledgers = useLedgers({ jobs: true, snapshots: true });
+  const queue = overdueImports(ledgers.jobs, ledgers.snapshots, now);
   const ex = overview.exceptions;
   const items: Array<{ label: string; n: number; to: string }> = [
+    // Queued work past due is a pipeline failure even when nothing has
+    // "failed" yet (L03). Hidden only while the queue is unknown.
+    ...(queue.known ? [{ label: "Overdue imports", n: queue.total, to: href("runs", { panel: "timeline", q: "queued" }) }] : []),
     { label: "Open VIN conflicts", n: ex.open_conflicts, to: href("runs", { panel: "conflicts" }) },
     { label: "Awaiting retirement review", n: ex.retirement_review, to: href("runs", { panel: "retirement" }) },
     { label: "Quarantined partitions (7 days)", n: ex.quarantined_partitions_7d, to: href("runs", { panel: "timeline", q: "quarantined" }) },
@@ -138,7 +151,7 @@ export default function OverviewDetail() {
   return (
     <div className="space-y-4">
       <Panel title="Exceptions" description="Things that need a person. Select one to open it.">
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           {items.map((i) => (
             <li key={i.label}>
               <Link to={i.to} className="block rounded-[6px] border border-adm-border bg-adm-surface px-4 py-3 hover:border-adm-primary/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-adm-primary">
@@ -157,7 +170,7 @@ export default function OverviewDetail() {
         {stores.length === 0 ? (
           <Panel><EmptyState title="No stores in this group yet" detail="Stores are never created automatically. Add each rooftop yourself, then map its feed." action={<Button variant="primary" onClick={() => go("stores", { store: "new" })}>Add store</Button>} compact /></Panel>
         ) : (
-          <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{stores.map((s) => <StoreCard key={s.store.id} s={s} />)}</ul>
+          <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{stores.map((s) => <StoreCard key={s.store.id} s={s} overdue={queue.known ? queue.stores.has(s.store.id) : null} />)}</ul>
         )}
       </section>
       <InlineNote tone="info" title="Showing a store's vehicles to a sibling store's customers never calls MarketCheck.">Only a store's own policy and caps allow paid lookups.</InlineNote>

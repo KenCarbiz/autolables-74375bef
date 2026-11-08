@@ -23,7 +23,7 @@ vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ user: { id: "user-1
 vi.mock("@/contexts/TenantContext", () => ({
   useTenant: () => ({ tenant: { id: "tenant-1", name: "Example Motors" }, currentStore: { id: "store-1", name: "Example Motors" }, stores: [{ id: "store-1", name: "Example Motors" }], loading: false, setCurrentStore: () => {} }),
 }));
-vi.mock("@/hooks/useEntitlements", () => ({ useEntitlements: () => ({ tenant: { id: "tenant-1" }, member: { role: "owner" }, profile: null, entitlements: [], loading: false }) }));
+vi.mock("@/hooks/useEntitlements", () => ({ useEntitlements: () => ({ tenant: { id: "tenant-1" }, member: { role: "owner" }, profile: null, entitlements: [], entitlementFor: () => null, error: null, loading: false }) }));
 vi.mock("@/contexts/AuditContext", () => ({ useAudit: () => ({ log: vi.fn(), entries: [] }) }));
 vi.mock("@/contexts/DealerSettingsContext", async (importOriginal) => {
   const mod = await importOriginal<typeof import("@/contexts/DealerSettingsContext")>();
@@ -59,6 +59,24 @@ describe("opening an Administration screen starts no edge function", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it.each([
+    adminTabHref("overview"),
+    adminTabHref("overview", "exceptions"),
+    adminTabHref("overview", "setup"),
+    adminTabHref("overview", "policy"),
+    adminTabHref("overview", "activity"),
+    adminTabHref("plan-features"),
+    adminTabHref("plan-features", "compare"),
+    adminTabHref("plan-features", "metric-stickers_generated"),
+  ])("wave E screen %s", async (url) => {
+    const tab = new URL(url, "http://x").searchParams.get("tab") as string;
+    const View = ADMIN_VIEWS[tab];
+    const { container } = renderAdmin(<Suspense fallback={null}><View /></Suspense>, { route: url });
+    await settle(container);
+    expect(functionCalls()).toEqual([]);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   const childUrls: Record<string, string> = {
     "/admin/people/:memberId": "/admin/people/member-1",
     "/admin/pricing/fee-review": "/admin/pricing/fee-review?enabled=1&amount=925&state=CT&scope=active",
@@ -68,10 +86,12 @@ describe("opening an Administration screen starts no edge function", () => {
     "/admin/integrations/inventory-network": "/admin/integrations/inventory-network",
     "/admin/customer-experience/preview": "/admin/customer-experience/preview",
     "/admin/documents/print-calibration": "/admin/documents/print-calibration",
+    "/admin/documents/service-catalog": "/admin/documents/service-catalog",
     "/admin/brand/payment-estimator": "/admin/brand/payment-estimator",
     "/admin/brand/payment-assumptions": "/admin/brand/payment-assumptions",
     "/admin/brand/store-identity": "/admin/brand/store-identity",
     "/admin/publishing/description-engine": "/admin/publishing/description-engine",
+    "/admin/integrations/store-inventory": "/admin/integrations/store-inventory",
     "/admin/integrations/runs/:runId": "/admin/integrations/runs/run-1",
     "/admin/integrations/providers/:providerId": "/admin/integrations/providers/syndication",
     "/admin/integrations/jobs/:jobId": "/admin/integrations/jobs/inventory_sync",

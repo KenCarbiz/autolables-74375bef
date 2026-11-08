@@ -147,8 +147,10 @@ export const PriceIntegritySection = ({ rows, loading }: { rows: PriceRow[]; loa
                     <>
                       {r.difference > 0 ? "+" : r.difference < 0 ? "−" : ""}
                       {money(Math.abs(r.difference))}
-                      {r.matchedWithDocFee && (
-                        <span className="ml-1 text-[12px] leading-[18px] text-adm-muted">after doc fee</span>
+                      {r.comparisonBasis && r.comparisonBasis !== "as_displayed" && (
+                        <span className="ml-1 text-[12px] leading-[18px] text-adm-muted">
+                          {r.comparisonBasis === "fee_removed_from_website" ? "website total less doc fee" : "website plus doc fee"}
+                        </span>
                       )}
                     </>
                   )}

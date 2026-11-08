@@ -95,14 +95,14 @@ describe("fee-inclusive website prices (Harte VDP ladder)", () => {
     // price further from the feed rather than closer.
     const fx = feeExclusiveEquivalent(25_876, HARTE);
     expect(fx).toBe(24_981);
-    expect(reconcileGap(25_876, 24_981, 895, fx)).toEqual({ difference: 0, matchedWithDocFee: true });
+    expect(reconcileGap(25_876, 24_981, 895, fx)).toMatchObject({ difference: 0, matchedWithDocFee: true });
   });
 
   it("still reports a real discrepancy of exactly the fee amount", () => {
     // The tolerance was NOT widened, so a genuine $895 gap on top of the fee is
     // still caught. A symmetric add-or-subtract heuristic would have hidden it.
     const fx = feeExclusiveEquivalent(25_876, HARTE);
-    expect(reconcileGap(25_876, 24_086, 895, fx)).toEqual({ difference: 895, matchedWithDocFee: true });
+    expect(reconcileGap(25_876, 24_086, 895, fx)).toMatchObject({ difference: 895, matchedWithDocFee: true });
   });
 
   it("declines to substitute when the page never added a fee", () => {
@@ -120,17 +120,17 @@ describe("fee-inclusive website prices (Harte VDP ladder)", () => {
   });
 
   it("falls back to the old heuristic for snapshots with no ladder", () => {
-    expect(reconcileGap(47_105, 48_000, 895, null)).toEqual({ difference: 0, matchedWithDocFee: true });
+    expect(reconcileGap(47_105, 48_000, 895, null)).toMatchObject({ difference: 0, matchedWithDocFee: true });
   });
 });
 
 describe("reconcileGap", () => {
   it("reports the raw gap when no doc fee is configured", () => {
-    expect(reconcileGap(47_105, 48_000, 0)).toEqual({ difference: -895, matchedWithDocFee: false });
+    expect(reconcileGap(47_105, 48_000, 0)).toMatchObject({ difference: -895, matchedWithDocFee: false });
   });
 
   it("treats a doc-fee-sized gap as reconciled and says so", () => {
-    expect(reconcileGap(47_105, 48_000, 895)).toEqual({ difference: 0, matchedWithDocFee: true });
+    expect(reconcileGap(47_105, 48_000, 895)).toMatchObject({ difference: 0, matchedWithDocFee: true });
   });
 });
 
@@ -155,7 +155,7 @@ describe("price rows grouped by VIN", () => {
       defaultDocFee: 0,
     });
     expect(rows[0].state).toBe("differs");
-    expect(rows[0].currentIssue).toBe("Website price differs by $895");
+    expect(rows[0].currentIssue).toBe("Website selling price differs by $895");
     expect(rows[0].historicalEvents).toBe(3);
     expect(rows[0].openFlags).toBe(0);
   });

@@ -1,8 +1,8 @@
 // ──────────────────────────────────────────────────────────────────────
 // epa-fuel-economy — official EPA fuel economy from fueleconomy.gov (public
 // domain; no key required). Matches a listing's year/make/model against the
-// EPA vehicle menu, prefers the option whose text matches the decoded engine
-// displacement and drivetrain, and persists the normalized record so the
+// EPA vehicle menu with the powertrain-, drivetrain- and engine-aware rules in
+// _shared/epaMatch.ts (refusing rather than guessing), and persists the record so the
 // customer passport can show a Monroney-style fuel economy panel and the
 // Buying Report can use the government annual-fuel-cost figure instead of an
 // assumption.
@@ -11,6 +11,7 @@
 // ──────────────────────────────────────────────────────────────────────
 import { json, preflight } from "../_shared/http.ts";
 import { adminClient, isServiceOrCron } from "../_shared/supabase.ts";
+import { matchEpa, listingPowertrain, litersOf, driveOf, transOf, cylindersOf, EPA_MATCHER_VERSION, VERIFIED_MATCHERS, type EpaClient, type MatchResult } from "../_shared/epaMatch.ts";
 
 const FE_BASE = "https://www.fueleconomy.gov/ws/rest";
 const JSON_HDR = { Accept: "application/json" };
@@ -28,6 +29,9 @@ interface EpaRecord {
   ghgScore: number | null;
   rangeMiles: number | null;
   fuelType: string | null;
+  atvType: string | null;
+  matchBasis: MatchResult["basis"];
+  matcherVersion: string;
   source: "fueleconomy.gov";
   checkedAt: string;
 }
@@ -53,74 +57,55 @@ const fetchJson = async (url: string) => {
   return await res.json().catch(() => ({}));
 };
 
-// EPA model names sometimes carry suffixes ("Q50 AWD") — try the exact model,
-// then progressively shorter prefixes of the listing's model words.
-const findModels = async (year: string, make: string, model: string): Promise<string[]> => {
-  const b = await fetchJson(`${FE_BASE}/vehicle/menu/model?year=${encodeURIComponent(year)}&make=${encodeURIComponent(make)}`);
-  const models = menuItems(b).map((m) => m.text);
-  const target = model.toLowerCase();
-  const exact = models.filter((m) => m.toLowerCase() === target);
-  if (exact.length) return exact;
-  const starts = models.filter((m) => m.toLowerCase().startsWith(target) || target.startsWith(m.toLowerCase()));
-  if (starts.length) return starts;
-  const first = target.split(/\s+/)[0];
-  return models.filter((m) => m.toLowerCase().split(/\s+/)[0] === first);
+const api: EpaClient = {
+  models: async (year, make) => menuItems(await fetchJson(`${FE_BASE}/vehicle/menu/model?year=${encodeURIComponent(year)}&make=${encodeURIComponent(make)}`)),
+  options: async (year, make, model) => menuItems(await fetchJson(`${FE_BASE}/vehicle/menu/options?year=${encodeURIComponent(year)}&make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}`)),
+  // deno-lint-ignore no-explicit-any
+  vehicle: async (id) => { const v: any = await fetchJson(`${FE_BASE}/vehicle/${encodeURIComponent(id)}`); return v && v.id != null ? v : null; },
 };
 
-const pickOption = (options: { text: string; value: string }[], hints: { liters: string | null; awd: boolean }): { text: string; value: string } | null => {
-  if (!options.length) return null;
-  const scored = options.map((o) => {
-    const t = o.text.toLowerCase();
-    let score = 0;
-    if (hints.liters && t.includes(`${hints.liters} l`)) score += 2;
-    if (hints.awd && /(awd|4wd|4x4|all.?wheel)/.test(t)) score += 1;
-    if (!hints.awd && /(awd|4wd|4x4)/.test(t)) score -= 1;
-    return { o, score };
-  }).sort((a, b) => b.score - a.score);
-  return scored[0].o;
-};
-
-async function lookupEpa(l: { ymm: string | null; mc: Record<string, unknown> }): Promise<EpaRecord | { error: string }> {
+async function lookupEpa(l: { ymm: string | null; trim: string | null; mc: Record<string, unknown> }): Promise<EpaRecord | { error: string }> {
   const parts = (l.ymm || "").trim().split(/\s+/);
-  const year = parts[0] && /^\d{4}$/.test(parts[0]) ? parts[0] : null;
-  const make = parts[1] || null;
-  const model = parts.slice(2).join(" ").trim() || null;
-  if (!year || !make || !model) return { error: "missing_ymm" };
-
-  const engine = String(l.mc.engine ?? l.mc.engine_size ?? "");
-  const liters = engine.match(/(\d\.\d)\s*l/i)?.[1] ?? null;
-  const awd = /(awd|4wd|4x4|all.?wheel)/i.test(String(l.mc.drivetrain ?? ""));
-
+  const year = parts[0] && /^\d{4}$/.test(parts[0]) ? parts[0] : "";
+  const make = parts[1] || "";
+  const model = parts.slice(2).join(" ").trim();
+  const trim = l.trim ?? (l.mc.trim as string | undefined) ?? null;
+  const facts = {
+    year, make, model, trim,
+    liters: litersOf(String(l.mc.engine ?? l.mc.engine_size ?? "")),
+    drive: driveOf(String(l.mc.drivetrain ?? "")),
+    trans: transOf(String(l.mc.transmission ?? "")),
+    cylinders: cylindersOf(String(l.mc.engine ?? "")),
+    powertrain: listingPowertrain({ powertrainType: l.mc.powertrain_type, fuelType: l.mc.fuel_type, trim, model }),
+  };
   try {
-    const models = await findModels(year, make, model);
-    if (!models.length) return { error: "no_model_match" };
-    for (const m of models) {
-      const b = await fetchJson(`${FE_BASE}/vehicle/menu/options?year=${encodeURIComponent(year)}&make=${encodeURIComponent(make)}&model=${encodeURIComponent(m)}`);
-      const opt = pickOption(menuItems(b), { liters, awd });
-      if (!opt) continue;
-      // deno-lint-ignore no-explicit-any
-      const v: any = await fetchJson(`${FE_BASE}/vehicle/${opt.value}`);
-      if (!v || v.id == null) continue;
-      return {
-        vehicleId: Number(v.id),
-        matchedOption: `${year} ${make} ${m} — ${opt.text}`,
-        city: num(v.city08),
-        highway: num(v.highway08),
-        combined: num(v.comb08),
-        annualFuelCost: num(v.fuelCost08),
-        co2TailpipeGpm: num(v.co2TailpipeGpm),
-        ghgScore: num(v.ghgScore),
-        rangeMiles: num(v.rangeA) ?? num(v.range),
-        fuelType: v.fuelType ? String(v.fuelType) : null,
-        source: "fueleconomy.gov",
-        checkedAt: new Date().toISOString(),
-      };
-    }
-    return { error: "no_option_match" };
+    const r = await matchEpa(facts, api);
+    if ("refused" in r) return { error: r.refused };
+    const v = r.vehicle;
+    return {
+      vehicleId: Number(v.id),
+      matchedOption: `${year} ${make} ${r.model} — ${r.option}`,
+      city: num(v.city08),
+      highway: num(v.highway08),
+      combined: num(v.comb08),
+      annualFuelCost: num(v.fuelCost08),
+      co2TailpipeGpm: num(v.co2TailpipeGpm),
+      ghgScore: num(v.ghgScore),
+      rangeMiles: num(v.rangeA) ?? num(v.range),
+      fuelType: v.fuelType ? String(v.fuelType) : null,
+      atvType: v.atvType ? String(v.atvType) : null,
+      matchBasis: r.basis,
+      matcherVersion: EPA_MATCHER_VERSION,
+      source: "fueleconomy.gov",
+      checkedAt: new Date().toISOString(),
+    };
   } catch (_e) {
     return { error: "timeout_or_network" };
   }
 }
+
+const verifiedRecord = (r: Record<string, unknown> | null | undefined) =>
+  VERIFIED_MATCHERS.includes(String(r?.matcherVersion ?? ""));
 
 Deno.serve(async (req) => {
   const pf = preflight(req); if (pf) return pf;
@@ -151,28 +136,42 @@ Deno.serve(async (req) => {
       .update({ epa_economy: rec, epa_checked_at: rec.checkedAt })
       .eq("id", id);
 
+  // Stamp the attempt so an unmatched model isn't retried every sweep. A
+  // definite refusal also clears a stored match: the earlier matcher's record
+  // for a car the new one will not match is not this car's data. A network
+  // failure leaves what is stored.
+  // A record a verified matcher (v3 on) wrote is kept: a later refusal is a
+  // tie or a gap in the service, not evidence that the stored figure is wrong.
+  const refuse = async (id: string, reason: string, stored?: Record<string, unknown> | null) =>
+    // deno-lint-ignore no-explicit-any
+    await (admin as any).from("vehicle_listings")
+      .update(reason === "timeout_or_network" || verifiedRecord(stored)
+        ? { epa_checked_at: new Date().toISOString() }
+        : { epa_economy: null, epa_checked_at: new Date().toISOString() })
+      .eq("id", id);
+
   if (body.batch) {
     // Batch sweep: all tenants under cron; pinned to one tenant for a JWT
     // caller. EPA data is static per model-year, so a 30-day re-check is
     // plenty; force overrides.
     const force = !!body.force;
     let q = admin.from("vehicle_listings")
-      .select("id, vin, ymm, mc_attributes, epa_checked_at")
+      .select("id, vin, ymm, trim, mc_attributes, epa_economy, epa_checked_at")
       .limit(400);
     if (tenantId) q = q.eq("tenant_id", tenantId);
     const { data: vehicles } = await q;
     const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
     let checked = 0, matched = 0, skipped = 0, errors = 0;
-    for (const v of (vehicles || []) as { id: string; vin: string | null; ymm: string | null; mc_attributes: Record<string, unknown> | null; epa_checked_at: string | null }[]) {
+    for (const v of (vehicles || []) as { id: string; vin: string | null; ymm: string | null; trim: string | null; mc_attributes: Record<string, unknown> | null; epa_economy: Record<string, unknown> | null; epa_checked_at: string | null }[]) {
       if (!v.ymm) { skipped++; continue; }
-      if (!force && v.epa_checked_at && new Date(v.epa_checked_at).getTime() > cutoff) { skipped++; continue; }
-      const r = await lookupEpa({ ymm: v.ymm, mc: v.mc_attributes || {} });
+      // A record written by a pre-v3 matcher is re-checked whatever its age.
+      const current = verifiedRecord(v.epa_economy) || !v.epa_economy;
+      if (!force && current && v.epa_checked_at && new Date(v.epa_checked_at).getTime() > cutoff) { skipped++; continue; }
+      const r = await lookupEpa({ ymm: v.ymm, trim: v.trim, mc: v.mc_attributes || {} });
       checked++;
       if ("error" in r) {
         errors++;
-        // Stamp the attempt so an unmatched model isn't retried every sweep.
-        // deno-lint-ignore no-explicit-any
-        await (admin as any).from("vehicle_listings").update({ epa_checked_at: new Date().toISOString() }).eq("id", v.id);
+        await refuse(v.id, r.error, v.epa_economy);
       } else { await persist(v.id, r); matched++; }
       await new Promise((res) => setTimeout(res, 150));
     }
@@ -181,13 +180,13 @@ Deno.serve(async (req) => {
 
   const vin = String(body.vin || "").toUpperCase().trim();
   if (!validVin(vin)) return json(400, { error: "invalid_vin" });
-  let lq = admin.from("vehicle_listings").select("id, ymm, mc_attributes").eq("vin", vin);
+  let lq = admin.from("vehicle_listings").select("id, ymm, trim, mc_attributes, epa_economy").eq("vin", vin);
   if (tenantId) lq = lq.eq("tenant_id", tenantId);
   const { data: listing } = await lq.maybeSingle();
   if (!listing) return json(404, { error: "listing_not_found" });
 
-  const r = await lookupEpa({ ymm: listing.ymm as string | null, mc: (listing.mc_attributes as Record<string, unknown>) || {} });
-  if ("error" in r) return json(200, { vin, available: false, error: r.error });
+  const r = await lookupEpa({ ymm: listing.ymm as string | null, trim: (listing.trim as string | null) ?? null, mc: (listing.mc_attributes as Record<string, unknown>) || {} });
+  if ("error" in r) { await refuse(listing.id as string, r.error, listing.epa_economy as Record<string, unknown> | null); return json(200, { vin, available: false, error: r.error }); }
   await persist(listing.id as string, r);
   return json(200, { vin, available: true, ...r });
 });

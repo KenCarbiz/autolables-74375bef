@@ -55,6 +55,27 @@ const TRIGGER_LABEL: Record<InventoryFeedJob["trigger"], string> = {
 
 const byCreatedDesc = <T extends { created_at: string }>(a: T, b: T) => ms(b.created_at) - ms(a.created_at);
 
+/**
+ * Which stores have an import job that is queued and past due (L03). A
+ * permission switch or an applied LAST snapshot says nothing about whether the
+ * NEXT file was imported, so every store health label consults this. `known`
+ * is false when either ledger was not read: health is then unknown, never
+ * healthy.
+ */
+export function overdueImports(jobs: InventoryFeedJob[] | null, snaps: InventoryStoreSnapshot[] | null, now: number): {
+  known: boolean; stores: Set<string>; unattributed: number; total: number;
+} {
+  if (!jobs || !snaps) return { known: false, stores: new Set(), unattributed: 0, total: 0 };
+  const overdue = jobs.filter((j) => j.status === "queued" && ms(j.next_attempt_at) <= now);
+  const stores = new Set<string>();
+  let unattributed = 0;
+  for (const j of overdue) {
+    const sid = snaps.find((s) => s.path === j.path && s.store_id)?.store_id ?? null;
+    if (sid) stores.add(sid); else unattributed += 1;
+  }
+  return { known: true, stores, unattributed, total: overdue.length };
+}
+
 export function buildOverviewModel(i: OverviewInputs): OverviewModel {
   const { now, stores } = i;
   const jobs = i.jobs ? [...i.jobs].sort(byCreatedDesc) : null;
@@ -154,13 +175,9 @@ export function buildOverviewModel(i: OverviewInputs): OverviewModel {
   else if (applied) customer = { no: 4, title: "Customer view", chip: { label: "Current data", tone: "green" }, note: `Applied ${formatClock(applied.applied_at ?? applied.created_at, now)}` };
   else customer = { no: 4, title: "Customer view", chip: { label: "No data", tone: "neutral" }, note: "Nothing applied yet" };
 
-  const pathStore = (path: string) => snaps?.find((s) => s.path === path && s.store_id)?.store_id ?? null;
-  const overdueStores = new Set<string>();
-  let unattributed = 0;
-  for (const j of overdue ?? []) {
-    const sid = pathStore(j.path);
-    if (sid) overdueStores.add(sid); else unattributed += 1;
-  }
+  const q = overdueImports(jobs, snaps, now);
+  const overdueStores = q.stores;
+  const unattributed = q.unattributed;
 
   const rows: ActionRow[] = [];
   const consider = (s: StoreOverview): ActionRow | null => {
