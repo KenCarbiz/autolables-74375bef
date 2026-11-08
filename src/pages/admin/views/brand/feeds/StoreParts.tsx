@@ -28,9 +28,9 @@ export const GroupCard = ({ group, draft, settings, changes, canEdit, onOpen }: 
           <h2 className="text-[16px] leading-[22px] font-semibold text-adm-ink">{group.title}</h2>
           <p className="text-[13px] leading-[18px] text-adm-muted">{group.blurb}</p>
         </div>
-        <AdminButton variant={canEdit && group.id !== "integrations" ? "primary" : "secondary"} onClick={onOpen} className="flex-shrink-0" aria-label={`${group.id === "integrations" || !canEdit ? "View details" : "Configure"}: ${group.title}`}>
+        {!narrow && <AdminButton variant={canEdit && group.id !== "integrations" ? "primary" : "secondary"} onClick={onOpen} className="flex-shrink-0" aria-label={`${group.id === "integrations" || !canEdit ? "View details" : "Configure"}: ${group.title}`}>
           {group.id === "integrations" || !canEdit ? "View" : "Configure"}
-        </AdminButton>
+        </AdminButton>}
       </div>
       <div className="flex items-center gap-2 flex-wrap">
         {sum.total > 0 && <StatusBadge state={sum.on > 0 ? "enabled" : "disabled"} label={`${sum.on} of ${sum.total} on`} />}
@@ -49,6 +49,9 @@ export const GroupCard = ({ group, draft, settings, changes, canEdit, onOpen }: 
         })}
         {more > 0 && <li className="text-[13px] leading-[18px] text-adm-muted">and {more} more</li>}
       </ul>
+      {narrow && <AdminButton variant={canEdit && group.id !== "integrations" ? "primary" : "secondary"} onClick={onOpen} className="w-full" aria-label={`${group.id === "integrations" || !canEdit ? "View details" : "Configure"}: ${group.title}`}>
+          {group.id === "integrations" || !canEdit ? "View" : "Configure"}
+        </AdminButton>}
     </li>
   );
 };

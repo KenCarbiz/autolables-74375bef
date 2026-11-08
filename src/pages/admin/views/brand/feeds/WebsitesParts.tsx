@@ -86,7 +86,7 @@ export const ProviderCard = ({ provider, value, onChange, error, canEdit, onDeta
     </div>
   );
   return (
-    <li className="rounded-xl border border-adm-divider bg-adm-surface p-4 max-sm:p-3 flex flex-col gap-3 max-sm:gap-2 min-w-0" data-provider={provider.id}>
+    <li className="md:[&:last-child:nth-child(odd)]:col-span-2 rounded-xl border border-adm-divider bg-adm-surface p-4 max-sm:p-3 flex flex-col gap-3 max-sm:gap-2 min-w-0" data-provider={provider.id}>
       <div className="flex items-center gap-3 flex-wrap">
         <span aria-hidden="true" data-logo-slot="" className="flex flex-shrink-0 items-center justify-center w-36 min-w-[144px] h-12 min-h-[48px] rounded-md border border-adm-divider bg-adm-workspace text-adm-muted">
           <AdminIcon name="link" />
@@ -104,7 +104,10 @@ export const ProviderCard = ({ provider, value, onChange, error, canEdit, onDeta
           <p className="mt-1 text-[14px] break-all text-adm-ink">{value.trim() || <span className="italic text-adm-muted">Not set</span>}</p>
         </div>
       )}
-      <ProviderCapabilities provider={provider} value={value} />
+      <details className="group border-t border-adm-divider">
+        <summary className="flex items-center justify-between min-h-[44px] cursor-pointer text-[14px] font-semibold text-adm-primary list-none">Details<AdminIcon name="chevron-down" className="group-open:rotate-180" /></summary>
+        <ProviderCapabilities provider={provider} value={value} />
+      </details>
       <div className="mt-auto">{actions}</div>
     </li>
   );
