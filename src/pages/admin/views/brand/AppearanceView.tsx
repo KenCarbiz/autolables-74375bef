@@ -12,7 +12,7 @@ import type { DraftErrors, EditorDraftChange } from "@/lib/admin/useEditorDraft"
 import { DEFAULT_ACCENT_HEX } from "./brandModel";
 import { BrandEditorFrame, LoadingState } from "./editor/BrandEditorFrame";
 import { settingsWriter, useBrandEditor, useBrandEditorContext } from "./editor/useBrandEditor";
-import { BlockedCard, ConfirmDialog, PreviewFrame, Segmented, SourceLine } from "./editor/parts";
+import { ConfirmDialog, PreviewFrame, Segmented, SourceLine, UpcomingCard } from "./editor/parts";
 
 interface AppearanceDraft extends Record<string, unknown> {
   primary_color: string;
@@ -210,25 +210,8 @@ export default function AppearanceView() {
         </AdvancedDisclosure>
       </SectionCard>
 
-      <BlockedCard
-        icon="layers"
-        title="Named palette"
-        does="Name each brand colour, give it a role (primary, secondary or accent), and add, edit, remove or reset them. Until then the primary and secondary colours above are the saved palette."
-        migrationId={PALETTE_MIGRATION}
-        preview={
-          <>
-            <FieldRow label="Colour name">{(p) => <input {...p} className={INPUT_CLASS} disabled placeholder="Name" />}</FieldRow>
-            <FieldRow label="Role">{(p) => <SelectField {...p} disabled><option>Primary, secondary or accent</option></SelectField>}</FieldRow>
-            <div className="flex gap-2 flex-wrap">
-              <AdminButton variant="secondary" disabled><AdminIcon name="plus" />Add colour</AdminButton>
-              <AdminButton variant="secondary" disabled><AdminIcon name="rotate" />Reset palette</AdminButton>
-            </div>
-          </>
-        }
-      />
-
       <SectionCard icon="image" title="Logos" description="One logo for each kind of background. Logos are never cropped, stretched or recoloured.">
-        <div className="grid gap-4 lg:grid-cols-2 items-stretch [&>*]:h-full">
+        <div className="max-w-xl">
           <LogoSlot
             label="Logo for light backgrounds"
             src={draft.dealer_logo_url || null}
@@ -243,16 +226,28 @@ export default function AppearanceView() {
           >
             <SourceLine>Dealer settings (dealer_logo_url), the same file the Identity summary shows.</SourceLine>
           </LogoSlot>
-          <BlockedCard
-            icon="moon"
-            title="Logo for dark backgrounds"
-            does="A separate logo for dark surfaces. Until then the light-background logo is shown unmodified as the fallback."
-            migrationId={PALETTE_MIGRATION}
-            className="h-full"
-            preview={<LogoSlot label="Logo for dark backgrounds" surface="dark" disabled guidance="PNG or SVG with a transparent background, up to 2 MB." onSelectFile={() => undefined} />}
-          />
         </div>
       </SectionCard>
+
+      <UpcomingCard
+        items={[
+          { icon: "layers", title: "Named palette", does: "Name each brand colour, give it a role and add, edit, remove or reset them. The colours above stay the saved palette.", migrationId: PALETTE_MIGRATION },
+          { icon: "moon", title: "Logo for dark backgrounds", does: "A separate logo for dark surfaces. The light-background logo is the fallback.", migrationId: PALETTE_MIGRATION },
+        ]}
+        preview={
+          <>
+            <>
+            <FieldRow label="Colour name">{(p) => <input {...p} className={INPUT_CLASS} disabled placeholder="Name" />}</FieldRow>
+            <FieldRow label="Role">{(p) => <SelectField {...p} disabled><option>Primary, secondary or accent</option></SelectField>}</FieldRow>
+            <div className="flex gap-2 flex-wrap">
+              <AdminButton variant="secondary" disabled><AdminIcon name="plus" />Add colour</AdminButton>
+              <AdminButton variant="secondary" disabled><AdminIcon name="rotate" />Reset palette</AdminButton>
+            </div>
+          </>
+            <LogoSlot label="Logo for dark backgrounds" surface="dark" disabled guidance="PNG or SVG with a transparent background, up to 2 MB." onSelectFile={() => undefined} />
+          </>
+        }
+      />
 
       <ConfirmDialog
         open={confirmRemove}
