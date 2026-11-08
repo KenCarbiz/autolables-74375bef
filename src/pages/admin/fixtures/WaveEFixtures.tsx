@@ -58,7 +58,7 @@ const baseData: OverviewData = {
 
 const fixtureSettings = {
   ...DEFAULT_SETTINGS,
-  dealer_name: "Example Honda",
+  dealer_name: "Example Motors",
   dealer_city: "Example City",
   dealer_state: "ST",
   dealer_logo_url: "fixture-logo",
@@ -87,8 +87,8 @@ const emptyData: OverviewData = {
 const overview: OverviewFixture = {
   data: baseData,
   settings: fixtureSettings,
-  rooftopLabel: "Example Honda (Example City, ST)",
-  groupLabel: "Example Auto Group",
+  rooftopLabel: "Example Motors",
+  groupLabel: null,
   visibleCategoryIds: null,
   seeds: {
     empty: { data: emptyData, settings: { ...DEFAULT_SETTINGS, dealer_name: "Your Dealership" } },
@@ -103,7 +103,7 @@ const settingsForPlan = {
   passport_agents: [],
   feature_custom_branding: false,
   dealer_timezone: "America/New_York",
-  dealer_name: "Example Honda",
+  dealer_name: "Example Motors",
   dealer_city: "Example City",
   dealer_state: "ST",
 };
@@ -129,8 +129,8 @@ const plan: PlanFixture = {
   entitlementUnreadable: false,
   usage: readyUsage(),
   settings: settingsForPlan,
-  rooftopLabel: "Example Honda (Example City, ST)",
-  groupLabel: "Example Auto Group",
+  rooftopLabel: "Example Motors",
+  groupLabel: null,
   canManageBilling: true,
   canManageInvoices: true,
   isPlatformAdmin: false,

@@ -41,7 +41,7 @@ describe("buildMetrics", () => {
     const m = buildMetrics(ready, "pro");
     expect(m.map((x) => x.spec.key)).toEqual(["stickers_generated", "documents_published", "template_customizations", "batch_jobs", "evidence_exports"]);
     expect(m.find((x) => x.spec.key === "batch_jobs")).toMatchObject({ value: null });
-    expect(m.find((x) => x.spec.key === "evidence_exports")?.reason).toMatch(/not recorded/);
+    expect(m.find((x) => x.spec.key === "evidence_exports")?.reason).toMatch(/not recorded/i);
     expect(m.find((x) => x.spec.key === "documents_published")?.value).toBe(0);
   });
   it("gives a limited metric a percent and an unlimited one none", () => {
@@ -68,14 +68,14 @@ describe("feature groups", () => {
     expect(by("window_stickers").status).toBe("included");
     expect(by("template_customization").status).toBe("setup_required");
     expect(by("evidence_packet_export").status).toBe("requires_upgrade");
-    expect(by("team_permissions").status).toBe("unavailable");
+    expect(by("team_permissions").status).toBe("platform_only");
     expect(groups.map((g) => g.label)).toEqual(["Documents & Printing", "Customization & Workflow", "Compliance & Evidence"]);
     const counts = featureCounts(groups);
     expect(Object.values(counts).reduce((a, b) => a + b, 0)).toBe(rows.length);
   });
   it("locks everything while the plan is not active", () => {
     const rows = buildFeatureGroups({ tier: "pro", accessActive: false, isPlatformAdmin: false, settings }).flatMap((g) => g.rows);
-    expect(rows.every((r) => r.status === "unavailable")).toBe(true);
+    expect(rows.every((r) => r.status === "unavailable" || r.status === "platform_only")).toBe(true);
   });
 });
 

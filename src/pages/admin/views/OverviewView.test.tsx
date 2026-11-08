@@ -97,12 +97,14 @@ describe("Overview sync banner and attention queue", () => {
 });
 
 describe("Overview policy, shortcuts and activity", () => {
-  it("keeps four policy concepts apart, each with View details", () => {
-    open();
-    for (const title of ["Listing visibility", "Document publication", "Retail readiness", "Customer routing"]) {
+  it("keeps four policy concepts apart, each with one details link named for it", () => {
+    const { container } = open();
+    const hrefs = Array.from(container.querySelectorAll("a")).map((a) => [a.textContent, a.getAttribute("href")]);
+    for (const [title, key] of [["Listing visibility", "listing_visibility"], ["Document publication", "document_publication"], ["Retail readiness", "retail_readiness"], ["Customer routing", "routing"]]) {
       expect(screen.getByText(title)).toBeTruthy();
-      expect(screen.getByRole("link", { name: `View details: ${title}` }).getAttribute("href")).toMatch(/panel=policy&concept=/);
+      expect(hrefs).toContainEqual([`${title} details`, `/admin?tab=overview&panel=policy&concept=${key}`]);
     }
+    expect(screen.queryByText("View details")).toBeNull();
   });
 
   it("links all eight settings categories", () => {

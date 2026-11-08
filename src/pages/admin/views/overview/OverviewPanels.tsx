@@ -7,10 +7,11 @@ import { formatDateTime } from "@/lib/admin/integrations/format";
 import { adminTabHref } from "@/lib/admin/sections";
 import { cn } from "@/lib/utils";
 import { plural } from "./OverviewParts";
+import { OVERVIEW_PANEL_TITLE } from "@/lib/admin/overviewPanels";
 import { DOCUMENTS_ATTENTION_HREF, exceptionsHref, overviewHref, severityCounts, SEVERITY_ORDER, type ExceptionRow, type ExceptionStats, type PolicyConcept, type SetupItem, type SetupProgress } from "./overviewModel";
 import { loadAdminEvents, type ActivityEvent } from "./useOverviewData";
 
-const TEXT_LINK = "text-[14px] leading-[20px] font-semibold text-adm-primary hover:underline max-sm:inline-flex max-sm:items-center max-sm:min-h-[44px] rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary";
+const TEXT_LINK = "max-sm:min-w-[44px] max-sm:justify-center text-[14px] leading-[20px] font-semibold text-adm-primary hover:underline max-sm:inline-flex max-sm:items-center max-sm:min-h-[44px] rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-adm-primary";
 
 export const PanelBack = ({ title, description }: { title: string; description: ReactNode }) => (
   <div className="space-y-2">
@@ -89,7 +90,7 @@ export function ExceptionsPanel({ stats, failed }: { stats: ExceptionStats | nul
 export function SetupPanel({ items, progress }: { items: SetupItem[]; progress: SetupProgress }) {
   return (
     <div className="space-y-4">
-      <PanelBack title="Setup checklist" description={`${progress.done} of ${progress.total} steps complete. Each step opens the one editor that owns the setting.`} />
+      <PanelBack title={OVERVIEW_PANEL_TITLE.setup} description={`${progress.done} of ${progress.total} steps complete. Each step opens the one editor that owns the setting.`} />
       <SectionCard title="Steps" icon="checklist">
         <ol className="-my-2 divide-y divide-adm-divider">
           {items.map((i) => (
@@ -121,7 +122,9 @@ export function PolicyPanel({ concepts }: { concepts: PolicyConcept[] }) {
       {concepts.map((c) => (
         <SectionCard key={c.key} id={`concept-${c.key}`} title={c.title} description={c.value} actions={<StatusBadge state={c.state === "unknown" ? "unknown" : c.state === "attention" ? "setup_required" : "enabled"} label={c.stateLabel} />} className={target === c.key ? "ring-2 ring-adm-primary/40" : undefined}>
           <p className="text-[14px] leading-[20px] text-adm-ink">{c.detail}</p>
-          {c.byClass.length > 0 && (
+          {c.byClass.length > 0 && (c.byClass.every((b) => b.cell.label === c.byClass[0].cell.label && b.cell.detail === c.byClass[0].cell.detail) ? (
+            <p className="text-[14px] leading-[20px]"><span className="font-semibold text-adm-ink">All vehicle classes.</span> <span className="text-adm-muted">The same rule applies to new, used and CPO vehicles.</span></p>
+          ) : (
             <dl className="divide-y divide-adm-divider border border-adm-divider rounded-lg">
               {c.byClass.map((b) => (
                 <div key={b.cls} className="px-3 py-3 grid sm:grid-cols-[110px_1fr] gap-x-4 gap-y-0.5">
@@ -132,7 +135,7 @@ export function PolicyPanel({ concepts }: { concepts: PolicyConcept[] }) {
                 </div>
               ))}
             </dl>
-          )}
+          ))}
           {c.tiers && (
             <p className="text-[14px] leading-[20px] text-adm-muted">{c.tiers.ready} of {c.tiers.total} routing steps are ready. Steps are listed in the saved order on the Routing page.</p>
           )}

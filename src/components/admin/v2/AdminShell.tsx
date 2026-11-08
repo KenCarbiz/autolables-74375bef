@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { OVERVIEW_PANEL_TITLE } from "@/lib/admin/overviewPanels";
 import { ArrowLeft } from "lucide-react";
 import type { AdminChildTab, AdminSection, AdminSectionId } from "@/lib/admin/sections";
 import { useAdminVisibility } from "./useAdminVisibility";
@@ -59,8 +60,14 @@ export const AdminShell = ({
   const { ctx } = useAdminVisibility();
   const loc = locateTab(activeTab.id);
   const isOverview = activeSection.id === "overview";
-  const title = isOverview ? "Setup checklist" : loc?.row.title ?? activeTab.label;
-  const crumbs = isOverview ? [{ label: "Administration", href: "/admin" }, { label: "Setup checklist" }] : crumbsFor(loc, activeTab.label);
+  const [searchParams] = useSearchParams();
+  const panelTitle = isOverview ? OVERVIEW_PANEL_TITLE[searchParams.get("panel") ?? ""] ?? null : null;
+  const title = isOverview ? "Administration overview" : loc?.row.title ?? activeTab.label;
+  const crumbs = isOverview
+    ? panelTitle
+      ? [{ label: "Administration", href: "/admin" }, { label: "Administration overview", href: "/admin?tab=overview" }, { label: panelTitle }]
+      : [{ label: "Administration", href: "/admin" }, { label: "Administration overview" }]
+    : crumbsFor(loc, activeTab.label);
   return (
     <AdminPageContainer>
       <div className="space-y-6">

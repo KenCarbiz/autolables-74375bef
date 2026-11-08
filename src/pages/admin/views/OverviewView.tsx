@@ -44,8 +44,7 @@ export default function OverviewView() {
       <div className="flex items-center justify-between gap-x-4 gap-y-1 flex-wrap">
         <ScopeLabel scope="all_rooftops" />
         <p className="text-[13px] leading-[18px] text-adm-muted">
-          {state.rooftopLabel}
-          {data?.checkedAt && !state.loading ? <> . Updated {formatDateTime(data.checkedAt, { timeZone, withZone: true })}</> : null}
+          {data?.checkedAt && !state.loading ? <>Updated {formatDateTime(data.checkedAt, { timeZone, withZone: true })}</> : null}
         </p>
       </div>
 
