@@ -120,7 +120,7 @@ export function MetricCards({ metrics, usage, plan, onOpen }: { metrics: MetricM
                       <span role="progressbar" aria-label={`${m.spec.label} against the monthly limit`} aria-valuemin={0} aria-valuemax={m.limit.hard} aria-valuenow={Math.min(m.value ?? 0, m.limit.hard)} aria-valuetext={`${m.value?.toLocaleString()} of ${m.limit.hard.toLocaleString()}`} className="mt-1.5 max-sm:mt-0 max-sm:mb-1 max-sm:order-5 max-sm:col-span-2 block h-2 rounded-full bg-adm-workspace overflow-hidden">
                         <span className={cn("block h-full rounded-full", m.quota === "blocked" ? "bg-adm-danger" : m.quota === "over_soft" || m.quota === "near" ? "bg-adm-warning" : "bg-adm-primary")} style={{ width: `${m.percent}%` }} />
                       </span>
-                      <p className="mt-1 max-sm:hidden">{m.percent}% of the limit used{m.quota && QUOTA_TEXT[m.quota] ? `. ${QUOTA_TEXT[m.quota]}.` : ""}</p>
+                      <p className={cn("mt-1", !(m.quota && QUOTA_TEXT[m.quota]) && "max-sm:hidden")}><span className="max-sm:hidden">{m.percent}% of the limit used. </span>{m.quota && QUOTA_TEXT[m.quota] ? `${QUOTA_TEXT[m.quota]}.` : ""}</p>
                     </>
                   )}
                 </>
