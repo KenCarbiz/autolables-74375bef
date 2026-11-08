@@ -41,11 +41,11 @@ describe("Overview against live reads", () => {
     spyResponses.tables.vehicle_listings = { data: null, count: 40, error: null };
     renderAdmin(<OverviewView />, { route: adminTabHref("overview") });
     const summary = screen.getByRole("region", { name: "Summary" });
-    await waitFor(() => expect(within(summary).getByText("2 vehicles")).toBeTruthy());
+    await waitFor(() => expect(within(summary).getByText((_, el) => !!el?.hasAttribute("data-summary-value") && el.textContent === "2 vehicles")).toBeTruthy());
     expect(within(summary).getByText(/3 open issues in total/)).toBeTruthy();
     const audit = spyCalls.find((c) => c.kind === "table" && c.table === "audit_log" && c.op === "not");
     expect(audit).toBeTruthy();
-    expect((audit as { args: unknown[] }).args).toEqual(["action", "in", "(listing_viewed,addendum_viewed,window_sticker.view)"]);
+    expect((audit as { args: unknown[] }).args).toEqual(["action", "in", "(listing_viewed,addendum_viewed,packet_view_notified)"]);
   });
 
   it("starts no sync, function or write on mount", async () => {

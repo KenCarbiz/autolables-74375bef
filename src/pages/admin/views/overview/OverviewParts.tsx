@@ -91,10 +91,10 @@ export function SummaryCards({ inventory, progress, reviews, exceptions, loading
         label="Exceptions"
         loading={loading}
         unavailable={failedExc || loading}
-        value={loading ? "Loading" : failedExc ? "Unavailable" : `${vehiclesKnown?.toLocaleString() ?? "0"}${excVehicles?.kind === "known" && excVehicles.capped ? "+" : ""} ${vehiclesKnown === 1 ? "vehicle" : "vehicles"}`}
+        value={loading ? "Loading" : failedExc ? "Unavailable" : <>{`${vehiclesKnown?.toLocaleString() ?? "0"}${excVehicles?.kind === "known" && excVehicles.capped ? "+" : ""}`}{" "}<span className="text-[15px] leading-[20px] font-semibold text-adm-muted">{vehiclesKnown === 1 ? "vehicle" : "vehicles"}</span></>}
         footer="Open exceptions"
       >
-        {failedExc && !loading ? "The queue could not be read. It is not zero." : issuesKnown !== null ? `${plural(issuesKnown, "open issue", "open issues")} in total. One vehicle can have several.` : ""}
+        {failedExc && !loading ? "The queue could not be read. It is not zero." : issuesKnown !== null ? `${plural(issuesKnown, "open issue", "open issues")} in total.${issuesKnown > 0 ? " One vehicle can have several." : ""}` : ""}
       </SummaryShell>
     </section>
   );
@@ -203,14 +203,18 @@ export function PolicySummary({ concepts }: { concepts: PolicyConcept[] }) {
     <SectionCard title="Current policy" description={<span className="max-sm:hidden">Four separate rules. None is inferred from another.</span>} icon="shield">
       <ul className="-my-2 divide-y divide-adm-divider">
         {concepts.map((c) => (
-          <li key={c.key} className="py-3 flex items-start gap-3">
-            <AdminIconTile name={CONCEPT_ICON[c.key]} tone="neutral" />
+          <li key={c.key} className="py-2.5 sm:py-3 flex items-start gap-3">
+            <AdminIconTile name={CONCEPT_ICON[c.key]} tone="neutral" className="max-sm:hidden" />
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] leading-[18px] text-adm-muted">{c.title}</p>
-              <p className="text-[15px] leading-[21px] font-semibold text-adm-ink">{c.value}</p>
-              <div className="mt-1 flex items-center gap-3 flex-wrap">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[13px] leading-[18px] text-adm-muted">{c.title}</p>
                 <StatusBadge state={c.state === "unknown" ? "unknown" : c.state === "attention" ? "setup_required" : c.stateLabel === "Differs by class" ? "overridden" : "enabled"} label={c.stateLabel} />
-                <Link to={`${overviewHref("policy")}&concept=${c.key}`} className={TEXT_LINK}>{c.title} details</Link>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[15px] leading-[21px] font-semibold text-adm-ink min-w-0">{c.value}</p>
+                <Link to={`${overviewHref("policy")}&concept=${c.key}`} aria-label={`${c.title} details`} className={cn(TEXT_LINK, "whitespace-nowrap")}>
+                  <span className="sm:hidden">Details</span><span className="max-sm:hidden">{c.title} details</span>
+                </Link>
               </div>
             </div>
           </li>

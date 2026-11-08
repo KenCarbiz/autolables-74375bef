@@ -10,7 +10,7 @@ import type { AdminIconName } from "@/components/admin/v3/editor";
 import { tierRows } from "../customer/routingModel";
 import { hubHref } from "../documents/hub/HubOverview";
 
-export const ADMIN_VIEW_ACTIONS = ["listing_viewed", "addendum_viewed", "window_sticker.view"] as const;
+export const ADMIN_VIEW_ACTIONS = ["listing_viewed", "addendum_viewed", "packet_view_notified"] as const;
 
 export interface SetupItem {
   key: string;

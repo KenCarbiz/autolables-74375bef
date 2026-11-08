@@ -141,7 +141,7 @@ export interface UsageSnapshot {
 
 export type UsageState = { kind: "loading" } | { kind: "failed"; reason: string } | { kind: "ready"; snapshot: UsageSnapshot };
 
-export type LimitView = { kind: "unknown" } | { kind: "unlimited" } | { kind: "limited"; soft: number; hard: number } | { kind: "undefined" };
+export type LimitView = { kind: "unknown" } | { kind: "no_plan" } | { kind: "unlimited" } | { kind: "limited"; soft: number; hard: number } | { kind: "undefined" };
 
 export const limitView = (tier: PlanTier, key: MetricKey): LimitView => {
   const l = limitFor(tier, key);
@@ -162,7 +162,7 @@ export interface MetricModel {
 
 export function buildMetrics(usage: UsageState, tier: PlanTier, planKnown = true): MetricModel[] {
   return METRIC_SPECS.map((spec) => {
-    const limit: LimitView = planKnown ? limitView(tier, spec.key) : { kind: "unknown" };
+    const limit: LimitView = !planKnown ? { kind: "unknown" } : tier === "none" ? { kind: "no_plan" } : limitView(tier, spec.key);
     let value: number | null = null;
     let reason: string | null = null;
     let reading: MetricReading | null = null;
@@ -179,7 +179,7 @@ export function buildMetrics(usage: UsageState, tier: PlanTier, planKnown = true
   });
 }
 
-export type FeatureStatus = "included" | "setup_required" | "requires_upgrade" | "unavailable" | "platform_only";
+export type FeatureStatus = "included" | "setup_required" | "requires_upgrade" | "unavailable" | "platform_only" | "unknown";
 
 export interface FeatureRow {
   key: FeatureKey;
@@ -248,7 +248,7 @@ export function featureRow(key: FeatureKey, ctx: FeatureContext): FeatureRow {
       ? { key, label, status: "included", detail: "Available to platform administrators.", link }
       : { key, label, status: "platform_only", detail: "Platform staff only. It is not part of any dealer plan.", link: null };
   }
-  if (ctx.planKnown === false) return { key, label, status: "unavailable", detail: "Plan could not be loaded.", link: null };
+  if (ctx.planKnown === false) return { key, label, status: "unknown", detail: "Plan could not be loaded.", link: null };
   if (!ctx.accessActive) return { key, label, status: "unavailable", detail: "Not available while the plan is not active.", link: null };
   if (rankOf(ctx.tier) < rankOf(required)) return { key, label, status: "requires_upgrade", detail: `Requires the ${planLabel(required)} plan.`, link: null };
   const setup = unmetSetup(key, ctx.settings);
@@ -259,10 +259,10 @@ export function featureRow(key: FeatureKey, ctx: FeatureContext): FeatureRow {
 export const buildFeatureGroups = (ctx: FeatureContext): FeatureGroup[] =>
   GROUPS.map((g) => ({ id: g.id, label: g.label, rows: g.keys.map((k) => featureRow(k, ctx)) }));
 
-export const FEATURE_STATUS_ORDER: readonly FeatureStatus[] = ["included", "setup_required", "requires_upgrade", "unavailable", "platform_only"];
+export const FEATURE_STATUS_ORDER: readonly FeatureStatus[] = ["included", "setup_required", "requires_upgrade", "unavailable", "platform_only", "unknown"];
 
 export const featureCounts = (groups: FeatureGroup[]): Record<FeatureStatus, number> => {
-  const out: Record<FeatureStatus, number> = { included: 0, setup_required: 0, requires_upgrade: 0, unavailable: 0, platform_only: 0 };
+  const out: Record<FeatureStatus, number> = { included: 0, setup_required: 0, requires_upgrade: 0, unavailable: 0, platform_only: 0, unknown: 0 };
   for (const g of groups) for (const r of g.rows) out[r.status] += 1;
   return out;
 };

@@ -91,7 +91,7 @@ const overview: OverviewFixture = {
   groupLabel: null,
   visibleCategoryIds: null,
   seeds: {
-    empty: { data: emptyData, settings: { ...DEFAULT_SETTINGS, dealer_name: "Your Dealership" } },
+    empty: { data: emptyData, settings: { ...DEFAULT_SETTINGS, dealer_timezone: "America/New_York", dealer_name: "Your Dealership" } },
     error: { data: FAILED_OVERVIEW(minutesAgo(2)) },
     readonly: { visibleCategoryIds: ["brand", "customer", "documents", "billing"] },
     stale: { data: { ...baseData, feed: { state: "stale", headline: "Inventory feed stale", detail: "Last successful pull 4 days ago. That is older than the expected cadence allows.", affectedOutput: "Inventory freshness and availability", inventoryPreserved: true }, lastSuccessAt: minutesAgo(4 * 24 * 60) } },

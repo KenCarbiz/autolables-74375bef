@@ -62,7 +62,7 @@ export const AdminShell = ({
   const isOverview = activeSection.id === "overview";
   const [searchParams] = useSearchParams();
   const panelTitle = isOverview ? OVERVIEW_PANEL_TITLE[searchParams.get("panel") ?? ""] ?? null : null;
-  const title = isOverview ? "Administration overview" : loc?.row.title ?? activeTab.label;
+  const title = isOverview ? panelTitle ?? "Administration overview" : loc?.row.title ?? activeTab.label;
   const crumbs = isOverview
     ? panelTitle
       ? [{ label: "Administration", href: "/admin" }, { label: "Administration overview", href: "/admin?tab=overview" }, { label: panelTitle }]

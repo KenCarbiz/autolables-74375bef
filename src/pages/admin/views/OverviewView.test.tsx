@@ -31,7 +31,7 @@ describe("Overview summary", () => {
     expect(within(summary).getAllByRole("link")).toHaveLength(4);
     expect(within(summary).getByText("128")).toBeTruthy();
     expect(within(summary).getByText("5 of 6")).toBeTruthy();
-    expect(within(summary).getByText("9 vehicles")).toBeTruthy();
+    expect(within(summary).getByText((_, el) => !!el?.hasAttribute("data-summary-value") && el.textContent === "9 vehicles")).toBeTruthy();
     expect(within(summary).getByText(/14 open issues in total/)).toBeTruthy();
   });
 
@@ -58,7 +58,7 @@ describe("Overview summary", () => {
     open("&state=empty");
     const summary = screen.getByRole("region", { name: "Summary" });
     expect(within(summary).getAllByText("0").length).toBeGreaterThanOrEqual(2);
-    expect(within(summary).getByText("0 vehicles")).toBeTruthy();
+    expect(within(summary).getByText((_, el) => !!el?.hasAttribute("data-summary-value") && el.textContent === "0 vehicles")).toBeTruthy();
     expect(screen.getByText("0 of 6")).toBeTruthy();
   });
 });
@@ -99,7 +99,7 @@ describe("Overview sync banner and attention queue", () => {
 describe("Overview policy, shortcuts and activity", () => {
   it("keeps four policy concepts apart, each with one details link named for it", () => {
     const { container } = open();
-    const hrefs = Array.from(container.querySelectorAll("a")).map((a) => [a.textContent, a.getAttribute("href")]);
+    const hrefs = Array.from(container.querySelectorAll("a")).map((a) => [a.getAttribute("aria-label") ?? a.textContent, a.getAttribute("href")]);
     for (const [title, key] of [["Listing visibility", "listing_visibility"], ["Document publication", "document_publication"], ["Retail readiness", "retail_readiness"], ["Customer routing", "routing"]]) {
       expect(screen.getByText(title)).toBeTruthy();
       expect(hrefs).toContainEqual([`${title} details`, `/admin?tab=overview&panel=policy&concept=${key}`]);
