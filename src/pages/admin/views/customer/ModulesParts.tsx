@@ -79,7 +79,7 @@ export function RequiredList() {
             <p className="text-[14px] leading-[20px] font-semibold text-adm-ink">{r.label}</p>
             <StatusBadge state="required" />
           </div>
-          <p className="mt-1 text-[13px] leading-[18px] text-adm-muted">{r.detail}</p>
+          <p className="mt-1 hidden sm:block text-[13px] leading-[18px] text-adm-muted">{r.detail}</p>
         </li>
       ))}
     </ul>
