@@ -10,7 +10,7 @@ import {
   EditorEmpty,
   FieldRow,
   INPUT_CLASS,
-  PreviewOnlyNotice,
+  useIsNarrow,
   SelectField,
   StatusBadge,
   SwitchField,
@@ -22,7 +22,11 @@ import {
   OUTPUT_PROFILE_KEYS,
   TONE_OPTIONS,
   buildSample,
+  changedProfileNumbers,
+  displayRange,
   outputProfile,
+  profileProblems,
+  profileValues,
   phraseMatches,
   validateProfileEdit,
   type OutputProfile,
@@ -41,14 +45,21 @@ export const AutoTextarea = ({ value, className, ...rest }: TextareaHTMLAttribut
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight + 2}px`;
   }, [value]);
-  return <textarea ref={ref} rows={3} value={value} className={cn(INPUT_CLASS, "resize-none overflow-hidden leading-[22px]", className)} {...rest} />;
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => { el.style.height = "auto"; el.style.height = `${el.scrollHeight + 2}px`; });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return <textarea ref={ref} rows={1} value={value} className={cn(INPUT_CLASS, "resize-none overflow-hidden leading-[22px] min-h-[44px]", className)} {...rest} />;
 };
 
 export const Managed45Notice = () => (
-  <PreviewOnlyNotice>
-    <strong className="font-semibold">Managed in Description Engine (PR #45, not merged).</strong>{" "}
-    The vehicle Description Engine, the vAuto export gate and per-rooftop description profiles are built in that change. It is not part of this build, so this page edits only the settings that exist today and does not duplicate the engine.
-  </PreviewOnlyNotice>
+  <Banner tone="info" icon="eye" title="Managed in the Description Engine (coming soon)">
+    <span className="sm:hidden">This page edits only the settings that exist today.</span>
+    <span className="max-sm:hidden">The vehicle Description Engine, the vAuto export gate and per-rooftop description profiles are not part of this build. This page edits only the settings that exist today and does not duplicate the engine.</span>
+  </Banner>
 );
 
 type Identity = { name: string; city: string; state: string };
@@ -76,19 +87,28 @@ const IdentityOverride = ({ label, source, value, onChange, onClear, field, disa
   );
 };
 
+const IdentityWrap = ({ narrow, children }: { narrow: boolean; children: React.ReactNode }) =>
+  narrow ? (
+    <details className="rounded-xl border border-adm-divider">
+      <summary className="cursor-pointer min-h-[44px] px-4 flex items-center text-[15px] font-semibold text-adm-ink">Name, city and state wording</summary>
+      <div className="px-4 pb-4 space-y-3">{children}</div>
+    </details>
+  ) : <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">{children}</div>;
+
 export const BrandVoiceSection = ({ api, onEditPhrases }: { api: DescriptionSettingsApi; onEditPhrases: () => void }) => {
   const d = api.edit.draft!;
   const e = api.edit.errors;
   const off = !api.canEdit;
   const id: Identity = api.identity;
   const legalCount = [...d.required_legal_text].length;
+  const narrow = useIsNarrow();
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+    <div className="space-y-4 sm:space-y-5">
+      <IdentityWrap narrow={narrow}>
         <IdentityOverride label="Dealership name" field="name" source={id.name} value={d.dealer_name_format} disabled={off} onChange={(v) => api.edit.set("dealer_name_format", v)} onClear={() => api.edit.set("dealer_name_format", "")} help="Written exactly like this in the copy." />
         <IdentityOverride label="City" field="city" source={id.city} value={d.primary_city} disabled={off} onChange={(v) => api.edit.set("primary_city", v)} onClear={() => api.edit.set("primary_city", "")} help="Used for local wording only." />
         <IdentityOverride label="State" field="state" source={id.state} value={d.state} disabled={off} onChange={(v) => api.edit.set("state", v)} onClear={() => api.edit.set("state", "")} help="Use the two letter abbreviation." />
-      </div>
+      </IdentityWrap>
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-5">
         <FieldRow label="Default tone" htmlFor="desc-tone" error={e.default_tone} help="Changes wording only. It never adds a claim.">
@@ -141,6 +161,7 @@ const PROVENANCE: Record<string, string> = {
 
 export const OutputProfilesSection = ({ api, onEdit, onPreview, onValidate }: { api: DescriptionSettingsApi; onEdit: (k: string) => void; onPreview: (k: string) => void; onValidate: (k: string) => void }) => {
   const d = api.edit.draft!;
+  const narrow = useIsNarrow();
   const latest = useMemo(() => {
     const m: Record<string, { count: number | null; at: string }> = {};
     for (const c of api.cached.data) m[c.channel] ??= { count: c.character_count, at: c.created_at };
@@ -148,54 +169,82 @@ export const OutputProfilesSection = ({ api, onEdit, onPreview, onValidate }: { 
   }, [api.cached.data]);
   return (
     <div className="space-y-5">
-      <ul className="grid grid-cols-1 xl:grid-cols-2 gap-3" aria-label="Output profiles">
+      <ul className="grid grid-cols-1 xl:grid-cols-2 gap-3 items-stretch" aria-label="Output profiles">
         {OUTPUT_PROFILE_KEYS.map((k) => {
           const pr = outputProfile(k, api.overrides.data[k]);
           if (!pr) return null;
           const sample = buildSample(pr, FIXTURE_SAMPLE_NARRATIVE, d);
-          const blocking = !!sample.blocker || sample.findings.some((f) => f.severity === "blocking");
+          const problems = profileProblems(pr);
+          const blocking = problems.length > 0 || !!sample.blocker || sample.findings.some((f) => f.severity === "blocking");
           const warned = sample.findings.some((f) => f.severity === "warning");
           const saved = latest[k];
+          const range = displayRange(pr);
           return (
-            <li key={k} data-profile={k} className={cn("rounded-xl border bg-adm-surface p-4 space-y-3 min-w-0", pr.target ? "border-adm-primary/40" : "border-adm-divider")}>
+            <li key={k} data-profile={k} className={cn("rounded-xl border bg-adm-surface p-3 sm:p-4 flex flex-col gap-2 sm:gap-3 min-w-0 h-full", pr.target ? "border-adm-primary/40" : "border-adm-divider")}>
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="min-w-0">
                   <h3 className="text-[16px] leading-[22px] font-semibold text-adm-ink">{pr.label}</h3>
-                  <p className="text-[13px] leading-[18px] text-adm-muted">{PROVENANCE[pr.provenance?.lengthLimit ?? "awaiting_confirmation"]}{pr.overridden ? ". Customized for this dealership." : ""}</p>
+                  <p className="text-[13px] leading-[18px] text-adm-muted max-sm:hidden">{PROVENANCE[pr.provenance?.lengthLimit ?? "awaiting_confirmation"]}{pr.overridden ? ". Customized." : ""}</p>
                 </div>
-                {blocking ? <StatusBadge state="failed" label="Sample blocked" /> : warned ? <StatusBadge state="stale" label="Sample has warnings" /> : <StatusBadge state="enabled" label="Sample passes" />}
+                {blocking ? <StatusBadge state="failed" label={problems.length ? "Profile invalid" : "Sample blocked"} /> : warned ? <StatusBadge state="stale" label="Sample has warnings" /> : <StatusBadge state="enabled" label="Sample passes" />}
               </div>
-              <dl className="grid grid-cols-3 gap-3">
-                <Row label="Target">{pr.target ? n(pr.target) : "None"}</Row>
-                <Row label="Readable range">{n(pr.policy.recommendedMin)} to {n(pr.policy.recommendedMax)}</Row>
-                <Row label="Limit">{n(pr.policy.characterLimit)}</Row>
-              </dl>
-              {pr.target && <p className="text-[14px] leading-[20px] text-adm-ink">Your target is {n(pr.target)} characters in total, including spaces, the call to action and the required wording, inside the {n(pr.policy.characterLimit)} limit. The 4,000 limit is reported by your account and has not been verified with the provider.</p>}
-              <dl className="grid grid-cols-2 gap-3">
-                <Row label="Sample count">{sample.counts ? `${n(sample.counts.codePoints)} characters` : "Cannot be built"}</Row>
-                <Row label="Last generated">{saved ? `${saved.count === null ? "Count not recorded" : `${n(saved.count)} characters`}, ${fmtWhen(saved.at)}` : "No saved output"}</Row>
-              </dl>
-              <div className="flex flex-wrap gap-2">
-                <AdminButton variant="secondary" className="min-h-[44px] flex-1" onClick={() => onEdit(k)}>{api.canEdit ? "Edit profile" : "View profile"}</AdminButton>
-                <AdminButton variant="secondary" className="min-h-[44px] flex-1" onClick={() => onPreview(k)}><AdminIcon name="eye" />Sample</AdminButton>
-                <AdminButton variant="secondary" className="min-h-[44px] flex-1" onClick={() => onValidate(k)}><AdminIcon name="shield-check" />Validation</AdminButton>
+              {narrow ? (
+                <p className="text-[14px] leading-[20px] text-adm-ink">{pr.target ? `Target ${n(pr.target)}. ` : ""}Limit {n(pr.policy.characterLimit)}. Sample {sample.counts ? `${n(sample.counts.codePoints)} characters` : "cannot be built"}.</p>
+              ) : (
+                <>
+                  <dl className="grid grid-cols-3 gap-3">
+                    <Row label="Target">{pr.target ? n(pr.target) : "None"}</Row>
+                    <Row label={pr.target ? "Draft pool" : "Readable range"}>{n(range.min)} to {n(range.max)}</Row>
+                    <Row label="Limit">{n(pr.policy.characterLimit)}</Row>
+                  </dl>
+                  {range.clamped && <p className="text-[13px] leading-[18px] text-adm-muted">The registry sizes the draft pool up to {n(range.registryMax)}, past the limit. It is shown here capped at the limit.</p>}
+                  {pr.target && <p className="text-[14px] leading-[20px] text-adm-ink">Your target is {n(pr.target)} characters in total, including spaces, the call to action and the required wording, inside the {n(pr.policy.characterLimit)} limit. The limit is reported by your account and has not been verified with the provider.</p>}
+                  <dl className="grid grid-cols-2 gap-3">
+                    <Row label="Sample count">{sample.counts ? `${n(sample.counts.codePoints)} characters` : "Cannot be built"}</Row>
+                    <Row label="Last generated">{saved ? `${saved.count === null ? "Count not recorded" : `${n(saved.count)} characters`}, ${fmtWhen(saved.at)}` : "No saved output"}</Row>
+                  </dl>
+                </>
+              )}
+              <div className="mt-auto flex gap-2 pt-1">
+                <AdminButton variant="secondary" className="min-h-[44px] flex-1 min-w-0 px-2" onClick={() => onEdit(k)}>{api.canEdit ? "Edit" : "View"}</AdminButton>
+                <AdminButton variant="secondary" className="min-h-[44px] flex-1 min-w-0 px-2" onClick={() => onPreview(k)}>{!narrow && <AdminIcon name="eye" />}Sample</AdminButton>
+                <AdminButton variant="secondary" className="min-h-[44px] flex-1 min-w-0 px-2" onClick={() => onValidate(k)}>{!narrow && <AdminIcon name="shield-check" />}Validation</AdminButton>
               </div>
             </li>
           );
         })}
       </ul>
 
+      {narrow ? (
+        <details className="rounded-xl border border-adm-divider">
+          <summary className="cursor-pointer min-h-[44px] px-4 flex items-center text-[15px] font-semibold text-adm-ink">Master length and quality limits</summary>
+          <div className="px-4 pb-4">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <FieldRow label="Master minimum length" htmlFor="desc-min" error={api.edit.errors.min_length} help="Characters. Shorter copy is flagged, never padded.">
+        <FieldRow label="Master minimum length" htmlFor="desc-min" error={api.edit.errors.min_length} help={narrow ? undefined : "Characters. Shorter copy is flagged, never padded."}>
           {(p) => <input {...p} type="number" inputMode="numeric" className={INPUT_CLASS} disabled={!api.canEdit} value={Number.isFinite(d.min_length) ? d.min_length : ""} onChange={(e) => api.edit.set("min_length", e.target.value === "" ? NaN : Number(e.target.value))} />}
         </FieldRow>
-        <FieldRow label="Master maximum length" htmlFor="desc-max" error={api.edit.errors.max_length} help="Characters. The Passport has its own limit above.">
+        <FieldRow label="Master maximum length" htmlFor="desc-max" error={api.edit.errors.max_length} help={narrow ? undefined : "Characters. The Passport has its own limit above."}>
           {(p) => <input {...p} type="number" inputMode="numeric" className={INPUT_CLASS} disabled={!api.canEdit} value={Number.isFinite(d.max_length) ? d.max_length : ""} onChange={(e) => api.edit.set("max_length", e.target.value === "" ? NaN : Number(e.target.value))} />}
         </FieldRow>
-        <FieldRow label="Quality review threshold" htmlFor="desc-quality" error={api.edit.errors.quality_threshold} help="Below this score a description goes to a person, never straight to a shopper.">
+        <FieldRow label="Quality review threshold" htmlFor="desc-quality" error={api.edit.errors.quality_threshold} help={narrow ? undefined : "Below this score a description goes to a person, never straight to a shopper."}>
           {(p) => <input {...p} type="number" inputMode="numeric" className={INPUT_CLASS} disabled={!api.canEdit} value={Number.isFinite(d.quality_threshold) ? d.quality_threshold : ""} onChange={(e) => api.edit.set("quality_threshold", e.target.value === "" ? NaN : Number(e.target.value))} />}
         </FieldRow>
       </div>
+          </div>
+        </details>
+      ) : (
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <FieldRow label="Master minimum length" htmlFor="desc-min" error={api.edit.errors.min_length} help={narrow ? undefined : "Characters. Shorter copy is flagged, never padded."}>
+          {(p) => <input {...p} type="number" inputMode="numeric" className={INPUT_CLASS} disabled={!api.canEdit} value={Number.isFinite(d.min_length) ? d.min_length : ""} onChange={(e) => api.edit.set("min_length", e.target.value === "" ? NaN : Number(e.target.value))} />}
+        </FieldRow>
+        <FieldRow label="Master maximum length" htmlFor="desc-max" error={api.edit.errors.max_length} help={narrow ? undefined : "Characters. The Passport has its own limit above."}>
+          {(p) => <input {...p} type="number" inputMode="numeric" className={INPUT_CLASS} disabled={!api.canEdit} value={Number.isFinite(d.max_length) ? d.max_length : ""} onChange={(e) => api.edit.set("max_length", e.target.value === "" ? NaN : Number(e.target.value))} />}
+        </FieldRow>
+        <FieldRow label="Quality review threshold" htmlFor="desc-quality" error={api.edit.errors.quality_threshold} help={narrow ? undefined : "Below this score a description goes to a person, never straight to a shopper."}>
+          {(p) => <input {...p} type="number" inputMode="numeric" className={INPUT_CLASS} disabled={!api.canEdit} value={Number.isFinite(d.quality_threshold) ? d.quality_threshold : ""} onChange={(e) => api.edit.set("quality_threshold", e.target.value === "" ? NaN : Number(e.target.value))} />}
+        </FieldRow>
+      </div>
+      )}
     </div>
   );
 };
@@ -204,19 +253,25 @@ export const ClaimsSection = ({ api }: { api: DescriptionSettingsApi }) => {
   const d = api.edit.draft!;
   return (
     <div className="space-y-4">
-      <Banner tone="info" icon="shield-check" title="A permission is not proof">Turning a claim on lets descriptions use verified data about it. It never makes the claim true. Each claim still needs the supporting record on the vehicle, and nothing is invented without it.</Banner>
-      <ul className="grid grid-cols-1 lg:grid-cols-2 gap-3" aria-label="Claim permissions">
+      <Banner tone="info" icon="shield-check" title="A permission is not proof">Turning a claim on lets descriptions use verified data about it. It never makes the claim true, and nothing is invented without the vehicle's own record.</Banner>
+      <ul className="divide-y divide-adm-divider rounded-xl border border-adm-divider" aria-label="Claim permissions">
         {CLAIMS.map((c) => (
-          <li key={c.key} className="rounded-xl border border-adm-divider p-4 space-y-2" data-claim={c.key}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0"><p className="text-[15px] leading-[22px] font-semibold text-adm-ink">{c.label}</p><p className="text-[14px] leading-[20px] text-adm-muted">{c.help}</p></div>
-              <StatusBadge state={d[c.key] ? "enabled" : "disabled"} label={d[c.key] ? "Permitted" : "Not permitted"} />
+          <li key={c.key} className="px-4 py-2 sm:py-3 space-y-0.5" data-claim={c.key}>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="min-w-0 flex-1 basis-[220px]"><p className="text-[15px] leading-[22px] font-semibold text-adm-ink">{c.label}</p><p className="text-[14px] leading-[20px] text-adm-muted max-sm:hidden">{c.help}</p></div>
+              <div className="flex items-center gap-3">
+                <StatusBadge state={d[c.key] ? "enabled" : "disabled"} label={d[c.key] ? "Permitted" : "Not permitted"} />
+                <SwitchField label="" ariaLabel={`Allow ${c.label}`} checked={d[c.key]} disabled={!api.canEdit} onChange={(v) => api.edit.set(c.key, v)} />
+              </div>
             </div>
-            <SwitchField label={`Allow ${c.label.replace(/^(?!CPO)(\w)/, (m) => m.toLowerCase())}`} checked={d[c.key]} disabled={!api.canEdit} onChange={(v) => api.edit.set(c.key, v)} />
-            <dl className="space-y-1.5">
-              <Row label="Still needs">{c.needs}</Row>
-              <Row label="When off">{c.off}</Row>
-            </dl>
+            <details className="group">
+              <summary className="cursor-pointer min-h-[44px] flex items-center text-[14px] font-semibold text-adm-primary">What it still needs</summary>
+              <dl className="space-y-1.5 pb-2">
+                <Row label="What it allows">{c.help}</Row>
+                <Row label="Still needs">{c.needs}</Row>
+                <Row label="When off">{c.off}</Row>
+              </dl>
+            </details>
           </li>
         ))}
       </ul>
@@ -262,7 +317,7 @@ export const PhraseEditorDrawer = ({ api, open, onClose }: { api: DescriptionSet
 
 export const OutputProfileDrawer = ({ api, profileKey, onClose }: { api: DescriptionSettingsApi; profileKey: string | null; onClose: () => void }) => {
   const pr: OutputProfile | null = profileKey ? outputProfile(profileKey, api.overrides.data[profileKey]) : null;
-  const initial = pr ? { recommendedMin: pr.policy.recommendedMin, recommendedMax: pr.policy.recommendedMax, characterLimit: pr.policy.characterLimit } : null;
+  const initial = pr ? profileValues(pr) : null;
   const [edit, setEdit] = useState<{ key: string; v: { recommendedMin: number; recommendedMax: number; characterLimit: number } } | null>(null);
   const [reason, setReason] = useState("");
   const rid = useId();
@@ -276,7 +331,7 @@ export const OutputProfileDrawer = ({ api, profileKey, onClose }: { api: Descrip
   const label: Record<string, string> = { recommendedMin: "Readable minimum", recommendedMax: "Readable maximum", characterLimit: "Hard limit" };
   return (
     <DetailDrawer open={!!profileKey} onClose={close} title={`${pr?.label ?? ""} output profile`} description="Length rules for this destination."
-      footer={<><AdminButton variant="secondary" onClick={close}>{api.canSaveProfiles ? "Cancel" : "Close"}</AdminButton>{api.canSaveProfiles && <AdminButton variant="primary" disabled={!mayApply} onClick={() => profileKey && current && api.saveProfile.mutate({ channel: profileKey, policy: { recommendedMin: current.recommendedMin, recommendedMax: current.recommendedMax, characterLimit: current.characterLimit }, reason }, { onSuccess: close })}>{api.saveProfile.isPending ? "Applying" : "Apply profile"}</AdminButton>}</>}>
+      footer={<><AdminButton variant="secondary" onClick={close}>{api.canSaveProfiles ? "Cancel" : "Close"}</AdminButton>{api.canSaveProfiles && <AdminButton variant="primary" disabled={!mayApply} onClick={() => profileKey && current && api.saveProfile.mutate({ channel: profileKey, policy: { ...(api.overrides.data[profileKey] ?? {}), ...changedProfileNumbers(initial!, current) }, reason }, { onSuccess: close })}>{api.saveProfile.isPending ? "Applying" : "Apply profile"}</AdminButton>}</>}>
       {pr && current && (
         <>
           {!api.canSaveProfiles && <Banner tone="neutral" icon="lock" title={api.isFixture ? "Design fixture" : "Read only"}>{api.isFixture ? "Saving is disabled in this preview." : "Changing an output profile needs the manage settings permission."}</Banner>}
@@ -286,7 +341,7 @@ export const OutputProfileDrawer = ({ api, profileKey, onClose }: { api: Descrip
           </div>
           {pr.target && <Banner tone="info" icon="lock" title={`Fixed target: ${n(pr.target)} characters in total`}>Counted as one line of plain ASCII text, including spaces, the call to action and the required wording. The target is set by the platform and is not edited here.</Banner>}
           {(["recommendedMin", "recommendedMax", "characterLimit"] as const).map((k) => (
-            <FieldRow key={k} label={label[k]} htmlFor={`${rid}-${k}`} error={errs[k]} help={k === "characterLimit" ? "Can be tightened, never raised past the shipped value." : pr.target ? "Sizes the draft the writer starts from. It does not move the target." : "Characters. Aim for useful detail, never filler."}>
+            <FieldRow key={k} label={(pr.target && k !== "characterLimit" ? `${label[k]} (draft pool)` : label[k])} htmlFor={`${rid}-${k}`} error={errs[k]} help={k === "characterLimit" ? (pr.target ? `Can be tightened, never below the ${n(pr.target)} target or raised past the shipped value.` : "Can be tightened, never raised past the shipped value.") : pr.target ? "Sizes the draft the writer starts from. It does not move the target and may run past the limit." : "Characters. Aim for useful detail, never filler."}>
               {(p) => <input {...p} type="number" inputMode="numeric" className={INPUT_CLASS} disabled={!api.canSaveProfiles} value={Number.isFinite(current[k]) ? current[k] : ""} onChange={(e) => set(k, e.target.value)} />}
             </FieldRow>
           ))}
@@ -298,6 +353,7 @@ export const OutputProfileDrawer = ({ api, profileKey, onClose }: { api: Descrip
               <div className="rounded-lg border border-adm-divider p-3" aria-label="Review of the profile change">
                 <p className="text-[14px] font-semibold text-adm-ink mb-1">Review</p>
                 <ul className="space-y-1">{(changed || []).map((k) => <li key={k} className="text-[14px] leading-[20px] text-adm-ink">{label[k]}: {n(initial![k])} to <strong>{n(current[k])}</strong></li>)}</ul>
+                <p className="text-[13px] leading-[18px] text-adm-muted">Only the numbers you changed are sent. Earlier overrides for this destination are kept.</p>
                 <p className="mt-1 text-[13px] leading-[18px] text-adm-muted">Applies to descriptions written from now on. Saved descriptions keep the profile they were written under.</p>
               </div>
             </>

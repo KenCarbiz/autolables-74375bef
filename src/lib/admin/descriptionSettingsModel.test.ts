@@ -3,7 +3,7 @@ import { decideEligibility } from "../../../supabase/functions/_shared/descripti
 import { resolveReviewMode } from "../../../supabase/functions/_shared/description-review-mode";
 import { countText } from "../../../supabase/functions/_shared/description-exact-fit";
 import { FIXTURE_SAMPLE_NARRATIVE } from "./descriptionSample";
-import { automationRows, buildSample, descriptionPayload, destinationRows, outputProfile, phraseMatches, readDescriptionDraft, summarizeDeliveries, validateDescription, DEFAULT_DESCRIPTION_DRAFT } from "./descriptionSettingsModel";
+import { automationRows, buildSample, descriptionPayload, destinationRows, outputProfile, phraseMatches, validateProfileEdit, profileProblems, displayRange, changedProfileNumbers, profileValues, readDescriptionDraft, summarizeDeliveries, validateDescription, DEFAULT_DESCRIPTION_DRAFT } from "./descriptionSettingsModel";
 
 const cfg = { cta_template: "Call or visit Example Honda to schedule a test drive.", required_legal_text: "Advertised price includes the documentation fee. Taxes and registration are additional.", prohibited_phrases: [] as string[] };
 
@@ -91,5 +91,35 @@ describe("description draft", () => {
     expect(p.review_mode_by_class).toEqual({ new: "DRAFT_ONLY" });
     expect(p.claims).toBeUndefined();
     expect(p.warranty_language_allowed).toBe(false);
+  });
+});
+
+describe("output profile edits", () => {
+  const vauto = { recommendedMin: 3500, recommendedMax: 4300, characterLimit: 4000 };
+  it("never allows the vAuto limit below the fixed 3,921 target", () => {
+    expect(validateProfileEdit("vauto", { ...vauto, characterLimit: 3900 }).characterLimit).toMatch(/3,921/);
+    expect(validateProfileEdit("vauto", { ...vauto, characterLimit: 3921 }).characterLimit).toBeUndefined();
+    expect(validateProfileEdit("vauto", { ...vauto, characterLimit: 4001 }).characterLimit).toMatch(/raised/);
+  });
+  it("keeps min <= target <= readable max for a fixed target", () => {
+    expect(validateProfileEdit("vauto", { ...vauto, recommendedMin: 3922 }).recommendedMin).toMatch(/above the fixed/);
+    expect(validateProfileEdit("vauto", { ...vauto, recommendedMax: 3900 }).recommendedMax).toMatch(/below the fixed/);
+    expect(validateProfileEdit("vauto", { ...vauto, recommendedMax: 3400 }).recommendedMax).toBeDefined();
+  });
+  it("accepts the unedited vAuto defaults and rejects non-integers", () => {
+    expect(validateProfileEdit("vauto", vauto)).toEqual({});
+    expect(profileProblems(outputProfile("vauto")!)).toEqual([]);
+    expect(validateProfileEdit("vauto", { ...vauto, recommendedMin: 3500.5 }).recommendedMin).toBeDefined();
+  });
+  it("shows the 4,300 readable max clamped to the 4,000 limit", () => {
+    expect(displayRange(outputProfile("vauto")!)).toMatchObject({ max: 4000, clamped: true, registryMax: 4300 });
+  });
+  it("caps the readable max at the limit when there is no fixed target", () => {
+    const w = profileValues(outputProfile("dealer_website")!);
+    expect(validateProfileEdit("dealer_website", { ...w, recommendedMax: w.characterLimit + 1 }).recommendedMax).toBeDefined();
+  });
+  it("reports only the numbers that changed", () => {
+    expect(changedProfileNumbers(vauto, { ...vauto, characterLimit: 3950 })).toEqual({ characterLimit: 3950 });
+    expect(changedProfileNumbers(vauto, vauto)).toEqual({});
   });
 });

@@ -151,7 +151,7 @@ describe("Publishing > Effective policy", () => {
     spies.readFails.value = true;
     renderView(false);
     expect(await screen.findByText("Some policy inputs could not be read")).toBeInTheDocument();
-    expect(document.querySelector('[data-parity="class-counts"]')).toHaveTextContent("Active listings Unavailable · Published Unavailable");
+    expect(document.querySelector('[data-parity="class-counts"]')).toHaveTextContent("Active listings Unavailable Published Unavailable");
     const table = screen.getByRole("table", { name: "Effective publishing policy by vehicle type" });
     expect(within(table).getAllByText(/\(descriptions unknown\)/)).toHaveLength(3);
     expect(screen.getByText("Enforced policy, no pending changes")).toBeInTheDocument();
@@ -179,7 +179,7 @@ describe("Publishing > Effective policy draft, review and apply against live set
 
   const ready = async () => {
     await screen.findByRole("table", { name: "Effective publishing policy by vehicle type" });
-    await waitFor(() => expect(document.querySelector('[data-parity="class-counts"]')).toHaveTextContent("Active listings 0 · Published 0"));
+    await waitFor(() => expect(document.querySelector('[data-parity="class-counts"]')).toHaveTextContent("Active listings 0 Published 0"));
   };
   const openEdit = () => {
     fireEvent.click(screen.getByRole("button", { name: "Edit policy" }));

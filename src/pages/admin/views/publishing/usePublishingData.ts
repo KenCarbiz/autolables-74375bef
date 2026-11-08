@@ -109,17 +109,41 @@ type AuditRow = { id: string; created_at: string; user_id: string | null; user_e
 
 const asRecord = (v: unknown): Record<string, unknown> | null => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
 
+const DOC_KEYS = ["requireApprovalBeforePublish", "autoPublishApprovedWindow", "autoPublishApprovedAddendum", "autoUnpublishStale", "hideSupersededPublic"];
+
+/** The draft-shaped values an audit row from the settings writer carries, so it can be compared with the dialog's row. */
+const draftValuesOf = (next: Record<string, unknown> | null): Record<string, unknown> => {
+  const out: Record<string, unknown> = {};
+  if (!next) return out;
+  if ("ingest_auto_publish" in next) out.ingest_auto_publish = next.ingest_auto_publish;
+  const rules = asRecord(next.document_rules);
+  if (rules) for (const k of DOC_KEYS) if (k in rules) out[k] = rules[k];
+  return out;
+};
+
 /**
- * The settings writer and the review dialog each record a row for one apply, seconds apart. The dialog's row carries
- * the idempotency key and the readable rule names, so it wins when two rows from one user fall within ten seconds.
+ * The settings writer and the review dialog each record a row for one apply. Two rows are one apply only when they
+ * share an idempotency key, or one is the writer's row for exactly the values in the other's payload by the same
+ * user with the same version. Two distinct applies are never merged, however close together.
  */
 export function toPolicyHistory(rows: AuditRow[]): PolicyHistoryEntry[] {
+  const keyOf = (r: AuditRow) => (asRecord(r.details)?.idempotency_key as string | undefined) ?? null;
   const sorted = [...rows].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const dialog = sorted.filter((r) => keyOf(r));
+  const covered = (r: AuditRow) => {
+    if (keyOf(r)) return false;
+    const v = draftValuesOf(asRecord(asRecord(r.details)?.next));
+    const entries = Object.entries(v);
+    if (entries.length === 0) return false;
+    return dialog.some((d) => d.user_id === r.user_id && Math.abs(Date.parse(d.created_at) - Date.parse(r.created_at)) < 60_000 && entries.every(([k, val]) => asRecord(asRecord(d.details)?.next)?.[k] === val));
+  };
+  const seen = new Set<string>();
   const out: AuditRow[] = [];
   for (const r of sorted) {
-    const near = out.findIndex((o) => o.user_id === r.user_id && Math.abs(Date.parse(o.created_at) - Date.parse(r.created_at)) < 10_000);
-    if (near === -1) out.push(r);
-    else if (!asRecord(out[near].details)?.idempotency_key && asRecord(r.details)?.idempotency_key) out[near] = r;
+    const k = keyOf(r);
+    if (k) { if (seen.has(k)) continue; seen.add(k); }
+    else if (covered(r)) continue;
+    out.push(r);
   }
   return out.map((r) => {
     const d = asRecord(r.details) ?? {};

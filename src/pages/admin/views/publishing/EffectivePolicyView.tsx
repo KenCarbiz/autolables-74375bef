@@ -83,8 +83,11 @@ export default function EffectivePolicyView() {
         <PolicyMatrix rows={rows} selected={selected} onSelect={setSelected} />
       </SectionCard>
 
-      <SectionCard id="selected-rule" icon="shield-check" title={`${VEHICLE_CLASS_LABEL[selected]} vehicles`} description="The effective rule, read from the same settings the server enforces."
-        actions={<span className="text-[13px] leading-[18px] text-adm-muted" data-parity="class-counts">Active listings <Link className="font-semibold text-adm-primary hover:underline" to={inv}>{classCounts.active}</Link> · Published <Link className="font-semibold text-adm-primary hover:underline" to={inv}>{classCounts.published}</Link></span>}>
+      <SectionCard id="selected-rule" icon="shield-check" title={`${VEHICLE_CLASS_LABEL[selected]} vehicles`} description="The effective rule, read from the same settings the server enforces.">
+        <p className="flex flex-wrap items-center gap-x-4 min-w-0 text-[14px] leading-[20px] text-adm-muted" data-parity="class-counts">
+          <span>Active listings <Link className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-1 font-semibold text-adm-primary hover:underline" to={inv}>{classCounts.active}</Link></span>{" "}
+          <span>Published <Link className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-1 font-semibold text-adm-primary hover:underline" to={`${inv}&status=published`}>{classCounts.published}</Link></span>
+        </p>
         <div className="rounded-xl bg-adm-workspace border border-adm-divider p-4 flex items-start gap-3">
           <AdminIconTile name="info" tone="neutral" />
           <div className="min-w-0">
