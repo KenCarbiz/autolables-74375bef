@@ -89,6 +89,19 @@ describe("NeoVIN decode facts for catalog templates", () => {
     const gas = normalizeForSticker(withFuel("Unleaded"), {}, canonicalPassportUrl("x"), "t").data;
     expect(gas.neovin?.fuelType).toBeUndefined();
   });
+
+  it("carries a gasoline NeoVIN fuel type only for the gasoline heavy-duty Ram 2500, which has no EPA row", () => {
+    const base = tucsonListings()[0];
+    const withFuel = (ymm: string, fuel: string, epa: Record<string, unknown> | null = null) =>
+      ({ ...base, ymm, epa_economy: epa, mc_attributes: { ...(base.mc_attributes as object), fuel_type: fuel } });
+    const ram = normalizeForSticker(withFuel("2026 Ram 2500", "Unleaded"), {}, canonicalPassportUrl("x"), "t").data;
+    expect(ram.neovin?.fuelType).toBe("Unleaded");
+    expect(normalizeForSticker(withFuel("2026 Ram 2500", "Diesel"), {}, canonicalPassportUrl("x"), "t").data.neovin?.fuelType).toBe("Diesel");
+    expect(normalizeForSticker(withFuel("2026 Ram 2500", "Electric / Premium Unleaded"), {}, canonicalPassportUrl("x"), "t").data.neovin?.fuelType).toBeUndefined();
+    expect(normalizeForSticker(withFuel("2026 Ram 1500", "Unleaded"), {}, canonicalPassportUrl("x"), "t").data.neovin?.fuelType).toBeUndefined();
+    expect(normalizeForSticker(withFuel("2026 Ford F-250", "Unleaded"), {}, canonicalPassportUrl("x"), "t").data.neovin?.fuelType).toBeUndefined();
+    expect(normalizeForSticker(withFuel("2026 Hyundai Tucson", "Unleaded"), {}, canonicalPassportUrl("x"), "t").data.neovin?.fuelType).toBeUndefined();
+  });
 });
 
 describe("EPA match conflict guard for catalog templates", () => {

@@ -77,6 +77,8 @@ export interface CatalogMatchRule {
   unknownDrivetrainMatches?: boolean;
   /** Tested against the lower-cased trim; absent means any trim of the model. */
   trimPattern?: string;
+  /** Heavy-duty gasoline truck: it has no EPA fuel economy row, so the fuel class is read from a NeoVIN decode that states gasoline. */
+  decodeGasolineFuel?: true;
 }
 
 export interface CatalogTemplate {
@@ -381,6 +383,20 @@ export const TEMPLATE_CATALOG: readonly CatalogTemplate[] = [
     blockers: ["font_substitution", "ocr_unverified", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "carb_panel_pending", "warranty_terms_not_wired"],
   },
   {
+    id: "ram_2026_2500_gas",
+    brand: "RAM",
+    canonicalMake: "RAM",
+    source: { modelYear: 2026, model: "2500", trim: "Big Horn" },
+    referenceStatus: "2026_factory_example",
+    page: { widthPt: 1224, heightPt: 792, orientation: "landscape" },
+    referencePdf: "../gas-hd-references/Ram_2026_2500_Big_Horn_Gas_3C6UR5DJ7TG302125.pdf",
+    design: { fileKey: "KQDfedj4ysiDgipy9fYPjs", masterNodeId: "1:824" },
+    match: { modelYears: [2026], modelPattern: "^(ram)?2500(pickup)?$", bodyClasses: ["PICKUP"], fuelClasses: ["gasoline"], decodeGasolineFuel: true, },
+    approval: "pending_owner_approval",
+    layoutStatus: "sample_ready",
+    blockers: ["font_substitution", "sample_machine_readable_artwork_not_reproduced", "owner_exact_match_not_approved", "carb_panel_pending", "warranty_terms_not_wired"],
+  },
+  {
     id: "rolls-royce_2026_spectre",
     brand: "Rolls-Royce",
     canonicalMake: "ROLLSROYCE",
@@ -564,18 +580,14 @@ export const BLOCKED_VARIANT_REQUESTS: readonly CatalogVariantRequest[] = [
       kind: "altered_commercial",
     },
   },
-  {
-    id: "ram_2026_2500_gas", brand: "Ram", canonicalMake: "RAM",
-    source: { modelYear: 2026, model: "2500", trim: null }, dieselTemplateId: "ram_2026_2500_limited",
-    match: { modelYears: [2026], modelPattern: "^(ram)?2500(pickup)?$", bodyClasses: ["PICKUP"], fuelClasses: ["gasoline"] },
-    approval: "pending_owner_approval", layoutStatus: "not_started", blockers: GAS_HD_BLOCKERS_WITH_REFERENCE, requiredFromReference: GAS_HD_REQUIRED,
-    reference: {
-      file: "gas-hd-references/Ram_2026_2500_Big_Horn_Gas_3C6UR5DJ7TG302125.pdf", vin: "3C6UR5DJ7TG302125",
-      sha256: "faac3bd17acf838ce68a15a7515f3df6092b7fe3cbe8c71a78cfd1e85876bd4d", source: "Stellantis window-sticker service (manufacturer)",
-      kind: "standard_retail",
-    },
-  },
 ];
+
+/** True when a template for this make and model reads the gasoline fuel class from the NeoVIN decode (no EPA row exists for it). */
+export const usesDecodeGasolineFuel = (make: string | null | undefined, model: string | null | undefined): boolean => {
+  const m = token(make);
+  const mo = token(model).toLowerCase();
+  return !!m && !!mo && TEMPLATE_CATALOG.some((t) => t.canonicalMake === m && t.match.decodeGasolineFuel === true && new RegExp(t.match.modelPattern).test(mo));
+};
 
 export const CATALOG_ENTRY_COUNT = TEMPLATE_CATALOG.length + BLOCKED_VARIANT_REQUESTS.length;
 

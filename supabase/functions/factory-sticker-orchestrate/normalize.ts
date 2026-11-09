@@ -8,7 +8,7 @@ import { parseYmm } from "../_shared/factorySticker/lib/ymm.ts";
 import { decideDrivetrain, isRatingMetadata, splitRatingMetadata, type DrivetrainEvidence } from "../_shared/factorySticker/lib/oem/sourceCorrections.ts";
 
 import { driveOf, listingPowertrain, litersOf, storedEpaConflict } from "../_shared/epaMatch.ts";
-import { hasBuiltCatalogTemplates } from "../_shared/factorySticker/lib/oem/templateCatalog.ts";
+import { hasBuiltCatalogTemplates, usesDecodeGasolineFuel } from "../_shared/factorySticker/lib/oem/templateCatalog.ts";
 import type { FactoryStickerRenderData } from "../_shared/factorySticker/lib/render/contract.ts";
 
 // deno-lint-ignore no-explicit-any
@@ -249,7 +249,8 @@ export function normalizeForSticker(
                 ...Object.values(catMap(sheet?.key_features)).flat().filter(isRatingMetadata),
               ],
               madeIn: str(mc.made_in),
-              ...(/diesel/i.test(String(mc.fuel_type ?? "")) ? { fuelType: String(mc.fuel_type) } : {}),
+              ...(/diesel/i.test(String(mc.fuel_type ?? "")) || (!epa && usesDecodeGasolineFuel(identity.make, identity.model) && /^(gasoline|unleaded|regular|premium|midgrade)\b/i.test(String(mc.fuel_type ?? "").trim()) && !/electric|hybrid|diesel/i.test(String(mc.fuel_type ?? "")))
+                ? { fuelType: String(mc.fuel_type) } : {}),
               ...(epaConflict ? { epaConflict } : {}),
               ...(/^(HEV|FHEV)$/i.test(String(mc.powertrain_type ?? "").trim()) ? { hybridDecode: true as const } : {}),
             },

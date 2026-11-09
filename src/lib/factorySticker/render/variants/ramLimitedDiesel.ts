@@ -51,10 +51,13 @@ function paintRight(p: Painter, d: FactoryStickerData): void {
   T(p, PASSPORT_QR_CAPTION, PARTS_X + PASSPORT_QR_PT + 10, y + 33, 8, "body");
 }
 
-export const buildRam2500DieselLayout: VariantLayoutBuilder = (input): LayoutModel | null => buildFcaLayout({
+/** Shared by the diesel and gasoline Ram 2500 templates: the right-hand panels and header are identical, and every fuel-specific word comes from the record. */
+export const buildRam2500HdLayout: VariantLayoutBuilder = (input): LayoutModel | null => buildFcaLayout({
   frameColor: "#000000",
   paintHeader,
   specTitle: modelLine,
   priceRows: (d) => priceRowsWithoutColors(d),
   paintRight,
 })(input);
+
+export const buildRam2500DieselLayout: VariantLayoutBuilder = buildRam2500HdLayout;

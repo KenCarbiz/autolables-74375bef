@@ -16,6 +16,7 @@ import { buildFordTransitCarbLayout } from "./fordTransitCarb.ts";
 import { CHEVROLET_SILVERADO_2500_DIESEL_ID, buildChevroletSilverado2500DieselLayout } from "./chevroletSilverado2500Diesel.ts";
 import { GMC_SIERRA_3500_DIESEL_ID, buildGmcSierra3500DieselLayout } from "./gmcSierra3500Diesel.ts";
 import { RAM_2500_DIESEL_ID, buildRam2500DieselLayout } from "./ramLimitedDiesel.ts";
+import { RAM_2500_GAS_ID, buildRam2500GasLayout } from "./ramBigHornGas.ts";
 import { GENESIS_GV80_GAS_ID, buildGenesisGv80GasLayout } from "./genesisGv80Gas.ts";
 import { buildHyundaiSantaFeHybridLayout } from "./hyundaiSantaFeHybrid.ts";
 import { HYUNDAI_TUCSON_GAS_ID, buildHyundaiTucsonGasLayout } from "./hyundaiTucsonGas.ts";
@@ -61,6 +62,7 @@ export const CATALOG_LAYOUTS: Partial<Record<string, VariantLayoutBuilder>> = {
   [SUBARU_FORESTER_GAS_ID]: buildSubaruForesterGasLayout,
   [FORD_F250_DIESEL_ID]: buildFordF250DieselLayout,
   [RAM_2500_DIESEL_ID]: buildRam2500DieselLayout,
+  [RAM_2500_GAS_ID]: buildRam2500GasLayout,
   [CHEVROLET_SILVERADO_2500_DIESEL_ID]: buildChevroletSilverado2500DieselLayout,
   [GMC_SIERRA_3500_DIESEL_ID]: buildGmcSierra3500DieselLayout,
   [CADILLAC_ESCALADE_IQL_EV_ID]: buildCadillacEscaladeIqEvLayout,
