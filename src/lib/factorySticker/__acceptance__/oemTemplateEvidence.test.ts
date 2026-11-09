@@ -525,7 +525,8 @@ const BRAND_DOCS: Record<string, BrandDoc> = {
     differences: [
       "- Page: the reference PDF is a 612x792pt portrait page (rotation 0, no text layer) that stores a landscape label sideways (reference_stored_rotated); the render is upright at 792x612pt. The reference scan is a torn, marked copy; the owner should confirm the upright letter-landscape page is acceptable.",
       "- Artwork not reproduced: the Honda logo (damaged in the scan, so the wordmark prints; missing_source_artwork), the Smartphone QR (the 0.90in Vehicle Passport QR takes its slot), agency seals, the MOB code, the engine number, the full-tank-of-fuel line, the control and reference numbers and the second barcode.",
-      "- The fuel-economy panel is the shared panel drawn at 82% (epa_panel_scaled) so the letter page keeps every line at or above 5.5pt.",
+      "- The fuel-economy panel is the shared panel drawn at 72% (epa_panel_scaled) so the letter page keeps every line at or above 5.5pt; lines that would exceed their width at the 5.5pt floor wrap earlier than on the reference.",
+      "- The price list is its own third column between the equipment and the fuel-economy panel, as on the reference. The reference's column proportions are approximated: the equipment columns are narrower than the reference's, and the price column holds the roadside-assistance warranty line, destination, total and the price footnote in one flow.",
       "- Matching: 2026 Odyssey, minivan, gasoline. The Odyssey has no hybrid configuration; any plug-in or hybrid powertrain is not matched and flags template_configuration_unsupported.",
     ],
   },

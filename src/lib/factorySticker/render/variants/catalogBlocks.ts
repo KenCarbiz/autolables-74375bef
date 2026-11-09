@@ -40,7 +40,8 @@ const GAL = (r: FactoryStickerData["regulatory"]): number | undefined =>
   r.gallonsPer100Miles ?? (r.combinedMpg !== undefined && r.combinedMpg > 0 ? 100 / r.combinedMpg : undefined);
 
 /** Fuel economy and environment panel; (ox, oy) is its top-left corner in reference pixels. */
-export function paintCatalogEpa(p: Painter, d: FactoryStickerData, g: Grid, ox: number, oy: number, opts: { flexFuel?: boolean } = {}): void {
+export function paintCatalogEpa(p: Painter, d: FactoryStickerData, g: Grid, ox: number, oy: number, opts: { flexFuel?: boolean; scale?: number } = {}): void {
+  const grow = (size: number): number => (opts.scale ? Math.max(1, 5.5 / (size * opts.scale)) : 1);
   const flex = opts.flexFuel === true && d.regulatory.flexFuel === true;
   const r = d.regulatory;
   const X = (lx: number): number => g.x(ox + lx);
@@ -68,7 +69,7 @@ export function paintCatalogEpa(p: Painter, d: FactoryStickerData, g: Grid, ox: 
   R(p, X(5), panelTop, W(690), Yy(229) - panelTop, PAPER);
   T(p, "Fuel Economy", X(57), Yy(54), 11, "bold");
   if (!mpgOk) {
-    wrap("Fuel economy and environment information is not available from verified EPA records for this exact configuration.", "bold", 12, W(410))
+    wrap("Fuel economy and environment information is not available from verified EPA records for this exact configuration.", "bold", 12, W(410) / grow(12))
       .forEach((l, i) => T(p, l, X(57), Yy(84) + i * 15, 12, "bold", { lh: 15 }));
   } else {
     p.text(String(Math.round(r.combinedMpg!)), X(53), Yy(158), 58, "bold", INK);
@@ -87,7 +88,7 @@ export function paintCatalogEpa(p: Painter, d: FactoryStickerData, g: Grid, ox: 
       const noteW = flex ? 180 : 215;
       const noteSize = flex ? 6.6 : 7.5;
       const noteLh = flex ? 6.9 : 8.2;
-      wrap(r.epaClassNote, "body", noteSize, W(noteW)).slice(0, flex ? 5 : 4).forEach((l, i) => T(p, l, X(noteX), Yy(flex ? 56 : 80) + i * noteLh, noteSize, "body", { lh: noteLh }));
+      wrap(r.epaClassNote, "body", noteSize, W(noteW) / grow(noteSize)).slice(0, flex ? 5 : 4).forEach((l, i) => T(p, l, X(noteX), Yy(flex ? 56 : 80) + i * noteLh, noteSize, "body", { lh: noteLh }));
     }
     const gallons = GAL(r);
     if (gallons !== undefined && flex) {
@@ -133,13 +134,13 @@ export function paintCatalogEpa(p: Painter, d: FactoryStickerData, g: Grid, ox: 
   paintScale(p, X(549), Yy(284), W(140), scaleState(verified ? r.smogRating : undefined), 14);
   if (verified && r.co2TailpipeGpm !== undefined) {
     const line = `This vehicle emits ${Math.round(r.co2TailpipeGpm)} grams CO2 per mile (tailpipe only). The best emits 0 grams per mile (tailpipe only). Producing and distributing fuel also create emissions; learn more at fueleconomy.gov.`;
-    wrap(line, "body", 6.4, W(470)).slice(0, 2).forEach((l, i) => T(p, l, X(216), Yy(318) + i * 7, 6.4, "body", { lh: 7 }));
+    wrap(line, "body", 6.4, W(470) / grow(6.4)).slice(0, opts.scale ? 3 : 2).forEach((l, i) => T(p, l, X(216), Yy(opts.scale ? 311 : 318) + i * 7 * grow(6.4), 6.4, "body", { lh: 7 }));
   }
 
   const footTop = Yy(345);
   const footBottom = Yy(EPA_PANEL_H);
   const note = "Actual results will vary for many reasons, including driving conditions and how you drive and maintain your vehicle. Cost estimates are current EPA estimates and may differ from those printed on the original label.";
-  wrap(note, "bold", 6.8, W(540)).forEach((l, i) => T(p, l, X(12), footTop + 3 + i * 7.8, 6.8, "bold", { color: PAPER, lh: 7.8 }));
+  wrap(note, "bold", 6.8, W(540) / grow(6.8)).forEach((l, i) => T(p, l, X(12), footTop + 3 + i * 7.8 * grow(6.8), 6.8, "bold", { color: PAPER, lh: 7.8 }));
   T(p, "fueleconomy.gov", X(12), footBottom - 36, 20, "bold", { color: PAPER });
   T(p, "Calculate personalized estimates and compare vehicles", X(12), footBottom - 12, 7.5, "bold", { color: PAPER });
   const url = d.document.passportUrl.trim();
