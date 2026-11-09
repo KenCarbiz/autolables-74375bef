@@ -1,6 +1,10 @@
+import { describe, expect, it } from "vitest";
 import { describeCatalogTemplate } from "../__fixtures__/catalogTemplateSuite";
 import { RAM2500_REFERENCE_VIN, ram2500Listing, ram2500ReferenceMatchData, ram2500RenderData } from "../__fixtures__/ram2500";
 import { RAM_2500_DIESEL_ID } from "./ramLimitedDiesel";
+import { RAM_2500_GAS_ID } from "./ramBigHornGas";
+import { templateRoutingFacts } from "../contract";
+import { pinCatalogPending } from "../__fixtures__/catalogState";
 
 const gasoline = (d: Parameters<typeof describeCatalogTemplate>[0]["supported"][number]["patch"] extends (x: infer T) => unknown ? T : never) =>
   ({ ...d, epa: null, neovin: { ratingMetadata: [], madeIn: null, fuelType: "Unleaded" } });
@@ -25,11 +29,22 @@ describeCatalogTemplate({
     { label: "diesel from the verified EPA match", patch: (d) => ({ ...d, neovin: undefined, epa: { ...(d.epa ?? { combined: null, city: null, highway: null }), fuelType: "Diesel" } as typeof d.epa }) },
   ],
   unsupported: [
-    { label: "gasoline powertrain", patch: gasoline },
     { label: "no fuel evidence", patch: (d) => ({ ...d, epa: null, neovin: { ratingMetadata: [], madeIn: null } }) },
     { label: "2025 model year", patch: (d) => ({ ...d, identity: { ...d.identity, year: "2025" } }) },
     { label: "Ram 1500", patch: (d) => ({ ...d, identity: { ...d.identity, model: "1500" } }) },
     { label: "Ram 3500", patch: (d) => ({ ...d, identity: { ...d.identity, model: "3500" } }) },
     { label: "sedan body", patch: (d) => ({ ...d, bodyClass: "Sedan" }) },
   ],
+});
+
+describe("Ram 2500 diesel template is diesel only", () => {
+  pinCatalogPending();
+
+  it("never routes a gasoline Ram 2500 to the diesel layout; it belongs to the gasoline template", () => {
+    const ref = ram2500ReferenceMatchData(ram2500RenderData());
+    expect(templateRoutingFacts(ref).template?.id).toBe(RAM_2500_DIESEL_ID);
+    const gas = gasoline(ref);
+    expect(templateRoutingFacts(gas).template?.id).toBe(RAM_2500_GAS_ID);
+    expect(templateRoutingFacts(gas).template?.id).not.toBe(RAM_2500_DIESEL_ID);
+  });
 });

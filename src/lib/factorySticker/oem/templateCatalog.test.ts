@@ -57,9 +57,9 @@ describe("owner decision of 2026-11-08", () => {
 describe("template catalog", () => {
   pinCatalogPending();
 
-  it("holds the 28 handoff templates: 26 pending owner approval, 2 superseded by approved masters, none approved", () => {
-    expect(TEMPLATE_CATALOG).toHaveLength(28);
-    expect(new Set(TEMPLATE_CATALOG.map((t) => t.id)).size).toBe(28);
+  it("holds the 28 handoff templates and the Ram 2500 gasoline template built from its verified label: 27 pending owner approval, 2 superseded by approved masters, none approved", () => {
+    expect(TEMPLATE_CATALOG).toHaveLength(29);
+    expect(new Set(TEMPLATE_CATALOG.map((t) => t.id)).size).toBe(29);
     for (const t of TEMPLATE_CATALOG) {
       const superseded = t.id === "infiniti_2026_qx60_sport" || t.id === "nissan_2026_pathfinder_platinum";
       expect(t.approval).toBe(superseded ? "superseded_by_approved_master" : "pending_owner_approval");
@@ -69,10 +69,10 @@ describe("template catalog", () => {
     }
   });
 
-  it("adds four gasoline heavy-duty requests: 32 entries, none built; only verified labels clear the reference blocker", () => {
+  it("keeps three gasoline heavy-duty requests blocked: 32 entries, none built; only verified labels clear the reference blocker", () => {
     expect(CATALOG_ENTRY_COUNT).toBe(32);
     expect(BLOCKED_VARIANT_REQUESTS.map((b) => b.id)).toEqual([
-      "ford_2026_f250_gas", "chevrolet_2026_silverado_2500hd_gas", "gmc_2026_sierra_3500hd_gas", "ram_2026_2500_gas",
+      "ford_2026_f250_gas", "chevrolet_2026_silverado_2500hd_gas", "gmc_2026_sierra_3500hd_gas",
     ]);
     const ids = new Set([...TEMPLATE_CATALOG, ...BLOCKED_VARIANT_REQUESTS].map((t) => t.id));
     expect(ids.size).toBe(32);
@@ -89,10 +89,13 @@ describe("template catalog", () => {
     }
   });
 
-  it("records the verified Ram label as standard retail and the GMC label as altered", () => {
-    const ram = BLOCKED_VARIANT_REQUESTS.find((b) => b.id === "ram_2026_2500_gas")!;
+  it("builds the Ram gasoline template from the verified retail label and keeps the GMC label as altered", () => {
+    const ram = getCatalogTemplate("ram_2026_2500_gas")!;
     const gmc = BLOCKED_VARIANT_REQUESTS.find((b) => b.id === "gmc_2026_sierra_3500hd_gas")!;
-    expect(ram.reference).toMatchObject({ vin: "3C6UR5DJ7TG302125", kind: "standard_retail" });
+    expect([ram.approval, ram.layoutStatus]).toEqual(["pending_owner_approval", "sample_ready"]);
+    expect(ram.blockers).not.toContain("layout_not_built");
+    expect(ram.match.fuelClasses).toEqual(["gasoline"]);
+    expect(BLOCKED_VARIANT_REQUESTS.some((b) => b.id === "ram_2026_2500_gas")).toBe(false);
     expect(gmc.reference).toMatchObject({ vin: "1GT3USE75TF129680", kind: "altered_commercial" });
     expect(gmc.blockers).toContain("reference_altered_vehicle");
     for (const id of ["ford_2026_f250_gas", "chevrolet_2026_silverado_2500hd_gas"]) {
@@ -101,7 +104,7 @@ describe("template catalog", () => {
   });
 
   it("never routes a gasoline heavy-duty truck to the diesel layout or to its unbuilt gasoline entry", () => {
-    const trucks: Array<[string, string]> = [["Ford", "F-250 Super Duty"], ["Chevrolet", "Silverado 2500HD"], ["GMC", "Sierra 3500HD"], ["Ram", "2500"]];
+    const trucks: Array<[string, string]> = [["Ford", "F-250 Super Duty"], ["Chevrolet", "Silverado 2500HD"], ["GMC", "Sierra 3500HD"]];
     for (const [make, model] of trucks) {
       const v: CatalogVehicleInput = { make, modelYear: 2026, model, trim: "XL", bodyClass: "Crew Cab Pickup", fuelClass: "gasoline", drivetrain: "4WD" };
       const r = resolveCatalogTemplate(v);

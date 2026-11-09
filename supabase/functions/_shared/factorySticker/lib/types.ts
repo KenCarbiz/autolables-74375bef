@@ -111,6 +111,10 @@ export interface StickerRegulatory {
   greenhouseGasRating?: number;
   smogRating?: number;
   evRangeMiles?: number;
+  /** Flexible-fuel driving range on gasoline, from the saved EPA row. */
+  gasolineRangeMiles?: number;
+  /** Flexible-fuel driving range on E85, from the saved EPA row. */
+  e85RangeMiles?: number;
   gasolineCombinedMpg?: number;
   /** Electricity + gasoline combined MPGe of a plug-in hybrid, exactly as saved from the EPA row. */
   combinedMpge?: number;
@@ -122,6 +126,8 @@ export interface StickerRegulatory {
   /** Total (electricity + gasoline) range of a plug-in hybrid. */
   totalRangeMiles?: number;
   epaClassNote?: string;
+  /** The saved EPA row states a flexible-fuel (E85) vehicle. */
+  flexFuel?: true;
   epaSourceReference?: string;
   /** ISO time the saved fueleconomy.gov row (and its cost figures) was retrieved. */
   epaRetrievedAt?: string;

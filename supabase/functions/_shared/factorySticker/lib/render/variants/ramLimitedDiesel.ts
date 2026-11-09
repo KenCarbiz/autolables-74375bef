@@ -44,21 +44,25 @@ function paintHeader(p: Painter, d: FactoryStickerData): void {
   T(p, "or call 1-866-RAMINFO", 880, Y(68.9), 12, "body", { align: "center" });
 }
 
-function paintRight(p: Painter, d: FactoryStickerData): void {
+const paintRightFor = (master: boolean) => (p: Painter, d: FactoryStickerData): void => {
   paintCarbPanel(p, d, EPA_X, Y(101), EPA_W, Y(426) - Y(101));
-  paintSafety(p, d);
+  paintSafety(p, d, master);
   const url = d.document.passportUrl.trim();
   if (!url) return;
   const y = Y(446);
   p.qr(PARTS_X + 2, y, PASSPORT_QR_PT, url, INK);
   T(p, "VEHICLE PASSPORT", PARTS_X + PASSPORT_QR_PT + 10, y + 20, 9, "bold");
   T(p, PASSPORT_QR_CAPTION, PARTS_X + PASSPORT_QR_PT + 10, y + 33, 8, "body");
-}
+};
 
-export const buildRam2500DieselLayout: VariantLayoutBuilder = (input): LayoutModel | null => buildFcaLayout({
+/** Shared by the diesel and gasoline Ram 2500 templates: the panels and header are the same, every fuel-specific word comes from the record, and only the gasoline template takes the master-measured geometry. */
+export const makeRam2500HdLayout = (masterGeometry: boolean): VariantLayoutBuilder => (input): LayoutModel | null => buildFcaLayout({
   frameColor: "#000000",
   paintHeader,
   specTitle: modelLine,
   priceRows: (d) => priceRowsWithoutColors(d),
-  paintRight,
+  paintRight: paintRightFor(masterGeometry),
+  masterGeometry,
 })(input);
+
+export const buildRam2500DieselLayout: VariantLayoutBuilder = makeRam2500HdLayout(false);

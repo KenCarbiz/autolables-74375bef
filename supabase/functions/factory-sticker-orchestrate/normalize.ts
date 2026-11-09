@@ -8,7 +8,7 @@ import { parseYmm } from "../_shared/factorySticker/lib/ymm.ts";
 import { decideDrivetrain, isRatingMetadata, splitRatingMetadata, type DrivetrainEvidence } from "../_shared/factorySticker/lib/oem/sourceCorrections.ts";
 
 import { driveOf, listingPowertrain, litersOf, storedEpaConflict } from "../_shared/epaMatch.ts";
-import { hasBuiltCatalogTemplates } from "../_shared/factorySticker/lib/oem/templateCatalog.ts";
+import { hasBuiltCatalogTemplates, usesDecodeGasolineFuel } from "../_shared/factorySticker/lib/oem/templateCatalog.ts";
 import type { FactoryStickerRenderData } from "../_shared/factorySticker/lib/render/contract.ts";
 
 // deno-lint-ignore no-explicit-any
@@ -159,6 +159,7 @@ export function normalizeForSticker(
           .flatMap((k) => (num(epaRow[k]) !== null ? [[k, num(epaRow[k])]] : [])),
       ) as { combinedMpge?: number; kwhPer100Miles?: number; chargeTimeHours?: number; electricRangeMiles?: number; totalRangeMiles?: number; smogScore?: number }
       : {}),
+    ...(hasBuiltCatalogTemplates(identity.make) && str(epaRow.atvType) ? { atvType: str(epaRow.atvType) } : {}),
     // Cost figures are only comparable within one retrieval: the 5-year
     // comparison is read only from a timestamped row, the same row as the
     // annual cost, and keeps its sign (negative = spends more).
@@ -248,7 +249,8 @@ export function normalizeForSticker(
                 ...Object.values(catMap(sheet?.key_features)).flat().filter(isRatingMetadata),
               ],
               madeIn: str(mc.made_in),
-              ...(/diesel/i.test(String(mc.fuel_type ?? "")) ? { fuelType: String(mc.fuel_type) } : {}),
+              ...(/diesel/i.test(String(mc.fuel_type ?? "")) || (!epa && usesDecodeGasolineFuel(identity.make, identity.model) && /^(gasoline|unleaded|regular|premium|midgrade)\b/i.test(String(mc.fuel_type ?? "").trim()) && !/electric|hybrid|diesel/i.test(String(mc.fuel_type ?? "")))
+                ? { fuelType: String(mc.fuel_type) } : {}),
               ...(epaConflict ? { epaConflict } : {}),
               ...(/^(HEV|FHEV)$/i.test(String(mc.powertrain_type ?? "").trim()) ? { hybridDecode: true as const } : {}),
             },

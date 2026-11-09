@@ -28,7 +28,9 @@ import { ram2500ReferenceMatchData, ram2500RenderData } from "../render/__fixtur
 import { silveradoReferenceMatchData, silveradoRenderData } from "../render/__fixtures__/silverado2500";
 import { sierraReferenceMatchData, sierraRenderData } from "../render/__fixtures__/sierra3500";
 import { FORD_F250_DIESEL_ID } from "../render/variants/fordF250Diesel";
+import { ram2500GasReferenceMatchData, ram2500GasRenderData } from "../render/__fixtures__/ram2500Gas";
 import { RAM_2500_DIESEL_ID } from "../render/variants/ramLimitedDiesel";
+import { RAM_2500_GAS_ID } from "../render/variants/ramBigHornGas";
 import { CHEVROLET_SILVERADO_2500_DIESEL_ID } from "../render/variants/chevroletSilverado2500Diesel";
 import { GMC_SIERRA_3500_DIESEL_ID } from "../render/variants/gmcSierra3500Diesel";
 import { KIA_SORENTO_GAS_ID } from "../render/variants/kiaSorentoGas";
@@ -523,7 +525,8 @@ const BRAND_DOCS: Record<string, BrandDoc> = {
     differences: [
       "- Page: the reference PDF is a 612x792pt portrait page (rotation 0, no text layer) that stores a landscape label sideways (reference_stored_rotated); the render is upright at 792x612pt. The reference scan is a torn, marked copy; the owner should confirm the upright letter-landscape page is acceptable.",
       "- Artwork not reproduced: the Honda logo (damaged in the scan, so the wordmark prints; missing_source_artwork), the Smartphone QR (the 0.90in Vehicle Passport QR takes its slot), agency seals, the MOB code, the engine number, the full-tank-of-fuel line, the control and reference numbers and the second barcode.",
-      "- The fuel-economy panel is the shared panel drawn at 82% (epa_panel_scaled) so the letter page keeps every line at or above 5.5pt.",
+      "- The fuel-economy panel is the shared panel drawn at 72% (epa_panel_scaled) so the letter page keeps every line at or above 5.5pt; lines that would exceed their width at the 5.5pt floor wrap earlier than on the reference.",
+      "- The price list is its own third column between the equipment and the fuel-economy panel, as on the reference. The reference's column proportions are approximated: the equipment columns are narrower than the reference's, and the price column holds the roadside-assistance warranty line, destination, total and the price footnote in one flow.",
       "- Matching: 2026 Odyssey, minivan, gasoline. The Odyssey has no hybrid configuration; any plug-in or hybrid powertrain is not matched and flags template_configuration_unsupported.",
     ],
   },
@@ -656,10 +659,10 @@ const BRAND_DOCS: Record<string, BrandDoc> = {
     ],
     sample: ["- sticker-KL47LCEP0TB000001: SYNTHETIC stress fixture (invented values). No Buick row exists in the saved vehicle_listings, so no real record was available; it is not a real vehicle."],
     differences: [
-      "- Artwork not reproduced: the adhesive-strip notice, the OnStar advertisement and its QR, the order-information QR, the driving-range bars and the flex-fuel E85 tag (the fuel tag prints the verified EPA fuel type); sales codes and order numbers have no render-data source.",
+      "- Artwork not reproduced: the adhesive-strip notice, the OnStar advertisement and its QR, the order-information QR and the driving-range bars and car icons; the flex-fuel tag and Driving Range block print only when the saved EPA row states a flexible-fuel (E85) vehicle, and the gasoline and E85 ranges print Not Available because the saved row carries one ambiguous range; sales codes and order numbers have no render-data source.",
       "- Equipment flow: the standard equipment now fills all five of the OEM's columns on the reference's 17px line pitch in upper case with bullets (previously the two rightmost columns stayed empty).",
       "- Standard equipment prints in the reference's column arrangement; the reference's pricing box occupies two columns, this layout gives pricing the right-hand column.",
-      "- Matching: 2026 Envista, SUV, gasoline. A non-SUV body or non-gasoline powertrain is not matched.",
+      "- Matching: 2026 Envista, SUV, gasoline or flexible-fuel (E85). A non-SUV body or non-gasoline powertrain is not matched.",
     ],
   },
 };
@@ -670,6 +673,8 @@ interface HdDoc {
   rows: string[];
   sample: string[];
   differences: string[];
+  /** Replaces the default diesel-only powertrain statement. */
+  powertrainRule?: string;
 }
 
 const hdMappingFor = (b: HdDoc): string => `# ${b.title} - data source mapping
@@ -708,7 +713,7 @@ ${t.blockers.map((x) => `- ${x}`).join("\n")}
 - Page: the reference PDF is 1224x792pt (17x11in landscape); the render is the same size and exactly one page.
 - Fonts: Helvetica / Helvetica-Bold stand in for the reference faces (font_substitution).
 - Layout compression: vertical positions are compressed to clear the mandatory reproduction banner and disclosure.
-- Powertrain rule: this template matches diesel pickups only. Fuel evidence is the verified EPA fuel type, else the NeoVIN fuel_type when it states diesel. Gasoline heavy-duty pickups are not matched and flag template_configuration_unsupported; no gasoline reference was supplied.
+- ${b.powertrainRule ?? "Powertrain rule: this template matches diesel pickups only. Fuel evidence is the verified EPA fuel type, else the NeoVIN fuel_type when it states diesel. Gasoline heavy-duty pickups are not matched by this template."}
 - CARB panel: native rebuild of the reference's California Air Resources Board panel. The record has no CARB grades, so both scales print "Not Available" with no pointer (carb_panel_pending). The CARB emblem is not reproduced; its name prints as a plain wordmark.
 - No EPA fuel-economy panel is drawn because the reference has none.
 - Artwork not reproduced: agency seals, the source QR codes (replaced by the 0.90in Vehicle Passport QR) and the source barcode (regenerated from the VIN). The federal-law label statement and any Monroney wording are not reproduced; the footnote reads "Original manufacturer's suggested retail prices shown. Excludes taxes, title, license, dealer-installed items and current selling price."
@@ -746,6 +751,27 @@ const HD_DOCS: Record<string, HdDoc> = {
     differences: [
       "- Shared FCA layout family (fcaCommon.ts); the right-hand panels are the CARB panel, the safety panel and the Passport QR in place of the FlexCare advertisement.",
       "- Matching: 2026 Ram 2500 pickup, diesel. Ram 1500, 3500 and gasoline 2500 are not matched.",
+    ],
+  },
+  ramGas: {
+    title: "Ram 2026 2500 Big Horn (gasoline)",
+    logo: "Ram logo",
+    rows: [
+      "| Model year, title | identity.year and model trim drivetrain | Omitted, never guessed |",
+      "| Spec line, Exterior / Interior colour, Engine, Transmission | identity; build_sheet.colors; mc_attributes | Row omitted |",
+      "| Assembly Point/Port of Entry, SOLD TO | factory.finalAssemblyPoint; original delivering dealer only | Omitted / blank |",
+      "| Gasoline Vehicle tag (CARB panel) | EPA fuel type when one exists; otherwise the NeoVIN fuel_type when it states gasoline (heavy-duty trucks have no EPA row) | Tag omitted |",
+    ],
+    sample: [
+      "- sticker-3C6UR5CJXNG247030: off-year layout stress test (2022 RAM 2500 Tradesman, 6.4L gasoline, used), not a production candidate. Production has no 2026 Ram 2500.",
+      "- reference-match: the verified Stellantis label for a 2026 Ram 2500 Big Horn Crew Cab 4X4 (VIN 3C6UR5DJ7TG302125, SHA-256 faac3bd17acf838ce68a15a7515f3df6092b7fe3cbe8c71a78cfd1e85876bd4d); $66,355 = base $57,155 + options $6,605 + destination $2,595.",
+    ],
+    powertrainRule: "Powertrain rule: this template matches gasoline Ram 2500 pickups only. Fuel evidence is the verified EPA fuel type, else the NeoVIN fuel_type when it states gasoline. A diesel Ram 2500 goes to the diesel template, never this one.",
+    differences: [
+      "- Shared FCA layout family (fcaCommon.ts) and the same right-hand panels as the diesel Ram: the CARB panel, the safety panel and the Passport QR in place of the FlexCare advertisement.",
+      "- The CARB per-VIN grades have no source (no VIN-to-test-group data), so the reference's printed grades (Greenhouse Gas C+, Smog A-) are not reproduced; both scales print Not Available.",
+      "- The reference prints retail (10-year/100,000-mile) and fleet/government (5-year/100,000-mile) powertrain terms; the record carries one powertrain term, so only that term prints. The reference's \"Customer Preferred Package 2UZ\" and \"5th Wheel / Gooseneck Towing Prep Group\" print as the record's packages without content lines.",
+      "- Matching: 2026 Ram 2500 pickup, gasoline. Ram 1500, 3500 and diesel 2500 are not matched.",
     ],
   },
   silverado: {
@@ -944,6 +970,7 @@ const packages: PackageSpec[] = [{
 })), ...([
   [FORD_F250_DIESEL_ID, "ford-2026-f250", "f250", f250RenderData, "off-year, other-model layout stress test (2024 F-150 record), not a production candidate", f250ReferenceMatchData],
   [RAM_2500_DIESEL_ID, "ram-2026-2500", "ram", ram2500RenderData, "off-year layout stress test (2022 RAM 2500 gasoline record), not a production candidate", ram2500ReferenceMatchData],
+  [RAM_2500_GAS_ID, "ram-2026-2500-gas", "ramGas", ram2500GasRenderData, "off-year layout stress test (2022 RAM 2500 gasoline record), not a production candidate", ram2500GasReferenceMatchData],
   [CHEVROLET_SILVERADO_2500_DIESEL_ID, "chevrolet-2026-silverado-2500", "silverado", silveradoRenderData, "off-year, other-model layout stress test (2023 Tahoe record), not a production candidate", silveradoReferenceMatchData],
   [GMC_SIERRA_3500_DIESEL_ID, "gmc-2026-sierra-3500", "sierra", sierraRenderData, "off-year, other-model layout stress test (2021 Yukon Denali record), not a production candidate", sierraReferenceMatchData],
 ] as const).map(([templateId, dirName, key, real, realLabel, reference]): PackageSpec => ({
