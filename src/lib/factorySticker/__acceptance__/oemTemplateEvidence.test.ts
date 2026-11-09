@@ -656,10 +656,10 @@ const BRAND_DOCS: Record<string, BrandDoc> = {
     ],
     sample: ["- sticker-KL47LCEP0TB000001: SYNTHETIC stress fixture (invented values). No Buick row exists in the saved vehicle_listings, so no real record was available; it is not a real vehicle."],
     differences: [
-      "- Artwork not reproduced: the adhesive-strip notice, the OnStar advertisement and its QR, the order-information QR, the driving-range bars and the flex-fuel E85 tag (the fuel tag prints the verified EPA fuel type); sales codes and order numbers have no render-data source.",
+      "- Artwork not reproduced: the adhesive-strip notice, the OnStar advertisement and its QR, the order-information QR and the driving-range bars and car icons; the flex-fuel tag and Driving Range block print only when the saved EPA row states a flexible-fuel (E85) vehicle, and the gasoline and E85 ranges print Not Available because the saved row carries one ambiguous range; sales codes and order numbers have no render-data source.",
       "- Equipment flow: the standard equipment now fills all five of the OEM's columns on the reference's 17px line pitch in upper case with bullets (previously the two rightmost columns stayed empty).",
       "- Standard equipment prints in the reference's column arrangement; the reference's pricing box occupies two columns, this layout gives pricing the right-hand column.",
-      "- Matching: 2026 Envista, SUV, gasoline. A non-SUV body or non-gasoline powertrain is not matched.",
+      "- Matching: 2026 Envista, SUV, gasoline or flexible-fuel (E85). A non-SUV body or non-gasoline powertrain is not matched.",
     ],
   },
 };

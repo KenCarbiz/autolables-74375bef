@@ -122,6 +122,8 @@ export interface StickerRegulatory {
   /** Total (electricity + gasoline) range of a plug-in hybrid. */
   totalRangeMiles?: number;
   epaClassNote?: string;
+  /** The saved EPA row states a flexible-fuel (E85) vehicle. */
+  flexFuel?: true;
   epaSourceReference?: string;
   /** ISO time the saved fueleconomy.gov row (and its cost figures) was retrieved. */
   epaRetrievedAt?: string;

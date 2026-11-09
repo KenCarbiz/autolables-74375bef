@@ -213,6 +213,8 @@ export interface FactoryStickerRenderData {
     /** Positive = saves vs average new vehicle over 5 years; negative = spends more. */
     fiveYearCostDifference?: number | null;
     classNote?: string | null;
+    /** EPA advanced-technology type from the saved row (for example "FFV"); read for catalog makes only. */
+    atvType?: string | null;
     /** When the saved fueleconomy.gov row was retrieved; its annual and 5-year cost figures share this one snapshot. */
     checkedAt?: string | null;
   } | null;
@@ -448,6 +450,7 @@ export function adaptRenderData(d: FactoryStickerRenderData): StickerLayoutInput
             ...opt("fiveYearCostDifference", d.epa.fiveYearCostDifference ?? null),
             ...opt("epaClassNote", d.epa.classNote ?? null),
             ...opt("epaRetrievedAt", d.epa.checkedAt ?? null),
+            ...(isFlexFuelEpa(d.epa) ? { flexFuel: true as const } : {}),
           }
         : { epaStatus: "UNAVAILABLE" as const }),
       ...(d.safety
@@ -800,6 +803,11 @@ export function catalogResolutionFor(data: FactoryStickerRenderData): CatalogRes
     fuelClass: catalogFuelClass(data),
     drivetrain: data.mechanical?.drivetrain ?? null,
   });
+}
+
+/** True only when the saved EPA row itself states flexible fuel: an E85 fuel type or the FFV advanced-technology type. */
+function isFlexFuelEpa(epa: { fuelType: string | null; atvType?: string | null }): boolean {
+  return /\be85\b|flex/i.test(epa.fuelType ?? "") || /^\s*ffv\s*$/i.test(epa.atvType ?? "");
 }
 
 function catalogFuelClass(data: FactoryStickerRenderData): ReturnType<typeof fuelClassOf> {

@@ -72,8 +72,8 @@ export function envistaReferenceMatchData(base: FactoryStickerRenderData): Facto
     factoryCodes: { dealer: null, emissions: null },
     epa: {
       city: 28, highway: 32, combined: 30, annualFuelCost: 1650, ghgScore: 6, smogScore: 6, rangeMiles: null,
-      fuelType: "Gasoline", gallonsPer100Miles: 3.3, co2TailpipeGpm: 297, fiveYearCostDifference: 250,
-      classNote: "Small station wagons range from 17 to 121 MPG. The best vehicle rates 146 MPGe.",
+      fuelType: "Gasoline or E85", atvType: "FFV", gallonsPer100Miles: 3.3, co2TailpipeGpm: 297, fiveYearCostDifference: 250,
+      classNote: "Small station wagons range from 17 to 121 MPG. The best vehicle rates 146 MPGe. Values are based on gasoline and do not reflect performance and ratings based on E85.",
     },
     safety: { overall: null, frontalDriver: 5, frontalPassenger: 4, sideFront: null, sideRear: null, rollover: 4 },
     nhtsaNotRated: false,

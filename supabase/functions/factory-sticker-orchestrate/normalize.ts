@@ -159,6 +159,7 @@ export function normalizeForSticker(
           .flatMap((k) => (num(epaRow[k]) !== null ? [[k, num(epaRow[k])]] : [])),
       ) as { combinedMpge?: number; kwhPer100Miles?: number; chargeTimeHours?: number; electricRangeMiles?: number; totalRangeMiles?: number; smogScore?: number }
       : {}),
+    ...(hasBuiltCatalogTemplates(identity.make) && str(epaRow.atvType) ? { atvType: str(epaRow.atvType) } : {}),
     // Cost figures are only comparable within one retrieval: the 5-year
     // comparison is read only from a timestamped row, the same row as the
     // annual cost, and keeps its sign (negative = spends more).

@@ -40,7 +40,8 @@ const GAL = (r: FactoryStickerData["regulatory"]): number | undefined =>
   r.gallonsPer100Miles ?? (r.combinedMpg !== undefined && r.combinedMpg > 0 ? 100 / r.combinedMpg : undefined);
 
 /** Fuel economy and environment panel; (ox, oy) is its top-left corner in reference pixels. */
-export function paintCatalogEpa(p: Painter, d: FactoryStickerData, g: Grid, ox: number, oy: number): void {
+export function paintCatalogEpa(p: Painter, d: FactoryStickerData, g: Grid, ox: number, oy: number, opts: { flexFuel?: boolean } = {}): void {
+  const flex = opts.flexFuel === true && d.regulatory.flexFuel === true;
   const r = d.regulatory;
   const X = (lx: number): number => g.x(ox + lx);
   const Yy = (ly: number): number => g.y(oy + ly);
@@ -52,7 +53,13 @@ export function paintCatalogEpa(p: Painter, d: FactoryStickerData, g: Grid, ox: 
   T(p, "EPA", X(6), Yy(6), 9.5, "bold", { color: PAPER, lh: 10 });
   T(p, "DOT", X(6), Yy(6) + 10.2, 9.5, "bold", { color: PAPER, lh: 10 });
   T(p, "Fuel Economy and Environment", X(58), Yy(14), 16, "bold", { color: PAPER });
-  if (d.vehicle.fuelType) {
+  if (flex) {
+    R(p, X(450), Yy(5), W(245), Yy(43) - Yy(5), EPA_BLUE);
+    R(p, X(458), Yy(10), W(40), Yy(24) - Yy(10), INK);
+    T(p, "E85", X(478), Yy(12), 7.5, "bold", { align: "center", color: PAPER });
+    T(p, "Flexible-Fuel Vehicle", X(690), Yy(10), 9.5, "bold", { align: "right" });
+    T(p, "Gasoline-Ethanol (E85)", X(690), Yy(10) + 11, 9.5, "bold", { align: "right" });
+  } else if (d.vehicle.fuelType) {
     R(p, X(483), Yy(5), W(212), Yy(43) - Yy(5), EPA_BLUE);
     T(p, fuelCategoryLabel(d.vehicle.fuelType), X(690), Yy(18), 10.5, "bold", { align: "right" });
   }
@@ -75,13 +82,28 @@ export function paintCatalogEpa(p: Painter, d: FactoryStickerData, g: Grid, ox: 
       T(p, String(Math.round(r.highwayMpg)), X(250), Yy(122), 20, "bold");
       T(p, "highway", X(250), Yy(150), 8, "body");
     }
-    if (r.epaClassNote) wrap(r.epaClassNote, "body", 7.5, W(215)).slice(0, 4).forEach((l, i) => T(p, l, X(268), Yy(80) + i * 8.2, 7.5, "body", { lh: 8.2 }));
+    if (r.epaClassNote) {
+      const noteX = flex ? 300 : 268;
+      const noteW = flex ? 180 : 215;
+      const noteSize = flex ? 6.6 : 7.5;
+      const noteLh = flex ? 6.9 : 8.2;
+      wrap(r.epaClassNote, "body", noteSize, W(noteW)).slice(0, flex ? 5 : 4).forEach((l, i) => T(p, l, X(noteX), Yy(flex ? 56 : 80) + i * noteLh, noteSize, "body", { lh: noteLh }));
+    }
     const gallons = GAL(r);
-    if (gallons !== undefined) {
+    if (gallons !== undefined && flex) {
+      T(p, gallons.toFixed(1), X(322), Yy(122), 20, "bold");
+      T(p, "gallons per 100 miles", X(322), Yy(150), 8, "body");
+    } else if (gallons !== undefined) {
       const gs = gallons.toFixed(1);
       T(p, gs, X(57), Yy(180), 20, "bold");
       T(p, "gallons per 100 miles", X(57) + measureText(gs, "bold", 20) + 4, Yy(190), 8, "body");
     }
+  }
+  if (flex) {
+    const range = (label: string): string => `${label}: Not Available`;
+    T(p, "Driving Range", X(57), Yy(198), 7, "bold");
+    T(p, range("Gasoline"), X(57), Yy(209), 6.4, "bold");
+    T(p, range("Ethanol (E85)"), X(57), Yy(219), 6.4, "bold");
   }
   const delta = verified ? r.fiveYearCostDifference : undefined;
   if (delta !== undefined && delta !== 0) {

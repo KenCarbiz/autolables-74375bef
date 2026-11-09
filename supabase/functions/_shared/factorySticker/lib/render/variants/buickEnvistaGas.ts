@@ -87,7 +87,7 @@ const spec: TabloidSpec = {
     paintGmEquipmentFrame(p, g, ctx.extraColumns ? [] : [310, 585, 850, 1125, 1388]);
     const equipment = flowGmEquipment(p, ctx, g, [[50, 252], [320, 258], [592, 254], [858, 262], [1134, 250]]);
 
-    paintCatalogEpa(p, d, g, 45, 575);
+    paintCatalogEpa(p, d, g, 45, 575, { flexFuel: true });
     const top = g.y(575);
     paintCatalogSafety(p, d, g.x(750), top, 450 * PX, g.y(925) - top);
     paintCatalogParts(p, d, g.x(1205), top, 445 * PX, g.y(900) - top, 2);
