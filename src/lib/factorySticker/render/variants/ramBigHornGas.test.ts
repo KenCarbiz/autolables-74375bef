@@ -63,6 +63,19 @@ describe("Ram 2500 gasoline reference label", () => {
     expect(all).toMatch(/Overall Vehicle Score/);
   });
 
+  it("takes the Figma master geometry: total-price box, column divider, safety width and footer rule", () => {
+    const rects = (m: ReturnType<typeof buildRenderLayout>) => m.pages[0].primitives.filter((q) => q.kind === "rect" || q.kind === "rule");
+    const gas = rects(buildRenderLayout(ref, theme, undefined, { sampleTemplateId: RAM_2500_GAS_ID }));
+    expect(gas.some((q) => Math.abs(q.x - 350.75) < 0.01 && Math.abs(q.w - 235.2) < 0.01)).toBe(true);
+    expect(gas.some((q) => Math.abs(q.x - 328.8) < 0.01 && q.w < 1.5 && q.h > 400)).toBe(true);
+    expect(gas.some((q) => Math.abs(q.x - 625) < 0.01 && Math.abs(q.w - 326) < 0.01)).toBe(true);
+    expect(gas.some((q) => Math.abs(q.x - 54) < 0.01 && Math.abs(q.w - 554.4) < 0.01)).toBe(true);
+    const dsl = rects(buildRenderLayout(diesel(ref), theme, undefined, { sampleTemplateId: RAM_2500_DIESEL_ID }));
+    expect(dsl.some((q) => Math.abs(q.x - 350.75) < 0.01)).toBe(false);
+    expect(dsl.some((q) => Math.abs(q.x - 359.2) < 0.01 && Math.abs(q.w - 219.6) < 0.01)).toBe(true);
+    expect(dsl.some((q) => Math.abs(q.x - 54) < 0.01 && Math.abs(q.w - 791) < 0.01)).toBe(true);
+  });
+
   it("routes a gasoline Ram 2500 to the gasoline template and a diesel Ram 2500 to the diesel one, never crossing", () => {
     expect(templateRoutingFacts(ref).template?.id).toBe(RAM_2500_GAS_ID);
     expect(templateRoutingFacts(diesel(ref)).template?.id).toBe(RAM_2500_DIESEL_ID);

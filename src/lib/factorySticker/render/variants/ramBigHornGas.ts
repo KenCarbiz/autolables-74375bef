@@ -13,9 +13,9 @@
 // default. The FlexCare artwork, "FCA US LLC", the L4-VON / S.L. / SHIP TO
 // fields and the federal-law statements are not reproduced.
 
-import { buildRam2500HdLayout } from "./ramLimitedDiesel.ts";
+import { makeRam2500HdLayout } from "./ramLimitedDiesel.ts";
 import type { VariantLayoutBuilder } from "./shared.ts";
 
 export const RAM_2500_GAS_ID = "ram_2026_2500_gas";
 
-export const buildRam2500GasLayout: VariantLayoutBuilder = buildRam2500HdLayout;
+export const buildRam2500GasLayout: VariantLayoutBuilder = makeRam2500HdLayout(true);

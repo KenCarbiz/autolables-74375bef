@@ -35,8 +35,7 @@ export const fitSize = (s: string, font: "body" | "bold", size: number, maxW: nu
   return z;
 };
 
-export const wedge = (p: Painter, x: number, y: number, h: number, dir: "left" | "right"): void => {
-  const w = 13;
+export const wedge = (p: Painter, x: number, y: number, h: number, dir: "left" | "right", w = 13): void => {
   const d = dir === "left" ? `M0 0 L${w} ${h / 2} L0 ${h} Z` : `M${w} 0 L0 ${h / 2} L${w} ${h} Z`;
   p.path(d, dir === "left" ? x - w : x, y, w, h, INK);
 };
@@ -51,19 +50,29 @@ function paintFrame(p: Painter, bottom: number, color: string): void {
   R(p, x1 - 14, y0 + 9, 14, bottom - y0 - 18, color);
 }
 
-export function paintPriceBox(p: Painter, x: number, y: number, w: number, h: number): void {
+export function paintPriceBox(p: Painter, x: number, y: number, w: number, h: number, master = false): void {
   R(p, x, y, w, h, null, 2.4);
+  if (master) {
+    wedge(p, x - 3.2, y, h, "left", MASTER_WEDGE_W);
+    wedge(p, x + w + 3.2, y, h, "right", MASTER_WEDGE_W);
+    return;
+  }
   wedge(p, x, y, h, "left");
   wedge(p, x + w, y, h, "right");
 }
 
+const MASTER_WEDGE_W = 8.64;
+const MASTER_SAFETY_W = 326;
+const MASTER_DIVIDER_X = 328.8;
+const MASTER_FOOTER_RULE_W = 554.4;
+
 /** Returns the y below the specification rows. */
-function paintSpec(p: Painter, d: FactoryStickerData, title: string): number {
+function paintSpec(p: Painter, d: FactoryStickerData, title: string, master: boolean): number {
   const v = d.vehicle;
   T(p, "MANUFACTURER'S SUGGESTED RETAIL PRICE OF", 57.3, Y(135.3), 9.6, "bold");
   T(p, "THIS MODEL INCLUDING DEALER PREPARATION", 57.3, Y(145.3), 9.6, "bold");
   const boxY = Y(156);
-  paintPriceBox(p, 72, boxY, 198, 26);
+  paintPriceBox(p, 72, boxY, 198, 26, master);
   T(p, "Base Price:", 80, boxY + 6, 12, "bold");
   const base = d.pricing.baseMsrp;
   T(p, base !== undefined ? formatMoney(base) : "NOT AVAILABLE", 262, boxY + (base !== undefined ? 6 : 8), base !== undefined ? 12 : 9, "bold", { align: "right" });
@@ -180,14 +189,15 @@ function paintEpa(p: Painter, d: FactoryStickerData): void {
 export const SAFETY_X = 625;
 const SAFETY_W = 322;
 
-export function paintSafety(p: Painter, d: FactoryStickerData): void {
+export function paintSafety(p: Painter, d: FactoryStickerData, master = false): void {
+  const safetyW = master ? MASTER_SAFETY_W : SAFETY_W;
   const r = d.regulatory;
   const top = Y(442);
   const ratings = [r.overallRating, r.frontalDriverRating, r.frontalPassengerRating, r.sideFrontRating, r.sideRearRating, r.rolloverRating];
   ratings.push(r.frontalRating, r.sideRating);
   const anyRated = r.nhtsaStatus === "VERIFIED" && ratings.some((n) => n !== undefined && n > 0);
   if (anyRated) {
-    paintSafetyPanel(p, d, Q(SAFETY_X), Q(top), Q(SAFETY_W), Q(235), {
+    paintSafetyPanel(p, d, Q(SAFETY_X), Q(top), Q(safetyW), Q(235), {
       headerH: 36, footerH: 80, subFrac: 0.29, valFrac: 0.57,
       titleSize: 21, labelSize: 16.4, noteSize: 11.2, footSize: 13, stretch: 1.04,
     });
@@ -199,13 +209,13 @@ export function paintSafety(p: Painter, d: FactoryStickerData): void {
   const headerH = 22;
   const msgH = 46;
   const footH = 32;
-  R(p, SAFETY_X, top, SAFETY_W, headerH + msgH + footH, INK);
-  T(p, "GOVERNMENT 5-STAR SAFETY RATINGS", SAFETY_X + SAFETY_W / 2, top + 5.5, 12.4, "bold", { align: "center", color: PAPER });
-  R(p, SAFETY_X + 4, top + headerH, SAFETY_W - 8, msgH, PAPER);
-  wrap(message, "body", 10.5, SAFETY_W - 24).forEach((l, i) => T(p, l, SAFETY_X + 10, top + headerH + 5 + i * 12.4, 10.5, "body", { lh: 12.4 }));
+  R(p, SAFETY_X, top, safetyW, headerH + msgH + footH, INK);
+  T(p, "GOVERNMENT 5-STAR SAFETY RATINGS", SAFETY_X + safetyW / 2, top + 5.5, 12.4, "bold", { align: "center", color: PAPER });
+  R(p, SAFETY_X + 4, top + headerH, safetyW - 8, msgH, PAPER);
+  wrap(message, "body", 10.5, safetyW - 24).forEach((l, i) => T(p, l, SAFETY_X + 10, top + headerH + 5 + i * 12.4, 10.5, "body", { lh: 12.4 }));
   const foot = top + headerH + msgH;
-  T(p, "Source: National Highway Traffic Safety Administration (NHTSA)", SAFETY_X + SAFETY_W / 2, foot + 5, 8.4, "bold", { align: "center", color: PAPER });
-  T(p, "www.nhtsa.gov/ratings", SAFETY_X + SAFETY_W / 2, foot + 17, 8.4, "bold", { align: "center", color: PAPER });
+  T(p, "Source: National Highway Traffic Safety Administration (NHTSA)", SAFETY_X + safetyW / 2, foot + 5, 8.4, "bold", { align: "center", color: PAPER });
+  T(p, "www.nhtsa.gov/ratings", SAFETY_X + safetyW / 2, foot + 17, 8.4, "bold", { align: "center", color: PAPER });
 }
 
 // ── Parts content ─────────────────────────────────────────────────────
@@ -279,7 +289,7 @@ export function paintPassport(p: Painter, url: string): void {
 // ── Pricing, warranty, footer ─────────────────────────────────────────
 
 /** Returns the y below the warranty block, or null when the pricing column cannot hold every row. */
-function paintPricing(p: Painter, d: FactoryStickerData, rows: PriceRow[]): number | null {
+function paintPricing(p: Painter, d: FactoryStickerData, rows: PriceRow[], master: boolean): number | null {
   const pr = d.pricing;
   const head = "OPTIONAL EQUIPMENT";
   let y = Y(217);
@@ -311,11 +321,24 @@ function paintPricing(p: Painter, d: FactoryStickerData, rows: PriceRow[]): numb
   T(p, pr.destinationCharge !== undefined ? formatMoney(pr.destinationCharge) : "NOT AVAILABLE", COL2_R, y, 9.5, "bold", { align: "right" });
   y += 18;
   if (y > Y(560)) return null;
-  paintPriceBox(p, 358, y, 222, 30);
   const total = totalMsrp(d);
-  T(p, "TOTAL PRICE: *", 366, y + 8, 11.5, "bold");
-  T(p, total !== undefined ? formatMoney(total) : "NOT AVAILABLE", 572, y + (total !== undefined ? 7.5 : 9), total !== undefined ? 13 : 9.5, "bold", { align: "right" });
-  y += 40;
+  const totalText = total !== undefined ? formatMoney(total) : "NOT AVAILABLE";
+  if (master) {
+    const bx = 349.55;
+    const bw = 237.6;
+    paintPriceBox(p, bx, y, bw, 31.7, true);
+    const amountSize = total !== undefined ? 13 : 9.5;
+    const labelW = measureText("TOTAL PRICE: *", "bold", 11.5);
+    const left = bx + (bw - labelW - 10 - measureText(totalText, "bold", amountSize)) / 2;
+    T(p, "TOTAL PRICE: *", left, y + 9, 11.5, "bold");
+    T(p, totalText, left + labelW + 10, y + (total !== undefined ? 8.5 : 10), amountSize, "bold");
+    y += 41.7;
+  } else {
+    paintPriceBox(p, 358, y, 222, 30);
+    T(p, "TOTAL PRICE: *", 366, y + 8, 11.5, "bold");
+    T(p, totalText, 572, y + (total !== undefined ? 7.5 : 9), total !== undefined ? 13 : 9.5, "bold", { align: "right" });
+    y += 40;
+  }
   T(p, "WARRANTY COVERAGE", 346.8, y, 9, "bold");
   y += 11;
   const w = warrantySection(d, "Warranty");
@@ -328,8 +351,8 @@ function paintPricing(p: Painter, d: FactoryStickerData, rows: PriceRow[]): numb
   return y + 4;
 }
 
-function paintFooter(p: Painter, d: FactoryStickerData, barcodePayload: string, limit: number): void {
-  R(p, 54, Y(669), 791, 0.8, INK);
+function paintFooter(p: Painter, d: FactoryStickerData, barcodePayload: string, limit: number, master: boolean): void {
+  R(p, 54, Y(669), master ? MASTER_FOOTER_RULE_W : 791, 0.8, INK);
   const assembly = d.factory.finalAssemblyPoint;
   if (assembly) T(p, `Assembly Point/Port of Entry: ${assembly.toUpperCase()}`, 54, Y(676), 7.5, "body");
   T(p, "SOLD TO:", 436, Y(676), 6.5, "bold");
@@ -358,6 +381,8 @@ export interface FcaBrand {
   paintHeader: (p: Painter, d: FactoryStickerData) => void;
   specTitle: (d: FactoryStickerData) => string;
   priceRows: (d: FactoryStickerData) => PriceRow[];
+  /** Gas Ram only: price-box wedges, total-price box, safety width, column divider and footer rule measured on the Figma master. */
+  masterGeometry?: boolean;
   /** Replaces the fuel-economy, safety, parts-content and Passport panels on the right (a brand whose reference prints other panels there). */
   paintRight?: (p: Painter, d: FactoryStickerData) => void;
 }
@@ -367,12 +392,14 @@ const makeSpec = (brand: FcaBrand): TabloidSpec => ({
   paintFirst(p: Painter, ctx: FirstPageContext): FirstPageResult | null {
     const { d, input } = ctx;
     const bottomLimit = Math.min(711, ctx.footerTop * 0.612 - 13);
-    const lower = paintPricing(p, d, brand.priceRows(d));
+    const master = brand.masterGeometry === true;
+    const lower = paintPricing(p, d, brand.priceRows(d), master);
     if (lower === null) return null;
     paintFrame(p, bottomLimit + 9, brand.frameColor);
     brand.paintHeader(p, d);
-    const specBottom = paintSpec(p, d, brand.specTitle(d));
-    paintFooter(p, d, input.layout.barcodePayload, bottomLimit - 2);
+    const specBottom = paintSpec(p, d, brand.specTitle(d), master);
+    paintFooter(p, d, input.layout.barcodePayload, bottomLimit - 2, master);
+    if (master) R(p, MASTER_DIVIDER_X, Y(135), 0.8, Y(666) - Y(135), INK);
     if (brand.paintRight) {
       brand.paintRight(p, d);
     } else {
