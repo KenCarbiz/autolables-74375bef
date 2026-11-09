@@ -31,14 +31,36 @@ export const HONDA_PAGE = { widthPt: 792, heightPt: 612 } as const;
 
 const EQ_STYLE: FlowStyle = { size: 11.4, lh: 13, hang: 5, inset: 0 };
 
+/**
+ * Column geometry measured on the Figma master (792x612, label spanning x 11 to
+ * 745) and mapped onto this page, whose label spans LEFT to LEFT + LABEL_W. The
+ * master's columns: equipment at x 17 and 151, the price column at 275, the
+ * right block (fuel economy, parts content, safety) at 409, 409 and 524.
+ */
+export const HONDA_MASTER = {
+  label: { left: 11, right: 745 },
+  equipment: [{ x: 17, w: 128 }, { x: 151, w: 118 }],
+  price: { x: 275, w: 115 },
+  epa: { x: 409, w: 334 },
+  parts: { x: 409, w: 114 },
+  safety: { x: 524, w: 221 },
+} as const;
+
 const LEFT = 22;
-const EQ_W = 246;
-const PRICE_X = 278;
-const PRICE_W = 120;
+const LABEL_W = 750;
+const SX = LABEL_W / (HONDA_MASTER.label.right - HONDA_MASTER.label.left);
+export const hondaX = (masterX: number): number => LEFT + (masterX - HONDA_MASTER.label.left) * SX;
+export const hondaW = (masterW: number): number => masterW * SX;
+
+const EQ_X = hondaX(HONDA_MASTER.equipment[0].x);
+const EQ_RIGHT = hondaX(HONDA_MASTER.equipment[1].x) + hondaW(HONDA_MASTER.equipment[1].w);
+const PRICE_X = hondaX(HONDA_MASTER.price.x);
+const PRICE_W = hondaW(HONDA_MASTER.price.w);
 const BOTTOM_W = PRICE_X + PRICE_W - LEFT;
-const RIGHT = 408;
-const RIGHT_W = 364;
+const RIGHT = hondaX(HONDA_MASTER.epa.x);
+const RIGHT_W = hondaW(HONDA_MASTER.epa.w);
 const EPA_SCALE = RIGHT_W / (700 * 0.72);
+const EPA_VSCALE = 0.86;
 
 function paintTitle(p: Painter, d: FactoryStickerData): void {
   const v = d.vehicle;
@@ -110,21 +132,23 @@ const spec: TabloidSpec = {
     if (!sections.length) T(p, "Standard equipment not available for this vehicle.", LEFT, 92, 7, "body");
     const entries = toEntries(sections, (s) => s.toUpperCase(), 3, undefined, input.equipmentNote);
     const split = ctx.extraColumns + 2;
-    const gap = 10;
-    const colW = (Q(EQ_W) - gap * (split - 1)) / split;
-    const cols: ColumnSpec[] = Array.from({ length: split }, (_, i) => ({ x: Q(LEFT) + i * (colW + gap), w: colW, top: Q(90), bottom: Q(462) }));
+    const gap = 6;
+    const colW = (Q(EQ_RIGHT - EQ_X) - gap * (split - 1)) / split;
+    const cols: ColumnSpec[] = split === 2
+      ? HONDA_MASTER.equipment.map((c) => ({ x: Q(hondaX(c.x)), w: Q(hondaW(c.w)), top: Q(90), bottom: Q(462) }))
+      : Array.from({ length: split }, (_, i) => ({ x: Q(EQ_X) + i * (colW + gap), w: colW, top: Q(90), bottom: Q(462) }));
     const { placed, rest } = flow(entries, cols, ctx.style);
     paintPlaced(p, placed, ctx.style, { headingFont: "bold" });
 
-    const g = makeGrid(0, 0, EPA_PANEL_H * 0.78, EPA_PANEL_H);
+    const g = makeGrid(0, 0, EPA_PANEL_H * EPA_VSCALE, EPA_PANEL_H);
     paintScaled(p, EPA_SCALE, RIGHT, 30, (q) => paintCatalogEpa(q, d, g, 0, 0, { scale: EPA_SCALE }));
     // Reference order under the fuel-economy panel: the parts-content box on
     // the left and the safety ratings beside it, sharing one band.
-    const bandTop = 30 + EPA_PANEL_H * 0.78 * EPA_SCALE + 5;
-    const partsW = 116;
-    const safetyX = RIGHT + partsW + 6;
-    paintCatalogParts(p, d, RIGHT, bandTop, partsW, 540 - bandTop, 1);
-    paintCatalogSafety(p, d, safetyX, bandTop, RIGHT + RIGHT_W - safetyX, 540 - bandTop);
+    const bandTop = 30 + EPA_PANEL_H * EPA_VSCALE * EPA_SCALE + 5;
+    const partsX = hondaX(HONDA_MASTER.parts.x);
+    const safetyX = hondaX(HONDA_MASTER.safety.x);
+    paintCatalogParts(p, d, partsX, bandTop, safetyX - partsX - 2, 540 - bandTop, 1);
+    paintCatalogSafety(p, d, safetyX, bandTop, hondaW(HONDA_MASTER.safety.w), 540 - bandTop, { footSize: 10.4 });
     return placedResult(entries, rest);
   },
 };

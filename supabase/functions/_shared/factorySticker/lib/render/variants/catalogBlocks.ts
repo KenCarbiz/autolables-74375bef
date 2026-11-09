@@ -173,9 +173,10 @@ export function paintCatalogEpa(p: Painter, d: FactoryStickerData, g: Grid, ox: 
   T(p, ghgHead, X(218), Yy(240), 9, "bold");
   T(p, "(tailpipe only)", X(218) + measureText(ghgHead, "bold", 9) + 3, Yy(240) + 1.6, 6.5, "body");
   paintScale(p, X(216), Yy(284), W(292), scaleState(verified ? r.greenhouseGasRating : undefined), 14);
-  T(p, "Smog Rating", X(547), Yy(240), 9, "bold");
-  T(p, "(tailpipe only)", X(547) + measureText("Smog Rating", "bold", 9) + 3, Yy(240) + 1.6, 6.5, "body");
-  paintScale(p, X(549), Yy(284), W(140), scaleState(verified ? r.smogRating : undefined), 14);
+  const smogX = opts.scale ? 538 : 547;
+  T(p, "Smog Rating", X(smogX), Yy(240), 9, "bold");
+  T(p, "(tailpipe only)", X(smogX) + measureText("Smog Rating", "bold", 9) + 3, Yy(240) + 1.6, 6.5, "body");
+  paintScale(p, X(smogX + 2), Yy(284), W(opts.scale ? 151 : 140), scaleState(verified ? r.smogRating : undefined), 14);
   if (verified && r.co2TailpipeGpm !== undefined) {
     const line = `This vehicle emits ${Math.round(r.co2TailpipeGpm)} grams CO2 per mile (tailpipe only). The best emits 0 grams per mile (tailpipe only). Producing and distributing fuel also create emissions; learn more at fueleconomy.gov.`;
     wrap(line, "body", 6.4, W(470) / grow(6.4)).slice(0, opts.scale ? 3 : 2).forEach((l, i) => T(p, l, X(216), Yy(opts.scale ? 311 : 318) + i * 7 * grow(6.4), 6.4, "body", { lh: 7 }));
@@ -205,7 +206,7 @@ export function isNhtsaRated(d: FactoryStickerData): boolean {
   return r.nhtsaStatus === "VERIFIED" && ratings.some((n) => n !== undefined && n > 0);
 }
 
-export function paintCatalogSafety(p: Painter, d: FactoryStickerData, x: number, y: number, w: number, h: number): void {
+export function paintCatalogSafety(p: Painter, d: FactoryStickerData, x: number, y: number, w: number, h: number, opts: { footSize?: number } = {}): void {
   const r = d.regulatory;
   if (isNhtsaRated(d)) {
     const footerH = 60;
@@ -213,7 +214,7 @@ export function paintCatalogSafety(p: Painter, d: FactoryStickerData, x: number,
     const body = Q(h) - headerH - footerH;
     paintSafetyPanel(p, d, Q(x), Q(y), Q(w), Q(h), {
       headerH, footerH, subFrac: 0.29, valFrac: 0.57,
-      titleSize: 19, labelSize: 14.5, noteSize: 10.2, footSize: 11.6, stretch: Math.min(1.04, body / 244),
+      titleSize: opts.footSize !== undefined ? 16.6 : 19, labelSize: 14.5, noteSize: 10.2, footSize: opts.footSize ?? 11.6, stretch: Math.min(1.04, body / 244),
     });
     return;
   }
@@ -224,12 +225,14 @@ export function paintCatalogSafety(p: Painter, d: FactoryStickerData, x: number,
   const footH = 32;
   const msgH = Math.min(52, h - headerH - footH);
   R(p, x, y, w, headerH + msgH + footH, INK);
-  T(p, "GOVERNMENT 5-STAR SAFETY RATINGS", x + w / 2, y + 5.5, 12.4, "bold", { align: "center", color: PAPER });
+  T(p, "GOVERNMENT 5-STAR SAFETY RATINGS", x + w / 2, y + 5.5, opts.footSize !== undefined ? fitSize("GOVERNMENT 5-STAR SAFETY RATINGS", "bold", 12.4, w - 8, 8) : 12.4, "bold", { align: "center", color: PAPER });
   R(p, x + 4, y + headerH, w - 8, msgH, PAPER);
   wrap(message, "body", 10.5, w - 24).forEach((l, i) => T(p, l, x + 10, y + headerH + 5 + i * 12.4, 10.5, "body", { lh: 12.4 }));
   const foot = y + headerH + msgH;
-  T(p, "Source: National Highway Traffic Safety Administration (NHTSA)", x + w / 2, foot + 5, 8.4, "bold", { align: "center", color: PAPER });
-  T(p, "www.nhtsa.gov/ratings", x + w / 2, foot + 17, 8.4, "bold", { align: "center", color: PAPER });
+  const sourceLine = "Source: National Highway Traffic Safety Administration (NHTSA)";
+  const footPt = opts.footSize !== undefined ? fitSize(sourceLine, "bold", 8.4, w - 6, 5.8) : 8.4;
+  T(p, sourceLine, x + w / 2, foot + 5, footPt, "bold", { align: "center", color: PAPER });
+  T(p, "www.nhtsa.gov/ratings", x + w / 2, foot + 17, footPt, "bold", { align: "center", color: PAPER });
 }
 
 /** Parts-content box (points). `columns: 2` prints the carline group left and the vehicle group right. */
