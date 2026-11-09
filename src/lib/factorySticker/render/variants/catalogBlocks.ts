@@ -33,8 +33,42 @@ export const makeGrid = (topPt: number, topPx: number, bottomPt: number, bottomP
 
 export const Q = (pt: number): number => pt / 0.612;
 
+const CAR_PATH = "M18.15 6.81L18.1 6.76C18.07 6.73 18.04 6.7 18.01 6.67L13.21 1.86C12.02 0.75 9.7 0 7.02 0C3.14 0 0 1.58 0 3.54V7.96C0 8.94 0.79 9.73 1.77 9.73C1.77 8.26 2.96 7.08 4.43 7.08C5.89 7.08 7.08 8.26 7.08 9.73H11.51C11.51 9.71 11.5 9.69 11.5 9.67C11.5 8.21 12.69 7.02 14.16 7.02C15.62 7.02 16.81 8.21 16.81 9.67C16.81 9.69 16.81 9.71 16.81 9.73C17.79 9.73 18.58 8.94 18.58 7.96C18.58 7.52 18.41 7.12 18.15 6.81ZM5.86 4.42L0.89 4.41V3.14C1.27 2.02 3.29 1.14 5.86 0.93V4.42ZM14.51 4.42H6.64V0.89C6.76 0.89 6.89 0.88 7.02 0.88C10.13 0.88 11.95 1.73 13.34 3.14L14.51 4.42ZM2.66 9.73C2.66 10.71 3.45 11.5 4.43 11.5C5.4 11.5 6.19 10.71 6.19 9.73C6.19 8.75 5.4 7.96 4.43 7.96C3.45 7.96 2.66 8.75 2.66 9.73ZM3.54 9.73C3.54 9.24 3.93 8.85 4.43 8.85C4.91 8.85 5.31 9.24 5.31 9.73C5.31 10.22 4.91 10.61 4.43 10.61C3.93 10.61 3.54 10.22 3.54 9.73ZM12.39 9.67C12.39 10.65 13.18 11.44 14.16 11.44C15.13 11.44 15.93 10.65 15.93 9.67C15.93 8.7 15.13 7.9 14.16 7.9C13.18 7.9 12.39 8.7 12.39 9.67ZM13.27 9.67C13.27 9.19 13.67 8.79 14.16 8.79C14.65 8.79 15.04 9.19 15.04 9.67C15.04 10.16 14.65 10.56 14.16 10.56C13.67 10.56 13.27 10.16 13.27 9.67Z";
+const CAR_W = 18.58;
+const CAR_H = 11.5;
+const PUMP_BODY = "M1 0H14Q15 0 15 1V26.5H0V1Q0 0 1 0ZM2.2 2V9.6H12.8V2Z";
+const PUMP_HOSE = "M15 4.5L18.5 7.5C20.5 9.5 20.7 12 20.7 15V21.5C20.7 24 19.7 25.5 18.5 25.5C17.3 25.5 16.5 24 16.5 21.5V14";
+const PUMP_W = 21.5;
+const PUMP_H = 26.5;
+
+const scalePath = (d: string, s: number): string => d.replace(/-?\d*\.?\d+/g, (n) => String(Math.round(Number(n) * s * 1000) / 1000));
+
+/** Fuel pump glyph with its top-left at (x, y); `h` is its printed height in points. */
+export function paintFuelPump(p: Painter, x: number, y: number, h: number): void {
+  const s = h / PUMP_H;
+  p.path(scalePath(PUMP_BODY, s), x, y, 15 * s, h, INK);
+  p.path(scalePath(PUMP_HOSE, s), x, y, PUMP_W * s, h, null, INK, Math.max(0.7, 1.3 * s));
+}
+
+/** Driving-range bar: ink bar from the panel edge with a car at its end; no value prints a white frame and "Not Available". */
+function paintRangeBar(p: Painter, label: string, miles: number | undefined, x0: number, x1: number, top: number, h: number): void {
+  const size = Math.max(5.8, Math.min(6.4, h * 0.62));
+  const textTop = top + (h - size) / 2 - 0.4;
+  if (miles === undefined) {
+    R(p, x0, top, x1 - x0, h, PAPER, 1);
+    T(p, `${label}: Not Available`, x0 + 38, textTop, size, "bold");
+  } else {
+    R(p, x0, top, x1 - x0, h, INK);
+    T(p, `${label}: ${Math.round(miles)} miles`, x0 + 38, textTop, size, "bold", { color: PAPER });
+  }
+  const s = Math.min(1, (h * 1.25) / CAR_H);
+  p.path(scalePath(CAR_PATH, s), x1, top + h / 2 - (CAR_H * s) / 2, CAR_W * s, CAR_H * s, INK);
+}
+
 export const EPA_PANEL_W = 700;
 export const EPA_PANEL_H = 453;
+
+const RANGE_BAR_END = 366.7;
 
 const GAL = (r: FactoryStickerData["regulatory"]): number | undefined =>
   r.gallonsPer100Miles ?? (r.combinedMpg !== undefined && r.combinedMpg > 0 ? 100 / r.combinedMpg : undefined);
@@ -55,9 +89,9 @@ export function paintCatalogEpa(p: Painter, d: FactoryStickerData, g: Grid, ox: 
   T(p, "DOT", X(6), Yy(6) + 10.2, 9.5, "bold", { color: PAPER, lh: 10 });
   T(p, "Fuel Economy and Environment", X(58), Yy(14), 16, "bold", { color: PAPER });
   if (flex) {
-    R(p, X(450), Yy(5), W(245), Yy(43) - Yy(5), EPA_BLUE);
-    R(p, X(458), Yy(10), W(40), Yy(24) - Yy(10), INK);
-    T(p, "E85", X(478), Yy(12), 7.5, "bold", { align: "center", color: PAPER });
+    R(p, X(469), Yy(5), W(225), Yy(43) - Yy(5), EPA_BLUE);
+    T(p, "E85", X(482), Yy(6), 9, "bold");
+    paintFuelPump(p, X(483), Yy(20), Math.min(14.7, (Yy(41) - Yy(20)) * 0.95));
     T(p, "Flexible-Fuel Vehicle", X(690), Yy(10), 9.5, "bold", { align: "right" });
     T(p, "Gasoline-Ethanol (E85)", X(690), Yy(10) + 11, 9.5, "bold", { align: "right" });
   } else if (d.vehicle.fuelType) {
@@ -101,10 +135,16 @@ export function paintCatalogEpa(p: Painter, d: FactoryStickerData, g: Grid, ox: 
     }
   }
   if (flex) {
-    const range = (label: string): string => `${label}: Not Available`;
-    T(p, "Driving Range", X(57), Yy(198), 7, "bold");
-    T(p, range("Gasoline"), X(57), Yy(209), 6.4, "bold");
-    T(p, range("Ethanol (E85)"), X(57), Yy(219), 6.4, "bold");
+    const known = [r.gasolineRangeMiles, r.e85RangeMiles].filter((m): m is number => m !== undefined && m > 0);
+    const longest = Math.max(...known, 0);
+    const reach = (m: number | undefined): number => (m !== undefined && m > 0 && longest > 0 ? Math.max(150, (RANGE_BAR_END * m) / longest) : RANGE_BAR_END);
+    const barH = (Yy(214.2 + 12.5) - Yy(214.2));
+    T(p, "Driving Range", X(57), Yy(189), 7, "bold");
+    ([["Gasoline", r.gasolineRangeMiles, 199], ["Ethanol (E85)", r.e85RangeMiles, 214.2]] as const).forEach(([label, miles, top]) => {
+      const m = miles !== undefined && miles > 0 ? miles : undefined;
+      paintRangeBar(p, label, m, X(0), X(reach(m)), Yy(top), barH);
+    });
+    if (mpgOk) paintFuelPump(p, X(7), Yy(92), Math.min(26.5, (Yy(129) - Yy(92))));
   }
   const delta = verified ? r.fiveYearCostDifference : undefined;
   if (delta !== undefined && delta !== 0) {

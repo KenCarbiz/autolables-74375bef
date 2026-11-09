@@ -4,6 +4,7 @@ import { expectNoTextOverlap } from "../__fixtures__/layoutAsserts";
 import { describeCatalogTemplate } from "../__fixtures__/catalogTemplateSuite";
 import { ENVISTA_REFERENCE_VIN, envistaListing, envistaReferenceMatchData, envistaRenderData } from "../__fixtures__/envista";
 import { BUICK_ENVISTA_GAS_ID } from "./buickEnvistaGas";
+import { INK } from "./shared";
 
 describeCatalogTemplate({
   title: "Buick Envista gasoline",
@@ -73,6 +74,30 @@ describe("Buick Envista EPA panel by fuel type", () => {
   it("never prints an E85 range the record does not carry", () => {
     const s = render(flexRecord({ fuelType: "Gasoline or E85", rangeMiles: 288 })).drawnStrings.join(" ");
     expect(s).not.toContain("288");
+  });
+
+  it("draws record-driven range bars with a car icon and bar length proportional to miles", () => {
+    const m = render(flexRecord({ fuelType: "Gasoline or E85", gasolineRangeMiles: 411, e85RangeMiles: 275 }));
+    const s = m.drawnStrings;
+    expect(s).toContain("Gasoline: 411 miles");
+    expect(s).toContain("Ethanol (E85): 275 miles");
+    expect(s.join(" ")).not.toContain("Not Available: ");
+    expect(s).not.toContain("Gasoline: Not Available");
+    const bars = m.pages[0].primitives.flatMap((q) => (q.kind === "rect" && q.fill === INK && q.h < 10 && q.w > 100 && q.w < 300 ? [q.w] : []));
+    expect(bars).toHaveLength(2);
+    expect(bars[1] / bars[0]).toBeCloseTo(275 / 411, 1);
+    const cars = m.pages[0].primitives.filter((q) => q.kind === "path" && Math.abs(q.w - 18.58) < 1.5 && q.fill !== null);
+    expect(cars.length).toBe(2);
+    expect(m.fit.ok).toBe(true);
+  });
+
+  it("draws empty range frames reading Not Available when the record has no range", () => {
+    const m = render(flexRecord({ fuelType: "Gasoline or E85" }));
+    expect(m.drawnStrings).toContain("Gasoline: Not Available");
+    expect(m.drawnStrings).toContain("Ethanol (E85): Not Available");
+    expect(m.drawnStrings.join(" ")).not.toMatch(/\b(393|288) miles/);
+    const cars = m.pages[0].primitives.filter((q) => q.kind === "path" && Math.abs(q.w - 18.58) < 1.5 && q.fill !== null);
+    expect(cars.length).toBe(2);
   });
 
   it("routes a flexible-fuel Envista to this template", () => {

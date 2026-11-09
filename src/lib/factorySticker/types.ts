@@ -107,6 +107,10 @@ export interface StickerRegulatory {
   greenhouseGasRating?: number;
   smogRating?: number;
   evRangeMiles?: number;
+  /** Flexible-fuel driving range on gasoline, from the saved EPA row. */
+  gasolineRangeMiles?: number;
+  /** Flexible-fuel driving range on E85, from the saved EPA row. */
+  e85RangeMiles?: number;
   gasolineCombinedMpg?: number;
   /** Electricity + gasoline combined MPGe of a plug-in hybrid, exactly as saved from the EPA row. */
   combinedMpge?: number;

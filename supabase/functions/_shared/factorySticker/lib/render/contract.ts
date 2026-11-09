@@ -200,6 +200,8 @@ export interface FactoryStickerRenderData {
     annualFuelCost: number | null;
     ghgScore: number | null;
     rangeMiles: number | null;
+    gasolineRangeMiles?: number | null;
+    e85RangeMiles?: number | null;
     fuelType: string | null;
     smogScore?: number | null;
     gasCombinedMpg?: number | null;
@@ -439,6 +441,8 @@ export function adaptRenderData(d: FactoryStickerRenderData): StickerLayoutInput
             ...opt("greenhouseGasRating", d.epa.ghgScore),
             ...opt("smogRating", d.epa.smogScore ?? null),
             ...opt("evRangeMiles", d.epa.rangeMiles),
+            ...opt("gasolineRangeMiles", d.epa.gasolineRangeMiles ?? null),
+            ...opt("e85RangeMiles", d.epa.e85RangeMiles ?? null),
             ...opt("gasolineCombinedMpg", d.epa.gasCombinedMpg ?? null),
             ...opt("combinedMpge", d.epa.combinedMpge ?? null),
             ...opt("kwhPer100Miles", d.epa.kwhPer100Miles ?? null),
