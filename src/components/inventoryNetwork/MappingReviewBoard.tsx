@@ -28,11 +28,11 @@ export const boardQueries = {
 
 const STATE_TONE: Record<MappingState, Tone> = {
   source_unread: "neutral", stale: "warning", validation_failed: "danger", unmapped: "neutral", proposed: "info", identity_conflict: "danger",
-  ready_for_approval: "info", approved_paused: "warning", approved: "success", imported: "success",
+  ready_for_approval: "info", approved_paused: "warning", approved: "success", import_failed: "danger", imported: "success",
 };
 const STATE_ICON: Record<MappingState, NetIconName> = {
   source_unread: "feedFile", stale: "refresh", validation_failed: "warning", unmapped: "mapping", proposed: "identityReview", identity_conflict: "conflict",
-  ready_for_approval: "approval", approved_paused: "paused", approved: "approval", imported: "import",
+  ready_for_approval: "approval", approved_paused: "paused", approved: "approval", import_failed: "warning", imported: "import",
 };
 const VERDICT_TONE: Record<string, Tone> = { match: "success", name_review: "warning", incomplete: "warning", mismatch: "danger" };
 const FIELD_TONE: Record<string, Tone> = { match: "success", mismatch: "danger", differs: "warning", unknown: "neutral" };
@@ -373,7 +373,7 @@ export function MappingReviewBoard({ groupId = null }: { groupId?: string | null
           <EmptyState title="No production files yet" detail="Discover files, then run a dry run to see each DealerId in them." compact />
         ) : (
           <WorkTable caption="Store mapping review" minWidth={1500} dense>
-            <thead><tr><Th>Source file</Th><Th>DealerId</Th><Th>Observed store / address</Th><Th>Destination store</Th><Th>Group</Th><Th align="right">Rows / new / used</Th><Th>Identity</Th><Th>Validation</Th><Th>Approval</Th><Th>Last arrival</Th><Th>Last import</Th><Th>Next action</Th></tr></thead>
+            <thead><tr><Th>Source file</Th><Th>DealerId</Th><Th>Observed store / address</Th><Th>Destination store</Th><Th>Group</Th><Th align="right">Rows / new / used</Th><Th>Identity</Th><Th>File validation</Th><Th>File approval</Th><Th>Import status</Th><Th>Last arrival</Th><Th>Last successful import</Th><Th>Next action</Th></tr></thead>
             <tbody>{rows.map((r) => {
               const c = r.partition?.counts;
               const verdict = r.mapping?.evidence?.computed_by === "server" ? r.mapping.evidence.verdict ?? null : null;
@@ -386,8 +386,9 @@ export function MappingReviewBoard({ groupId = null }: { groupId?: string | null
                   <Td>{r.group?.name ?? (r.bindingGroup ? `${r.bindingGroup.name} (file)` : <span className="text-adm-muted">None</span>)}</Td>
                   <Td align="right">{c ? `${c.rows} / ${c.new ?? "n/a"} / ${c.used ?? "n/a"}` : "n/a"}</Td>
                   <Td>{verdict ? <span className="inline-flex items-center gap-1"><StatusText tone={VERDICT_TONE[verdict] ?? "neutral"}>{humanize(verdict)}</StatusText>{verdict === "match" && r.mapping?.status === "approved" && <NetIcon name="verified" className="text-adm-success" label="Verified" />}</span> : <span className="text-adm-muted">Not reviewed</span>}</Td>
-                  <Td>{r.partition ? <StatusText tone={r.partition.outcome === "rejected" ? "danger" : r.partition.counts.invalid > 0 ? "warning" : "success"}>{r.partition.outcome === "rejected" ? "Failed" : `${r.partition.counts.invalid} invalid`}</StatusText> : r.state === "validation_failed" ? <StatusText tone="danger">Failed</StatusText> : <span className="text-adm-muted">No dry run</span>}</Td>
-                  <Td><span className="inline-flex items-center gap-1.5"><NetIcon name={STATE_ICON[r.state]} className="text-adm-muted" /><StatusText tone={STATE_TONE[r.state]}>{STATE_LABEL[r.state]}</StatusText></span>{r.stale && r.state !== "stale" && <span className="ml-1"><StatusText tone="warning">Stale</StatusText></span>}</Td>
+                  <Td>{r.partition ? (r.partition.outcome === "rejected" ? <StatusText tone="danger">Validation failed</StatusText> : <><StatusText tone={r.validated ? "success" : "warning"}>{r.validated ? "Validated" : "Not validated"}</StatusText><span className="block text-[12px] text-adm-muted">{r.partition.counts.invalid} invalid rows</span></>) : r.state === "validation_failed" ? <StatusText tone="danger">Validation failed</StatusText> : <span className="text-adm-muted">No dry run</span>}</Td>
+                  <Td><StatusText tone={r.fileApproved ? "success" : "warning"}>{r.fileApproved ? "File approved" : "Not approved"}</StatusText></Td>
+                  <Td><span className="inline-flex items-center gap-1.5"><NetIcon name={STATE_ICON[r.state]} className="text-adm-muted" /><StatusText tone={STATE_TONE[r.state]}>{STATE_LABEL[r.state]}</StatusText></span>{r.stale && r.state !== "stale" && <span className="ml-1"><StatusText tone="warning">Newer file</StatusText></span>}{r.lastImportFailure && r.state !== "import_failed" && <span className="block text-[12px] text-adm-muted">Last attempt failed {when(r.lastImportFailure.at)}</span>}</Td>
                   <Td>{when(r.lastArrival)}</Td>
                   <Td>{when(r.lastImport)}</Td>
                   <Td className="text-[12px]">{r.nextAction}</Td>

@@ -159,8 +159,8 @@ function FilePanel({ file, binding, tenantId, groupName, stores, mappings }: {
             {binding?.status !== "approved" && <Button disabled={busy} onClick={() => act(() => proposeBinding(file.path, tenantId), `File proposed for ${groupName}`)}>Propose binding to {groupName}</Button>}
             {binding?.status === "pending" && (
               <>
-                {!allMatch && <CheckField id="bind-ack" label="I reviewed the identities and confirm this file belongs to this group" checked={ack} onChange={setAck} />}
-                <Button variant="primary" disabled={busy || (!allMatch && !ack)} onClick={() => act(() => approveBinding(file.path, ack), "File binding approved")}>Approve binding</Button>
+                <CheckField id="bind-ack" label={allMatch ? "I confirm this file belongs to this group" : "I reviewed the identities and confirm this file belongs to this group"} checked={ack} onChange={setAck} />
+                <Button variant="primary" disabled={busy || !ack} onClick={() => act(() => approveBinding(file.path, ack), "File binding approved")}>Approve binding</Button>
               </>
             )}
             {binding && binding.status !== "disabled" && <ConfirmButton label="Disable" confirmLabel="Disable binding" variant="danger" disabled={busy} onConfirm={() => act(() => disableBinding(file.path), "File binding disabled")} />}

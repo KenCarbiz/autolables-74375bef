@@ -60,7 +60,11 @@ async function tenantProfile(db: SupabaseClient, tenantId: string): Promise<Tena
 async function syncFileStatus(db: SupabaseClient, path: string) {
   const b = await bindingFor(db, path);
   const s = intakeStatus(b?.status ?? null);
-  must(await write(db, "inventory_feed_files").update({ status: s.status, quarantine_reason: s.reason, updated_at: new Date().toISOString() }).eq("provider", "filescom").eq("path", path).in("status", ["pending", "quarantined"]));
+  const now = new Date().toISOString();
+  must(await write(db, "inventory_feed_files").update({ status: s.status, quarantine_reason: s.reason, updated_at: now }).eq("provider", "filescom").eq("path", path).in("status", ["pending", "quarantined"]));
+  // A file that already has a run result keeps that status, but its quarantine
+  // reason must follow the binding, or an approved file still reads "unmapped".
+  must(await write(db, "inventory_feed_files").update({ quarantine_reason: s.reason, updated_at: now }).eq("provider", "filescom").eq("path", path).not("status", "in", "(pending,quarantined)"));
 }
 
 async function overview(db: SupabaseClient) {
