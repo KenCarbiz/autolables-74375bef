@@ -1770,7 +1770,8 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const A = (keys: string[]) => specAttr(mcr, ksr, keys);
       const { groups } = featureGroups(listing);
       const hp = mcr.horsepower != null ? `${mcr.horsepower} hp` : A(["horsepower"]);
-      const mpg = ks.mpg_city && ks.mpg_hwy ? `${ks.mpg_city}/${ks.mpg_hwy} MPG` : A(["mpg", "combined_mpg"]);
+      const mpgUnit = d.epa?.unit ?? (/^bev$/i.test(String(mcr.powertrain_type ?? "")) || /^electric/i.test(String(ks.fuel ?? mcr.fuel_type ?? "")) ? "MPGe" : "MPG");
+      const mpg = ks.mpg_city && ks.mpg_hwy ? `${ks.mpg_city}/${ks.mpg_hwy} ${mpgUnit}` : A(["mpg", "combined_mpg"]);
       const seating = mcr.seating != null ? `${mcr.seating}-passenger` : A(["seating", "seats"]);
       const engineV = ks.engine ? String(ks.engine) : A(["engine"]);
       const transV = ks.transmission ? String(ks.transmission) : A(["transmission"]);
@@ -1796,8 +1797,8 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         ["Wheel Material", A(["wheel_material"])], ["Brakes", A(["brakes"])],
       ];
       const fuelRows: [string, string | null][] = [
-        ["Fuel Type", fuelV], ["City MPG", ks.mpg_city ? String(ks.mpg_city) : null], ["Highway MPG", ks.mpg_hwy ? String(ks.mpg_hwy) : null],
-        ["Combined MPG", A(["combined_mpg"])], ["Fuel Tank Capacity", A(["fuel_tank", "fuel_capacity", "tank_capacity"])],
+        ["Fuel Type", fuelV], [`City ${mpgUnit}`, ks.mpg_city ? String(ks.mpg_city) : null], [`Highway ${mpgUnit}`, ks.mpg_hwy ? String(ks.mpg_hwy) : null],
+        [`Combined ${mpgUnit}`, A(["combined_mpg"])], ["Fuel Tank Capacity", A(["fuel_tank", "fuel_capacity", "tank_capacity"])],
         ["Towing", A(["towing", "towing_capacity", "max_towing"])], ["Payload", A(["payload", "payload_capacity"])],
       ];
       const mechRows: [string, string | null][] = [
@@ -2106,10 +2107,10 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                     <Section title="Why This Build Stands Out" sub="What sets this vehicle apart.">
                       <div className={`${CARD} p-4`}>
                         <ul className="space-y-2">{whyBuild.map((t) => <Check key={t}>{t}</Check>)}</ul>
-                        <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 flex items-start gap-2">
+                        {!eq.generic && <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 flex items-start gap-2">
                           <CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0 mt-0.5" />
                           <div><p className="text-[12.5px] font-bold text-[#15803D] leading-tight">All equipment is included</p><p className="text-[11px] text-[#3F6B52] mt-0.5">No missing features or hidden costs — everything shown comes with the vehicle.</p></div>
-                        </div>
+                        </div>}
                       </div>
                     </Section>
                   )}

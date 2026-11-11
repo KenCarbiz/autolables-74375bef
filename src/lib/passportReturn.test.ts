@@ -5,6 +5,7 @@ describe("isSafePassportReturnPath", () => {
   it("accepts internal passport paths", () => {
     expect(isSafePassportReturnPath("/v3/2023-infiniti-qx50-113139")).toBe(true);
     expect(isSafePassportReturnPath("/v/2023-infiniti-qx50-113139")).toBe(true);
+    expect(isSafePassportReturnPath("/v-next/2023-infiniti-qx50-113139")).toBe(true);
     expect(isSafePassportReturnPath("/v/3PCAJ5BB1PF113139")).toBe(true);
   });
   it("rejects external and unsafe targets (no open redirect)", () => {

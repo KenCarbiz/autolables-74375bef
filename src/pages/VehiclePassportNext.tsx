@@ -23,6 +23,7 @@ import { buildPassportActionPath } from "@/lib/passportReturn";
 import { buildPassportSaleCard } from "@/lib/passport/saleCard";
 import { deriveVerificationReport } from "@/lib/passport/verificationSummary";
 import { buildNextPassportData, buildNextPassportDealer } from "@/lib/passport/nextPassportData";
+import { buildVehiclePassportDataContract } from "@/lib/vehicleData/dataContract";
 import { trackCustomerEngagement, trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
 import PassportNextLayout from "@/components/passport/next/PassportNextLayout";
 import { MOCK_LISTING, MOCK_NEW_2026, MOCK_SPARSE, MOCK_NEW_MSRP, MOCK_USED_FEE } from "./VehiclePassportV3";
@@ -38,6 +39,22 @@ const INTENT_SECTION: Record<string, string> = {
   payment: "todays-price",
   trade: "trade",
   contact: "contact",
+};
+
+/** Detail controls that leave the page, mapped to existing /v/:slug/:section
+ *  destinations. Features, specifications, photos and the overview open in
+ *  place inside the layout, so they are intentionally absent here. */
+const DETAIL_ROUTE: Record<string, string> = {
+  "Verification": "vehicle-history",
+  "Market Intelligence": "market-price",
+  "Factory Warranty": "factory-warranty",
+  "Ownership Timeline": "ownership-timeline",
+  "Supporting details": "verification",
+  "Rating methodology": "verification",
+  "Window Sticker": "documents",
+  "All Documents": "documents",
+  "Confirm Before Purchase": "documents",
+  "Payment Details": "todays-price",
 };
 
 function Loader() {
@@ -97,6 +114,7 @@ export default function VehiclePassportNext() {
         gallery: listingGallery(listing),
         windowSticker: sticker ? { previewImage: sticker.thumbnailUrl, url: sticker.pdfUrl } : null,
         isVisible: (id: string) => packetVisible(listing, id),
+        contract: buildVehiclePassportDataContract(listing, d),
       }),
       dealer: buildNextPassportDealer(d, listing as never),
     };
@@ -138,6 +156,10 @@ export default function VehiclePassportNext() {
             metadata: { cta: intent, passport_version: "next" },
           });
           go(INTENT_SECTION[intent] || "contact");
+        }}
+        onOpenDetail={(section) => {
+          const target = DETAIL_ROUTE[section];
+          if (target) go(target);
         }}
       />
     </Draft>

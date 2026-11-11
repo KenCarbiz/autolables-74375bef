@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "mc:sandbox": "bun scripts/marketcheck-sandbox.ts",
     "admin:parity": "node scripts/admin-parity/run.cjs",
     "admin:parity:sheets": "node scripts/admin-parity/sidebyside.cjs",
     "sync:edge-sticker": "node scripts/sync-edge-sticker-lib.mjs"
