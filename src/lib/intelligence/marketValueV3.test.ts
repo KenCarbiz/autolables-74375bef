@@ -229,3 +229,40 @@ describe("range, geography and freshness", () => {
     expect(borrowed.freshness.state).toBe("current");
   });
 });
+
+describe("MarketPass V2 corrections (proposed, 2026-11-12)", () => {
+  it("states no range when no evidence carries a spread, instead of inventing a percentage band", () => {
+    // Only the inferred-sold signal is usable: estimate 41,000, no P25-P75 and no provider range.
+    // v3.0 drew 41,000 x 0.95 = 38,950 to 41,000 x 1.05 = 43,050 around it.
+    const r = buildMarketValueV3(base({
+      comparables: null,
+      provider: null,
+      soldContext: { medianLastAdvertisedBeforeSale: 41000, count: 9, scope: "model_year_state", windowDays: 90, checkedAt: "2026-10-27T00:00:00Z" },
+    }));
+    expect(r.estimatedValue).toBe(41000);
+    expect(r.rangeLow).toBeNull();
+    expect(r.rangeHigh).toBeNull();
+    expect(r.rangeMethod).toBe("none");
+  });
+
+  it("labels each range with the method that produced it", () => {
+    expect(buildMarketValueV3(base()).rangeMethod).toBe("comparable_weighted_p25_p75");
+    expect(buildMarketValueV3(base({ comparables: null })).rangeMethod).toBe("provider_reported_range");
+    const configured = buildMarketValueV3(base({ comparables: null, provider: null,
+      soldContext: { medianLastAdvertisedBeforeSale: 40000, count: 9, scope: "model_year_state", windowDays: 90, checkedAt: null } }), { fallbackRangePct: 0.05 });
+    // 40,000 x 0.95 = 38,000; 40,000 x 1.05 = 42,000, only because the caller asked for a band.
+    expect([configured.rangeLow, configured.rangeHigh, configured.rangeMethod]).toEqual([38000, 42000, "configured_fallback_band"]);
+  });
+
+  it("keeps comparables chosen around the subject's own price out of the value", () => {
+    const r = buildMarketValueV3(base({ comparables: comps({ selection: "conditioned_on_subject_price" }) }));
+    expect(signal(r, "comparable_distribution").used).toBe(false);
+    expect(signal(r, "comparable_distribution").reason).toBe("comparable_selection_conditioned_on_subject_price");
+    expect(r.estimatedValue).toBe(40500);
+    expect(r.providerAgreement).toBe("single_signal");
+    const unrecorded = buildMarketValueV3(base({ comparables: comps({ selection: "not_recorded" }) }));
+    expect(signal(unrecorded, "comparable_distribution").reason).toBe("comparable_selection_not_recorded");
+    const independent = buildMarketValueV3(base({ comparables: comps({ selection: "price_independent" }) }));
+    expect(signal(independent, "comparable_distribution").used).toBe(true);
+  });
+});

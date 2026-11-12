@@ -125,7 +125,9 @@ describe("adverse evidence lowers the correct domain only", () => {
   it("an odometer rollback lowers integrity more than a conflict", () => {
     const conflict = buildVehicleScore(fullInput({ titleOdometer: verifiedTitle({ state: "REVIEW_REQUIRED", odometerStatus: "conflict" }) }));
     const rollback = buildVehicleScore(fullInput({ titleOdometer: verifiedTitle({ state: "ADVERSE", odometerStatus: "rollback_indicated" }) }));
-    expect(domain(conflict, "integrity").score).toBe(100 - SCORE_DEDUCTIONS.integrity.odometerConflict - SCORE_DEDUCTIONS.integrity.reviewRequired);
+    // The conflict is the review reason; it is deducted once: 100 - 30 = 70.
+    expect(domain(conflict, "integrity").score).toBe(70);
+    expect(domain(conflict, "integrity").adverse).toEqual(["odometer_conflict"]);
     expect(domain(rollback, "integrity").score).toBe(100 - SCORE_DEDUCTIONS.integrity.odometerRollback);
     expect(domain(conflict, "condition").score).toBe(100);
   });

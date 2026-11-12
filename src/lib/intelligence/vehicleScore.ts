@@ -20,7 +20,7 @@ import {
   type ScoreDomainKey, type ScoreDomainResult, type ScoreLabel, type TitleOdometerSummary, type VehicleScoreResult,
 } from "./contracts.ts";
 
-export const VEHICLE_SCORE_VERSION = "vehicle-score-v1.1.0-shadow";
+export const VEHICLE_SCORE_VERSION = "vehicle-score-v1.2.0-shadow";
 
 export interface DocumentationFacts {
   serviceRecordCount: number | null;
@@ -123,7 +123,9 @@ function integrityDomain(identity: IdentitySummary, title: TitleOdometerSummary)
       d.adverse.push(...brands.map((b) => `title_brand:${b}`));
     }
     if (title.state === "VERIFIED_NO_ADVERSE_REPORTED") d.evidence.push("title_no_adverse_reported");
-    if (title.state === "REVIEW_REQUIRED") {
+    // An odometer conflict is what puts a report into review; it is deducted
+    // once below, under its own name, not a second time as "review required".
+    if (title.state === "REVIEW_REQUIRED" && title.odometerStatus !== "conflict") {
       deduction += r.reviewRequired;
       d.adverse.push("title_review_required");
     }
