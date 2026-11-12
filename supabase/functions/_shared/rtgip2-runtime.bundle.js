@@ -2144,7 +2144,7 @@ async function loadV3(sql, app, cfg, nowSec) {
   } catch {
     fault = "pins_malformed";
   }
-  const keyEnv = cfg.env("RTGIP3_KEY_ENV") ?? "stg";
+  const keyEnv = cfg.runtimeMode === "production" ? "prd" : cfg.env("RTGIP3_KEY_ENV") ?? "stg";
   if (!KEY_ENVS2.has(keyEnv)) fault = "key_env_invalid";
   const records = [];
   for (const k of got.keys) {
@@ -2258,11 +2258,13 @@ function createAppRuntime(cfg) {
   const nowSec = () => Math.floor(now() / 1e3);
   const doFetch = cfg.fetch ?? ((...a) => fetch(...a));
   const httpsOnly = cfg.gatewayHttpsOnly !== false;
+  const mode = cfg.runtimeMode ?? "staging";
+  const v3Only = mode === "production";
   const refuse = (reason) => json(503, { reason });
   const v3Enabled = () => cfg.env("RTGIP3_ENABLED") === "true";
   function staticGate() {
     if (cfg.compiledEnabled !== true) return refuse("RTGIP2_NOT_ACTIVATED");
-    if (cfg.env("RTGIP2_RUNTIME_MODE") !== "staging") return refuse("runtime_mode_off");
+    if (cfg.env("RTGIP2_RUNTIME_MODE") !== mode) return refuse("runtime_mode_off");
     let ok = false;
     try {
       const u = new URL(cfg.env("SUPABASE_URL") ?? "");
@@ -2270,7 +2272,7 @@ function createAppRuntime(cfg) {
     } catch {
       ok = false;
     }
-    return ok ? null : refuse("not_staging_backend");
+    return ok ? null : refuse(mode === "production" ? "not_production_backend" : "not_staging_backend");
   }
   function gatewayBase() {
     try {
@@ -2515,6 +2517,7 @@ function createAppRuntime(cfg) {
     if (req.method !== "POST") return json(405, { reason: "method_not_allowed" });
     if (!isJson(req)) return json(415, { reason: "unsupported_media_type" });
     if (req.headers.get("rtgip-protocol") === PROTOCOL3) return inboundV3(req, sql);
+    if (v3Only) return json(403, { reason: "protocol_not_accepted", receipts: [] });
     const read2 = await readBody(req);
     if ("reason" in read2) return json(read2.status, { reason: read2.reason });
     const reg = await loadRegistry(sql, cfg.app);
@@ -2659,7 +2662,7 @@ function createAppRuntime(cfg) {
     async (sql) => {
       if (req.method !== "POST") return json(405, { reason: "method_not_allowed" });
       const base = gatewayBase();
-      const reg = await loadRegistry(sql, cfg.app);
+      const reg = v3Only ? { connections: [], keys: [] } : await loadRegistry(sql, cfg.app);
       const v3 = await loadV3(sql, cfg.app, cfg, nowSec());
       const v2Key = currentKey(reg, cfg.app, nowSec());
       if (!v3) {
@@ -2732,7 +2735,7 @@ function createAppRuntime(cfg) {
         const advanced = [];
         if (v3 && pin?.protocol === PROTOCOL3) {
           ({ status, doc } = await stepV3(v3, base, worker, asDispatcher, { envelope, body, eventId, gen, action, ...pin }, advanced));
-        } else if (v3 && pin?.protocol !== "rtgip/2") {
+        } else if (v3Only || v3 && pin?.protocol !== "rtgip/2") {
           doc = { reason: "protocol_mismatch" };
         } else {
           const key = currentKey(reg, cfg.app, nowSec());
@@ -3671,13 +3674,16 @@ var labelsPublishAuthorizer = async (db, userId, req) => {
 
 // src/lib/rooftopos-parked/rtgip2-autolabels/runtime-config.ts
 var RTGIP2_APP_RUNTIME_ENABLED = true;
-var STAGING_PROJECT_REF = "uakiwvigsmrlyfpsalai";
-var GATEWAY_STAGING_ORIGIN = "https://rooftopos-gateway-staging.lovable.app";
-var STAGING_GATEWAY_ORIGINS = [GATEWAY_STAGING_ORIGIN];
+var RTGIP2_RUNTIME_MODE = "production";
+var PROJECT_REF = "onnbmmdbrsgytfozfozn";
+var GATEWAY_ORIGIN_PLACEHOLDER = "https://production-gateway-origin-unset.invalid";
+var GATEWAY_PRODUCTION_ORIGIN = typeof __RTGIP_PRODUCTION_GATEWAY_ORIGIN__ === "string" ? __RTGIP_PRODUCTION_GATEWAY_ORIGIN__ : GATEWAY_ORIGIN_PLACEHOLDER;
+var GATEWAY_ORIGINS = GATEWAY_PRODUCTION_ORIGIN === GATEWAY_ORIGIN_PLACEHOLDER ? [] : [GATEWAY_PRODUCTION_ORIGIN];
 
 // src/lib/rooftopos-parked/rtgip2-autolabels/runtime-entry.ts
 var APP_BINDINGS = {
   app: "autolabels",
+  runtimeMode: RTGIP2_RUNTIME_MODE,
   adapter: labelsStagingAdapter,
   publish: { kinds: PUBLISH_KINDS, refKeys: PUBLISH_REF_KEYS, authorize: labelsPublishAuthorizer }
 };
@@ -3686,19 +3692,21 @@ function createEntryRuntime(opts) {
   return createAppRuntime({
     ...APP_BINDINGS,
     compiledEnabled: opts.compiledEnabled,
-    stagingRef: STAGING_PROJECT_REF,
-    gatewayOrigins: STAGING_GATEWAY_ORIGINS,
+    stagingRef: PROJECT_REF,
+    gatewayOrigins: GATEWAY_ORIGINS,
     env,
-    sql: () => postgres(env("SUPABASE_DB_URL") ?? "", { prepare: false, max: 3, idle_timeout: 5, onnotice: () => {
+    // The dedicated login rtgip_edge (function secret RTGIP_EDGE_DB_URL), never the postgres owner.
+    sql: () => postgres(env("RTGIP_EDGE_DB_URL") ?? "", { prepare: false, max: 3, idle_timeout: 5, onnotice: () => {
     } })
   });
 }
 export {
   APP_BINDINGS,
+  GATEWAY_ORIGINS,
+  PROJECT_REF,
   RTGIP2_APP_RUNTIME_ENABLED,
+  RTGIP2_RUNTIME_MODE,
   RTGIP3,
-  STAGING_GATEWAY_ORIGINS,
-  STAGING_PROJECT_REF,
   createAppRuntime,
   createEntryRuntime
 };

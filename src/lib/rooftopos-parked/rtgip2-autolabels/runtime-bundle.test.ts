@@ -9,35 +9,37 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   APP_BINDINGS,
+  GATEWAY_ORIGINS,
+  PROJECT_REF,
   RTGIP2_APP_RUNTIME_ENABLED,
-  STAGING_GATEWAY_ORIGINS,
-  STAGING_PROJECT_REF,
+  RTGIP2_RUNTIME_MODE,
   createAppRuntime,
   createEntryRuntime,
 } from "./runtime-entry.ts";
+import { GATEWAY_ORIGIN_PLACEHOLDER } from "./runtime-config.ts";
 import type { Sql } from "../rtgip2-runtime/runtime.ts";
 
 const root = (rel: string) => path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..", rel);
 const read = (rel: string) => readFileSync(root(rel), "utf8");
 const BUNDLE = "supabase/functions/_shared/rtgip2-runtime.bundle.js";
-const PRODUCTION_REFS = ["onnbmmdbrsgytfozfozn", "ptiwdwfdckfqivoocyvp", "eabnaohpjuewhwrfhkun"];
-const STAGING_REFS = ["uakiwvigsmrlyfpsalai", "zzwuxpbxkfxgtrnfxgia", "mubzldoczujeoatzdwko"];
+const PRODUCTION_REF = "onnbmmdbrsgytfozfozn";
+const OTHER_PRODUCTION_REFS = ["ptiwdwfdckfqivoocyvp", "eabnaohpjuewhwrfhkun", "panlppkjvcctebnkalyz"];
+const STAGING_REFS = ["uakiwvigsmrlyfpsalai", "zzwuxpbxkfxgtrnfxgia", "mubzldoczujeoatzdwko", "ldlmkelrxlfmrhdrtvqn"];
 const COMPILED_LITERAL = true;
-const STAGING_GATEWAY_ORIGIN = "https://rooftopos-gateway-staging.lovable.app";
-const ENV_NAMES = ["RTGIP2_DISPATCH_TOKEN", "RTGIP2_GATEWAY_URL", "RTGIP2_RUNTIME_MODE", "RTGIP3_ENABLED", "RTGIP3_KEY_ENV", "RTGIP3_KEY_PINS", "RTGIP3_VERIFIER_DIGEST", "SUPABASE_ANON_KEY", "SUPABASE_DB_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_URL"];
+const ENV_NAMES = ["RTGIP2_DISPATCH_TOKEN", "RTGIP2_GATEWAY_URL", "RTGIP2_RUNTIME_MODE", "RTGIP3_ENABLED", "RTGIP3_KEY_ENV", "RTGIP3_KEY_PINS", "RTGIP3_VERIFIER_DIGEST", "RTGIP_EDGE_DB_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_URL"];
 
 describe("the generated bundle", () => {
   it("rebuilds byte-identically from source, so the deployed artifact has one reproducible sha256", () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), "rtgip2-bundle-"));
     const builds = [0, 1].map((i) => {
       const out = path.join(dir, `bundle-${i}.js`);
-      execFileSync(process.execPath, [root("scripts/rtgip2/build-runtime.mjs"), "--out", out], { cwd: root("."), stdio: "pipe" });
+      execFileSync(process.execPath, [root("scripts/rtgip2/build-runtime.mjs"), "--out", out], { cwd: root("."), stdio: "pipe", env: { ...process.env, RTGIP_PRODUCTION_GATEWAY_ORIGIN: "" } });
       return readFileSync(out, "utf8");
     });
     expect(builds[1]).toBe(builds[0]);
     expect(read(BUNDLE)).toBe(builds[0]);
     expect(createHash("sha256").update(read(BUNDLE)).digest("hex")).toMatch(/^[0-9a-f]{64}$/);
-    execFileSync(process.execPath, [root("scripts/rtgip2/build-runtime.mjs"), "--check"], { cwd: root("."), stdio: "pipe" });
+    execFileSync(process.execPath, [root("scripts/rtgip2/build-runtime.mjs"), "--check"], { cwd: root("."), stdio: "pipe", env: { ...process.env, RTGIP_PRODUCTION_GATEWAY_ORIGIN: "" } });
   }, 60_000);
 
   it("is plain JavaScript whose only external import is npm:postgres@3.4.5", () => {
@@ -72,23 +74,40 @@ describe("the generated bundle", () => {
     expect(read(`${BUNDLE}.sha256`)).toBe(`${createHash("sha256").update(text).digest("hex")}  rtgip2-runtime.bundle.js\n`);
   });
 
-  it("carries the compiled switches as plain constants", () => {
+  it("carries the compiled production switches as plain constants and never the postgres owner URL", () => {
     const text = read(BUNDLE);
     expect(text).toContain(`var RTGIP2_APP_RUNTIME_ENABLED = ${COMPILED_LITERAL};`);
-    expect(text).toContain(`var STAGING_PROJECT_REF = "${STAGING_PROJECT_REF}";`);
-    expect(text).toContain(`var GATEWAY_STAGING_ORIGIN = "${STAGING_GATEWAY_ORIGIN}";`);
-    expect(text).toContain("var STAGING_GATEWAY_ORIGINS = [GATEWAY_STAGING_ORIGIN];");
+    expect(text).toContain('var RTGIP2_RUNTIME_MODE = "production";');
+    expect(text).toContain(`var PROJECT_REF = "${PRODUCTION_REF}";`);
+    expect(text).toContain(`var GATEWAY_ORIGIN_PLACEHOLDER = "${GATEWAY_ORIGIN_PLACEHOLDER}";`);
+    expect(text).toContain("var GATEWAY_ORIGINS = GATEWAY_PRODUCTION_ORIGIN === GATEWAY_ORIGIN_PLACEHOLDER ? [] : [GATEWAY_PRODUCTION_ORIGIN];");
+    expect(text).toContain("runtimeMode: RTGIP2_RUNTIME_MODE,");
+    expect(text).not.toContain("SUPABASE_DB_URL");
+    for (const ref of [...STAGING_REFS, ...OTHER_PRODUCTION_REFS]) expect(text).not.toContain(ref);
+    expect(text).not.toMatch(/lovable\.app/);
   });
+
+  it("takes the production Gateway origin only as a bare https origin at build time", () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "rtgip2-origin-"));
+    const out = path.join(dir, "bundle.js");
+    const build = (origin: string) =>
+      execFileSync(process.execPath, [root("scripts/rtgip2/build-runtime.mjs"), "--out", out], { cwd: root("."), stdio: "pipe", env: { ...process.env, RTGIP_PRODUCTION_GATEWAY_ORIGIN: origin } });
+    build("https://gateway.example.com");
+    expect(readFileSync(out, "utf8")).toContain('var GATEWAY_PRODUCTION_ORIGIN = true ? "https://gateway.example.com" : GATEWAY_ORIGIN_PLACEHOLDER;');
+    for (const bad of ["http://gateway.example.com", "https://gateway.example.com/", "https://u:p@gateway.example.com", "https://x.invalid", "not a url"])
+      expect(() => build(bad)).toThrow();
+  }, 60_000);
 });
 
 describe("the compiled constants", () => {
-  it("keep the literal at its committed state, the staging ref off every production ref, and exactly the Gateway Staging origin", () => {
+  it("keep the literal at its committed state, production mode, the AutoLabels production ref and no usable Gateway origin yet", () => {
     expect(RTGIP2_APP_RUNTIME_ENABLED).toBe(COMPILED_LITERAL);
-    expect(STAGING_PROJECT_REF).toBe("uakiwvigsmrlyfpsalai");
-    expect(STAGING_REFS).toContain(STAGING_PROJECT_REF);
-    expect(PRODUCTION_REFS).not.toContain(STAGING_PROJECT_REF);
-    expect(STAGING_GATEWAY_ORIGINS.every((o) => /^https:\/\/[a-z0-9.-]+$/.test(o))).toBe(true);
-    expect(STAGING_GATEWAY_ORIGINS).toEqual([STAGING_GATEWAY_ORIGIN]);
+    expect(RTGIP2_RUNTIME_MODE).toBe("production");
+    expect(APP_BINDINGS.runtimeMode).toBe("production");
+    expect(PROJECT_REF).toBe(PRODUCTION_REF);
+    expect(STAGING_REFS).not.toContain(PROJECT_REF);
+    expect(GATEWAY_ORIGINS).toEqual([]);
+    expect(new URL(GATEWAY_ORIGIN_PLACEHOLDER).hostname.endsWith(".invalid")).toBe(true);
   });
 });
 
@@ -124,74 +143,63 @@ describe("the entry runtime with the real constants", () => {
   afterEach(() => {
     delete (globalThis as unknown as { Deno?: unknown }).Deno;
   });
-  const stagingEnv = { RTGIP2_RUNTIME_MODE: "staging", SUPABASE_URL: `https://${STAGING_PROJECT_REF}.supabase.co`, SUPABASE_SERVICE_ROLE_KEY: "k".repeat(24), SUPABASE_DB_URL: "postgres://nobody@127.0.0.1:1/none" };
+  const prodEnv: Record<string, string> = {
+    RTGIP2_RUNTIME_MODE: "production",
+    SUPABASE_URL: `https://${PRODUCTION_REF}.supabase.co`,
+    SUPABASE_SERVICE_ROLE_KEY: "k".repeat(24),
+    RTGIP_EDGE_DB_URL: "postgres://nobody@127.0.0.1:1/none",
+  };
+  const noDb = (() => {
+    throw new Error("the database must not be reached");
+  }) as unknown as () => Sql;
+  const runtime = (env: Record<string, string | undefined>, sql: () => Sql = noDb) =>
+    createAppRuntime({ ...APP_BINDINGS, compiledEnabled: true, stagingRef: PROJECT_REF, gatewayOrigins: GATEWAY_ORIGINS, env: (n) => env[n], sql });
+  const reason = async (r: Response) => [r.status, ((await r.json()) as { reason: string }).reason];
+  const post = (headers: Record<string, string> = {}) => new Request("https://fn.test/", { method: "POST", headers, body: "{}" });
 
   it("refuses every entry point when the compiled literal is off, whatever the environment says", async () => {
-    platform(stagingEnv);
+    platform(prodEnv);
     const rt = createEntryRuntime({ compiledEnabled: false });
-    for (const call of [rt.inbound, rt.dispatch, rt.publish]) {
-      const r = await call(new Request("https://fn.test/", { method: "POST", headers: { authorization: `Bearer ${stagingEnv.SUPABASE_SERVICE_ROLE_KEY}` }, body: "{}" }));
-      expect([r.status, ((await r.json()) as { reason: string }).reason]).toEqual([503, "RTGIP2_NOT_ACTIVATED"]);
+    for (const call of [rt.inbound, rt.dispatch, rt.publish])
+      expect(await reason(await call(post({ authorization: `Bearer ${prodEnv.SUPABASE_SERVICE_ROLE_KEY}` })))).toEqual([503, "RTGIP2_NOT_ACTIVATED"]);
+  });
+
+  it("stays dark until RTGIP2_RUNTIME_MODE is exactly production: unset, staging or anything else is runtime_mode_off", async () => {
+    for (const m of [undefined, "staging", "Production", "production ", "prod"]) {
+      const rt = runtime({ ...prodEnv, RTGIP2_RUNTIME_MODE: m });
+      for (const call of [rt.inbound, rt.dispatch, rt.publish]) expect(await reason(await call(post()))).toEqual([503, "runtime_mode_off"]);
     }
   });
 
-  it("with the literal injected on, still refuses each production backend and any unlisted Gateway", async () => {
-    const connect = vi.fn(() => {
-      throw new Error("the database must not be reached");
-    });
-    const rt = createAppRuntime({
-      ...APP_BINDINGS,
-      compiledEnabled: true,
-      stagingRef: STAGING_PROJECT_REF,
-      gatewayOrigins: STAGING_GATEWAY_ORIGINS,
-      env: (n) => ({ ...stagingEnv, SUPABASE_URL: "", RTGIP2_GATEWAY_URL: "https://gateway.example.test" })[n as keyof typeof stagingEnv],
-      sql: connect as unknown as () => Sql,
-    });
-    for (const ref of [...PRODUCTION_REFS, ...STAGING_REFS.filter((r) => r !== STAGING_PROJECT_REF)]) {
-      const probe = createAppRuntime({
-        ...APP_BINDINGS,
-        compiledEnabled: true,
-        stagingRef: STAGING_PROJECT_REF,
-        gatewayOrigins: STAGING_GATEWAY_ORIGINS,
-        env: (n) => ({ ...stagingEnv, SUPABASE_URL: `https://${ref}.supabase.co` })[n as keyof typeof stagingEnv],
-        sql: connect as unknown as () => Sql,
-      });
-      for (const call of [probe.inbound, probe.dispatch, probe.publish]) {
-        const r = await call(new Request("https://fn.test/", { method: "POST", body: "{}" }));
-        expect([ref, r.status, ((await r.json()) as { reason: string }).reason]).toEqual([ref, 503, "not_staging_backend"]);
-      }
+  it("can never answer on a staging backend or another app's production backend, even in production mode", async () => {
+    const connect = vi.fn(noDb);
+    for (const ref of [...STAGING_REFS, ...OTHER_PRODUCTION_REFS]) {
+      const rt = runtime({ ...prodEnv, SUPABASE_URL: `https://${ref}.supabase.co` }, connect);
+      for (const call of [rt.inbound, rt.dispatch, rt.publish])
+        expect([ref, ...(await reason(await call(post())))]).toEqual([ref, 503, "not_production_backend"]);
     }
-    expect((await rt.dispatch(new Request("https://fn.test/", { method: "POST" }))).status).toBe(503);
     expect(connect).not.toHaveBeenCalled();
   });
 
-  it("answers gateway_origin_not_allowed for dispatch to any Gateway outside the compiled allowlist", async () => {
-    const rt = createAppRuntime({
-      ...APP_BINDINGS,
-      compiledEnabled: true,
-      stagingRef: STAGING_PROJECT_REF,
-      gatewayOrigins: STAGING_GATEWAY_ORIGINS,
-      env: (n) => ({ ...stagingEnv, RTGIP2_GATEWAY_URL: "https://gateway.example.test" })[n as keyof typeof stagingEnv] ?? (n === "RTGIP2_GATEWAY_URL" ? "https://gateway.example.test" : undefined),
-      sql: (() => {
-        throw new Error("the database must not be reached");
-      }) as unknown as () => Sql,
-    });
-    const r = await rt.dispatch(new Request("https://fn.test/", { method: "POST", headers: { authorization: `Bearer ${stagingEnv.SUPABASE_SERVICE_ROLE_KEY}` } }));
-    expect([r.status, ((await r.json()) as { reason: string }).reason]).toEqual([503, "gateway_origin_not_allowed"]);
+  it("refuses dispatch to any Gateway while the compiled origin is the placeholder", async () => {
+    for (const g of ["https://gateway.example.test", GATEWAY_ORIGIN_PLACEHOLDER, "https://rooftopos-gateway-staging.lovable.app"]) {
+      const rt = runtime({ ...prodEnv, RTGIP2_GATEWAY_URL: g });
+      expect(await reason(await rt.dispatch(post({ authorization: `Bearer ${prodEnv.SUPABASE_SERVICE_ROLE_KEY}` })))).toEqual([503, "gateway_origin_not_allowed"]);
+    }
   });
 
-  it("lets dispatch past the origin gate only for the compiled Gateway Staging origin, then still requires a bearer", async () => {
-    const rt = createAppRuntime({
-      ...APP_BINDINGS,
-      compiledEnabled: true,
-      stagingRef: STAGING_PROJECT_REF,
-      gatewayOrigins: STAGING_GATEWAY_ORIGINS,
-      env: (n) => (n === "RTGIP2_GATEWAY_URL" ? `${STAGING_GATEWAY_ORIGIN}/` : stagingEnv[n as keyof typeof stagingEnv]),
-      sql: (() => {
-        throw new Error("the database must not be reached");
-      }) as unknown as () => Sql,
-    });
-    const r = await rt.dispatch(new Request("https://fn.test/", { method: "POST" }));
-    expect([r.status, ((await r.json()) as { reason: string }).reason]).toEqual([401, "unauthorized"]);
+  it("refuses every rtgip/2 or unlabelled delivery with 403 protocol_not_accepted before reading a key or the Vault", async () => {
+    const queries: string[] = [];
+    const fakeSql = (() => {
+      const tx = { unsafe: async (q: string) => (queries.push(q), q.includes("delivery_config") ? [{ transport_enabled: true, local_app: "autolabels" }] : []) };
+      const sql = { begin: async (fn: (t: typeof tx) => unknown) => fn(tx), unsafe: tx.unsafe, end: async () => {} };
+      return sql as unknown as Sql;
+    }) as () => Sql;
+    for (const p of [{ "rtgip-protocol": "rtgip/2" }, {}]) {
+      const rt = runtime(prodEnv, fakeSql);
+      const r = await rt.inbound(new Request("https://fn.test/", { method: "POST", headers: { "content-type": "application/json", ...p }, body: "{}" }));
+      expect([r.status, ((await r.json()) as { reason: string }).reason]).toEqual([403, "protocol_not_accepted"]);
+    }
+    expect(queries.join("\n")).not.toMatch(/signing_keys|vault/);
   });
 });

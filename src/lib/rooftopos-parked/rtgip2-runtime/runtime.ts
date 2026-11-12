@@ -5,8 +5,11 @@
 // app-specific fact (adapter, publish authorizer, refs, constants) is injected.
 //
 // Nothing here can switch a route on by itself. Five gates run first, in order, before the body or
-// any secret is read: the compiled literal, the runtime mode, the compiled staging backend, the
-// compiled Gateway origin allowlist (dispatch only) and the app database's own transport switch.
+// any secret is read: the compiled literal, the runtime mode, the compiled backend, the compiled
+// Gateway origin allowlist (dispatch only) and the app database's own transport switch. A runtime
+// compiled for production answers only when RTGIP2_RUNTIME_MODE is "production" on that compiled
+// production backend, speaks rtgip/3 only and keys from the "prd" environment; its rtgip/2 paths
+// are unreachable (no rtgip/2 registry or Vault read, every non-rtgip/3 delivery refused).
 import type postgres from "postgres";
 import {
   MAX_BODY_BYTES,
@@ -44,6 +47,7 @@ import { verifySourceChainV3, type SourceChainV3Verdict } from "./source-chain.t
 
 export type Sql = postgres.Sql;
 export type App = "autolabels" | "autocurb" | "autoframe";
+export type RuntimeMode = "staging" | "production";
 
 export interface RuntimeAdapter {
   produce(
@@ -78,8 +82,13 @@ export interface AppRuntimeConfig {
   app: App;
   /** The compiled literal. The deployed entry files pass RTGIP2_APP_RUNTIME_ENABLED and nothing else. */
   compiledEnabled: boolean;
-  /** Compiled staging project ref; SUPABASE_URL must be exactly https://<ref>.supabase.co. */
+  /** Compiled project ref; SUPABASE_URL must be exactly https://<ref>.supabase.co. */
   stagingRef: string;
+  /**
+   * Compiled runtime mode, default "staging". RTGIP2_RUNTIME_MODE must equal it. "production" also
+   * makes the node rtgip/3-only and fixes its key environment to "prd".
+   */
+  runtimeMode?: RuntimeMode | undefined;
   /** Compiled Gateway origin allowlist (dispatch). Empty refuses every dispatch. */
   gatewayOrigins: readonly string[];
   /** Default true. Only a test file sets false, to reach a loopback stub Gateway. */
@@ -406,7 +415,7 @@ async function v3Installed(sql: Sql): Promise<boolean> {
 async function loadV3(
   sql: Sql,
   app: App,
-  cfg: { env: (name: string) => string | undefined },
+  cfg: { env: (name: string) => string | undefined; runtimeMode?: RuntimeMode | undefined },
   nowSec: number,
 ): Promise<V3State | null> {
   const got = (await sql.begin(async (tx) => {
@@ -437,7 +446,7 @@ async function loadV3(
   } catch {
     fault = "pins_malformed";
   }
-  const keyEnv = cfg.env("RTGIP3_KEY_ENV") ?? "stg";
+  const keyEnv = cfg.runtimeMode === "production" ? "prd" : (cfg.env("RTGIP3_KEY_ENV") ?? "stg");
   if (!KEY_ENVS.has(keyEnv)) fault = "key_env_invalid";
   const records: PublicKeyRecord[] = [];
   for (const k of got.keys) {
@@ -566,6 +575,8 @@ export function createAppRuntime(cfg: AppRuntimeConfig): AppRuntime {
   const nowSec = () => Math.floor(now() / 1000);
   const doFetch = cfg.fetch ?? ((...a: Parameters<typeof fetch>) => fetch(...a));
   const httpsOnly = cfg.gatewayHttpsOnly !== false;
+  const mode: RuntimeMode = cfg.runtimeMode ?? "staging";
+  const v3Only = mode === "production";
 
   const refuse = (reason: string) => json(503, { reason });
   /** rtgip/3's own switch, default off: only the exact value "true" turns it on. */
@@ -573,7 +584,7 @@ export function createAppRuntime(cfg: AppRuntimeConfig): AppRuntime {
 
   function staticGate(): Response | null {
     if (cfg.compiledEnabled !== true) return refuse("RTGIP2_NOT_ACTIVATED");
-    if (cfg.env("RTGIP2_RUNTIME_MODE") !== "staging") return refuse("runtime_mode_off");
+    if (cfg.env("RTGIP2_RUNTIME_MODE") !== mode) return refuse("runtime_mode_off");
     let ok = false;
     try {
       const u = new URL(cfg.env("SUPABASE_URL") ?? "");
@@ -585,7 +596,7 @@ export function createAppRuntime(cfg: AppRuntimeConfig): AppRuntime {
     } catch {
       ok = false;
     }
-    return ok ? null : refuse("not_staging_backend");
+    return ok ? null : refuse(mode === "production" ? "not_production_backend" : "not_staging_backend");
   }
 
   function gatewayBase(): string | null {
@@ -855,6 +866,7 @@ export function createAppRuntime(cfg: AppRuntimeConfig): AppRuntime {
       if (req.method !== "POST") return json(405, { reason: "method_not_allowed" });
       if (!isJson(req)) return json(415, { reason: "unsupported_media_type" });
       if (req.headers.get("rtgip-protocol") === core3.PROTOCOL3) return inboundV3(req, sql);
+      if (v3Only) return json(403, { reason: "protocol_not_accepted", receipts: [] });
       const read = await readBody(req);
       if ("reason" in read) return json(read.status, { reason: read.reason });
       const reg = await loadRegistry(sql, cfg.app);
@@ -1041,7 +1053,7 @@ export function createAppRuntime(cfg: AppRuntimeConfig): AppRuntime {
       async (sql) => {
         if (req.method !== "POST") return json(405, { reason: "method_not_allowed" });
         const base = gatewayBase()!;
-        const reg = await loadRegistry(sql, cfg.app);
+        const reg: Registry = v3Only ? { connections: [], keys: [] } : await loadRegistry(sql, cfg.app);
         const v3 = await loadV3(sql, cfg.app, cfg, nowSec());
         // REVIEW-IMPL-2 M-1: nothing is leased that this node cannot sign or attest for its protocol. A claim
         // charges an attempt, so a lease taken during a key or configuration fault would be charged until the
@@ -1122,8 +1134,9 @@ export function createAppRuntime(cfg: AppRuntimeConfig): AppRuntime {
           const advanced: string[] = [];
           if (v3 && pin?.protocol === core3.PROTOCOL3) {
             ({ status, doc } = await stepV3(v3, base, worker, asDispatcher, { envelope, body, eventId, gen, action, ...pin }, advanced));
-          } else if (v3 && pin?.protocol !== "rtgip/2") {
+          } else if (v3Only || (v3 && pin?.protocol !== "rtgip/2")) {
             // With the rtgip/3 SQL every leased row carries its pin; anything else is never sent as rtgip/2.
+            // A production node never sends rtgip/2 at all.
             doc = { reason: "protocol_mismatch" };
           } else {
           const key = currentKey(reg, cfg.app, nowSec())!;

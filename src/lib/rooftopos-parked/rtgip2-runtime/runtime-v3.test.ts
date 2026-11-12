@@ -893,3 +893,53 @@ describe("rtgip/3 inbound (target)", () => {
     expect([r.status, body.reason]).toEqual([400, "duplicate_or_invalid_header"]);
   });
 });
+
+describe("a runtime compiled for production (runtimeMode production)", () => {
+  const PROD = "onnbmmdbrsgytfozfozn";
+  const prod = (cfg: AppRuntimeConfig, env: Record<string, string | undefined> = {}): AppRuntimeConfig => {
+    const base = cfg.env;
+    const over: Record<string, string | undefined> = { RTGIP2_RUNTIME_MODE: "production", SUPABASE_URL: `https://${PROD}.supabase.co`, ...env };
+    return { ...cfg, runtimeMode: "production", stagingRef: PROD, env: (n) => (n in over ? over[n] : base(n)) };
+  };
+
+  it("is runtime_mode_off with RTGIP2_RUNTIME_MODE staging, and not_production_backend on the staging ref", async () => {
+    const w = await world();
+    for (const [env, why] of [
+      [{ RTGIP2_RUNTIME_MODE: "staging" }, "runtime_mode_off"],
+      [{ RTGIP2_RUNTIME_MODE: undefined }, "runtime_mode_off"],
+      [{ SUPABASE_URL: `https://${STAGING}.supabase.co` }, "not_production_backend"],
+    ] as [Record<string, string | undefined>, string][]) {
+      const rt = createAppRuntime(prod(w.cfg, env));
+      for (const call of [rt.inbound, rt.dispatch, rt.publish]) expect([why, (await call(dispatchReq())).status]).toEqual([why, 503]);
+    }
+    expect(w.calls).toHaveLength(0);
+  });
+
+  it("never reads the rtgip/2 registry or the Vault when it dispatches, and has no rtgip/2 signer to fall back to", async () => {
+    const w = await world({ db: (t) => (t.includes(OPEN_PROTOCOLS) ? [] : undefined) });
+    const r = await createAppRuntime(prod(w.cfg)).dispatch(dispatchReq());
+    // The fixture keys are stg keys, which a prd node never loads, so nothing can sign: 503 before any lease.
+    expect([r.status, await r.json()]).toEqual([503, { reason: "no_signing_key" }]);
+    expect(called(w.calls, "signing_keys")).toHaveLength(0);
+    expect(called(w.calls, "vault.")).toHaveLength(0);
+    expect(called(w.calls, "outbox_claim")).toHaveLength(0);
+  });
+
+  it("answers 403 protocol_not_accepted to an rtgip/2 delivery before any registry, key or Vault read", async () => {
+    const w = await world();
+    const sealed = await sealEnvelope(draftEnvelope("autocurb", "autolabels", "appraisal.completed"));
+    const r = await createAppRuntime(prod(w.cfg)).inbound(post(sealed.body, { "rtgip-protocol": "rtgip/2" }));
+    expect([r.status, await r.json()]).toEqual([403, { reason: "protocol_not_accepted", receipts: [] }]);
+    expect(called(w.calls, "signing_keys")).toHaveLength(0);
+    expect(called(w.calls, "inbox_admit")).toHaveLength(0);
+  });
+
+  it("keys from the prd environment only: staging key ids are refused whatever RTGIP3_KEY_ENV says", async () => {
+    for (const env of [{}, { RTGIP3_KEY_ENV: "stg" }]) {
+      const w = await world({ db: (t) => (t.includes(OPEN_PROTOCOLS) ? [{ protocol: "rtgip/3" }] : undefined) });
+      const r = await createAppRuntime(prod(w.cfg, env)).dispatch(dispatchReq());
+      expect(r.status).toBe(503);
+      expect(called(w.calls, "outbox_claim")).toHaveLength(0);
+    }
+  });
+});
