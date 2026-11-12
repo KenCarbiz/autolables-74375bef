@@ -602,8 +602,11 @@ export default function VehiclePassportGoverned() {
     // right. Re-enrichment restores the module on a like-for-like basis.
     if (d.price == null || d.marketAvg == null || d.marketBasisWeak) return null;
     // -1..+1 where 0 = market avg. Clamp using low/high range.
-    const low = d.marketLow ?? d.marketAvg * 0.85;
-    const high = d.marketHigh ?? d.marketAvg * 1.15;
+    // No provider range, no scale: an invented +/-15% band would place the
+    // car on a market spread nobody measured.
+    if (d.marketLow == null || d.marketHigh == null || d.marketHigh <= d.marketLow) return null;
+    const low = d.marketLow;
+    const high = d.marketHigh;
     const span = Math.max(1, high - low);
     const t = Math.max(0, Math.min(1, (d.price - low) / span));
     return { t, label: d.belowMarket != null && d.belowMarket > 250 ? "Best Value" : d.belowMarket != null && d.belowMarket < -250 ? "Above Market" : "Fair Market" };

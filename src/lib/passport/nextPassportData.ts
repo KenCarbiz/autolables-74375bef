@@ -317,8 +317,11 @@ function buildMarket(d: PassportData, pv: (k: string) => boolean): NextPassportD
   }
   const position = (() => {
     if (d.price == null || d.marketAvg == null) return null;
-    const low = d.marketLow ?? d.marketAvg * 0.85;
-    const high = d.marketHigh ?? d.marketAvg * 1.15;
+    // No provider range, no scale: an invented +/-15% band would place the
+    // car on a market spread nobody measured.
+    if (d.marketLow == null || d.marketHigh == null || d.marketHigh <= d.marketLow) return null;
+    const low = d.marketLow;
+    const high = d.marketHigh;
     return Math.max(0, Math.min(1, (d.price - low) / Math.max(1, high - low)));
   })();
   return {

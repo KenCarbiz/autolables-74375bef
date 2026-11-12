@@ -990,7 +990,7 @@ export const deriveRating = (listing: VehicleListing, d: PassportData): VehicleR
     // (floor 55) — continuous, so a $200 move can never flip a whole band.
     priceScore = clampScore(55, 98, 80 - pct * 2);
     if (soldAnchor != null) {
-      priceEvidence.push(`Median of ${m.soldCount!.toLocaleString()} recently sold in ${m.soldState ?? "your state"}, 90 days`);
+      priceEvidence.push(`Median last advertised price of ${m.soldCount!.toLocaleString()} inferred sold listings in ${m.soldState ?? "your state"}, 90 days`);
     } else if (likeAnchor != null || statsAnchor != null || (!d.marketBasisWeak && d.marketAvg != null)) {
       priceEvidence.push(likeAnchor != null && m.likeCount != null
         ? `Checked against ${m.likeCount.toLocaleString()} closely matched listings${m.radius != null ? ` within ${m.radius} miles` : ""}`
@@ -1123,7 +1123,15 @@ export const deriveRating = (listing: VehicleListing, d: PassportData): VehicleR
   // demand and equipment alone would be a rating without a spine.
   const measured = factors.filter((f) => f.score != null);
   const anchored = measured.some((f) => f.key === "price" || f.key === "history");
-  const overall = measured.length >= 2 && anchored
+  // A blended rating must never present a vehicle with adverse history as a
+  // strong overall result: price, demand and equipment would outweigh a
+  // branded title, a reported accident or an open recall. Those vehicles get
+  // no overall rating; the History & Title factor still shows its deductions.
+  const adverseHistory = d.titleStatus === "branded"
+    || (d.accidentCount ?? 0) > 0
+    || (d.openRecalls ?? 0) > 0
+    || d.recall.riskSignalled;
+  const overall = measured.length >= 2 && anchored && !adverseHistory
     ? Math.min(97, Math.round(
         measured.reduce((s, f) => s + (f.score as number) * f.weight, 0) /
         measured.reduce((s, f) => s + f.weight, 0),
