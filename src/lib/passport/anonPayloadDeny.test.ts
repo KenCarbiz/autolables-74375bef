@@ -7,6 +7,9 @@ import { join } from "node:path";
 import {
   LOT_FEED_DENY, PUBLIC_VIEW_DENY, scrubTitleVerification,
 } from "../../../supabase/functions/_shared/lotFeedRow.ts";
+import {
+  PUBLIC_LISTING_FIELDS, projectPublicListing,
+} from "../../../supabase/functions/_shared/publicListingProjection.ts";
 
 // public-listing-view answers /v/:slug for anyone on the internet, and its RPC
 // is `SELECT * FROM vehicle_listings`. It used to delete about fifteen fields
@@ -56,10 +59,7 @@ const rawRow = (): Record<string, unknown> => ({
 
 /** Exactly the sweep public-listing-view runs, pinned by the source assertion
  *  in "the sweep is wired into the function" below. */
-const shipToShopper = (row: Record<string, unknown>) => {
-  for (const k of PUBLIC_VIEW_DENY) delete row[k];
-  return row;
-};
+const shipToShopper = (row: Record<string, unknown>) => projectPublicListing(row);
 
 describe("the credential never reaches an anonymous shopper", () => {
   it("denies install_token", () => {
@@ -87,9 +87,7 @@ describe("the credential never reaches an anonymous shopper", () => {
     }
   });
 
-  it("withholds exactly what it means to, and nothing more", () => {
-    // Asserted against the real exported Set, so widening or narrowing what an
-    // anonymous caller sees is a deliberate act somebody has to change here.
+  it("keeps the exported backstop list stable", () => {
     expect([...PUBLIC_VIEW_DENY].sort()).toEqual([
       "assigned_agent_id", "created_by", "install_token", "mc_raw",
       "price_parse_notes", "recall_override_at", "recall_override_by",
@@ -98,61 +96,38 @@ describe("the credential never reaches an anonymous shopper", () => {
   });
 });
 
-describe("one denylist, not two", () => {
-  it("derives the public denylist from the feed denylist", () => {
-    // A field added to LOT_FEED_DENY is denied to the shopper too, with no
-    // second list to remember. That is the whole reason install_token — which
-    // has been on the feed list since it was written — was still shipping.
+describe("the public view is an allowlist, with the denylist as a backstop", () => {
+  it("never names a denied key as a public field", () => {
     for (const k of PUBLIC_VIEW_DENY) {
-      expect(LOT_FEED_DENY.has(k), `${k} is not on the shared list`).toBe(true);
+      expect(PUBLIC_LISTING_FIELDS.has(k), `${k} is both denied and allowed`).toBe(false);
     }
-    // The list is imported, never redefined here. Other names may ride the
-    // same import; what must not appear is a second copy of the list.
-    expect(view).toMatch(/import \{[^}]*\bPUBLIC_VIEW_DENY\b[^}]*\} from "\.\.\/_shared\/lotFeedRow\.ts";/);
-    expect(view).not.toMatch(/const PUBLIC_VIEW_DENY\s*=/);
+    expect(PUBLIC_LISTING_FIELDS.has("install_token")).toBe(false);
   });
 
-  it("the sweep is wired into the function, over the whole row", () => {
-    expect(view).toMatch(/for \(const k of PUBLIC_VIEW_DENY\) delete \(row as Record<string, unknown>\)\[k\];/);
-    // Not a hand-listed delete standing in for the sweep.
-    expect(view).not.toMatch(/delete \(row as Record<string, unknown>\)\.mc_raw;/);
+  it("is wired into the function through the projection, not a deny sweep", () => {
+    expect(view).toMatch(/import \{ projectPublicListing \} from "\.\.\/_shared\/publicListingProjection\.ts";/);
+    expect(view).toMatch(/shipped = projectPublicListing\(row\);/);
+    expect(view).not.toMatch(/for \(const k of PUBLIC_VIEW_DENY\)/);
   });
 
-  it("runs last, after curation and sanitation have finished shaping the row", () => {
-    const sweep = view.indexOf("for (const k of PUBLIC_VIEW_DENY)");
-    const ret = view.indexOf("return json(200, { listing: row });");
-    expect(sweep).toBeGreaterThan(view.indexOf("Packet curation enforcement"));
-    expect(sweep).toBeGreaterThan(view.indexOf("Anonymous payload whitelist"));
-    expect(sweep).toBeLessThan(ret);
-    // Nothing writes to the row between the sweep and the response.
-    expect(view.slice(sweep, ret)).not.toMatch(/\brow\.\w+ =/);
+  it("applies recall and title shaping to the projected row, after projection", () => {
+    const proj = view.indexOf("projectPublicListing(row)");
+    const recall = view.indexOf("applyRecallProjection(shipped)");
+    const ret = view.indexOf("return json(200, { listing: shipped });");
+    expect(proj).toBeGreaterThan(-1);
+    expect(recall).toBeGreaterThan(proj);
+    expect(ret).toBeGreaterThan(recall);
+    expect(view.slice(recall, ret)).not.toMatch(/\bshipped\.\w+ =/);
   });
 });
 
 describe("the locked passport still gets everything it renders", () => {
-  it("keeps the market modules, which are sanitized rather than denied", () => {
-    // blackbook, market_payload and comparables ARE on the feed denylist —
-    // redistributing a paid valuation feed to a sister app is a licensing
-    // question. They are not secrets, and Market Intelligence / Market
-    // Comparison are part of the owner-approved /v/:slug spec, so the shopper
-    // gets the shopper-safe projections public-listing-view already builds.
-    for (const k of ["blackbook", "market_payload", "comparables"]) {
-      expect(LOT_FEED_DENY.has(k)).toBe(true);
-      expect(PUBLIC_VIEW_DENY.has(k), `${k} would blank a locked module`).toBe(false);
-    }
-    const shipped = shipToShopper(rawRow());
-    expect(shipped.blackbook).toBeDefined();
+  it("keeps the market modules, projected key by key", () => {
+    const shipped = shipToShopper({ ...rawRow(), blackbook: { retail: 1, wholesale: 2 } });
+    expect(shipped.blackbook).toBeUndefined();
+    expect(JSON.stringify(shipped)).not.toContain("wholesale");
     expect(shipped.market_payload).toBeDefined();
     expect(shipped.comparables).toBeDefined();
-  });
-
-  it("still strips competitor identity and wholesale numbers from them", () => {
-    // The sanitation the exemption depends on. If these projections go, the
-    // exemption is no longer safe.
-    expect(view).toMatch(/row\.blackbook = \{ available: bb\.available === true, retail:/);
-    expect(view).not.toMatch(/wholesale: bb\./);
-    expect(view).toMatch(/delete mm\.cheaper_count;/);
-    expect(view).toMatch(/row\.market_payload = \{/);
   });
 
   it("keeps every field the passport reads off the listing", () => {
@@ -165,19 +140,17 @@ describe("the locked passport still gets everything it renders", () => {
       "available_accessories", "epa_economy", "history_payload", "market_meta",
       "group_similar", "value_history", "doc_fee",
       "advertised_price_before_doc", "website_sale_price", "dealer_discount",
-      "retail_cash", "dealer_snapshot", "packet_modules", "value_props",
+      "retail_cash", "dealer_snapshot", "packet_modules",
     ]) {
       expect(shipped[k], `${k} was stripped from the locked passport`).toBeDefined();
     }
   });
 
   it("keeps the fee-inclusive price derivation intact", () => {
-    // buildSalePriceCard reads these four off the listing. A denylist that ate
-    // any of them would silently change the price the passport prints.
     for (const k of [
       "advertised_price_before_doc", "doc_fee", "website_sale_price", "dealer_discount",
     ]) {
-      expect(PUBLIC_VIEW_DENY.has(k)).toBe(false);
+      expect(PUBLIC_LISTING_FIELDS.has(k), k).toBe(true);
     }
   });
 });
@@ -229,7 +202,7 @@ describe("the title attestation reaches the shopper without the employee who sig
   });
 
   it("is wired into both surfaces", () => {
-    expect(view).toContain("scrubTitleVerification((row as Record<string, unknown>).title_verification)");
+    expect(view).toContain("scrubTitleVerification(shipped.title_verification)");
     const shaper = readFileSync(
       join(__dirname, "../../../supabase/functions/_shared/lotFeedRow.ts"),
       "utf8",

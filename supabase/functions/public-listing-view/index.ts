@@ -5,7 +5,8 @@ import { resolveCustomerPassportRouting, type PassportAgent } from "../_shared/p
 import { matchIihsAward, type IihsAward } from "../_shared/iihs-awards.ts";
 import { resolvePassportVersion } from "../_shared/passport-version.ts";
 import { projectPublicPaymentEstimator } from "../_shared/paymentEstimatorProjection.ts";
-import { PUBLIC_VIEW_DENY, scrubTitleVerification, applyRecallProjection } from "../_shared/lotFeedRow.ts";
+import { scrubTitleVerification, applyRecallProjection } from "../_shared/lotFeedRow.ts";
+import { projectPublicListing } from "../_shared/publicListingProjection.ts";
 import {
   PUBLIC_MARKET_FLAGS_FIELD, projectPublicMarketFlags,
 } from "../_shared/factorySticker/lib/market/publicClaim.ts";
@@ -846,78 +847,6 @@ serve(async (req) => {
       }
     } catch { /* curation is best-effort shaping; never block the shopper view */ }
 
-    // ── Anonymous payload whitelist. The RPC returns the raw row; before it
-    // ships to a shopper, drop anything that identifies competitors or helps
-    // find a cheaper car (below-price comps, cheaper counts, wholesale/trade
-    // values, other dealers' names/VINs/URLs).
-    try {
-      const ourPrice = (() => { const n = Number(row.price); return Number.isFinite(n) && n > 0 ? n : null; })();
-      if (Array.isArray(row.comparables)) {
-        row.comparables = (row.comparables as Record<string, unknown>[])
-          .filter((c) => {
-            const p = Number(c?.price);
-            if (!Number.isFinite(p) || p <= 0) return false;
-            return ourPrice == null || p >= ourPrice;
-          })
-          .map((c) => ({
-            price: c.price ?? null, miles: c.miles ?? null, ymm: c.ymm ?? null,
-            trim: c.trim ?? null, dist: c.dist ?? null, dom: c.dom ?? null, image: c.image ?? null,
-          }));
-      }
-      // The OFFER. Same shaping as comparables, but no price floor: these are
-      // the dealer's own cars, and a cheaper one of theirs is a sale, not a
-      // leak. Cannibalisation is already excluded upstream.
-      if (Array.isArray(row.group_similar)) {
-        row.group_similar = (row.group_similar as Record<string, unknown>[])
-          .filter((c) => { const p = Number(c?.price); return Number.isFinite(p) && p > 0; })
-          .map((c) => ({
-            price: c.price ?? null, miles: c.miles ?? null, ymm: c.ymm ?? null,
-            trim: c.trim ?? null, dist: c.dist ?? null, dom: c.dom ?? null, image: c.image ?? null,
-          }));
-      }
-      if (row.market_meta && typeof row.market_meta === "object") {
-        const mm = row.market_meta as Record<string, unknown>;
-        delete mm.cheaper_count;
-        delete mm.rank_basis;
-      }
-      if (row.market_payload && typeof row.market_payload === "object") {
-        const mp = row.market_payload as Record<string, unknown>;
-        row.market_payload = {
-          marketValue: mp.marketValue ?? null, low: mp.low ?? null, high: mp.high ?? null,
-          belowMarket: mp.belowMarket ?? null, position: mp.position ?? null,
-          source: mp.source ?? null, checked_at: mp.checked_at ?? null,
-        };
-      }
-      if (row.blackbook && typeof row.blackbook === "object") {
-        const bb = row.blackbook as Record<string, unknown>;
-        // tradein ships as an independent-guide value row; wholesale (and the
-        // raw provider payload) stays stripped from the anonymous view.
-        row.blackbook = { available: bb.available === true, retail: bb.retail ?? null, tradein: bb.tradein ?? null, checked_at: bb.checked_at ?? null };
-      }
-      if (row.history_payload && typeof row.history_payload === "object") {
-        const hp = row.history_payload as Record<string, unknown>;
-        row.history_payload = {
-          available: hp.available === true,
-          entries: (Array.isArray(hp.entries) ? hp.entries as Record<string, unknown>[] : []).map((e) => ({
-            miles: e.miles ?? null,
-            seller_type: e.seller_type ?? null,
-            inventory_type: e.inventory_type ?? null,
-            first_seen: e.first_seen ?? null,
-            last_seen: e.last_seen ?? null,
-          })),
-          owners: hp.owners ?? null,
-          inServiceDate: null,
-          firstSeen: hp.firstSeen ?? null,
-          checked_at: hp.checked_at ?? null,
-          source: hp.source ?? null,
-        };
-      }
-    } catch {
-      // Fail CLOSED: if sanitation breaks, the raw payloads must not ship.
-      delete row.comparables; delete row.market_meta; delete row.market_payload;
-      delete row.blackbook; delete row.history_payload;
-    }
-
     // ── VIN decode receipts. The Passport's identity check verifies only
     // against a decoder's own record of the VIN it decoded. Stored snapshots
     // only: a read, never a decoder call and never a write. See
@@ -937,53 +866,38 @@ serve(async (req) => {
       }
     } catch { row.vin_decode_receipts = []; }
 
-    // ── Final deny sweep. The last thing that touches the payload. ─────────
+    // ── Explicit public projection. The last thing that touches the payload.
     //
     // get_vehicle_listing_by_slug is `SELECT * FROM vehicle_listings`, so every
-    // column that table has ever grown arrives here and ships unless something
-    // names it. The named deletes above could not hold that line: install_token
-    // was never among them, and it is not merchandising data — it is the sole
-    // credential for the anon `install_proofs_upload` storage policy and for
-    // record_install_proof(), both of which are EXECUTE/INSERT-granted to anon
-    // and keyed on the token alone. Every published and archived listing was
-    // therefore handing a working capability to anyone who opened its passport,
-    // and install_proofs rows written with it come back out through the recon
-    // block above as verified installed equipment.
-    //
-    // The denylist is shared with the sister-app feeds (autofilm-feed,
-    // vehicle-lookup) so there is one place to add a field and no second list
-    // to remember. What it drops here: the credential (install_token), the
-    // internal actors (created_by, assigned_agent_id), the recall-override
-    // audit trail incl. free-text notes (recall_override_by / _at / _notes),
-    // the price-scraper diagnostics (price_parse_notes), and the raw
-    // MarketCheck dump (mc_raw — verbatim, incl. the competitor-facing `dealer`
-    // block; the passport reads the curated mc_attributes and never this).
-    //
-    // What it deliberately does NOT drop: blackbook, market_payload and
-    // comparables. They are on the feed denylist as a licensing question, not
-    // as a secret, and the locked passport's Market Intelligence and Market
-    // Comparison modules render all three. They ship as the shopper-safe
-    // projections built directly above — competitor identity, wholesale values
-    // and cheaper-car counts already stripped. See PUBLIC_VIEW_SANITIZED in
-    // _shared/lotFeedRow.ts, which is where that exemption is spelled out and
-    // the only reason a denied field can fall out of scope.
-    for (const k of PUBLIC_VIEW_DENY) delete (row as Record<string, unknown>)[k];
+    // column that table has ever grown arrives here. The previous guard named
+    // what to delete (install_token, then Black Book, then cheaper_count ...)
+    // and anything unnamed shipped: price_percentile, comp_price_cut_*,
+    // last_visit_plan, the whole mc_attributes fee block and ref_price all
+    // reached anonymous shoppers that way. Now a key ships only if
+    // _shared/publicListingProjection.ts names it (with the customer surface
+    // that reads it), the market and provider containers are projected key by
+    // key, and free-form dealer content is scrubbed of dealer-only key names at
+    // every depth. Comparables are no longer filtered by our own price: the
+    // cohort is chosen upstream without reference to it.
+    let shipped: Record<string, unknown>;
+    try {
+      shipped = projectPublicListing(row);
+    } catch {
+      return json(500, { error: "projection_failed" });
+    }
 
     // The title attestation is shown to the shopper, but the employee who
-    // signed it is not. The deny sweep above works on whole columns and this
-    // one has to survive with its inside changed, so it is scrubbed rather
-    // than dropped -- the same treatment history_payload gets.
-    if ((row as Record<string, unknown>).title_verification) {
-      (row as Record<string, unknown>).title_verification =
-        scrubTitleVerification((row as Record<string, unknown>).title_verification);
+    // signed it is not.
+    if (shipped.title_verification) {
+      shipped.title_verification = scrubTitleVerification(shipped.title_verification);
     }
 
     // Recall last, on the finished row: the shopper's copy carries a clear
     // status and a zero count only where a VIN-level check produced them, and
     // the model line's campaign context ships labelled as model-level.
-    applyRecallProjection(row as Record<string, unknown>);
+    applyRecallProjection(shipped);
 
-    return json(200, { listing: row });
+    return json(200, { listing: shipped });
   } catch (err) {
     return json(500, { error: err instanceof Error ? err.message : "unknown error" });
   }

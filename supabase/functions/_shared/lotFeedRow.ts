@@ -9,9 +9,12 @@
 // failure mode a hand-picked projection produces: a field the feed forgot is
 // indistinguishable from a vehicle that has no value for it.
 //
-// So the shape is allow-by-default. The row goes out as it is, minus a
-// denylist that has to be written deliberately. A column added to
-// vehicle_listings reaches the consumer on its own.
+// That lesson is kept: identity fields are set explicitly below and counted when
+// missing. But the row itself is no longer allow-by-default. It goes out through
+// the explicit allowlist in publicListingProjection.ts, because the same
+// default shipped dealer-only market intelligence (price percentile, price-cut
+// counts, fee internals, ref_price) to every consumer. LOT_FEED_DENY is kept as
+// the record of what must never ship; the allowlist is what enforces it.
 // ──────────────────────────────────────────────────────────────────────
 
 // deno-lint-ignore-file no-explicit-any
@@ -20,6 +23,7 @@ import {
   deriveRecallView,
   type RecallRowInput,
 } from "./factorySticker/lib/vehicleTruth/recallView.ts";
+import { projectPublicListing } from "./publicListingProjection.ts";
 
 /** Never leaves the building. Everything else does. */
 export const LOT_FEED_DENY = new Set([
@@ -349,11 +353,9 @@ export function shapeLotRow(
   const mc = (row?.mc_attributes || {}) as Record<string, unknown>;
   const { year, make, model } = lotIdentity(row, file);
 
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(row || {})) {
-    if (LOT_FEED_DENY.has(k)) continue;
-    out[k] = v;
-  }
+  // Explicit allowlist (publicListingProjection.ts), not the old row-minus-
+  // denylist. A column or JSON key nobody named does not reach the consumer.
+  const out: Record<string, unknown> = projectPublicListing(row, { forFeed: true });
 
   // Identity, discrete. `ymm` stays exactly as it is — it is the display title.
   out.year = year;
@@ -373,7 +375,12 @@ export function shapeLotRow(
   // off mc_attributes and so does this, from the same place, so the two cannot
   // disagree about what a car stickered for.
   out.msrp = num(mc.msrp);
+  // A provider ESTIMATE of this VIN's market value, not a sale price or an
+  // appraisal. The label and our retrieval time travel with it so a consumer
+  // cannot present it as fact; no provider observation time is stored.
   out.market_value = num(row?.market_value);
+  out.market_value_label = "Estimated market value";
+  out.market_value_retrieved_at = typeof row?.market_checked_at === "string" ? row.market_checked_at : null;
   // Stated, never computed. A savings figure derived from msrp - price would be
   // our arithmetic presented as the dealership's claim.
   out.savings = num(row?.dealer_discount);

@@ -55,8 +55,8 @@ describe("VIN decode receipts: minimal, exact-VIN, read-only", () => {
     expect(block).not.toMatch(/fetch\(|marketcheck|neovin\/|functions\.invoke/i);
     // A failure ships no receipts rather than raw rows.
     expect(block).toMatch(/catch \{ row\.vin_decode_receipts = \[\]; \}/);
-    // The receipts are attached before the final deny sweep, which stays in place.
-    expect(view.indexOf("vin_decode_receipts")).toBeLessThan(view.indexOf("for (const k of PUBLIC_VIEW_DENY) delete"));
+    // The receipts are attached before the allowlist projection, which names the key.
+    expect(view.indexOf("vin_decode_receipts")).toBeLessThan(view.indexOf("shipped = projectPublicListing(row)"));
     expect(PUBLIC_VIEW_DENY.has("vin_decode_receipts")).toBe(false);
   });
 
