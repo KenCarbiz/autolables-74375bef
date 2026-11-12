@@ -36,6 +36,7 @@ export const FORBIDDEN_SOLD_PHRASES = [
   "sold price",
   "sale price of similar",
   "recently sold for",
+  "recently sold in",
 ] as const;
 
 const normalize = (s: unknown): string => String(s ?? "").toLowerCase().replace(/\s+/g, " ");
