@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { collectAll, readMirror, TRUTH_PREFIX } from "../../../scripts/sync-edge-sticker-lib.mjs";
+import { collectAll, INTELLIGENCE_PREFIX, readMirror, TRUTH_PREFIX, WARRANTY_PREFIX } from "../../../scripts/sync-edge-sticker-lib.mjs";
 
 // Supabase ships only supabase/functions/ to the edge runtime, so the
 // orchestrator cannot import the engine out of src/ — a deploy fails
@@ -28,6 +28,12 @@ describe("edge factory-sticker mirror", () => {
     expect(truth).toContain(`${TRUTH_PREFIX}ingest.ts`);
     // Rewritten on copy: inside lib/vehicleTruth the engine is one level up.
     expect(mirror.get(`${TRUTH_PREFIX}snapshot.ts`)).not.toContain("../factorySticker/");
+  });
+
+  it("mirrors the MarketPass assessment the marketpass-assessment function serves", () => {
+    expect(mirror.has(`${INTELLIGENCE_PREFIX}marketPass/handler.ts`)).toBe(true);
+    expect(mirror.has(`${INTELLIGENCE_PREFIX}readModels/listingFacts.ts`)).toBe(true);
+    expect(mirror.has(`${WARRANTY_PREFIX}inServiceEvidence.ts`)).toBe(true);
   });
 
   it("carries no file the source no longer has", () => {

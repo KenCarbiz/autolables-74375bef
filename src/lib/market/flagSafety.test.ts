@@ -39,8 +39,9 @@ function productionFiles(dir: string, out: string[] = []): string[] {
 }
 
 const FILES = ROOTS.flatMap((r) => productionFiles(r));
+const SOURCES = new Map(FILES.map((f) => [f, readFileSync(f, "utf8")] as const));
 const readersOf = (flag: string): string[] =>
-  FILES.filter((f) => new RegExp(`readMarketFlag\\([^)]*"${flag}"\\)`).test(readFileSync(f, "utf8")));
+  FILES.filter((f) => new RegExp(`readMarketFlag\\([^)]*"${flag}"\\)`).test(SOURCES.get(f) ?? ""));
 
 /**
  * The audited state. A RECORD, not a target: when a reader is implemented, the

@@ -37,6 +37,13 @@ export const VEHICLE_FILE_PREFIX = "vehicleFile/";
 // one directory up from lib/market/, where the flattened engine lives.
 export const MARKET_SOURCE_DIR = join(root, "src/lib/market");
 export const MARKET_PREFIX = "market/";
+// The intelligence layer (MarketPass and the shadow scorers) imports the market
+// engine, the truth layer and one warranty helper as siblings; all three land
+// as siblings of lib/intelligence/ too, so its imports resolve unchanged.
+export const INTELLIGENCE_SOURCE_DIR = join(root, "src/lib/intelligence");
+export const INTELLIGENCE_PREFIX = "intelligence/";
+export const WARRANTY_FILES = ["inServiceEvidence.ts"];
+export const WARRANTY_PREFIX = "warranty/";
 const rewriteEngineImports = (body) => body.replace(/from "\.\.\/factorySticker\//g, 'from "../');
 
 const SKIP_DIRS = new Set(["__fixtures__", "__snapshots__", "__acceptance__"]);
@@ -67,7 +74,7 @@ export function collect(dir, base = dir, out = new Map(), withHeader = true) {
   return out;
 }
 
-/** Every file the mirror should contain: the engine, the truth layer, shared document primitives, the Vehicle File read model, and the market engine. */
+/** Every file the mirror should contain: the engine, the truth layer, shared document primitives, the Vehicle File read model, the market engine, and the intelligence layer. */
 export function collectAll() {
   const out = collect(SOURCE_DIR);
   const truth = collect(TRUTH_SOURCE_DIR, TRUTH_SOURCE_DIR, new Map(), false);
@@ -88,6 +95,14 @@ export function collectAll() {
   for (const [rel, body] of vehicleFile) {
     const key = VEHICLE_FILE_PREFIX + rel;
     out.set(key, HEADER.replace("{src}", `src/lib/vehicleFile/${rel}`) + rewriteEngineImports(body));
+  }
+  const intelligence = collect(INTELLIGENCE_SOURCE_DIR, INTELLIGENCE_SOURCE_DIR, new Map(), false);
+  for (const [rel, body] of intelligence) {
+    out.set(INTELLIGENCE_PREFIX + rel, HEADER.replace("{src}", `src/lib/intelligence/${rel}`) + body);
+  }
+  for (const name of WARRANTY_FILES) {
+    const body = readFileSync(join(root, "src/lib/warranty", name), "utf8");
+    out.set(WARRANTY_PREFIX + name, HEADER.replace("{src}", `src/lib/warranty/${name}`) + body);
   }
   return out;
 }
