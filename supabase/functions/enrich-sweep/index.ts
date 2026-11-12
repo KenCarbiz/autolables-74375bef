@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { shouldDecodeVin, MAX_SPEC_ATTEMPTS } from "../_shared/factorySticker/lib/sourceData.ts";
 import { invokeFunction } from "../_shared/invoke.ts";
+import { readCallPolicy } from "../_shared/marketcheck/callPolicy.ts";
 
 // Allow a signed-in platform admin to trigger the sweep from the app,
 // mirroring specs-backfill's pattern. Verifies via admin.auth.getUser then
@@ -222,6 +223,10 @@ serve(async (req) => {
   const body = await req.json().catch(() => ({})) as { sweep_start?: string; depth?: number };
   const sweepStart = body.sweep_start || new Date().toISOString();
   const depth = typeof body.depth === "number" ? body.depth : 0;
+
+  if (!readCallPolicy().scheduledRefresh) {
+    return json(200, { ok: true, skipped: "scheduled_refresh_disabled", depth });
+  }
 
   // One sweep at a time. Each hop re-takes the lock and extends it, so the run
   // holds it start to finish while an expiry still releases it if a hop dies.

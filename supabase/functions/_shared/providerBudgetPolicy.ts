@@ -151,7 +151,9 @@ export interface AdmitResult {
   monthCalls: number | null;
   cap: number | null;
   reserve: number | null;
-  reason: AdmissionReason | "gate_unavailable";
+  reason: AdmissionReason | "gate_unavailable" | "call_policy";
+  /** Which MarketCheck call-policy rule refused, when one did. */
+  policyReason?: string | null;
   /** The account-wide reservation (migration 0007), when one was taken. */
   accountRequestId?: string | null;
   /** Why the account coordinator refused, when it did. */
