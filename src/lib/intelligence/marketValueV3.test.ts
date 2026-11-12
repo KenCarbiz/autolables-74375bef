@@ -94,6 +94,13 @@ describe("what lowers confidence", () => {
     expect(r.confidenceReasons).toContain("comparable_tier_relaxed:trim_year_band>year_band");
   });
 
+  it("the starting tier alone is not a relaxation, so it does not cap confidence", () => {
+    // selectTier always records the tier it started at; one entry means no step down.
+    const r = buildMarketValueV3(base({ comparables: comps({ relaxationSteps: ["A: 5 qualified"] }) }));
+    expect(r.confidence).toBe("high");
+    expect(r.confidenceReasons.some((x) => x.startsWith("comparable_tier_relaxed"))).toBe(false);
+  });
+
   it("material provider disagreement, which is set aside rather than averaged, and flagged", () => {
     const r = buildMarketValueV3(base({ provider: provider(36000) }));
     expect(r.providerAgreement).toBe("disagree");

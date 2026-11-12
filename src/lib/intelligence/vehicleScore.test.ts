@@ -209,3 +209,22 @@ describe("labels", () => {
     expect(r.label).toBe("Excellent");
   });
 });
+
+describe("a title review that is only missing evidence", () => {
+  const gapOnly = () => verifiedTitle({ state: "REVIEW_REQUIRED", odometerStatus: "not_checked", reasons: ["report_missing_odometer"] });
+
+  it("is recorded as missing evidence, not deducted as adverse, and keeps the score out of public view", () => {
+    const r = buildVehicleScore(fullInput({ titleOdometer: gapOnly() }));
+    const integrity = domain(r, "integrity");
+    expect(integrity.adverse).not.toContain("title_review_required");
+    expect(integrity.missing).toContain("title_report_evidence_gap");
+    expect(r.reasons).toContain("public_ineligible:title_not_verified");
+    expect(r.publication).not.toBe("eligible");
+  });
+
+  it("a review with a substantive reason is still deducted", () => {
+    const r = buildVehicleScore(fullInput({ titleOdometer: verifiedTitle({ state: "REVIEW_REQUIRED", reasons: ["report_missing_odometer", "title_brand_unclear"] }) }));
+    expect(domain(r, "integrity").adverse).toContain("title_review_required");
+  });
+});
+

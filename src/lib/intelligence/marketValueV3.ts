@@ -27,7 +27,7 @@ import {
   resolveFreshness, type GeographyScope, type MarketValueV3, type ProviderAgreement, type ValuationSignal,
 } from "./contracts.ts";
 
-export const MARKET_VALUE_V3_VERSION = "market-value-v3.1.0-shadow";
+export const MARKET_VALUE_V3_VERSION = "market-value-v3.1.1-shadow";
 
 /** A value older than this is a stale baseline; the used policy refreshes on this cadence. */
 export const MARKET_VALUE_V3_TTL_DAYS = 7;
@@ -355,7 +355,9 @@ export function buildMarketValueV3(input: MarketValueV3Input, options: MarketVal
     });
     confidence = v2.confidence;
     confidenceReasons.push(...v2.reasons);
-    if (comps.relaxationSteps.length) {
+    // selectTier records the tier it starts at as step one, so one step
+    // means the tightest tier answered; relaxation is a second step onward.
+    if (comps.relaxationSteps.length > 1) {
       confidence = capConfidence(confidence, "medium");
       confidenceReasons.push(`comparable_tier_relaxed:${comps.relaxationSteps.join(">")}`);
     }

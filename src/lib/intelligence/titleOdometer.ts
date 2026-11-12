@@ -266,3 +266,18 @@ export function classifyTitleOdometer(input: TitleOdometerInput, options: TitleO
 
 /** Words a public title statement may never contain (section 16). */
 export const FORBIDDEN_TITLE_WORDS = /\b(clean|guarantee[ds]?|owners?|accidents?)\b/i;
+
+/** Review reasons that say evidence is missing or old, not that anything adverse was found. */
+export const TITLE_EVIDENCE_GAP_REASONS = ["report_older_than_ttl", "report_incomplete", "report_missing_odometer"] as const;
+
+/**
+ * True when a REVIEW_REQUIRED title is in review only because the report is
+ * old, incomplete or carries no odometer reading. That is an evidence gap,
+ * to be treated like an unverified title, never as a title brand.
+ */
+export function titleReviewIsEvidenceGapOnly(t: Pick<TitleOdometerSummary, "state" | "odometerStatus" | "reasons">): boolean {
+  if (t.state !== "REVIEW_REQUIRED" || t.odometerStatus === "conflict" || t.odometerStatus === "rollback_indicated") return false;
+  const gap = TITLE_EVIDENCE_GAP_REASONS as readonly string[];
+  if (!t.reasons.some((r) => gap.includes(r))) return false;
+  return t.reasons.every((r) => gap.includes(r) || (r.startsWith("odometer_") && r !== "odometer_conflict"));
+}
