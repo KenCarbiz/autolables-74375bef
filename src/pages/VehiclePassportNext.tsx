@@ -25,6 +25,8 @@ import { deriveVerificationReport } from "@/lib/passport/verificationSummary";
 import { buildNextPassportData, buildNextPassportDealer } from "@/lib/passport/nextPassportData";
 import { trackCustomerEngagement, trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
 import PassportNextLayout from "@/components/passport/next/PassportNextLayout";
+import { useMarketPassAssessment } from "@/hooks/useMarketPassAssessment";
+import { previewMarketPassContract } from "@/lib/passport/marketPassPreview";
 import { MOCK_LISTING, MOCK_NEW_2026, MOCK_SPARSE, MOCK_NEW_MSRP, MOCK_USED_FEE } from "./VehiclePassportV3";
 import { MOCK_REVIEW_LISTING } from "./VehiclePassportVerification";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
@@ -83,6 +85,16 @@ export default function VehiclePassportNext() {
   const { listing, loading, notFound } = usePublicListing(rawSlug, { preview: isPreview, previewData });
   const { sticker } = usePublishedWindowSticker(listing?.slug || rawSlug, !isPreview);
 
+  // MarketPass V2 is opt-in on this draft page (?marketpass=1) and, live, also
+  // needs the dealer's marketpass_v2 flag, which the edge function enforces.
+  const wantsMarketPass = search.get("marketpass") === "1";
+  const liveMarketPass = useMarketPassAssessment(listing?.slug || rawSlug, wantsMarketPass && !isPreview && !!listing);
+  const marketPass = useMemo(() => {
+    if (!wantsMarketPass) return null;
+    if (isPreview) return { contract: previewMarketPassContract(scenario), synthetic: true };
+    return liveMarketPass ? { contract: liveMarketPass, synthetic: false } : null;
+  }, [wantsMarketPass, isPreview, scenario, liveMarketPass]);
+
   const built = useMemo(() => {
     if (!listing) return null;
     const d = derivePassport(listing);
@@ -121,6 +133,7 @@ export default function VehiclePassportNext() {
       <PassportNextLayout
         data={built.data}
         dealer={built.dealer}
+        marketPass={marketPass}
         onEvent={(name, payload) => {
           // Reuses the existing engagement pipeline. Tagged passport_version
           // "next" so draft traffic can never be mistaken for live passport
