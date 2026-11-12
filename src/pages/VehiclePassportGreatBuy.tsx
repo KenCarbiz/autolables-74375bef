@@ -366,7 +366,7 @@ const VehiclePassportGreatBuy = () => {
   if (isNew) why.push("New — you are the first owner");
   if (premium) why.push(`Premium trim — ${listing.trim}`);
   if (oemVerified) why.push("OEM data verified");
-  if (d.belowMarket && d.belowMarket > 0) why.push(`Priced ${fmt$(d.belowMarket)} below market`);
+  if (d.belowMarket && d.belowMarket > 0) why.push(`Priced ${fmt$(d.belowMarket)} below the estimated market value`);
   if (d.saveVsMsrp) why.push(`${fmt$(d.saveVsMsrp)} below MSRP`);
   else if (d.belowOriginalMsrp) why.push(`${fmt$(d.belowOriginalMsrp)} below original MSRP`);
   if (topPct) why.push(topPct);
@@ -418,17 +418,17 @@ const VehiclePassportGreatBuy = () => {
     // can never be read as the normalized VIN-level value or vice versa.
     { k: "Price", v: d.price != null ? fmt$(d.price) : "—", m: priceAboveAnchor ? (gbSheet?.estValue ? `Carries ${fmt$(gbSheet.estValue)} in factory packages the average comparable may not include` : "Priced to today's market for its trim") : priceComparison ? `${fmt$(priceComparison.value)} · ${priceComparison.label}${priceComparison.key === "comparable_listing_average" && d.marketMeta.trimMatched === false && listing.trim ? " (all trims)" : ""}` : isPreview ? "$71,400" : "", a: priceAboveAnchor ? null : priceAdv },
     sold.soldPrice && d.marketMeta.soldPriceMedian != null
-      ? { k: "Typical Sold Price", v: d.price != null ? fmt$(d.price) : "—", m: `${fmt$(d.marketMeta.soldPriceMedian)} (sold median, 90 days)`, a: { text: `${fmt$(sold.soldPrice.amount)} below`, good: true } }
+      ? { k: "Last Advertised Price (exited listings)", v: d.price != null ? fmt$(d.price) : "—", m: `${fmt$(d.marketMeta.soldPriceMedian)} (median last advertised price of similar listings that left the market)`, a: { text: `${fmt$(sold.soldPrice.amount)} below`, good: true } }
       : null,
     { k: "Mileage", v: listing.mileage != null ? `${listing.mileage.toLocaleString()} mi` : "—", m: avgCompMiles != null ? `${avgCompMiles.toLocaleString()} mi` : isPreview ? "24,000 mi" : "", a: avgCompMiles != null && listing.mileage != null ? (listing.mileage < avgCompMiles ? { text: "Lower mileage", good: true } : null) : isPreview ? { text: "Lower mileage", good: true } : null },
     sold.milesAdv && listing.mileage != null && d.marketMeta.soldMilesMedian != null
-      ? { k: "Miles vs Sold", v: `${listing.mileage.toLocaleString()} mi`, m: `${Math.round(d.marketMeta.soldMilesMedian).toLocaleString()} mi (sold median)`, a: { text: "Under sold median", good: true } }
+      ? { k: "Miles vs Exited Listings", v: `${listing.mileage.toLocaleString()} mi`, m: `${Math.round(d.marketMeta.soldMilesMedian).toLocaleString()} mi (median of exited listings)`, a: { text: "Under exited-listing median", good: true } }
       : null,
     d.dom != null && d.marketMeta.avgDom != null && d.marketMeta.avgDom <= CREDIBLE_AVG_DOM_MAX && d.dom <= d.marketMeta.avgDom
       ? { k: "Market Days", v: `${d.dom} days`, m: `${d.marketMeta.avgDom} days`, a: d.dom < d.marketMeta.avgDom ? { text: "Shorter time", good: true } : null }
       : null,
     sold.velocity && d.dom != null && d.marketMeta.soldDomMedian != null && d.dom < d.marketMeta.soldDomMedian
-      ? { k: "Days to Sell", v: `${d.dom} days listed`, m: `~${Math.round(d.marketMeta.soldDomMedian)} days (sold median)`, a: { text: "Moving faster", good: true } }
+      ? { k: "Days Listed vs Exited Listings", v: `${d.dom} days listed`, m: `~${Math.round(d.marketMeta.soldDomMedian)} days (median days listed, exited listings)`, a: { text: "Listed fewer days", good: true } }
       : null,
     trimCount != null && trimCount <= 5
       ? { k: "Availability", v: `1 of ${trimCount}`, m: "Builds like this nearby", a: trimCount <= 3 || sameTrimComps.length <= 2 ? { text: "Rare build", good: true } : null }
@@ -473,7 +473,7 @@ const VehiclePassportGreatBuy = () => {
   const subjectPros = [
     d.ownerCount === 1 ? "One owner" : isNew ? "New — first owner" : null,
     gbSheet?.estValue ? "Better equipment" : null,
-    d.belowMarket && d.belowMarket > 0 ? "Below market price" : null,
+    d.belowMarket && d.belowMarket > 0 ? "Below estimated market value" : null,
     d.warrantyStr && !d.warrantyExpired ? "Warranty remains" : null,
     avgCompMiles != null && listing.mileage != null && listing.mileage < avgCompMiles ? "Lower mileage" : null,
   ].filter(Boolean).slice(0, 3) as string[];
@@ -489,7 +489,7 @@ const VehiclePassportGreatBuy = () => {
   const buyNow: string[] = [];
   if (gbSheet?.estValue) buyNow.push(`Built with ${fmt$(gbSheet.estValue)} in valuable factory packages.`);
   if (d.ownerCount === 1) buyNow.push("One-owner vehicles like this are becoming harder to find.");
-  if (d.belowMarket && d.belowMarket > 0) buyNow.push("Priced below the market average right now.");
+  if (d.belowMarket && d.belowMarket > 0) buyNow.push("Priced below the estimated market value.");
   if (sold.velocity) buyNow.push(`${sold.velocity}.`);
   if (d.saveVsMsrp) buyNow.push(`Priced ${fmt$(d.saveVsMsrp)} below MSRP.`);
   if (d.dom != null && d.marketMeta.avgDom != null && d.marketMeta.avgDom <= CREDIBLE_AVG_DOM_MAX && d.dom < d.marketMeta.avgDom) buyNow.push("Market days are favorable compared with similar listings.");

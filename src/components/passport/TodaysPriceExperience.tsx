@@ -169,7 +169,7 @@ const PriceTransparencyCard = ({ listing, d }: { listing: VehicleListing; d: Pas
   const optionsValue = readBuildSheet(listing)?.estValue ?? null;
   const includedCoverage = d.dealerCoverage.find((c) => c.mode === "included" && c.title) ?? null;
   const recap: string[] = [
-    ...(d.belowMarket && d.belowMarket > 0 ? [`${fmt$(d.belowMarket)} below market`] : []),
+    ...(d.belowMarket && d.belowMarket > 0 ? [`${fmt$(d.belowMarket)} est. below market`] : []),
     ...(optionsValue ? [`${fmt$(optionsValue)} in factory options`] : []),
     ...(includedCoverage ? [`${includedCoverage.title} included`] : []),
   ].slice(0, 3);

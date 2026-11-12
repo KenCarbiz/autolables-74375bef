@@ -67,12 +67,12 @@ describe("Demand & Velocity — skewed avg_dom governance", () => {
 
   it("still cites the average when it sits in a credible band", () => {
     const lines = demandEvidence({ dom: 17, avg_dom: 40 });
-    expect(lines.some((l) => l.includes("17 days listed vs a 40-day market average"))).toBe(true);
+    expect(lines.some((l) => l.includes("17 days listed vs a 40-day average for comparable listings"))).toBe(true);
   });
 
   it("boundary: an average exactly at the credibility ceiling is usable", () => {
     const lines = demandEvidence({ dom: 20, avg_dom: CREDIBLE_AVG_DOM_MAX });
-    expect(lines.some((l) => l.includes(`${CREDIBLE_AVG_DOM_MAX}-day market average`))).toBe(true);
+    expect(lines.some((l) => l.includes(`${CREDIBLE_AVG_DOM_MAX}-day average for comparable listings`))).toBe(true);
   });
 
   it("skewed average with a not-fresh listing yields no fabricated benchmark line", () => {

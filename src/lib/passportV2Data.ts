@@ -265,6 +265,10 @@ export interface PassportData {
     soldCount: number | null; soldPriceMedian: number | null; soldDomMedian: number | null; soldMilesMedian: number | null;
     soldScope: string | null; soldState: string | null; soldCheckedAt: string | null;
     soldDisplayable: boolean;
+    // Comparable cohort record written by the enrich pass; null when the
+    // stored comps predate price-independent selection.
+    cohort: CompCohort | null;
+    analyzedCount: number | null;
   };
   comparables: { vin?: string | null; ymm?: string | null; trim?: string | null; miles?: number | null; price?: number | null; dist?: number | null; dealer?: string | null; dom?: number | null; image?: string | null }[];
   blackbook: { tradeinClean: number | null; retailClean: number | null; wholesaleClean: number | null; available: boolean } | null;
@@ -454,6 +458,72 @@ export const computePriceHistory = (listing: VehicleListing): { valueHistory: Pr
   return { valueHistory, priceChange7d, priceChangeTotal, priceChangeLatest };
 };
 
+export interface CompCohort {
+  selection: string;
+  total_matches: number | null;
+  returned_count: number;
+  analyzed_count: number;
+  sampled: boolean;
+  sort_basis: string;
+  radius_miles: number | null;
+  year: string | null;
+  trim: string | null;
+  miles_band: { percent: number | null; range: string } | null;
+  excluded: { subject_vin: number; dealer_own_listings: number; unpriced: number; trim_or_drivetrain_mismatch?: number; outliers: number };
+  outlier_rule: string;
+  median_method: string;
+}
+
+const readCohort = (v: unknown): CompCohort | null => {
+  if (!v || typeof v !== "object") return null;
+  const c = v as Record<string, unknown>;
+  if (c.selection !== "price_independent_cohort" || typeof c.analyzed_count !== "number") return null;
+  return c as unknown as CompCohort;
+};
+
+/**
+ * The customer-readable account of which listings were compared: cohort,
+ * geography, trim, mileage, exclusions and sample size. Every line comes from
+ * the stored cohort record, so a payload without one explains nothing rather
+ * than assuming the comparison was tight.
+ */
+export const cohortExplanation = (c: CompCohort): string[] => {
+  const out: string[] = [];
+  const total = c.total_matches;
+  out.push(total != null && total > c.analyzed_count
+    ? `${c.analyzed_count.toLocaleString()} listings analyzed out of ${total.toLocaleString()} matching listings${c.sampled ? " (a nearest-first sample)" : ""}`
+    : `${c.analyzed_count.toLocaleString()} listings analyzed`);
+  const crit: string[] = [];
+  if (c.year) crit.push(`model year ${c.year}`);
+  crit.push(c.trim ? `trim ${c.trim}` : "all trims");
+  if (c.miles_band) crit.push(`mileage within the ${c.miles_band.range.replace("-", " to ")} mile band`);
+  out.push(`Selected by ${crit.join(", ")}${c.radius_miles != null ? `, within ${c.radius_miles} miles` : ", no distance limit"}; chosen without reference to this vehicle's price`);
+  const ex: string[] = [];
+  if (c.excluded.subject_vin > 0) ex.push("this vehicle");
+  if (c.excluded.dealer_own_listings > 0) ex.push(`${c.excluded.dealer_own_listings} of this dealer's own listings`);
+  if (c.excluded.unpriced > 0) ex.push(`${c.excluded.unpriced} without a price`);
+  if ((c.excluded.trim_or_drivetrain_mismatch ?? 0) > 0) ex.push(`${c.excluded.trim_or_drivetrain_mismatch} with a different trim or drivetrain`);
+  if (c.excluded.outliers > 0) ex.push(`${c.excluded.outliers} statistical outliers`);
+  if (ex.length) out.push(`Excluded: ${ex.join(", ")}`);
+  return out;
+};
+
+/**
+ * Total search matches and records actually analyzed are different numbers.
+ * `analyzed` is true only when the stored cohort says how many records the
+ * statistics were built on; otherwise only the provider's match count is
+ * known and it is shown as matches, never as "analyzed".
+ */
+export const compSampleView = (m: PassportData["marketMeta"]): { analyzed: boolean; n: number | null; total: number | null; caption: string } => {
+  const where = m.radius != null ? `within ${m.radius} mi` : "nearby";
+  if (m.analyzedCount != null) {
+    const total = m.cohort?.total_matches ?? m.similarCount;
+    return { analyzed: true, n: m.analyzedCount, total, caption: total != null && total > m.analyzedCount ? `of ${total.toLocaleString()} matches, ${where}` : where };
+  }
+  if (m.similarCount != null) return { analyzed: false, n: m.similarCount, total: m.similarCount, caption: `${where}; not all analyzed` };
+  return { analyzed: false, n: null, total: null, caption: where };
+};
+
 export const derivePassport = (listing: VehicleListing): PassportData => {
   const dealer = (listing.dealer_snapshot || {}) as Record<string, unknown>;
   const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
@@ -490,8 +560,10 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     likeCount: n(mm.like_count), likeMedian: n(mm.like_median),
     soldCount, soldPriceMedian: n(ss.price_median), soldDomMedian: n(ss.dom_median), soldMilesMedian: n(ss.miles_median),
     soldScope, soldState: (ss.state as string) || null, soldCheckedAt,
-    // Make-level scope is too loose for a customer claim, and stale sold data
-    // must age out rather than keep asserting "last 90 days".
+    cohort: readCohort(mm.cohort),
+    analyzedCount: readCohort(mm.cohort)?.analyzed_count ?? null,
+    // Make-level scope is too loose for a customer claim, and stale exit data
+    // must age out; the provider reports no window, so none is claimed.
     soldDisplayable: soldScope != null && soldScope !== "make_state" && soldCount != null && soldCount >= 5
       && soldCheckedAt != null && Date.now() - new Date(soldCheckedAt).getTime() <= 45 * 86400000,
   };
@@ -990,7 +1062,7 @@ export const deriveRating = (listing: VehicleListing, d: PassportData): VehicleR
     // (floor 55) — continuous, so a $200 move can never flip a whole band.
     priceScore = clampScore(55, 98, 80 - pct * 2);
     if (soldAnchor != null) {
-      priceEvidence.push(`Median last advertised price of ${m.soldCount!.toLocaleString()} inferred sold listings in ${m.soldState ?? "your state"}, 90 days`);
+      priceEvidence.push(`Median last advertised price of ${m.soldCount!.toLocaleString()} listings that left the market in ${m.soldState ?? "your state"}`);
     } else if (likeAnchor != null || statsAnchor != null || (!d.marketBasisWeak && d.marketAvg != null)) {
       priceEvidence.push(likeAnchor != null && m.likeCount != null
         ? `Checked against ${m.likeCount.toLocaleString()} closely matched listings${m.radius != null ? ` within ${m.radius} miles` : ""}`
@@ -1019,7 +1091,7 @@ export const deriveRating = (listing: VehicleListing, d: PassportData): VehicleR
   const demandInputs: { score: number; line: string }[] = [];
   if (m.soldDisplayable && m.soldDomMedian != null && m.soldDomMedian >= 1) {
     const sd = Math.round(m.soldDomMedian);
-    demandInputs.push({ score: sd <= 30 ? 90 : sd <= 45 ? 80 : sd <= 60 ? 68 : 55, line: `Similar vehicles typically sell in ~${sd} days here` });
+    demandInputs.push({ score: sd <= 30 ? 90 : sd <= 45 ? 80 : sd <= 60 ? 68 : 55, line: `Similar listings were typically listed ~${sd} days before leaving the market here` });
   }
   // avg_dom is the mean age of ACTIVE listings — a right-skewed figure that a
   // handful of stale listings can drag to 150+ days. Anchoring "vs a 154-day
@@ -1030,7 +1102,7 @@ export const deriveRating = (listing: VehicleListing, d: PassportData): VehicleR
     const credibleAvg = m.avgDom <= CREDIBLE_AVG_DOM_MAX ? m.avgDom : null;
     if (credibleAvg != null) {
       const r = d.dom / credibleAvg;
-      demandInputs.push({ score: r <= 0.5 ? 90 : r <= 1 ? 78 : r <= 1.5 ? 60 : 48, line: `${d.dom} days listed vs a ${credibleAvg}-day market average` });
+      demandInputs.push({ score: r <= 0.5 ? 90 : r <= 1 ? 78 : r <= 1.5 ? 60 : 48, line: `${d.dom} days listed vs a ${credibleAvg}-day average for comparable listings` });
     } else if (d.dom <= 30) {
       demandInputs.push({ score: d.dom <= 14 ? 82 : 70, line: `Listed ${d.dom} days — fresh to market` });
     }
@@ -1038,9 +1110,8 @@ export const deriveRating = (listing: VehicleListing, d: PassportData): VehicleR
   if (m.daysSupply != null) {
     demandInputs.push({ score: m.daysSupply < 30 ? 88 : m.daysSupply < 60 ? 72 : 55, line: `${Math.round(m.daysSupply)}-day local supply of similar vehicles` });
   }
-  if (d.viewCount != null && d.viewCount >= 5) {
-    demandInputs.push({ score: clampScore(40, 95, 40 + d.viewCount), line: `${d.viewCount.toLocaleString()} shoppers have viewed this vehicle` });
-  }
+  // Passport page views are traffic to this page, not market demand; they are
+  // intentionally not an input here.
   const demandScore = demandInputs.length
     ? clampScore(5, 95, demandInputs.reduce((a, b) => a + b.score, 0) / demandInputs.length)
     : null;
@@ -1177,23 +1248,23 @@ export const deriveSoldClaims = (d: PassportData, mileage: number | null, condit
   // Inferred-sold vocabulary (change order §5): a listing that left the market
   // is an inferred sale and its figure is the last ADVERTISED price, never a
   // transaction price. soldLanguage.test.ts scans this file for the wording.
-  const velocity = `${m.soldCount.toLocaleString()} ${noun} inferred sold in ${m.soldState} in the last 90 days`;
+  const velocity = `${m.soldCount.toLocaleString()} ${noun} left the market in ${m.soldState} (listing records, not confirmed sales)`;
   const aboveMarket = d.marketAvg != null && d.price != null && d.price > d.marketAvg;
   const soldPrice = m.soldCount >= 10 && m.soldScope === "model_year_state" && m.soldPriceMedian != null
     && d.price != null && d.price <= m.soldPriceMedian * 0.97
     && (mileage == null || m.soldMilesMedian == null || mileage <= m.soldMilesMedian * 1.25)
     && !aboveMarket
     ? {
-        headline: `Priced ${fmt$(m.soldPriceMedian - d.price)} below the typical last advertised price before sale`,
-        sub: `Median last advertised price of ${m.soldCount.toLocaleString()} inferred sold listings in ${m.soldState}, last 90 days`,
+        headline: `Priced ${fmt$(m.soldPriceMedian - d.price)} below the typical last advertised price of similar listings that left the market`,
+        sub: `Median last advertised price of ${m.soldCount.toLocaleString()} listings that left the market in ${m.soldState}; advertised prices, not transaction prices`,
         amount: m.soldPriceMedian - d.price,
       }
     : null;
   const sellTime = m.soldDomMedian != null && m.soldDomMedian >= 1 && m.soldDomMedian <= 60
-    ? `Similar vehicles typically leave the market within ~${Math.round(m.soldDomMedian)} days here`
+    ? `Similar listings typically left the market after ~${Math.round(m.soldDomMedian)} days listed here`
     : null;
   const milesAdv = mileage != null && m.soldMilesMedian != null && m.soldMilesMedian >= mileage * 1.15
-    ? `${mileage.toLocaleString()} miles — under the ${Math.round(m.soldMilesMedian).toLocaleString()}-mile median of recently inferred sold listings`
+    ? `${mileage.toLocaleString()} miles — under the ${Math.round(m.soldMilesMedian).toLocaleString()}-mile median of similar listings that left the market`
     : null;
   return { velocity, soldPrice, sellTime, milesAdv };
 };

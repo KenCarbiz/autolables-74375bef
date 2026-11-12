@@ -16,6 +16,8 @@ export const APPROVED_SOLD_PHRASES = [
   "inferred sold",
   "inferred market exit",
   "left the market",
+  "listings that left the market",
+  "recently removed listings",
   "advertised price before inferred sale",
 ] as const;
 
@@ -78,3 +80,29 @@ export const FORBIDDEN_COLUMN_FRAGMENTS = ["transaction_price", "actual_sale_pri
 
 export const isAcceptableSoldColumnName = (name: string): boolean =>
   !FORBIDDEN_COLUMN_FRAGMENTS.some((f) => name.toLowerCase().includes(f));
+
+/**
+ * Customer copy built on /search/car/recents exits. That call is made without
+ * sold=true, so an exit may be a sale or an expiry, and the stored record
+ * carries no provider-reported window. Customer copy therefore may not say a
+ * vehicle sold, nor name a period.
+ */
+export const CUSTOMER_UNSUPPORTED_EXIT_PHRASES = [
+  "inferred sold",
+  "inferred sale",
+  "sold in",
+  "sell in",
+  "sold within",
+  "before sale",
+  "90 days",
+  "90-day",
+] as const;
+
+export function checkCustomerExitWording(copy: unknown): SoldWordingCheck {
+  const text = normalize(copy);
+  const offending = [
+    ...checkInferredSoldWording(copy).offending,
+    ...CUSTOMER_UNSUPPORTED_EXIT_PHRASES.filter((p) => text.includes(p)),
+  ];
+  return { ok: offending.length === 0, offending };
+}

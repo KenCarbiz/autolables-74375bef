@@ -15,13 +15,16 @@ describe("overall rating with adverse history", () => {
   it("rates the clean fixture at the hand-computed weighted mean", () => {
     const r = rate(base);
     const s = Object.fromEntries(r.factors.map((f) => [f.key, f.score]));
-    // Weights 30/25/15/15/15 over the five measured factors.
+    // Page views are not market demand, so the fixture has no demand evidence and
+    // that factor is unmeasured. Overall is the weighted mean of the measured
+    // factors: (87*30 + 97*25 + 94*15 + 86*15) / 85 = 7735 / 85 = 91.
+    expect(s.demand).toBeNull();
     const expected = Math.round(
-      ((s.price as number) * 30 + (s.history as number) * 25 + (s.demand as number) * 15
-        + (s.equipment as number) * 15 + (s.coverage as number) * 15) / 100,
+      ((s.price as number) * 30 + (s.history as number) * 25
+        + (s.equipment as number) * 15 + (s.coverage as number) * 15) / 85,
     );
     expect(r.overall).toBe(expected);
-    expect(r.overall).toBe(92);
+    expect(r.overall).toBe(91);
   });
 
   it("gives no overall rating to a branded title, even with a strong price", () => {

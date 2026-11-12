@@ -10,7 +10,7 @@ import {
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
 import { usePublicListing } from "@/hooks/usePublicListing";
-import { derivePassport, fmt$, historyReportName, suppressPassportMarketClaim } from "@/lib/passportV2Data";
+import { derivePassport, fmt$, historyReportName, suppressPassportMarketClaim, compSampleView } from "@/lib/passportV2Data";
 import { listingGallery } from "@/lib/photos";
 import { packetVisible } from "@/lib/packetModules";
 import { buildPassportActionPath } from "@/lib/passportReturn";
@@ -101,7 +101,7 @@ function MarketTrendChart({ listing, market, currency }: { listing: MarketSeries
   const ys = (v: number) => pad + (1 - (v - min) / span) * (h - pad * 2);
   const path = (pts: MarketSeriesPoint[]) => pts.map((p, i) => `${xs(i, pts.length).toFixed(1)},${ys(p.value).toFixed(1)}`).join(" ");
   const first = listing[0], last = listing[listing.length - 1];
-  const summary = `This vehicle's listed price moved from ${currency(first.value)} on ${first.at} to ${currency(last.value)} on ${last.at}${market.length >= 2 ? `; the normalized market value is also shown.` : "."}`;
+  const summary = `This vehicle's listed price moved from ${currency(first.value)} on ${first.at} to ${currency(last.value)} on ${last.at}${market.length >= 2 ? `; the estimated market value is also shown.` : "."}`;
   return (
     <div>
       <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ height: 150 }} role="img" aria-label={summary}>
@@ -111,7 +111,7 @@ function MarketTrendChart({ listing, market, currency }: { listing: MarketSeries
       </svg>
       <div className="mt-1 flex items-center gap-4 text-[11px]" style={{ color: "#64748B" }}>
         <span className="inline-flex items-center gap-1.5"><span className="w-4 h-0.5" style={{ background: "#2563EB" }} /> This vehicle&#39;s advertised price</span>
-        {market.length >= 2 && <span className="inline-flex items-center gap-1.5"><span className="w-4 h-0.5" style={{ background: "#94A3B8" }} /> Normalized market value</span>}
+        {market.length >= 2 && <span className="inline-flex items-center gap-1.5"><span className="w-4 h-0.5" style={{ background: "#94A3B8" }} /> Estimated market value</span>}
       </div>
       <p className="sr-only">{summary}</p>
     </div>
@@ -586,7 +586,7 @@ export default function VehiclePassportGoverned() {
   // ── Intelligence chips: derive the 3 strongest vehicle-specific reasons.
   type Chip = { label: string; tone: "green" | "blue" | "amber"; icon: React.ElementType };
   const intelChips: Chip[] = [];
-  if (purchasable && d.belowMarket != null && d.belowMarket > 250) intelChips.push({ label: `${fmt$(d.belowMarket)} Below Market`, tone: "green", icon: TrendingUp });
+  if (purchasable && d.belowMarket != null && d.belowMarket > 250) intelChips.push({ label: `${fmt$(d.belowMarket)} Est. Below Market`, tone: "green", icon: TrendingUp });
   if (d.warrantyStr && !d.warrantyExpired) intelChips.push({ label: `Factory Warranty · ${d.warrantyStr}`, tone: "blue", icon: Award });
   if (intelChips.length < 3 && d.ownerCount === 1) intelChips.push({ label: "1-Owner", tone: "blue", icon: BadgeCheck });
   if (intelChips.length < 3 && recallVerified) intelChips.push({ label: "No Open Recalls", tone: "green", icon: CheckCircle2 });
@@ -594,6 +594,7 @@ export default function VehiclePassportGoverned() {
   if (intelChips.length < 3 && d.serviceCount > 0) intelChips.push({ label: `${d.serviceCount} Service Records`, tone: "blue", icon: Award });
   const chips = intelChips.slice(0, 3);
 
+  const compSample = compSampleView(d.marketMeta);
   // ── Market position
   const marketPos = (() => {
     // A weak basis (legacy model-wide comps median — mileage/trim-blind) may
@@ -609,7 +610,7 @@ export default function VehiclePassportGoverned() {
     const high = d.marketHigh;
     const span = Math.max(1, high - low);
     const t = Math.max(0, Math.min(1, (d.price - low) / span));
-    return { t, label: d.belowMarket != null && d.belowMarket > 250 ? "Best Value" : d.belowMarket != null && d.belowMarket < -250 ? "Above Market" : "Fair Market" };
+    return { t, label: d.belowMarket != null && d.belowMarket > 250 ? "Below Est. Market" : d.belowMarket != null && d.belowMarket < -250 ? "Above Est. Market" : "Near Est. Market" };
   })();
 
   // ── Sticky CTA (existing dealer-configurable button set)
@@ -797,7 +798,8 @@ export default function VehiclePassportGoverned() {
         ];
         if (watchEnabled) actionTiles.push({ label: "Watch Price", icon: Eye, active: watchOpen, onClick: () => { if (!watchOpen) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "watch_price" } }); setWatchOpen(true); } });
 
-        // Only from a real check date — never "today" as a stand-in.
+        // Our retrieval date only. No provider observation date is stored for
+        // these values, so none is claimed; never "today" as a stand-in.
         const marketCheckedLabel = (() => {
           const iso = d.marketCheckedAt || d.marketMeta.checkedAt;
           if (!iso) return null;
@@ -994,20 +996,20 @@ export default function VehiclePassportGoverned() {
                 {/* Freshness, not methodology. A market read is only as good as
                     its date, and the shopper cannot judge it without one. */}
                 {marketCheckedLabel && (
-                  <span className="shrink-0 text-[11px] font-medium" style={{ color: SUB }}>Updated {marketCheckedLabel}</span>
+                  <span className="shrink-0 text-[11px] font-medium" style={{ color: SUB }}>Market data retrieved {marketCheckedLabel}</span>
                 )}
               </div>
               <div className={`${CARD} mt-3 p-4`}>
                 <div className="grid grid-cols-3 gap-3">
-                  <div><div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>Analyzed</div><div className="mt-1 text-[20px] font-extrabold tabular-nums" style={{ color: NAVY }}>{d.marketMeta.similarCount ?? "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.marketMeta.radius ? `within ${d.marketMeta.radius} mi` : "nearby"}</div></div>
-                  <div><div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>vs market</div><div className="mt-1 text-[20px] font-extrabold tabular-nums" style={{ color: marketPresentationTone === "positive" ? GREEN : NAVY }}>{d.belowMarket && d.belowMarket > 0 ? fmt$(d.belowMarket) : d.aboveMarket != null ? fmt$(d.aboveMarket) : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.belowMarket && d.belowMarket > 0 ? "below value" : "vs value"}</div></div>
-                  <div><div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>Days listed</div><div className="mt-1 text-[20px] font-extrabold tabular-nums" style={{ color: NAVY }}>{d.dom != null ? d.dom : d.marketMeta.avgDom != null ? d.marketMeta.avgDom : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.dom != null ? "this car" : "market avg"}</div></div>
+                  <div><div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>{compSample.analyzed ? "Analyzed" : "Matches"}</div><div className="mt-1 text-[20px] font-extrabold tabular-nums" style={{ color: NAVY }}>{compSample.n ?? "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{compSample.caption}</div></div>
+                  <div><div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>vs market</div><div className="mt-1 text-[20px] font-extrabold tabular-nums" style={{ color: marketPresentationTone === "positive" ? GREEN : NAVY }}>{d.belowMarket && d.belowMarket > 0 ? fmt$(d.belowMarket) : d.aboveMarket != null ? fmt$(d.aboveMarket) : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.belowMarket && d.belowMarket > 0 ? "below est. value" : "vs est. value"}</div></div>
+                  <div><div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>Days listed</div><div className="mt-1 text-[20px] font-extrabold tabular-nums" style={{ color: NAVY }}>{d.dom != null ? d.dom : d.marketMeta.avgDom != null ? d.marketMeta.avgDom : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.dom != null ? "this car, per listing feed" : "avg, comparable listings"}</div></div>
                 </div>
                 <div className="mt-4">
                   <div className="relative h-2.5 rounded-full" style={{ background: "linear-gradient(90deg, #DCFCE7 0%, #DBEAFE 50%, #FEE2E2 100%)" }}>
                     <span className="absolute -top-1 w-4 h-4 rounded-full border-2 border-white shadow" style={{ left: `calc(${Math.round(marketPos.t * 100)}% - 8px)`, background: NAVY }} />
                   </div>
-                  <div className="mt-2 flex justify-between text-[11px]" style={{ color: SUB }}><span>Best Value</span><span className="font-bold" style={{ color: NAVY }}>{marketPos.label}</span><span>Above Market</span></div>
+                  <div className="mt-2 flex justify-between text-[11px]" style={{ color: SUB }}><span>Below est. market</span><span className="font-bold" style={{ color: NAVY }}>{marketPos.label}</span><span>Above est. market</span></div>
                 </div>
                 <div className="mt-3 flex items-center justify-between gap-3">
                   <button onClick={() => openPanel("market-price")} className="text-[13px] font-bold inline-flex items-center gap-1" style={{ color: BLUE }}>View market details <ChevronRight className="w-4 h-4" /></button>
@@ -1339,7 +1341,7 @@ export default function VehiclePassportGoverned() {
         // ── Phase E view models (governed, presentation-only) ──
         const mc = resolveMarketComparison({
           valueHistory: d.valueHistory, advertisedPrice: price, normalizedMarketValue: d.marketBasisWeak ? null : d.marketAvg,
-          sampleSize: d.marketMeta.similarCount, radiusMiles: d.marketMeta.radius, checkedAt: d.marketCheckedAt,
+          sampleSize: d.marketMeta.analyzedCount, radiusMiles: d.marketMeta.radius, checkedAt: d.marketCheckedAt,
         });
         const subjectYear = Number((listing.ymm || "").match(/\b(19|20)\d{2}\b/)?.[0]) || null;
         // The OFFER, not the price evidence. d.comparables is the market set
@@ -1458,11 +1460,11 @@ export default function VehiclePassportGoverned() {
                         <div className="mt-2 relative h-2.5 rounded-full" style={{ background: "linear-gradient(90deg,#16A34A,#F59E0B,#EF4444)" }}>
                           <span className="absolute -top-1 h-4.5 w-1.5 rounded-full ring-2 ring-white" style={{ left: `calc(${Math.round(marketPos.t * 100)}% - 3px)`, height: 18, background: NAVY }} />
                         </div>
-                        <div className="mt-1.5 flex justify-between text-[10px]" style={{ color: SUB }}><span>Best value</span><span className="font-bold" style={{ color: NAVY }}>{marketPos.label}</span><span>Above market</span></div>
+                        <div className="mt-1.5 flex justify-between text-[10px]" style={{ color: SUB }}><span>Below est. market</span><span className="font-bold" style={{ color: NAVY }}>{marketPos.label}</span><span>Above est. market</span></div>
                       </div>
-                      <div><div className={label3} style={{ color: SUB }}>Listings analyzed</div><div className="mt-1 text-[22px] font-extrabold tabular-nums" style={{ color: NAVY }}>{d.marketMeta.similarCount ?? "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.marketMeta.radius ? `within ${d.marketMeta.radius} mi` : "in the region"}</div></div>
-                      <div><div className={label3} style={{ color: SUB }}>vs market</div><div className="mt-1 text-[22px] font-extrabold tabular-nums" style={{ color: d.belowMarket && d.belowMarket > 0 ? GREEN : aboveMarket != null ? AMBER : NAVY }}>{d.belowMarket && d.belowMarket > 0 ? fmt$(d.belowMarket) : aboveMarket != null ? fmt$(aboveMarket) : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.belowMarket && d.belowMarket > 0 ? "below normalized value" : aboveMarket != null ? "above normalized value" : "vs normalized value"}</div></div>
-                      <div><div className={label3} style={{ color: SUB }}>Normalized market value</div><div className="mt-1 text-[22px] font-extrabold tabular-nums" style={{ color: NAVY }}>{d.marketAvg != null ? fmt$(d.marketAvg) : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.marketCheckedAt ? "VIN-level predicted value" : "—"}</div></div>
+                      <div><div className={label3} style={{ color: SUB }}>{compSample.analyzed ? "Listings analyzed" : "Matching listings"}</div><div className="mt-1 text-[22px] font-extrabold tabular-nums" style={{ color: NAVY }}>{compSample.n ?? "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{compSample.caption}</div></div>
+                      <div><div className={label3} style={{ color: SUB }}>vs market</div><div className="mt-1 text-[22px] font-extrabold tabular-nums" style={{ color: d.belowMarket && d.belowMarket > 0 ? GREEN : aboveMarket != null ? AMBER : NAVY }}>{d.belowMarket && d.belowMarket > 0 ? fmt$(d.belowMarket) : aboveMarket != null ? fmt$(aboveMarket) : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.belowMarket && d.belowMarket > 0 ? "below est. value" : aboveMarket != null ? "above est. value" : "vs est. value"}</div></div>
+                      <div><div className={label3} style={{ color: SUB }}>Estimated market value</div><div className="mt-1 text-[22px] font-extrabold tabular-nums" style={{ color: NAVY }}>{d.marketAvg != null ? fmt$(d.marketAvg) : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.marketCheckedAt ? "Provider estimate for this VIN" : "—"}</div></div>
                     </div>
                   ) : (
                     <p className="mt-3 text-[13px]" style={{ color: SUB }}>{marketUnavailableCopy}</p>
@@ -1551,7 +1553,7 @@ export default function VehiclePassportGoverned() {
                                 <div className="relative h-2 rounded-full" style={{ background: "linear-gradient(90deg,#16A34A,#F59E0B,#EF4444)" }}>
                                   <span className="absolute -top-1 w-1.5 rounded-full ring-2 ring-white" style={{ left: `calc(${Math.round(marketPos.t * 100)}% - 3px)`, height: 16, background: NAVY }} />
                                 </div>
-                                <div className="mt-1 flex justify-between text-[10px]" style={{ color: SUB }}><span>Best value</span><span className="font-bold" style={{ color: NAVY }}>{marketPos.label}</span><span>Above market</span></div>
+                                <div className="mt-1 flex justify-between text-[10px]" style={{ color: SUB }}><span>Below est. market</span><span className="font-bold" style={{ color: NAVY }}>{marketPos.label}</span><span>Above est. market</span></div>
                               </div>
                             )}
                           </div>
@@ -1562,14 +1564,14 @@ export default function VehiclePassportGoverned() {
                                 <div className="relative h-2.5 rounded-full" style={{ background: "linear-gradient(90deg,#16A34A,#F59E0B,#EF4444)" }}>
                                   <span className="absolute -top-1 w-1.5 rounded-full ring-2 ring-white" style={{ left: `calc(${Math.round(marketPos.t * 100)}% - 3px)`, height: 18, background: NAVY }} />
                                 </div>
-                                <div className="mt-1.5 flex justify-between text-[10px]" style={{ color: SUB }}><span>Best value</span><span className="font-bold" style={{ color: NAVY }}>{marketPos.label}</span><span>Above market</span></div>
+                                <div className="mt-1.5 flex justify-between text-[10px]" style={{ color: SUB }}><span>Below est. market</span><span className="font-bold" style={{ color: NAVY }}>{marketPos.label}</span><span>Above est. market</span></div>
                               </>
                             )}
                           </div>
                         )}
                         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-0.5 text-[11px]" style={{ color: SUB }}>
-                          {mc.sampleSize != null && <span>{mc.sampleSize} comparables{mc.radiusMiles ? ` · ${mc.radiusMiles} mi` : ""}</span>}
-                          {mc.checkedAt && <span>Checked {mc.checkedAt.slice(0, 10)}</span>}
+                          {mc.sampleSize != null && <span>{mc.sampleSize} comparables analyzed{mc.radiusMiles ? ` · ${mc.radiusMiles} mi` : ""}</span>}
+                          {mc.checkedAt && <span>Market data retrieved {mc.checkedAt.slice(0, 10)}</span>}
                         </div>
                         {mc.limitations.length > 0 && <p className="mt-1.5 text-[11px]" style={{ color: SUB }}>{mc.limitations[0]}</p>}
                       </>
@@ -1584,7 +1586,7 @@ export default function VehiclePassportGoverned() {
                     <div className="flex items-center justify-between gap-4">
                       <div>
                         <div className="text-[13px] font-bold" style={{ color: NAVY }}>No close matches found</div>
-                        <p className="text-[12px] mt-0.5" style={{ color: SUB }}>{d.marketMeta.similarCount != null ? `We analyzed ${d.marketMeta.similarCount} listings, but none met the current year, trim, condition and mileage requirements.` : "None met the current year, trim, condition and mileage requirements."}</p>
+                        <p className="text-[12px] mt-0.5" style={{ color: SUB }}>{compSample.n != null ? `We ${compSample.analyzed ? "analyzed" : "found"} ${compSample.n} ${compSample.analyzed ? "listings" : "matching listings"}, but none met the current year, trim, condition and mileage requirements.` : "None met the current year, trim, condition and mileage requirements."}</p>
                       </div>
                       <button onClick={() => { firePhaseE("all_similar_vehicles_opened"); openPanel("comparable-vehicles"); }} className="text-[13px] font-bold inline-flex items-center gap-1 hover:underline shrink-0" style={{ color: BLUE }}>View broader alternatives <ChevronRight className="w-4 h-4" /></button>
                     </div>

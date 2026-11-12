@@ -704,7 +704,7 @@ const VehiclePassportV3 = () => {
       };
     }
     if (sold.soldPrice && d.marketMeta.soldCount != null && d.marketMeta.soldState) {
-      return { strong: "Below Typical Sold Price", sub: `vs ${d.marketMeta.soldCount} sold in ${d.marketMeta.soldState}, 90 days` };
+      return { strong: "Below Typical Last Advertised Price", sub: `vs ${d.marketMeta.soldCount} listings that left the market in ${d.marketMeta.soldState}` };
     }
     if (ourPrice <= mkt * 1.02) {
       return {
@@ -729,7 +729,7 @@ const VehiclePassportV3 = () => {
   const demandParts = [
     d.viewCount != null && d.viewCount >= 5 ? `${d.viewCount.toLocaleString()} views` : null,
     domFavorable ? `${d.dom} days on market` : null,
-    sold.velocity && d.marketMeta.soldCount != null ? `${d.marketMeta.soldCount} sold in 90 days` : null,
+    sold.velocity && d.marketMeta.soldCount != null ? `${d.marketMeta.soldCount} listings left the market in ${d.marketMeta.soldState}` : null,
   ].filter(Boolean) as string[];
   const warrantyIncl = d.dealerCoverage.find((c) => c.mode === "included");
   const warrantyAvail = d.dealerCoverage.find((c) => c.mode === "available");
