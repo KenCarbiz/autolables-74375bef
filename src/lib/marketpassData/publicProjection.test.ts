@@ -106,6 +106,25 @@ describe("public projection never lets private intelligence through, at any dept
   });
 });
 
+describe("autofilm-feed keeps every field AutoFilm reads", () => {
+  // Read by AutoFilm's readVehicle, readPassport and the rep vehicle lookup
+  // (autofilm-starter supabase/functions/_shared/inventory_sync.ts,
+  // vehicle_passport.ts, api/index.ts) and present as vehicle_listings columns.
+  const AUTOFILM_READS = [
+    "vin", "photos", "hero_image_url", "ymm", "year", "make", "model", "trim", "stock_number", "price",
+    "mileage", "condition", "slug", "body_style", "msrp", "market_value", "savings", "window_sticker_url",
+    "certification", "features", "warranty_info", "service_records", "history_report_url",
+    "payment_estimate", "epa_economy", "website_sale_price", "retail_cash", "dealer_discount", "doc_fee",
+    "recall_status", "open_recall_count", "market_position", "photo_count",
+  ];
+  it("each one survives shapeLotRow", () => {
+    const row: Record<string, unknown> = { ...stuffed() };
+    for (const k of AUTOFILM_READS) if (!(k in row)) row[k] = k === "photos" ? ["https://x/a.jpg"] : 3;
+    const out = shapeLotRow(row, null) as Record<string, unknown>;
+    expect(AUTOFILM_READS.filter((k) => !(k in out))).toEqual([]);
+  });
+});
+
 describe("real production rows still project to what the passport reads", () => {
   const rows = Object.entries(fixtures as Record<string, unknown>).filter(([k]) => !k.startsWith("_")).map(([, v]) => v as Record<string, unknown>);
   it("keeps identity, price inputs, specs, recalls and history on every fixture row", () => {

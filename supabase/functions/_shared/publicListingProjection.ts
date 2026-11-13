@@ -114,6 +114,7 @@ export const PUBLIC_FIELD_CONSUMERS: Readonly<Record<string, string>> = {
   vin_decode_receipts: "Verified Vehicle Data identity check",
   public_market_flags: "market claim suppression",
   view_count: "Passport page views (labelled as page views)",
+  photo_count: "AutoFilm vehicle lookup (photo count on the rep card)",
 };
 
 export const PUBLIC_LISTING_FIELDS: ReadonlySet<string> = new Set(Object.keys(PUBLIC_FIELD_CONSUMERS));
