@@ -37,6 +37,8 @@ import {
   DollarSign, HelpCircle, BookOpen, Car, Phone, MessageSquare, ExternalLink,
   TrendingUp, RefreshCw,
 } from "lucide-react";
+import type { MarketPassPublicContract } from "@/lib/intelligence/marketPass/contracts";
+import MarketPassIndicators from "./MarketPassIndicators";
 
 /* ==========================================================================
    1. STATUS VOCABULARY  (§9 — semantics are product-wide, do not localize)
@@ -1051,23 +1053,28 @@ export default function PassportNextLayout({
   dealer = DEFAULT_DEALER,
   onEvent,
   onAction,
+  marketPass,
 }: {
   data?: any;
   dealer?: any;
   onEvent?: (name: string, payload: any) => void;
   onAction?: (intent: string, payload: any) => void;
+  marketPass?: { contract: MarketPassPublicContract; synthetic: boolean } | null;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const engine = useAnalyticsEngine({ vehicle: data.vehicle, dealerId: dealer.dealer_id, onEvent, onAction });
 
   return (
     <AnalyticsCtx.Provider value={engine}>
-      <PassportBody rootRef={rootRef} data={data} dealer={dealer} />
+      <PassportBody rootRef={rootRef} data={data} dealer={dealer} marketPass={marketPass ?? null} />
     </AnalyticsCtx.Provider>
   );
 }
 
-function PassportBody({ rootRef, data, dealer }: { rootRef: React.RefObject<HTMLDivElement>; data: any; dealer: any }) {
+function PassportBody({ rootRef, data, dealer, marketPass }: {
+  rootRef: React.RefObject<HTMLDivElement>; data: any; dealer: any;
+  marketPass: { contract: MarketPassPublicContract; synthetic: boolean } | null;
+}) {
   const { track, act } = useAnalytics();
   useScrollDepth(rootRef);
 
@@ -1096,6 +1103,7 @@ function PassportBody({ rootRef, data, dealer }: { rootRef: React.RefObject<HTML
           <QuickActions onQuick={quick} />
           <VerificationSection verification={data.verification} onDetail={detail} />
           <MarketSection market={data.market} onDetail={detail} />
+          {marketPass && <MarketPassIndicators contract={marketPass.contract} synthetic={marketPass.synthetic} />}
           <ReasonsSection reasons={data.reasons} onDetail={detail} />
           <ConfirmSection confirm={data.confirm} onDetail={detail} />
           <TimelineSection timeline={data.timeline} onDetail={detail} />

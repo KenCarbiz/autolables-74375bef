@@ -425,6 +425,13 @@ export interface MarketValueV3 {
   estimatedValue: number | null;
   rangeLow: number | null;
   rangeHigh: number | null;
+  /**
+   * How the range was obtained. "none" means no evidence carried a spread and
+   * no range is stated; the fixed-percentage fallback runs only when a caller
+   * configures one explicitly.
+   */
+  rangeMethod?: "comparable_weighted_p25_p75" | "provider_reported_range" | "configured_fallback_band" | "none";
+  rangeWidenedForDisagreement?: boolean;
   confidence: ValuationConfidence;
   confidenceReasons: string[];
   qualifiedCompCount: number;

@@ -4,6 +4,10 @@ export declare const SOURCE_DIR: string;
 export declare const TARGET_DIR: string;
 export declare const TRUTH_SOURCE_DIR: string;
 export declare const TRUTH_PREFIX: string;
+export declare const INTELLIGENCE_SOURCE_DIR: string;
+export declare const INTELLIGENCE_PREFIX: string;
+export declare const WARRANTY_FILES: string[];
+export declare const WARRANTY_PREFIX: string;
 export declare function collectAll(): Map<string, string>;
 export declare function collect(
   dir: string,

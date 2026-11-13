@@ -12,12 +12,13 @@
 // deal never rises above CONSIDER.
 
 import { isExactIdentity, type IdentityMatchLevel } from "../market/identityMatch.ts";
+import { titleReviewIsEvidenceGapOnly } from "./titleOdometer.ts";
 import type {
   BuyerRecommendationResult, ConditionSummary, DataConfidenceResult, DealRatingResult, HardGate,
   ProvenanceSummary, RecallSummary, RecommendationState, TitleOdometerSummary, VehicleScoreResult,
 } from "./contracts.ts";
 
-export const BUYER_RECOMMENDATION_VERSION = "buyer-recommendation-v1.0.0-shadow";
+export const BUYER_RECOMMENDATION_VERSION = "buyer-recommendation-v1.1.0-shadow";
 
 export interface RecommendationBands {
   highlyRecommendedMinScore: number;
@@ -76,7 +77,7 @@ export const HARD_GATE_REASONS: Record<HardGate, string> = {
 export function evaluateHardGates(input: BuyerRecommendationInput): HardGate[] {
   const gates: HardGate[] = [];
   const t = input.titleOdometer;
-  if (t && (t.state === "ADVERSE" || t.state === "REVIEW_REQUIRED")) gates.push("unresolved_title_brand");
+  if (t && (t.state === "ADVERSE" || (t.state === "REVIEW_REQUIRED" && !titleReviewIsEvidenceGapOnly(t)))) gates.push("unresolved_title_brand");
   if (t && (t.odometerStatus === "conflict" || t.odometerStatus === "rollback_indicated")) gates.push("odometer_conflict");
   if (!isExactIdentity(input.identityLevel)) gates.push("identity_not_exact");
   const r = input.recall;
@@ -171,7 +172,7 @@ export function buildBuyerRecommendation(
   }
 
   const t = input.titleOdometer;
-  if (!t || t.state === "NOT_VERIFIED") {
+  if (!t || t.state === "NOT_VERIFIED" || titleReviewIsEvidenceGapOnly(t)) {
     state = lower(state, titleCap);
     reasons.push("Title and odometer have not been verified against NMVTIS");
   } else {

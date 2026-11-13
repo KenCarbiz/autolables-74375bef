@@ -39,8 +39,9 @@ function productionFiles(dir: string, out: string[] = []): string[] {
 }
 
 const FILES = ROOTS.flatMap((r) => productionFiles(r));
+const SOURCES = new Map(FILES.map((f) => [f, readFileSync(f, "utf8")] as const));
 const readersOf = (flag: string): string[] =>
-  FILES.filter((f) => new RegExp(`readMarketFlag\\([^)]*"${flag}"\\)`).test(readFileSync(f, "utf8")));
+  FILES.filter((f) => new RegExp(`readMarketFlag\\([^)]*"${flag}"\\)`).test(SOURCES.get(f) ?? ""));
 
 /**
  * The audited state. A RECORD, not a target: when a reader is implemented, the
@@ -93,6 +94,8 @@ const AUDITED_READERS: Record<string, number> = {
   buyer_recommendation: 0,
   passport_2_new: 0,
   passport_2_used: 0,
+  // 2026-11-12: MarketPass V2, read by the pure handler the edge function calls.
+  marketpass_v2: 1,
 };
 
 describe("the flag reader audit", () => {
@@ -114,6 +117,8 @@ describe("the flag reader audit", () => {
       .toEqual(["src/lib/market/shadowPipeline.ts"]);
     expect(readersOf("market_invalid_claim_suppression"))
       .toEqual(["src/lib/market/publicClaim.ts"]);
+    expect(readersOf("marketpass_v2"))
+      .toEqual(["src/lib/intelligence/marketPass/handler.ts"]);
     for (const gate of [
       "sold_summary", "available_options_packages", "premium_plus_used_intake", "premium_used_refresh",
       "autorecalls_vin", "nmvtis_auto_verify", "oem_incentives_v2", "provider_webhooks", "blackbook_live",

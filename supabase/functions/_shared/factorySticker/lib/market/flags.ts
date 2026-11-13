@@ -84,6 +84,9 @@ export const MARKET_FLAGS = {
   passport_2_new: false,
   /** Passport 2.0 used-vehicle experience. */
   passport_2_used: false,
+  // ── MarketPass V2, 2026-11-12. Proposed rules, not approved. ───────────
+  /** Serve the MarketPass assessment (marketpass-assessment edge function) for a tenant. */
+  marketpass_v2: false,
 } as const;
 
 export type MarketFlag = keyof typeof MARKET_FLAGS;
