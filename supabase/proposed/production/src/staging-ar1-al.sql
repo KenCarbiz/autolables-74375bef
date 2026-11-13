@@ -1,0 +1,528 @@
+-- AR-1 strict option 1 (PROPOSAL, k2/D2-ANALYSIS-r2 sections 2.2, 4-6), autolabels Staging (Supabase uakiwvigsmrlyfpsalai, Lovable 0bc16929). One DO statement, atomic.
+-- NOT APPROVED: the receipt-contract amendment A1-1..A1-6 needs Ken's explicit approval, and this file its own approval and checksum.
+-- Runs only as postgres on the pinned server, only on the post-B4 state. Transport stays off; no key row is added, changed or removed.
+-- Adds rtgip.signing_keys.audience (A1-4, the same rule as the Gateway's K3-GW) with a guard that no -1 row ever takes an audience,
+-- the gateway_confirmation receipt kind (A1-1, outcomes consumer_committed, target_quarantined, delivery_abandoned) and replaces
+-- receipt_check_signature, receipt_verify, outbox_advance (A1-2 source rule) and inbox_admit (A1-3 key audience) with the bodies of
+-- rtgip_v2_ar1_option1.proposed.sql. The 4 -1 rows keep audience NULL and are therefore outside every verification path (inert until cutover).
+DO $ar1$
+DECLARE
+  d rtgip.delivery_config;
+  v_n integer;
+  v_s text;
+  t text;
+  v_acl text;
+  v_rows jsonb := $j$[{"connection_id":"conn:autocurb>autolabels:c5100000-0000-4000-8000-000000000001:stg-syn-a-01","source_app":"autocurb","target_app":"autolabels","tenant_id":"c5100000-0000-4000-8000-000000000001","rooftop_ids":["stg-syn-a-01"],"event_types":["appraisal.completed","acquisition.milestone_recorded","acquisition.purchase_completed"],"purposes":["acquisition_evidence","custody_evidence"]},{"connection_id":"conn:autoframe>autolabels:c5100000-0000-4000-8000-000000000001:stg-syn-a-01","source_app":"autoframe","target_app":"autolabels","tenant_id":"c5100000-0000-4000-8000-000000000001","rooftop_ids":["stg-syn-a-01"],"event_types":["media.approved","media.revoked"],"purposes":["media_reference"]},{"connection_id":"conn:autolabels>autocurb:c5100000-0000-4000-8000-000000000001:stg-syn-a-01","source_app":"autolabels","target_app":"autocurb","tenant_id":"c5100000-0000-4000-8000-000000000001","rooftop_ids":["stg-syn-a-01"],"event_types":["vehicle.identity_registered","inventory.status_changed","custody.episode_opened","custody.episode_closed","sale.milestone_recorded","listing.price_published"],"purposes":["inventory_sync","custody_evidence"]},{"connection_id":"conn:autolabels>autoframe:c5100000-0000-4000-8000-000000000001:stg-syn-a-01","source_app":"autolabels","target_app":"autoframe","tenant_id":"c5100000-0000-4000-8000-000000000001","rooftop_ids":["stg-syn-a-01"],"event_types":["vehicle.identity_registered","inventory.status_changed","custody.episode_opened","custody.episode_closed","sale.milestone_recorded","listing.availability_changed"],"purposes":["inventory_sync","custody_evidence"]}]$j$::jsonb;
+BEGIN
+  IF coalesce(host(inet_server_addr()), '') <> '2a05:d018:1b65:3000:4237:64f1:ae00:c178' THEN
+    RAISE EXCEPTION 'ar1_stop: wrong server %', coalesce(host(inet_server_addr()), 'null');
+  END IF;
+  IF session_user <> 'postgres' OR current_user <> 'postgres' THEN
+    RAISE EXCEPTION 'ar1_stop: must run as postgres (session %, current %)', session_user, current_user;
+  END IF;
+  IF current_setting('server_version_num')::int / 10000 <> 17 THEN
+    RAISE EXCEPTION 'ar1_stop: server major % is not 17', current_setting('server_version_num');
+  END IF;
+  SELECT count(*) INTO v_n FROM rtgip.delivery_config;
+  IF v_n <> 1 THEN RAISE EXCEPTION 'ar1_stop: delivery_config has % rows, expected 1', v_n; END IF;
+  SELECT * INTO d FROM rtgip.delivery_config;
+  IF d.id IS NOT TRUE OR d.transport_enabled IS DISTINCT FROM false OR d.local_app IS DISTINCT FROM 'autolabels' THEN
+    RAISE EXCEPTION 'ar1_stop: delivery_config is not (local_app autolabels, transport_enabled false); B4 must be applied first';
+  END IF;
+  IF date_trunc('second', d.updated_at) <> timestamptz '2026-11-03 21:07:23+00' THEN
+    RAISE EXCEPTION 'ar1_stop: delivery_config.updated_at % differs from the inventory', d.updated_at;
+  END IF;
+  SELECT pg_get_constraintdef(k.oid) INTO v_s FROM pg_constraint k
+   WHERE k.conrelid = 'rtgip.delivery_config'::regclass AND k.conname = 'delivery_config_transport_enabled_check';
+  IF v_s IS DISTINCT FROM 'CHECK ((transport_enabled = false))' THEN
+    RAISE EXCEPTION 'ar1_stop: transport CHECK is not the pinned definition (%)', coalesce(v_s, 'missing');
+  END IF;
+  SELECT count(*) INTO v_n FROM (
+    (SELECT r.connection_id, r.source_app, r.target_app, r.tenant_id, r.rooftop_ids, r.event_types, r.purposes, false, false, 'active'::text
+       FROM jsonb_to_recordset(v_rows) AS r(connection_id text, source_app text, target_app text, tenant_id text, rooftop_ids text[], event_types text[], purposes text[]))
+    EXCEPT
+    (SELECT c.connection_id, c.source_app, c.target_app, c.tenant_id, c.rooftop_ids, c.event_types, c.purposes, c.producer_enabled, c.reader_enabled, c.status FROM rtgip.connections c)
+  ) x;
+  IF v_n <> 0 THEN RAISE EXCEPTION 'ar1_stop: % B4 connection rows missing or different', v_n; END IF;
+  SELECT count(*) INTO v_n FROM rtgip.connections;
+  IF v_n <> 4 THEN RAISE EXCEPTION 'ar1_stop: connections has % rows, expected exactly the 4 B4 rows', v_n; END IF;
+  FOREACH t IN ARRAY ARRAY['outbox', 'receipts', 'inbox', 'inbox_deliveries', 'inbox_conflicts', 'admissions', 'watermarks', 'nonce_claims'] LOOP
+    EXECUTE format('SELECT count(*) FROM rtgip.%I', t) INTO v_n;
+    IF v_n <> 0 THEN RAISE EXCEPTION 'ar1_stop: rtgip.% has % rows, expected 0', t, v_n; END IF;
+  END LOOP;
+  SELECT count(*) INTO v_n FROM rtgip.audit_log;
+  IF v_n <> 34 THEN RAISE EXCEPTION 'ar1_stop: rtgip.audit_log has % rows, expected 34', v_n; END IF;
+  SELECT count(*) INTO v_n FROM rtgip.key_import_tickets;
+  IF v_n <> 8 THEN RAISE EXCEPTION 'ar1_stop: rtgip.key_import_tickets has % rows, expected 8', v_n; END IF;
+  SELECT count(*) INTO v_n FROM rtgip.key_import_install;
+  IF v_n <> 1 THEN RAISE EXCEPTION 'ar1_stop: rtgip.key_import_install has % rows, expected 1', v_n; END IF;
+  SELECT count(*) INTO v_n FROM rtgip.event_catalog;
+  IF v_n <> 21 THEN RAISE EXCEPTION 'ar1_stop: rtgip.event_catalog has % rows, expected 21', v_n; END IF;
+  SELECT count(*) INTO v_n FROM rtgip.forbidden_keys;
+  IF v_n <> 67 THEN RAISE EXCEPTION 'ar1_stop: rtgip.forbidden_keys has % rows, expected 67', v_n; END IF;
+  SELECT count(*) INTO v_n FROM rtgip.signing_keys;
+  IF v_n <> 4 THEN RAISE EXCEPTION 'ar1_stop: rtgip.signing_keys has % rows, expected the 4 -1 rows', v_n; END IF;
+  SELECT count(*) INTO v_n FROM (
+    (SELECT * FROM (VALUES
+      ('stg-autocurb-1','autocurb','rtgip/2','current',timestamptz '2026-11-04 00:00:00+00',timestamptz '2026-12-04 00:00:00+00','rtgip:stg-autocurb-1',ARRAY['conn:autocurb>autoframe:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autocurb>autolabels:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autoframe>autocurb:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autolabels>autocurb:c5100000-0000-4000-8000-000000000001:stg-syn-a-01']::text[]),
+      ('stg-autoframe-1','autoframe','rtgip/2','current',timestamptz '2026-11-04 00:00:00+00',timestamptz '2026-12-04 00:00:00+00','rtgip:stg-autoframe-1',ARRAY['conn:autocurb>autoframe:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autoframe>autocurb:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autoframe>autolabels:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autolabels>autoframe:c5100000-0000-4000-8000-000000000001:stg-syn-a-01']::text[]),
+      ('stg-autolabels-1','autolabels','rtgip/2','current',timestamptz '2026-11-04 00:00:00+00',timestamptz '2026-12-04 00:00:00+00','rtgip:stg-autolabels-1',ARRAY['conn:autocurb>autolabels:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autoframe>autolabels:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autolabels>autocurb:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autolabels>autoframe:c5100000-0000-4000-8000-000000000001:stg-syn-a-01']::text[]),
+      ('stg-gateway-1','gateway','rtgip/2','current',timestamptz '2026-11-04 00:00:00+00',timestamptz '2026-12-04 00:00:00+00','rtgip:stg-gateway-1',ARRAY['conn:autocurb>autoframe:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autocurb>autolabels:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autoframe>autocurb:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autoframe>autolabels:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autolabels>autocurb:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autolabels>autoframe:c5100000-0000-4000-8000-000000000001:stg-syn-a-01']::text[])
+    ) AS e(key_id, owner, dialect, status, not_before, not_after, secret_ref, conns))
+    EXCEPT
+    (SELECT k.key_id, k.owner, k.dialect, k.status, k.not_before, k.not_after, k.secret_ref, (SELECT array_agg(c ORDER BY c COLLATE "C") FROM unnest(k.connection_ids) c) FROM rtgip.signing_keys k)
+  ) x;
+  IF v_n <> 0 THEN RAISE EXCEPTION 'ar1_stop: signing_keys differ from the inventory (% rows)', v_n; END IF;
+  SELECT string_agg(name, ',' ORDER BY name COLLATE "C") INTO v_s FROM vault.secrets;
+  IF v_s IS DISTINCT FROM 'rtgip:stg-autocurb-1,rtgip:stg-autoframe-1,rtgip:stg-autolabels-1,rtgip:stg-gateway-1' THEN
+    RAISE EXCEPTION 'ar1_stop: vault secret names differ from the inventory';
+  END IF;
+  SELECT string_agg(p.proname || ':' || left(md5(pg_get_functiondef(p.oid)), 8), ',' ORDER BY p.proname COLLATE "C") INTO v_s
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'rtgip' AND p.prokind IN ('f','p');
+  IF v_s IS DISTINCT FROM 'audit_log_immutable:3fabef52,canonical_json:20e5fde6,claim_nonce:5a4fa884,clock:eaaf497c,consumer_effect:a951fa40,ct_equal:622fc07f,deliverable_reason:79204041,delivery_identity:73fa8053,derive_event_id:9a1d8570,envelope_sha:bc43a666,inbox_admit:1d2c31b2,inbox_deliveries_guard:126dffc1,inbox_receive:cb09a870,inbox_record_receipts:9da725a6,key_import_tickets_guard:0c8a30c3,local_app:b39703f7,outbox_advance:e9b7bf75,outbox_claim:6a236d09,outbox_enqueue:f29c64e9,outbox_fail:29f3eeea,outbox_guard:bf3fd5a0,outbox_redrive:16d67731,purge_expired_nonces:5783a9e6,receipt_canonical:47f3c713,receipt_check_signature:964c243d,receipt_verify:d6c44538,refusal_class:82839242,watermark_key:60edbf70' THEN
+    RAISE EXCEPTION 'ar1_stop: rtgip function bodies differ from the B4 inventory md5 pins';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = 'rtgip.signing_keys'::regclass AND attname IN ('audience','purpose') AND NOT attisdropped) THEN
+    RAISE EXCEPTION 'ar1_stop: signing_keys already has an audience/purpose column (already applied?)';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'rtgip.signing_keys'::regclass AND conname IN ('signing_keys_audience_check','signing_keys_legacy_no_audience_check'))
+     OR EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'rtgip' AND indexname = 'signing_keys_one_current_per_audience') THEN
+    RAISE EXCEPTION 'ar1_stop: an AR-1 constraint or index already exists';
+  END IF;
+  SELECT pg_get_constraintdef(k.oid) INTO v_s FROM pg_constraint k
+   WHERE k.conrelid = 'rtgip.receipts'::regclass AND k.conname = 'receipts_kind_check';
+  IF v_s IS DISTINCT FROM 'CHECK ((kind = ANY (ARRAY[''gateway_admission''::text, ''target_inbox''::text, ''consumer_commit''::text])))' THEN RAISE EXCEPTION 'ar1_stop: receipts_kind_check is not the package definition (%)', coalesce(v_s, 'missing'); END IF;
+  SELECT coalesce(string_agg(DISTINCT CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE x.grantee::regrole::text END, ',' ORDER BY CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE x.grantee::regrole::text END), '') INTO v_s FROM pg_proc p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) x WHERE p.oid = 'rtgip.inbox_admit(jsonb, text, text, jsonb)'::regprocedure AND x.privilege_type = 'EXECUTE' AND x.grantee <> p.proowner;
+  IF v_s IS DISTINCT FROM 'rtgip_inbox_receiver' THEN RAISE EXCEPTION 'ar1_stop: rtgip.inbox_admit EXECUTE grantees are (%), expected (rtgip_inbox_receiver)', v_s; END IF;
+  SELECT count(*) INTO v_n FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'rtgip' AND p.proname = 'outbox_advance';
+  IF v_n <> 1 THEN RAISE EXCEPTION 'ar1_stop: expected one rtgip.outbox_advance, found %', v_n; END IF;
+  SELECT coalesce(string_agg(DISTINCT CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE x.grantee::regrole::text END, ','), '') INTO v_s
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) x
+   WHERE n.nspname = 'rtgip' AND p.proname = 'outbox_advance' AND x.privilege_type = 'EXECUTE' AND x.grantee <> p.proowner;
+  IF v_s IS DISTINCT FROM 'rtgip_dispatcher' THEN RAISE EXCEPTION 'ar1_stop: rtgip.outbox_advance EXECUTE grantees are (%), expected (rtgip_dispatcher)', v_s; END IF;
+  SELECT coalesce(string_agg(DISTINCT CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE x.grantee::regrole::text END, ',' ORDER BY CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE x.grantee::regrole::text END), '') INTO v_s FROM pg_proc p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) x WHERE p.oid = 'rtgip.receipt_check_signature(jsonb)'::regprocedure AND x.privilege_type = 'EXECUTE' AND x.grantee <> p.proowner;
+  IF v_s IS DISTINCT FROM '' THEN RAISE EXCEPTION 'ar1_stop: rtgip.receipt_check_signature EXECUTE grantees are (%), expected ()', v_s; END IF;
+  SELECT coalesce(string_agg(DISTINCT CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE x.grantee::regrole::text END, ',' ORDER BY CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE x.grantee::regrole::text END), '') INTO v_s FROM pg_proc p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) x WHERE p.oid = 'rtgip.receipt_verify(text, text, jsonb, text, text)'::regprocedure AND x.privilege_type = 'EXECUTE' AND x.grantee <> p.proowner;
+  IF v_s IS DISTINCT FROM '' THEN RAISE EXCEPTION 'ar1_stop: rtgip.receipt_verify EXECUTE grantees are (%), expected ()', v_s; END IF;
+  SELECT string_agg(p.proname || '=' || coalesce((SELECT string_agg(ai::text, ',' ORDER BY ai::text COLLATE "C") FROM unnest(p.proacl) ai), 'NULL')
+                    || ':' || p.prosecdef || ':' || pg_get_userbyid(p.proowner), ';' ORDER BY p.proname COLLATE "C") INTO v_s
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'rtgip' AND p.proname IN ('inbox_admit','outbox_advance','receipt_check_signature','receipt_verify');
+  v_acl := v_s;
+
+  -- apply
+  EXECUTE 'ALTER TABLE rtgip.signing_keys ADD COLUMN audience text';
+  EXECUTE $c$ALTER TABLE rtgip.signing_keys ADD CONSTRAINT signing_keys_audience_check CHECK (audience IS NULL OR (dialect = 'rtgip/2' AND ((owner = 'gateway' AND audience IN ('autolabels','autocurb','autoframe')) OR (owner <> 'gateway' AND audience = 'gateway'))))$c$;
+  EXECUTE $c$ALTER TABLE rtgip.signing_keys ADD CONSTRAINT signing_keys_legacy_no_audience_check CHECK (audience IS NULL OR key_id !~ '-1$')$c$;
+  EXECUTE $c$CREATE UNIQUE INDEX signing_keys_one_current_per_audience ON rtgip.signing_keys (owner, audience) WHERE audience IS NOT NULL AND status = 'current'$c$;
+  EXECUTE format('COMMENT ON COLUMN rtgip.signing_keys.audience IS %L', '{"version":"AR1-APP-r2","contract":"AR-1 strict option 1, A1-1..A1-6"}');
+  EXECUTE 'ALTER TABLE rtgip.receipts DROP CONSTRAINT receipts_kind_check';
+  EXECUTE $c$ALTER TABLE rtgip.receipts ADD CONSTRAINT receipts_kind_check CHECK (kind IN ('gateway_admission','target_inbox','consumer_commit','gateway_confirmation'))$c$;
+  EXECUTE $f1$CREATE OR REPLACE FUNCTION rtgip.receipt_check_signature(r jsonb) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE
+  k rtgip.signing_keys%ROWTYPE; v_now timestamptz := rtgip.clock(); v_iat timestamptz := to_timestamp((r->>'issued_at')::bigint);
+  v_secret text; v_mac text;
+BEGIN
+  SELECT * INTO k FROM rtgip.signing_keys WHERE key_id = r->>'key_id';
+  IF NOT FOUND OR k.owner <> r->>'issuer' OR k.dialect <> 'rtgip/2' OR k.status = 'revoked'
+     OR v_now < k.not_before OR v_now > k.not_after OR v_iat < k.not_before OR v_iat > k.not_after
+     OR NOT ((r->>'connection_id') = ANY (k.connection_ids))
+     OR k.audience IS DISTINCT FROM (CASE WHEN k.owner = 'gateway' THEN rtgip.local_app() ELSE 'gateway' END)
+     OR (k.owner <> 'gateway' AND k.owner IS DISTINCT FROM rtgip.local_app()) THEN
+    RAISE EXCEPTION 'ack_key_not_authorized';
+  END IF;
+  IF v_iat > v_now + interval '300 seconds' THEN RAISE EXCEPTION 'ack_future_receipt'; END IF;
+  SELECT s.decrypted_secret INTO v_secret FROM vault.decrypted_secrets s WHERE s.name = k.secret_ref;
+  IF v_secret IS NULL OR v_secret = '' THEN RAISE EXCEPTION 'ack_key_secret_unavailable'; END IF;
+  v_mac := encode(extensions.hmac(convert_to('rtgip/2-receipt/2' || chr(10) || rtgip.receipt_canonical(r - 'signature'), 'UTF8'),
+                                  convert_to(v_secret, 'UTF8'), 'sha256'), 'hex');
+  IF r->>'signature' !~ '^[0-9a-f]{64}$' OR NOT rtgip.ct_equal(v_mac, r->>'signature') THEN RAISE EXCEPTION 'ack_bad_signature'; END IF;
+END $$;$f1$;
+  EXECUTE $f2$CREATE OR REPLACE FUNCTION rtgip.receipt_verify(p_text text, p_prev text, p_envelope jsonb, p_connection text, p_delivery_id text)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE
+  r jsonb; prev jsonb; f text; v_kind text; v_out text; v_issuer text; v_recipient text;
+  fields constant text[] := ARRAY['connection_id','delivery_id','envelope_sha256','event_id','issued_at','issuer','key_id','kind','outcome',
+    'payload_sha256','prev_receipt_sha256','protocol','receipt_version','recipient','rooftop_id','route','signature','source_app','target_app','tenant_id'];
+  strs constant text[] := ARRAY['protocol','kind','event_id','route','source_app','target_app','tenant_id','rooftop_id','connection_id',
+    'payload_sha256','envelope_sha256','delivery_id','issuer','recipient','outcome','key_id','signature'];
+  bound constant text[] := ARRAY['event_id','route','source_app','target_app','tenant_id','rooftop_id','connection_id','payload_sha256',
+    'envelope_sha256','delivery_id','issuer','recipient'];
+  want jsonb;
+BEGIN
+  BEGIN r := p_text::jsonb; EXCEPTION WHEN others THEN RAISE EXCEPTION 'ack_unsupported_version_or_shape'; END;
+  IF jsonb_typeof(r) IS DISTINCT FROM 'object'
+     OR (SELECT array_agg(x ORDER BY x COLLATE "C") FROM jsonb_object_keys(r) x) IS DISTINCT FROM fields THEN
+    RAISE EXCEPTION 'ack_unsupported_version_or_shape';
+  END IF;
+  FOREACH f IN ARRAY strs LOOP
+    IF jsonb_typeof(r->f) IS DISTINCT FROM 'string' THEN RAISE EXCEPTION 'ack_unsupported_version_or_shape'; END IF;
+  END LOOP;
+  v_kind := r->>'kind'; v_out := r->>'outcome';
+  IF r->>'protocol' <> 'rtgip/2-receipt/2' OR r->'receipt_version' IS DISTINCT FROM '2'::jsonb
+     OR jsonb_typeof(r->'issued_at') IS DISTINCT FROM 'number' OR (r->'issued_at')::text !~ '^(0|[1-9][0-9]{0,15})$'
+     OR r->>'payload_sha256' !~ '^[0-9a-f]{64}$' OR r->>'envelope_sha256' !~ '^[0-9a-f]{64}$'
+     OR r->>'delivery_id' !~ '^[0-9a-f]{64}$' OR r->>'signature' !~ '^[0-9a-f]{64}$'
+     OR NOT (jsonb_typeof(r->'prev_receipt_sha256') = 'null' OR (jsonb_typeof(r->'prev_receipt_sha256') = 'string' AND r->>'prev_receipt_sha256' ~ '^[0-9a-f]{64}$'))
+     OR NOT ((v_kind = 'gateway_admission' AND v_out = 'admitted')
+          OR (v_kind = 'target_inbox' AND v_out IN ('applied','duplicate','stale_ignored','held','quarantined'))
+          OR (v_kind = 'consumer_commit' AND v_out IN ('applied','stale_ignored'))
+          OR (v_kind = 'gateway_confirmation' AND v_out IN ('consumer_committed','target_quarantined','delivery_abandoned'))) THEN
+    RAISE EXCEPTION 'ack_unsupported_version_or_shape';
+  END IF;
+  IF p_text <> rtgip.receipt_canonical(r) THEN RAISE EXCEPTION 'ack_not_canonical'; END IF;
+  IF v_kind NOT IN ('gateway_admission','gateway_confirmation') THEN RAISE EXCEPTION 'ack_wrong_stage'; END IF;
+
+  v_issuer := 'gateway';
+  v_recipient := p_envelope->>'source_app';
+  want := jsonb_build_object('event_id', p_envelope->>'event_id', 'route', p_envelope->>'route', 'source_app', p_envelope->>'source_app',
+    'target_app', p_envelope->>'target_app', 'tenant_id', p_envelope->>'tenant_id', 'rooftop_id', p_envelope->>'rooftop_id',
+    'connection_id', p_connection, 'payload_sha256', p_envelope->>'payload_sha256', 'envelope_sha256', rtgip.envelope_sha(p_envelope),
+    'delivery_id', p_delivery_id, 'issuer', v_issuer, 'recipient', v_recipient);
+  FOREACH f IN ARRAY bound LOOP
+    IF r->>f IS DISTINCT FROM want->>f THEN RAISE EXCEPTION 'ack_wrong_%', f; END IF;
+  END LOOP;
+  IF rtgip.deliverable_reason(p_connection, p_envelope) IS NOT NULL THEN RAISE EXCEPTION 'ack_connection_not_authorized'; END IF;
+  PERFORM rtgip.receipt_check_signature(r);
+
+  IF v_kind = 'gateway_admission' THEN
+    IF jsonb_typeof(r->'prev_receipt_sha256') <> 'null' OR p_prev IS NOT NULL THEN RAISE EXCEPTION 'ack_unexpected_previous_stage'; END IF;
+  ELSE
+    IF p_prev IS NULL THEN RAISE EXCEPTION 'ack_missing_previous_stage'; END IF;
+    prev := p_prev::jsonb;
+    IF prev->>'kind' IS DISTINCT FROM 'gateway_admission'
+       OR r->>'prev_receipt_sha256' IS DISTINCT FROM encode(extensions.digest(convert_to(p_prev, 'UTF8'), 'sha256'), 'hex') THEN
+      RAISE EXCEPTION 'ack_missing_previous_stage';
+    END IF;
+    IF (r->>'issued_at')::bigint < (prev->>'issued_at')::bigint THEN RAISE EXCEPTION 'ack_stage_time_reversed'; END IF;
+  END IF;
+  RETURN r;
+END $$;$f2$;
+  EXECUTE $f3$CREATE OR REPLACE FUNCTION rtgip.outbox_advance(p_event_id uuid, p_worker text, p_generation integer, p_receipts text[])
+RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE
+  o rtgip.outbox%ROWTYPE; r jsonb; i integer; n integer; v_prev text; v_to text; v_all jsonb := '[]'::jsonb;
+BEGIN
+  SELECT * INTO o FROM rtgip.outbox WHERE event_id = p_event_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'unknown_event'; END IF;
+  IF o.lease_owner IS DISTINCT FROM p_worker OR o.lease_generation IS DISTINCT FROM p_generation OR o.lease_action IS NULL
+     OR o.state NOT IN ('in_flight','gateway_admitted') THEN
+    RAISE EXCEPTION 'lost_lease';
+  END IF;
+  BEGIN
+    n := coalesce(cardinality(p_receipts), 0);
+    IF n = 0 THEN RAISE EXCEPTION 'ack_missing'; END IF;
+    IF n > 2 THEN RAISE EXCEPTION 'ack_chain_too_long'; END IF;
+    IF o.lease_action = 'deliver' AND n <> 1 THEN RAISE EXCEPTION 'illegal_transition:%:chain', o.state; END IF;
+    IF o.lease_action = 'confirm' AND (jsonb_array_length(o.receipts) < 1
+       OR rtgip.receipt_canonical(o.receipts->0) IS DISTINCT FROM p_receipts[1]) THEN
+      RAISE EXCEPTION 'ack_admission_mismatch';
+    END IF;
+    IF o.lease_action = 'deliver' AND jsonb_array_length(o.receipts) > 0
+       AND rtgip.receipt_canonical(o.receipts->0) IS DISTINCT FROM p_receipts[1] THEN
+      RAISE EXCEPTION 'ack_admission_mismatch';
+    END IF;
+    FOR i IN 1 .. n LOOP
+      r := rtgip.receipt_verify(p_receipts[i], v_prev, o.envelope, o.connection_id, o.delivery_id);
+      v_prev := p_receipts[i];
+      v_all := v_all || jsonb_build_array(r);
+    END LOOP;
+
+    IF o.lease_action = 'deliver' THEN
+      IF v_all->0->>'kind' <> 'gateway_admission' THEN RAISE EXCEPTION 'ack_wrong_stage'; END IF;
+      INSERT INTO rtgip.receipts (event_id, attempt, kind, issuer, outcome, key_id, signing_text, signature)
+      VALUES (o.event_id, o.attempts, 'gateway_admission', v_all->0->>'issuer', 'admitted', v_all->0->>'key_id',
+              rtgip.receipt_canonical((v_all->0) - 'signature'), v_all->0->>'signature')
+      ON CONFLICT DO NOTHING;
+      UPDATE rtgip.outbox SET state = 'gateway_admitted', receipts = v_all, last_error = NULL,
+        lease_owner = NULL, lease_until = NULL, lease_action = NULL, next_attempt_at = now() + interval '5 seconds'
+      WHERE event_id = o.event_id;
+      v_to := 'gateway_admitted';
+    ELSE
+      IF n = 1 THEN RETURN 'pending:gateway_confirmation_pending'; END IF;
+      IF v_all->1->>'kind' IS DISTINCT FROM 'gateway_confirmation' THEN RAISE EXCEPTION 'ack_wrong_stage'; END IF;
+      v_to := CASE v_all->1->>'outcome' WHEN 'target_quarantined' THEN 'target_quarantined'
+                                         WHEN 'delivery_abandoned' THEN 'dead_letter' ELSE 'consumer_committed' END;
+      INSERT INTO rtgip.receipts (event_id, attempt, kind, issuer, outcome, key_id, signing_text, signature)
+      VALUES (o.event_id, o.attempts, 'gateway_confirmation', v_all->1->>'issuer', v_all->1->>'outcome', v_all->1->>'key_id',
+              rtgip.receipt_canonical((v_all->1) - 'signature'), v_all->1->>'signature')
+      ON CONFLICT DO NOTHING;
+      UPDATE rtgip.outbox SET state = v_to, receipts = v_all, last_error = NULL,
+        lease_owner = NULL, lease_until = NULL, lease_action = NULL
+      WHERE event_id = o.event_id;
+    END IF;
+    INSERT INTO rtgip.audit_log (actor, action, event_id, detail)
+    VALUES (p_worker, 'advance:' || v_to, o.event_id, jsonb_build_object('receipts', n, 'attempt', o.attempts, 'generation', p_generation));
+    RETURN v_to;
+  EXCEPTION WHEN raise_exception OR invalid_text_representation THEN
+    INSERT INTO rtgip.audit_log (actor, action, event_id, detail)
+    VALUES (coalesce(p_worker, '?'), 'receipt_rejected', p_event_id, jsonb_build_object('reason', SQLERRM, 'generation', p_generation));
+    RETURN 'rejected:' || SQLERRM;
+  END;
+END $$;$f3$;
+  EXECUTE $f4$CREATE OR REPLACE FUNCTION rtgip.inbox_admit(p_headers jsonb, p_body text, p_admission text, p_consumer_reject jsonb DEFAULT NULL)
+RETURNS TABLE (admission_id bigint, event_id uuid, outcome text, reason text, committed boolean, committed_outcome text, connection_id text, envelope jsonb,
+               delivery_id text, issued_at bigint, stored_receipts text[], replayed boolean)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+#variable_conflict use_column
+DECLARE
+  v_local text := rtgip.local_app();
+  h_key text := left(p_headers->>'rtgip-key-id', 128);
+  h_signer text := p_headers->>'rtgip-signer';
+  h_ts text := p_headers->>'rtgip-timestamp';
+  h_nonce text := p_headers->>'rtgip-nonce';
+  h_scope text := p_headers->>'rtgip-scope';
+  h_sig text := p_headers->>'rtgip-signature';
+  k rtgip.signing_keys%ROWTYPE; cat rtgip.event_catalog%ROWTYPE;
+  e jsonb; v_secret text; v_sha text; v_claim text; v_conn text; v_n integer; v_why text;
+  v_adm bigint; v_rej_event uuid; v_rej_reason text; v_first text; v_rej_seen boolean := false; rec record;
+  v_did text; v_adig text; v_issued bigint; d rtgip.inbox_deliveries%ROWTYPE; v_have_d boolean := false; v_is_first boolean := true;
+  v_first_commit text; v_first_reason text;
+  shape constant text[] := ARRAY['aggregate','causation_id','classification','correlation_id','emitted_at','event_id','event_type',
+    'occurred_at','origin','payload','payload_sha256','protocol','purpose','rooftop_id','route','schema_version','source_app','target_app','tenant_id','vehicle'];
+BEGIN
+  BEGIN
+    IF v_local IS NULL THEN RAISE EXCEPTION 'receiver_not_local_app'; END IF;
+    IF jsonb_typeof(p_headers) IS DISTINCT FROM 'object' OR p_headers->>'rtgip-protocol' IS DISTINCT FROM 'rtgip/2' THEN RAISE EXCEPTION 'protocol_mismatch'; END IF;
+    IF h_key IS NULL OR h_signer IS NULL OR h_ts IS NULL OR h_nonce IS NULL OR h_scope IS NULL OR h_sig IS NULL THEN RAISE EXCEPTION 'missing_headers'; END IF;
+    IF left(h_sig, 7) <> 'rtgip2=' THEN RAISE EXCEPTION 'protocol_mismatch'; END IF;
+    IF h_nonce !~ '^[A-Za-z0-9_-]{16,128}$' THEN RAISE EXCEPTION 'invalid_nonce'; END IF;
+    SELECT * INTO k FROM rtgip.signing_keys sk WHERE sk.key_id = h_key;
+    IF NOT FOUND THEN RAISE EXCEPTION 'unknown_key'; END IF;
+    IF k.dialect <> 'rtgip/2' THEN RAISE EXCEPTION 'key_dialect_mismatch'; END IF;
+    IF k.status = 'revoked' THEN RAISE EXCEPTION 'key_revoked'; END IF;
+    IF now() < k.not_before OR now() > k.not_after THEN RAISE EXCEPTION 'key_outside_validity'; END IF;
+    IF k.owner <> h_signer THEN RAISE EXCEPTION 'signer_key_mismatch'; END IF;
+    IF h_signer <> 'gateway' THEN RAISE EXCEPTION 'signer_not_gateway'; END IF;
+    IF k.audience IS DISTINCT FROM v_local THEN RAISE EXCEPTION 'key_audience_mismatch'; END IF;
+    IF h_ts !~ '^[0-9]{1,12}$' OR abs(extract(epoch FROM now()) - h_ts::bigint) > 300 THEN RAISE EXCEPTION 'timestamp_out_of_window'; END IF;
+    IF p_body IS NULL OR octet_length(convert_to(p_body, 'UTF8')) > 65536 THEN RAISE EXCEPTION 'body_too_large'; END IF;
+    v_sha := encode(extensions.digest(convert_to(p_body, 'UTF8'), 'sha256'), 'hex');
+    SELECT s.decrypted_secret INTO v_secret FROM vault.decrypted_secrets s WHERE s.name = k.secret_ref;
+    IF v_secret IS NULL OR v_secret = '' THEN RAISE EXCEPTION 'key_secret_unavailable'; END IF;
+    IF NOT rtgip.ct_equal('rtgip2=' || encode(extensions.hmac(convert_to(array_to_string(
+         ARRAY['rtgip/2', h_key, k.owner, h_ts, h_nonce, h_scope, v_sha], chr(10)), 'UTF8'), convert_to(v_secret, 'UTF8'), 'sha256'), 'hex'), h_sig) THEN
+      RAISE EXCEPTION 'bad_signature';
+    END IF;
+  EXCEPTION WHEN raise_exception OR invalid_text_representation OR numeric_value_out_of_range THEN
+    INSERT INTO rtgip.audit_log (actor, action, detail)
+    VALUES ('inbox', 'admission_rejected', jsonb_build_object('stage', 'signature', 'reason', SQLERRM, 'key_id', h_key));
+    RETURN QUERY SELECT NULL::bigint, NULL::uuid, 'rejected'::text, SQLERRM::text, false, NULL::text, NULL::text, NULL::jsonb, NULL::text, NULL::bigint, NULL::text[], false;
+    RETURN;
+  END;
+
+  v_claim := rtgip.claim_nonce(h_key, h_nonce, v_sha, to_timestamp(h_ts::bigint + 900));
+  IF v_claim = 'conflict' THEN
+    INSERT INTO rtgip.audit_log (actor, action, detail)
+    VALUES ('inbox', 'admission_rejected', jsonb_build_object('stage', 'nonce', 'reason', 'nonce_reused', 'key_id', h_key));
+    RETURN QUERY SELECT NULL::bigint, NULL::uuid, 'rejected'::text, 'nonce_reused'::text, false, NULL::text, NULL::text, NULL::jsonb, NULL::text, NULL::bigint, NULL::text[], false;
+    RETURN;
+  END IF;
+
+  BEGIN
+    BEGIN e := p_body::jsonb; EXCEPTION WHEN others THEN RAISE EXCEPTION 'malformed_json'; END;
+    IF jsonb_typeof(e) IS DISTINCT FROM 'object' THEN RAISE EXCEPTION 'invalid_envelope:not_an_object'; END IF;
+    IF rtgip.canonical_json(e) <> p_body THEN RAISE EXCEPTION 'body_not_canonical'; END IF;
+    IF (SELECT array_agg(x ORDER BY x COLLATE "C") FROM jsonb_object_keys(e) x) IS DISTINCT FROM shape THEN RAISE EXCEPTION 'invalid_envelope:fields'; END IF;
+    IF e->>'protocol' IS DISTINCT FROM 'rtgip/2' THEN RAISE EXCEPTION 'protocol_mismatch'; END IF;
+    IF jsonb_typeof(e->'schema_version') IS DISTINCT FROM 'number' OR jsonb_typeof(e->'payload') IS DISTINCT FROM 'object'
+       OR EXISTS (SELECT 1 FROM unnest(ARRAY[e->'event_id', e->'event_type', e->'source_app', e->'target_app', e->'route', e->'purpose',
+            e->'tenant_id', e->'rooftop_id', e->'payload_sha256', e#>'{vehicle,instance_id}', e#>'{vehicle,episode_id}', e#>'{origin,event_id}']) v
+          WHERE jsonb_typeof(v) IS DISTINCT FROM 'string') THEN
+      RAISE EXCEPTION 'invalid_envelope:identity';
+    END IF;
+    IF h_scope IS DISTINCT FROM array_to_string(ARRAY[e->>'source_app', e->>'target_app', e->>'tenant_id', e->>'rooftop_id',
+         e->>'event_type', e->>'schema_version', e->>'purpose', e->>'event_id'], ';') THEN
+      RAISE EXCEPTION 'scope_mismatch';
+    END IF;
+    IF encode(extensions.digest(convert_to(rtgip.canonical_json(e->'payload'), 'UTF8'), 'sha256'), 'hex') IS DISTINCT FROM e->>'payload_sha256' THEN
+      RAISE EXCEPTION 'payload_hash_mismatch';
+    END IF;
+    IF rtgip.derive_event_id(e) IS DISTINCT FROM e->>'event_id' THEN RAISE EXCEPTION 'event_id_not_derived'; END IF;
+    IF e->>'target_app' IS DISTINCT FROM v_local THEN RAISE EXCEPTION 'wrong_destination'; END IF;
+    IF e->>'route' IS DISTINCT FROM (e->>'source_app') || '->' || (e->>'target_app') THEN RAISE EXCEPTION 'unknown_route'; END IF;
+    IF e->>'source_app' = 'autofilm' OR e->>'target_app' = 'autofilm' THEN RAISE EXCEPTION 'route_reserved'; END IF;
+    SELECT * INTO cat FROM rtgip.event_catalog ec WHERE ec.route = e->>'route' AND ec.event_type = e->>'event_type';
+    IF NOT FOUND THEN RAISE EXCEPTION 'event_not_on_route'; END IF;
+    IF cat.owner <> e->>'source_app' THEN RAISE EXCEPTION 'not_source_authority'; END IF;
+    IF NOT ((e->>'purpose') = ANY (cat.purposes)) THEN RAISE EXCEPTION 'purpose_not_allowed'; END IF;
+    IF NOT ((e->'schema_version')::text ~ '^[0-9]{1,6}$' AND (e->>'schema_version')::integer = ANY (cat.schema_versions)) THEN
+      RAISE EXCEPTION 'unsupported_schema_version';
+    END IF;
+    IF EXISTS (SELECT 1 FROM jsonb_path_query(e, 'lax $.**') v
+               WHERE (jsonb_typeof(v) = 'object' AND EXISTS (SELECT 1 FROM jsonb_object_keys(v) kk JOIN rtgip.forbidden_keys fk ON fk.key = lower(kk)))
+                  OR (jsonb_typeof(v) = 'string' AND (v #>> '{}') ~* '^(https?:|data:|blob:|ftp:)')) THEN
+      RAISE EXCEPTION 'invalid_envelope:sensitive_content';
+    END IF;
+    SELECT min(c.connection_id), count(*) INTO v_conn, v_n FROM rtgip.connections c
+      WHERE c.source_app = e->>'source_app' AND c.target_app = e->>'target_app' AND c.tenant_id = e->>'tenant_id' AND c.status = 'active'
+        AND (e->>'rooftop_id') = ANY (c.rooftop_ids);
+    IF v_n = 0 THEN
+      IF NOT EXISTS (SELECT 1 FROM rtgip.connections c WHERE c.source_app = e->>'source_app' AND c.target_app = e->>'target_app' AND c.tenant_id = e->>'tenant_id') THEN
+        RAISE EXCEPTION 'no_connection_for_tenant';
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM rtgip.connections c WHERE c.source_app = e->>'source_app' AND c.target_app = e->>'target_app' AND c.tenant_id = e->>'tenant_id' AND c.status = 'active') THEN
+        RAISE EXCEPTION 'connection_revoked';
+      END IF;
+      RAISE EXCEPTION 'rooftop_not_granted';
+    END IF;
+    IF v_n > 1 THEN RAISE EXCEPTION 'ambiguous_connection'; END IF;
+    v_why := rtgip.deliverable_reason(v_conn, e);
+    IF v_why = 'connection_mismatch' THEN RAISE EXCEPTION 'rooftop_not_granted'; END IF;
+    IF v_why IS NOT NULL THEN RAISE EXCEPTION '%', v_why; END IF;
+    IF NOT (v_conn = ANY (k.connection_ids)) THEN RAISE EXCEPTION 'key_not_bound_to_connection'; END IF;
+    IF p_admission IS NULL THEN RAISE EXCEPTION 'ack_missing'; END IF;
+    v_did := rtgip.delivery_identity(v_conn, e);
+    PERFORM rtgip.receipt_verify(p_admission, NULL, e, v_conn, v_did);
+    IF p_admission::jsonb->>'kind' <> 'gateway_admission' THEN RAISE EXCEPTION 'ack_wrong_stage'; END IF;
+    v_adig := encode(extensions.digest(convert_to(p_admission, 'UTF8'), 'sha256'), 'hex');
+    SELECT * INTO d FROM rtgip.inbox_deliveries x WHERE x.delivery_id = v_did;
+    v_have_d := FOUND;
+    IF v_have_d AND d.admission_digest <> v_adig THEN RAISE EXCEPTION 'admission_digest_mismatch'; END IF;
+    IF p_consumer_reject IS NOT NULL THEN
+      BEGIN v_rej_event := (p_consumer_reject->>'event_id')::uuid; EXCEPTION WHEN others THEN v_rej_event := NULL; END;
+      v_rej_reason := left(p_consumer_reject->>'reason', 180);
+      IF v_rej_event IS NULL OR v_rej_reason IS NULL OR v_rej_reason = '' THEN RAISE EXCEPTION 'invalid_consumer_reject'; END IF;
+    END IF;
+  EXCEPTION WHEN raise_exception OR invalid_text_representation OR numeric_value_out_of_range THEN
+    INSERT INTO rtgip.audit_log (actor, action, detail)
+    VALUES ('inbox', 'admission_rejected', jsonb_build_object('stage', 'envelope', 'reason', SQLERRM, 'key_id', h_key, 'body_sha256', v_sha));
+    RETURN QUERY SELECT NULL::bigint, NULL::uuid, 'rejected'::text, SQLERRM::text, false, NULL::text, NULL::text, NULL::jsonb, NULL::text, NULL::bigint, NULL::text[], false;
+    RETURN;
+  END;
+
+  v_adm := nextval(pg_get_serial_sequence('rtgip.admissions', 'id'));
+  IF v_have_d AND d.outcome <> 'held' THEN
+    -- The decision for this delivery is final: answer with it, stored receipts included.
+    admission_id := v_adm; event_id := (e->>'event_id')::uuid; outcome := d.outcome; reason := d.reason;
+    committed := d.commit_outcome IS NOT NULL; committed_outcome := d.commit_outcome; connection_id := v_conn; envelope := e;
+    delivery_id := v_did; issued_at := d.issued_at; stored_receipts := d.receipts; replayed := true;
+    RETURN NEXT;
+    INSERT INTO rtgip.admissions (id, key_id, nonce, body_sha256, event_id, connection_id, signer, outcome, consumer_reject)
+    VALUES (v_adm, h_key, h_nonce, v_sha, (e->>'event_id')::uuid, v_conn, h_signer, d.outcome, NULL);
+    INSERT INTO rtgip.audit_log (actor, action, event_id, detail)
+    VALUES ('inbox', 'admitted:' || d.outcome, (e->>'event_id')::uuid,
+            jsonb_build_object('admission_id', v_adm, 'connection_id', v_conn, 'key_id', h_key, 'nonce_claim', v_claim, 'delivery_id', v_did, 'stored', true));
+    RETURN;
+  END IF;
+  v_issued := CASE WHEN v_have_d THEN d.issued_at ELSE floor(extract(epoch FROM now()))::bigint END;
+  FOR rec IN SELECT * FROM rtgip.inbox_receive(e, v_local, v_rej_event, CASE WHEN v_rej_reason IS NOT NULL THEN 'consumer_reject:' || v_rej_reason END) LOOP
+    v_first := coalesce(v_first, rec.outcome);
+    IF v_is_first THEN v_first_commit := rec.committed_outcome; v_first_reason := rec.reason; END IF;
+    IF rec.event_id = v_rej_event AND rec.outcome = 'quarantined' THEN v_rej_seen := true; END IF;
+    admission_id := v_adm; event_id := rec.event_id; outcome := rec.outcome; reason := rec.reason;
+    committed := rec.committed; committed_outcome := rec.committed_outcome; connection_id := v_conn; envelope := rec.envelope;
+    delivery_id := CASE WHEN v_is_first THEN v_did END; issued_at := CASE WHEN v_is_first THEN v_issued END; stored_receipts := NULL; replayed := false;
+    v_is_first := false;
+    RETURN NEXT;
+  END LOOP;
+  IF v_rej_event IS NOT NULL AND NOT v_rej_seen THEN RAISE EXCEPTION 'consumer_reject_not_applicable'; END IF;
+  INSERT INTO rtgip.inbox_deliveries (delivery_id, tenant_id, origin_app, event_id, connection_id, admission_digest, issued_at, outcome, commit_outcome, reason, envelope)
+  VALUES (v_did, e->>'tenant_id', e#>>'{origin,app}', (e->>'event_id')::uuid, v_conn, v_adig, v_issued, v_first, v_first_commit, v_first_reason, e)
+  ON CONFLICT (delivery_id) DO UPDATE SET outcome = EXCLUDED.outcome, commit_outcome = EXCLUDED.commit_outcome, reason = EXCLUDED.reason;
+  UPDATE rtgip.inbox i SET delivery_id = v_did, admission_digest = v_adig, issued_at = v_issued
+    WHERE i.tenant_id = e->>'tenant_id' AND i.origin_app = e#>>'{origin,app}' AND i.event_id = (e->>'event_id')::uuid AND i.delivery_id IS NULL;
+  INSERT INTO rtgip.admissions (id, key_id, nonce, body_sha256, event_id, connection_id, signer, outcome, consumer_reject)
+  VALUES (v_adm, h_key, h_nonce, v_sha, (e->>'event_id')::uuid, v_conn, h_signer, v_first, v_rej_reason);
+  INSERT INTO rtgip.audit_log (actor, action, event_id, detail)
+  VALUES ('inbox', 'admitted:' || v_first, (e->>'event_id')::uuid,
+          jsonb_build_object('admission_id', v_adm, 'connection_id', v_conn, 'key_id', h_key, 'nonce_claim', v_claim, 'delivery_id', v_did));
+END $$;$f4$;
+
+  -- postcheck
+  SELECT count(*) INTO v_n FROM rtgip.delivery_config;
+  IF v_n <> 1 THEN RAISE EXCEPTION 'ar1_check: delivery_config has % rows, expected 1', v_n; END IF;
+  SELECT * INTO d FROM rtgip.delivery_config;
+  IF d.id IS NOT TRUE OR d.transport_enabled IS DISTINCT FROM false OR d.local_app IS DISTINCT FROM 'autolabels' THEN
+    RAISE EXCEPTION 'ar1_check: delivery_config is not (local_app autolabels, transport_enabled false); B4 must be applied first';
+  END IF;
+  IF date_trunc('second', d.updated_at) <> timestamptz '2026-11-03 21:07:23+00' THEN
+    RAISE EXCEPTION 'ar1_check: delivery_config.updated_at % differs from the inventory', d.updated_at;
+  END IF;
+  SELECT pg_get_constraintdef(k.oid) INTO v_s FROM pg_constraint k
+   WHERE k.conrelid = 'rtgip.delivery_config'::regclass AND k.conname = 'delivery_config_transport_enabled_check';
+  IF v_s IS DISTINCT FROM 'CHECK ((transport_enabled = false))' THEN
+    RAISE EXCEPTION 'ar1_check: transport CHECK is not the pinned definition (%)', coalesce(v_s, 'missing');
+  END IF;
+  SELECT count(*) INTO v_n FROM (
+    (SELECT r.connection_id, r.source_app, r.target_app, r.tenant_id, r.rooftop_ids, r.event_types, r.purposes, false, false, 'active'::text
+       FROM jsonb_to_recordset(v_rows) AS r(connection_id text, source_app text, target_app text, tenant_id text, rooftop_ids text[], event_types text[], purposes text[]))
+    EXCEPT
+    (SELECT c.connection_id, c.source_app, c.target_app, c.tenant_id, c.rooftop_ids, c.event_types, c.purposes, c.producer_enabled, c.reader_enabled, c.status FROM rtgip.connections c)
+  ) x;
+  IF v_n <> 0 THEN RAISE EXCEPTION 'ar1_check: % B4 connection rows missing or different', v_n; END IF;
+  SELECT count(*) INTO v_n FROM rtgip.connections;
+  IF v_n <> 4 THEN RAISE EXCEPTION 'ar1_check: connections has % rows, expected exactly the 4 B4 rows', v_n; END IF;
+  FOREACH t IN ARRAY ARRAY['outbox', 'receipts', 'inbox', 'inbox_deliveries', 'inbox_conflicts', 'admissions', 'watermarks', 'nonce_claims'] LOOP
+    EXECUTE format('SELECT count(*) FROM rtgip.%I', t) INTO v_n;
+    IF v_n <> 0 THEN RAISE EXCEPTION 'ar1_check: rtgip.% has % rows, expected 0', t, v_n; END IF;
+  END LOOP;
+  SELECT count(*) INTO v_n FROM rtgip.audit_log;
+  IF v_n <> 34 THEN RAISE EXCEPTION 'ar1_check: rtgip.audit_log has % rows, expected 34', v_n; END IF;
+  SELECT count(*) INTO v_n FROM rtgip.key_import_tickets;
+  IF v_n <> 8 THEN RAISE EXCEPTION 'ar1_check: rtgip.key_import_tickets has % rows, expected 8', v_n; END IF;
+  SELECT count(*) INTO v_n FROM rtgip.key_import_install;
+  IF v_n <> 1 THEN RAISE EXCEPTION 'ar1_check: rtgip.key_import_install has % rows, expected 1', v_n; END IF;
+  SELECT count(*) INTO v_n FROM rtgip.event_catalog;
+  IF v_n <> 21 THEN RAISE EXCEPTION 'ar1_check: rtgip.event_catalog has % rows, expected 21', v_n; END IF;
+  SELECT count(*) INTO v_n FROM rtgip.forbidden_keys;
+  IF v_n <> 67 THEN RAISE EXCEPTION 'ar1_check: rtgip.forbidden_keys has % rows, expected 67', v_n; END IF;
+  SELECT count(*) INTO v_n FROM rtgip.signing_keys;
+  IF v_n <> 4 THEN RAISE EXCEPTION 'ar1_check: rtgip.signing_keys has % rows, expected the 4 -1 rows', v_n; END IF;
+  SELECT count(*) INTO v_n FROM (
+    (SELECT * FROM (VALUES
+      ('stg-autocurb-1','autocurb','rtgip/2','current',timestamptz '2026-11-04 00:00:00+00',timestamptz '2026-12-04 00:00:00+00','rtgip:stg-autocurb-1',ARRAY['conn:autocurb>autoframe:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autocurb>autolabels:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autoframe>autocurb:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autolabels>autocurb:c5100000-0000-4000-8000-000000000001:stg-syn-a-01']::text[]),
+      ('stg-autoframe-1','autoframe','rtgip/2','current',timestamptz '2026-11-04 00:00:00+00',timestamptz '2026-12-04 00:00:00+00','rtgip:stg-autoframe-1',ARRAY['conn:autocurb>autoframe:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autoframe>autocurb:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autoframe>autolabels:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autolabels>autoframe:c5100000-0000-4000-8000-000000000001:stg-syn-a-01']::text[]),
+      ('stg-autolabels-1','autolabels','rtgip/2','current',timestamptz '2026-11-04 00:00:00+00',timestamptz '2026-12-04 00:00:00+00','rtgip:stg-autolabels-1',ARRAY['conn:autocurb>autolabels:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autoframe>autolabels:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autolabels>autocurb:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autolabels>autoframe:c5100000-0000-4000-8000-000000000001:stg-syn-a-01']::text[]),
+      ('stg-gateway-1','gateway','rtgip/2','current',timestamptz '2026-11-04 00:00:00+00',timestamptz '2026-12-04 00:00:00+00','rtgip:stg-gateway-1',ARRAY['conn:autocurb>autoframe:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autocurb>autolabels:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autoframe>autocurb:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autoframe>autolabels:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autolabels>autocurb:c5100000-0000-4000-8000-000000000001:stg-syn-a-01','conn:autolabels>autoframe:c5100000-0000-4000-8000-000000000001:stg-syn-a-01']::text[])
+    ) AS e(key_id, owner, dialect, status, not_before, not_after, secret_ref, conns))
+    EXCEPT
+    (SELECT k.key_id, k.owner, k.dialect, k.status, k.not_before, k.not_after, k.secret_ref, (SELECT array_agg(c ORDER BY c COLLATE "C") FROM unnest(k.connection_ids) c) FROM rtgip.signing_keys k)
+  ) x;
+  IF v_n <> 0 THEN RAISE EXCEPTION 'ar1_check: signing_keys differ from the inventory (% rows)', v_n; END IF;
+  SELECT string_agg(name, ',' ORDER BY name COLLATE "C") INTO v_s FROM vault.secrets;
+  IF v_s IS DISTINCT FROM 'rtgip:stg-autocurb-1,rtgip:stg-autoframe-1,rtgip:stg-autolabels-1,rtgip:stg-gateway-1' THEN
+    RAISE EXCEPTION 'ar1_check: vault secret names differ from the inventory';
+  END IF;
+  SELECT count(*) INTO v_n FROM rtgip.signing_keys WHERE audience IS NOT NULL;
+  IF v_n <> 0 THEN RAISE EXCEPTION 'ar1_check: % key rows carry an audience (cutover started: retire the -2 rows first)', v_n; END IF;
+  SELECT string_agg(p.proname || ':' || left(md5(pg_get_functiondef(p.oid)), 8), ',' ORDER BY p.proname COLLATE "C") INTO v_s
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'rtgip' AND p.prokind IN ('f','p');
+  IF v_s IS DISTINCT FROM 'audit_log_immutable:3fabef52,canonical_json:20e5fde6,claim_nonce:5a4fa884,clock:eaaf497c,consumer_effect:a951fa40,ct_equal:622fc07f,deliverable_reason:79204041,delivery_identity:73fa8053,derive_event_id:9a1d8570,envelope_sha:bc43a666,inbox_admit:1d24b62f,inbox_deliveries_guard:126dffc1,inbox_receive:cb09a870,inbox_record_receipts:9da725a6,key_import_tickets_guard:0c8a30c3,local_app:b39703f7,outbox_advance:b6bcb415,outbox_claim:6a236d09,outbox_enqueue:f29c64e9,outbox_fail:29f3eeea,outbox_guard:bf3fd5a0,outbox_redrive:16d67731,purge_expired_nonces:5783a9e6,receipt_canonical:47f3c713,receipt_check_signature:0b3305cf,receipt_verify:35afb8e3,refusal_class:82839242,watermark_key:60edbf70' THEN
+    RAISE EXCEPTION 'ar1_check: rtgip function bodies differ from the rehearsed AR-1 md5 pins';
+  END IF;
+  SELECT col_description('rtgip.signing_keys'::regclass, a.attnum) INTO v_s FROM pg_attribute a
+   WHERE a.attrelid = 'rtgip.signing_keys'::regclass AND a.attname = 'audience' AND NOT a.attisdropped AND a.atttypid = 'text'::regtype;
+  IF v_s IS DISTINCT FROM '{"version":"AR1-APP-r2","contract":"AR-1 strict option 1, A1-1..A1-6"}' THEN RAISE EXCEPTION 'ar1_check: signing_keys.audience is missing or not the AR-1 column'; END IF;
+  SELECT pg_get_constraintdef(k.oid) INTO v_s FROM pg_constraint k
+   WHERE k.conrelid = 'rtgip.signing_keys'::regclass AND k.conname = 'signing_keys_audience_check';
+  IF v_s IS DISTINCT FROM 'CHECK (((audience IS NULL) OR ((dialect = ''rtgip/2''::text) AND (((owner = ''gateway''::text) AND (audience = ANY (ARRAY[''autolabels''::text, ''autocurb''::text, ''autoframe''::text]))) OR ((owner <> ''gateway''::text) AND (audience = ''gateway''::text))))))' THEN RAISE EXCEPTION 'ar1_check: signing_keys_audience_check is not the AR-1 definition (%)', coalesce(v_s, 'missing'); END IF;
+  SELECT pg_get_constraintdef(k.oid) INTO v_s FROM pg_constraint k
+   WHERE k.conrelid = 'rtgip.signing_keys'::regclass AND k.conname = 'signing_keys_legacy_no_audience_check';
+  IF v_s IS DISTINCT FROM 'CHECK (((audience IS NULL) OR (key_id !~ ''-1$''::text)))' THEN RAISE EXCEPTION 'ar1_check: signing_keys_legacy_no_audience_check is not the AR-1 definition (%)', coalesce(v_s, 'missing'); END IF;
+  SELECT indexdef INTO v_s FROM pg_indexes WHERE schemaname = 'rtgip' AND indexname = 'signing_keys_one_current_per_audience';
+  IF v_s IS DISTINCT FROM 'CREATE UNIQUE INDEX signing_keys_one_current_per_audience ON rtgip.signing_keys USING btree (owner, audience) WHERE ((audience IS NOT NULL) AND (status = ''current''::text))' THEN RAISE EXCEPTION 'ar1_check: signing_keys_one_current_per_audience is not the AR-1 index (%)', coalesce(v_s, 'missing'); END IF;
+  SELECT pg_get_constraintdef(k.oid) INTO v_s FROM pg_constraint k
+   WHERE k.conrelid = 'rtgip.receipts'::regclass AND k.conname = 'receipts_kind_check';
+  IF v_s IS DISTINCT FROM 'CHECK ((kind = ANY (ARRAY[''gateway_admission''::text, ''target_inbox''::text, ''consumer_commit''::text, ''gateway_confirmation''::text])))' THEN RAISE EXCEPTION 'ar1_check: receipts_kind_check is not the AR-1 definition (%)', coalesce(v_s, 'missing'); END IF;
+  SELECT string_agg(p.proname || '=' || coalesce((SELECT string_agg(ai::text, ',' ORDER BY ai::text COLLATE "C") FROM unnest(p.proacl) ai), 'NULL')
+                    || ':' || p.prosecdef || ':' || pg_get_userbyid(p.proowner), ';' ORDER BY p.proname COLLATE "C") INTO v_s
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'rtgip' AND p.proname IN ('inbox_admit','outbox_advance','receipt_check_signature','receipt_verify');
+  IF v_s IS DISTINCT FROM v_acl THEN RAISE EXCEPTION 'ar1_check: the ACL, owner or SECURITY DEFINER of a replaced function changed'; END IF;
+  SELECT coalesce(string_agg(DISTINCT CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE x.grantee::regrole::text END, ',' ORDER BY CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE x.grantee::regrole::text END), '') INTO v_s FROM pg_proc p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) x WHERE p.oid = 'rtgip.inbox_admit(jsonb, text, text, jsonb)'::regprocedure AND x.privilege_type = 'EXECUTE' AND x.grantee <> p.proowner;
+  IF v_s IS DISTINCT FROM 'rtgip_inbox_receiver' THEN RAISE EXCEPTION 'ar1_check: rtgip.inbox_admit EXECUTE grantees are (%), expected (rtgip_inbox_receiver)', v_s; END IF;
+  SELECT count(*) INTO v_n FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'rtgip' AND p.proname = 'outbox_advance';
+  IF v_n <> 1 THEN RAISE EXCEPTION 'ar1_check: expected one rtgip.outbox_advance, found %', v_n; END IF;
+  SELECT coalesce(string_agg(DISTINCT CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE x.grantee::regrole::text END, ','), '') INTO v_s
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) x
+   WHERE n.nspname = 'rtgip' AND p.proname = 'outbox_advance' AND x.privilege_type = 'EXECUTE' AND x.grantee <> p.proowner;
+  IF v_s IS DISTINCT FROM 'rtgip_dispatcher' THEN RAISE EXCEPTION 'ar1_check: rtgip.outbox_advance EXECUTE grantees are (%), expected (rtgip_dispatcher)', v_s; END IF;
+  SELECT coalesce(string_agg(DISTINCT CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE x.grantee::regrole::text END, ',' ORDER BY CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE x.grantee::regrole::text END), '') INTO v_s FROM pg_proc p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) x WHERE p.oid = 'rtgip.receipt_check_signature(jsonb)'::regprocedure AND x.privilege_type = 'EXECUTE' AND x.grantee <> p.proowner;
+  IF v_s IS DISTINCT FROM '' THEN RAISE EXCEPTION 'ar1_check: rtgip.receipt_check_signature EXECUTE grantees are (%), expected ()', v_s; END IF;
+  SELECT coalesce(string_agg(DISTINCT CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE x.grantee::regrole::text END, ',' ORDER BY CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE x.grantee::regrole::text END), '') INTO v_s FROM pg_proc p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) x WHERE p.oid = 'rtgip.receipt_verify(text, text, jsonb, text, text)'::regprocedure AND x.privilege_type = 'EXECUTE' AND x.grantee <> p.proowner;
+  IF v_s IS DISTINCT FROM '' THEN RAISE EXCEPTION 'ar1_check: rtgip.receipt_verify EXECUTE grantees are (%), expected ()', v_s; END IF;
+  RAISE NOTICE 'ar1_apply_ok al local_app=autolabels audience column, gateway_confirmation, 4 functions replaced; keys unchanged';
+END
+$ar1$;
