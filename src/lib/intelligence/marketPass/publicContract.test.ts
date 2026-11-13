@@ -124,6 +124,12 @@ describe("the edge handler's authorization decision", () => {
     expect(decideMarketPassResponse({ row: loadedRow(), settings: {}, caller: anon, audience: "public", nowMs: NOW }).status).toBe(404);
   });
 
+  it("a tenant binding that is not the listing's tenant serves nothing", () => {
+    const bound = (t: string) => decideMarketPassResponse({ row: loadedRow(), settings: settings(), caller: anon, audience: "public", nowMs: NOW, expectedTenantId: t });
+    expect(bound(OTHER_TENANT)).toEqual({ status: 404, body: { error: "not_found" } });
+    expect(bound(TENANT).status).toBe(200);
+  });
+
   it("an unpublished listing is not found for the public, and a missing row is not found", () => {
     expect(call(anon, "public", { ...loadedRow(), status: "draft" }).status).toBe(404);
     expect(call(member, "dealer", { ...loadedRow(), status: "draft" }).status).toBe(200);

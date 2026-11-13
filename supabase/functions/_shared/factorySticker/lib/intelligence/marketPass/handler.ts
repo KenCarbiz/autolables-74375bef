@@ -12,6 +12,8 @@
 //   member of the listing's tenant, ?audience=dealer -> dealer contract
 //   any other caller asking for the dealer view  -> 401 / 403, nothing private
 //   flag off for the listing's tenant            -> 404 marketpass_disabled
+//   ?tenant_id= given and not the listing's      -> 404 not_found (AutoFilm binds
+//                                                   each request to its own dealer)
 
 import { readMarketFlag } from "../../market/flags.ts";
 import { buildMarketPassAssessment } from "./assessment.ts";
@@ -31,6 +33,8 @@ export interface MarketPassRequest {
   caller: MarketPassCaller;
   audience: "public" | "dealer";
   nowMs: number;
+  /** When set, the listing must belong to this tenant or nothing is served. */
+  expectedTenantId?: string | null;
 }
 
 export interface MarketPassResponse {
@@ -41,6 +45,9 @@ export interface MarketPassResponse {
 export function decideMarketPassResponse(req: MarketPassRequest): MarketPassResponse {
   const { row, caller } = req;
   if (!row || !row.vin) return { status: 404, body: { error: "not_found" } };
+  if (req.expectedTenantId != null && req.expectedTenantId !== "" && row.tenant_id !== req.expectedTenantId) {
+    return { status: 404, body: { error: "not_found" } };
+  }
   const member = caller.userId != null && row.tenant_id != null && caller.memberTenantIds.includes(row.tenant_id);
   const published = row.status === "published";
   if (!published && !member) return { status: 404, body: { error: "not_found" } };

@@ -6,7 +6,10 @@ import type { MarketPassRow } from "../_shared/factorySticker/lib/intelligence/m
 // ──────────────────────────────────────────────────────────────
 // marketpass-assessment  ·  MarketPass V2 (PROPOSED rules, NOT deployed)
 //
-//   GET /functions/v1/marketpass-assessment?slug=<slug>[&audience=dealer]
+//   GET /functions/v1/marketpass-assessment?slug=<slug>[&tenant_id=<uuid>][&audience=dealer]
+//
+// tenant_id is a binding check, not a credential: AutoFilm passes the tenant
+// its rooftop is mapped to, and a listing of another tenant is not found.
 //
 // Reads only what is already stored on the listing and the dealer profile.
 // It calls no provider: no MarketCheck, NeoVIN or Black Book request can
@@ -43,6 +46,8 @@ serve(async (req) => {
   const slug = (url.searchParams.get("slug") ?? "").trim();
   if (!slug || slug.length > 120) return json(400, { error: "slug_required" });
   const audience = url.searchParams.get("audience") === "dealer" ? "dealer" : "public";
+  const expectedTenantId = (url.searchParams.get("tenant_id") ?? "").trim() || null;
+  if (expectedTenantId && !/^[0-9a-f-]{36}$/i.test(expectedTenantId)) return json(400, { error: "tenant_id_invalid" });
 
   try {
     const admin = createClient(supabaseUrl, serviceKey);
@@ -73,7 +78,7 @@ serve(async (req) => {
       }
     }
 
-    const decision = decideMarketPassResponse({ row, settings, caller, audience, nowMs: Date.now() });
+    const decision = decideMarketPassResponse({ row, settings, caller, audience, nowMs: Date.now(), expectedTenantId });
     return json(decision.status, decision.body);
   } catch (_e) {
     return json(500, { error: "assessment_failed" });
