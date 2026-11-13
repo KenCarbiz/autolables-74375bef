@@ -102,13 +102,21 @@ BEGIN
     EXECUTE format('SELECT count(*) FROM rtgip.%I', t) INTO v_n;
     IF v_n <> 0 THEN RAISE EXCEPTION 'p2al_edge_check: rtgip.% has % rows, expected 0 on the dark production node', t, v_n; END IF;
   END LOOP;
+  SELECT count(*), coalesce(string_agg(p.oid::regprocedure::text, ', ' ORDER BY p.oid::regprocedure::text COLLATE "C"), '') INTO v_n, v_s
+    FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.prosecdef
+     AND (p.proacl IS NULL OR EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE'))
+     AND p.prosrc ~* '(request\.jwt\.claim|auth\.(uid|role|jwt)[[:space:]]*\()';
+  RAISE NOTICE 'p2al_edge_inventory: % PUBLIC-executable SECURITY DEFINER functions in public read the JWT claims; rtgip_edge can call them with forged claims: %', v_n, v_s;
+  SELECT count(*) INTO v_n FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.prosecdef
+     AND (p.proacl IS NULL OR EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE'));
+  RAISE NOTICE 'p2al_edge_inventory: % PUBLIC-executable SECURITY DEFINER functions in public in total (owner accepts or revokes per function on the step 10 card)', v_n;
   RAISE NOTICE 'p2al_edge_ok: rtgip_edge LOGIN NOINHERIT, SET-only on 4 duty roles, read grants and policies for the runtime';
 END
 $p2al$;
 $p2wrapfile$;
 BEGIN
-  IF encode(sha256(convert_to(t, 'UTF8')), 'hex') <> 'c58ee7cdca7060fee723759c9207493b1bccb54b5179a05d3240bb1b570e434d' THEN
-    RAISE EXCEPTION 'p2al-10-EDGE wrapper STOP: file text sha256 % differs from the approved c58ee7cd', encode(sha256(convert_to(t, 'UTF8')), 'hex');
+  IF encode(sha256(convert_to(t, 'UTF8')), 'hex') <> 'd6dd3c2d5065ee67098b9ff3066c4a3a9f2b482bcb9a9d7b0372c66fddee8bf9' THEN
+    RAISE EXCEPTION 'p2al-10-EDGE wrapper STOP: file text sha256 % differs from the approved d6dd3c2d', encode(sha256(convert_to(t, 'UTF8')), 'hex');
   END IF;
   EXECUTE t;
 END

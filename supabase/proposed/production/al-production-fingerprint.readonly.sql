@@ -134,5 +134,23 @@ SELECT host(inet_server_addr()) AS addr,
          WHERE am.member = to_regrole('rtgip_edge') AND am.set_option AND NOT am.inherit_option AND NOT am.admin_option) = 'rtgip_dispatcher,rtgip_inbox_receiver,rtgip_outbox_writer,rtgip_source_reader' AS edge_memberships_ok,
        NOT EXISTS (SELECT 1 FROM pg_roles r WHERE (r.rolname IN ('anon','authenticated','service_role') OR r.rolname LIKE 'sandbox\_exec%')
                      AND (has_schema_privilege(r.oid, 'rtgip', 'USAGE') OR has_schema_privilege(r.oid, 'rtgip_fx', 'USAGE')
-                          OR EXISTS (SELECT 1 FROM pg_proc p WHERE p.pronamespace IN ('rtgip'::regnamespace, 'rtgip_fx'::regnamespace) AND has_function_privilege(r.oid, p.oid, 'EXECUTE')))) AS api_closed_ok,
+                          OR has_schema_privilege(r.oid, 'rtgip_src', 'USAGE')
+                          OR EXISTS (SELECT 1 FROM pg_proc p WHERE p.pronamespace IN ('rtgip'::regnamespace, 'rtgip_fx'::regnamespace, 'rtgip_src'::regnamespace) AND has_function_privilege(r.oid, p.oid, 'EXECUTE')))) AS api_closed_ok,
+       NOT EXISTS (SELECT 1 FROM unnest(ARRAY['public.vehicle_history_is_platform_admin()', 'public.vehicle_history_is_manager(uuid)', 'public.vehicle_history_effective_setting(uuid, uuid, text)', 'public.vehicle_history_set_setting(text, uuid, text, jsonb, integer, text)', 'public.vehicle_history_record_milestone(uuid, text, timestamptz, text, text, text, text, uuid, uuid, text, bigint)', 'public.vehicle_history_flag_reappearance(uuid, uuid, text, uuid, text, text)', 'public.vehicle_history_resolve_reappearance(uuid, text, text)', 'public.vehicle_history_grant_access(uuid, text, uuid, text, uuid, text, text, text[], text, timestamptz, timestamptz)', 'public.vehicle_history_end_access(uuid, text, timestamptz, text)', 'public.vehicle_history_set_transaction_retention(uuid, timestamptz, text)', 'public.vehicle_history_owner_view(text)', 'public.integration_replay_inbox(uuid, uuid[], text)', 'public.vehicle_history_apply_identity_correction(uuid)', 'public.vehicle_history_next_state(text, text)']::text[]) f(sig) WHERE to_regprocedure(f.sig) IS NULL
+                     OR has_function_privilege('authenticated', to_regprocedure(f.sig), 'EXECUTE') OR has_function_privilege('anon', to_regprocedure(f.sig), 'EXECUTE')) AS s3_rpcs_dark_ok,
+       EXISTS (SELECT 1 FROM pg_roles r WHERE r.rolname = 'rtgip_edge' AND has_schema_privilege(r.oid, 'public', 'USAGE')) AS edge_public_usage,
+       (SELECT string_agg(c.relname || '.' || a.attname, ',' ORDER BY c.relname || '.' || a.attname COLLATE "C")
+          FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid, aclexplode(a.attacl) x
+         WHERE x.grantee = to_regrole('rtgip_edge') AND x.privilege_type = 'SELECT' AND NOT a.attisdropped)
+         = 'dealer_stores.id,dealer_stores.tenant_id,outbox.connection_id,outbox.delivery_id_v3,outbox.event_id,outbox.lease_generation,outbox.protocol,outbox.state,rooftop_stores.rooftop_id,rooftop_stores.status,rooftop_stores.store_id,rooftop_stores.tenant_id,tenant_members.accepted_at,tenant_members.role,tenant_members.tenant_id,tenant_members.user_id' AS edge_column_grants_ok,
+       NOT EXISTS (SELECT 1 FROM pg_proc p, pg_roles r WHERE r.rolname = 'rtgip_edge' AND p.pronamespace = 'public'::regnamespace
+                     AND has_function_privilege(r.oid, p.oid, 'EXECUTE') AND (p.proacl IS NOT NULL AND EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = r.oid))) AS edge_no_own_public_grant_ok,
+       (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.prosecdef
+     AND (p.proacl IS NULL OR EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE'))
+     AND p.prosrc ~* '(request\.jwt\.claim|auth\.(uid|role|jwt)[[:space:]]*\()') AS edge_jwt_definers,
+       (SELECT coalesce(string_agg(p.oid::regprocedure::text, '; ' ORDER BY p.oid::regprocedure::text COLLATE "C"), '') FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.prosecdef
+     AND (p.proacl IS NULL OR EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE'))
+     AND p.prosrc ~* '(request\.jwt\.claim|auth\.(uid|role|jwt)[[:space:]]*\()') AS edge_jwt_definer_list,
+       (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.prosecdef
+     AND (p.proacl IS NULL OR EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE'))) AS public_definers,
        NOT EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'rtgip' AND c.relkind = 'r' AND NOT c.relrowsecurity) AS rtgip_rls_ok;

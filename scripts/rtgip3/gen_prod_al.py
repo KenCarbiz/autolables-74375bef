@@ -68,6 +68,26 @@ EDGE_OUTBOX_COLS = ["event_id", "state", "protocol", "lease_generation", "connec
 EDGE_COLS = {"public.tenant_members": ["user_id", "tenant_id", "role", "accepted_at"], "public.dealer_stores": ["id", "tenant_id"],
              "rtgip_src.rooftop_stores": ["tenant_id", "rooftop_id", "store_id", "status"]}
 EDGE_SET = ["rtgip_dispatcher", "rtgip_inbox_receiver", "rtgip_outbox_writer", "rtgip_source_reader"]
+# The 14 S3 RPCs that 02 grants to authenticated (20261109000000_vehicle_history_foundation.sql, last DO block). 02b takes
+# that grant back so S3 lands dark; nothing in the runtime, R or E calls them (R and E run as definer and never reference them).
+S3_RPCS = ["public.vehicle_history_is_platform_admin()", "public.vehicle_history_is_manager(uuid)",
+           "public.vehicle_history_effective_setting(uuid, uuid, text)",
+           "public.vehicle_history_set_setting(text, uuid, text, jsonb, integer, text)",
+           "public.vehicle_history_record_milestone(uuid, text, timestamptz, text, text, text, text, uuid, uuid, text, bigint)",
+           "public.vehicle_history_flag_reappearance(uuid, uuid, text, uuid, text, text)",
+           "public.vehicle_history_resolve_reappearance(uuid, text, text)",
+           "public.vehicle_history_grant_access(uuid, text, uuid, text, uuid, text, text, text[], text, timestamptz, timestamptz)",
+           "public.vehicle_history_end_access(uuid, text, timestamptz, text)",
+           "public.vehicle_history_set_transaction_retention(uuid, timestamptz, text)",
+           "public.vehicle_history_owner_view(text)", "public.integration_replay_inbox(uuid, uuid[], text)",
+           "public.vehicle_history_apply_identity_correction(uuid)", "public.vehicle_history_next_state(text, text)"]
+# M-1: SECURITY DEFINER functions in public that PUBLIC (so any direct login, rtgip_edge included) may execute and whose body
+# reads the JWT claims. A direct login can set request.jwt.claims itself, which a PostgREST caller cannot. Read only.
+JWT_DEFINERS_WHERE = ("p.pronamespace = 'public'::regnamespace AND p.prosecdef\n"
+                      "     AND (p.proacl IS NULL OR EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE'))\n"
+                      "     AND p.prosrc ~* '(request\\.jwt\\.claim|auth\\.(uid|role|jwt)[[:space:]]*\\()'")
+PUBLIC_DEFINERS_WHERE = ("p.pronamespace = 'public'::regnamespace AND p.prosecdef\n"
+                         "     AND (p.proacl IS NULL OR EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE'))")
 
 
 def read(path, pin=None):
@@ -91,9 +111,15 @@ def lines(text, a, b):
     return "".join(text.splitlines(keepends=True)[a - 1:b])
 
 
-def header(step, title, what, rollback):
-    return (f"-- P2 AutoLabels PRODUCTION step {step}: {title} (PROPOSAL, NOT APPROVED, install dark).\n"
-            f"-- AutoLabels production (Supabase {PROD['ref']}, Lovable {PROD['lovable']}, server {PROD['server']}). One DO statement,\n"
+def header(step, title, what, rollback, staging=False):
+    if staging:
+        first = (f"-- P2 AutoLabels STAGING REHEARSAL of production step {step}: {title} (PROPOSAL, NOT APPROVED; its own card before P4).\n"
+                 f"-- AutoLabels Staging (server {STAGING_AL_SERVER}). Same SQL as the production step; only the pins and the\n"
+                 "-- pre-state differ (staging keeps its enrolled connections, keys and ledger rows). One DO statement,\n")
+    else:
+        first = (f"-- P2 AutoLabels PRODUCTION step {step}: {title} (PROPOSAL, NOT APPROVED, install dark).\n"
+                 f"-- AutoLabels production (Supabase {PROD['ref']}, Lovable {PROD['lovable']}, server {PROD['server']}). One DO statement,\n")
+    return (first +
             f"-- atomic: any STOP or CHECK raises and nothing is applied. Runs only as postgres on PostgreSQL 17.\n"
             + "".join(f"-- {w}\n" for w in what)
             + f"-- Rollback: {rollback}\n"
@@ -134,6 +160,74 @@ def dark(tag, phase, local_app="autolabels"):
 """
     del la
     return out
+
+
+def staging_dark(tag, phase):
+    """AutoLabels Staging after the Card 3 shutdown: dark config row and CHECK lock; enrolled rows stay."""
+    return f"""  IF (SELECT count(*) FROM rtgip.delivery_config) <> 1 OR EXISTS (SELECT 1 FROM rtgip.delivery_config WHERE id IS NOT TRUE OR transport_enabled IS DISTINCT FROM false OR local_app IS DISTINCT FROM 'autolabels') THEN
+    RAISE EXCEPTION '{tag}_{phase}: delivery_config is not the single dark row (transport_enabled false, local_app autolabels)';
+  END IF;
+  IF (SELECT count(*) FROM pg_constraint WHERE conrelid = 'rtgip.delivery_config'::regclass AND contype = 'c'
+        AND conname = 'delivery_config_transport_enabled_check' AND pg_get_constraintdef(oid) = 'CHECK ((transport_enabled = false))') <> 1 THEN
+    RAISE EXCEPTION '{tag}_{phase}: the transport CHECK lock is not the pinned definition';
+  END IF;
+"""
+
+
+def jwt_notice(tag):
+    return f"""  SELECT count(*), coalesce(string_agg(p.oid::regprocedure::text, ', ' ORDER BY p.oid::regprocedure::text COLLATE "C"), '') INTO v_n, v_s
+    FROM pg_proc p WHERE {JWT_DEFINERS_WHERE};
+  RAISE NOTICE '{tag}_inventory: % PUBLIC-executable SECURITY DEFINER functions in public read the JWT claims; rtgip_edge can call them with forged claims: %', v_n, v_s;
+  SELECT count(*) INTO v_n FROM pg_proc p WHERE {PUBLIC_DEFINERS_WHERE};
+  RAISE NOTICE '{tag}_inventory: % PUBLIC-executable SECURITY DEFINER functions in public in total (owner accepts or revokes per function on the step 10 card)', v_n;
+"""
+
+
+def s3b_inner(server, major, inverse=False):
+    tag = "p2al_s3b" + ("_inverse" if inverse else "")
+    arr = "ARRAY[" + ", ".join(G.q(f) for f in S3_RPCS) + "]::text[]"
+    granted = """has_function_privilege('authenticated', to_regprocedure(f), 'EXECUTE')"""
+    pub = """EXISTS (SELECT 1 FROM pg_proc pp, aclexplode(coalesce(pp.proacl, acldefault('f', pp.proowner))) a WHERE pp.oid = to_regprocedure(f) AND a.grantee = 0)"""
+    anon = """has_function_privilege('anon', to_regprocedure(f), 'EXECUTE')"""
+    svc = """has_function_privilege('service_role', to_regprocedure(f), 'EXECUTE')"""
+    if inverse:
+        pre_bad, pre_msg = f"{granted} OR {anon} OR {pub} OR NOT {svc}", "is not as 02b left it (authenticated, anon and PUBLIC without EXECUTE, service_role with it)"
+        apply = "    EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO authenticated', to_regprocedure(f));\n"
+        post_bad, post_msg = f"NOT {granted} OR {anon} OR {pub} OR NOT {svc}", "is not as 02 granted it"
+        done = "the 14 S3 RPCs are executable by authenticated again, exactly as 02 granted them"
+    else:
+        pre_bad, pre_msg = f"NOT {granted} OR {anon} OR {pub} OR NOT {svc}", "is not as 02 granted it (authenticated and service_role EXECUTE, anon and PUBLIC none)"
+        apply = "    EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon, authenticated', to_regprocedure(f));\n"
+        post_bad, post_msg = f"{granted} OR {anon} OR {pub} OR NOT {svc}", "is still executable by an API role other than service_role"
+        done = "the 14 S3 RPCs are dark: no EXECUTE for authenticated, anon or PUBLIC; service_role keeps its grant"
+    return f"""DO $p2al$
+DECLARE
+  v_comp constant text := {dq('p2alchk', fp_comp_sql())};
+  v_state text;
+  v_digest text;
+  f text;
+BEGIN
+{G.common_pins(tag, server, major)}  EXECUTE v_comp INTO v_state, v_digest USING 'S3';
+  IF v_state IS DISTINCT FROM 'installed' OR v_digest IS DISTINCT FROM '{STAGING_DIGEST['S3']}' THEN
+    RAISE EXCEPTION '{tag}_stop: S3 is % with digest %, expected installed with the staging digest', v_state, v_digest;
+  END IF;
+  FOREACH f IN ARRAY {arr} LOOP
+    IF to_regprocedure(f) IS NULL THEN RAISE EXCEPTION '{tag}_stop: % is missing', f; END IF;
+    IF {pre_bad} THEN RAISE EXCEPTION '{tag}_stop: % {pre_msg}', f; END IF;
+  END LOOP;
+
+  FOREACH f IN ARRAY {arr} LOOP
+{apply}  END LOOP;
+
+  FOREACH f IN ARRAY {arr} LOOP
+    IF {post_bad} THEN RAISE EXCEPTION '{tag}_check: % {post_msg}', f; END IF;
+  END LOOP;
+  EXECUTE v_comp INTO v_state, v_digest USING 'S3';
+  IF v_digest IS DISTINCT FROM '{STAGING_DIGEST['S3']}' THEN RAISE EXCEPTION '{tag}_check: S3 digest changed to %', v_digest; END IF;
+  RAISE NOTICE '{tag}_ok: {done}';
+END
+$p2al$;
+"""
 
 
 def component_inner(step, key, file_text, server, major, restore=False):
@@ -363,8 +457,10 @@ def ar3_files(server, major):
     return fw, iv
 
 
-def edge_inner(server, major, inverse=False):
-    tag = "p2al_edge" + ("_inverse" if inverse else "")
+def edge_inner(server, major, inverse=False, staging=False):
+    tag = "p2al_edge" + ("_stg" if staging else "") + ("_inverse" if inverse else "")
+    pre_dark = staging_dark(tag, "stop") if staging else dark(tag, "stop")
+    post_dark = staging_dark(tag, "check") if staging else dark(tag, "check")
     pol = "rtgip_edge_runtime_read"
     rls_tables = [f"rtgip.{t}" for t in EDGE_TABLES + ["outbox"]] + ["public.tenant_members", "public.dealer_stores"]
     rls_arr = "ARRAY[" + ",".join(G.q(x) for x in rls_tables) + "]"
@@ -412,7 +508,7 @@ BEGIN
 {G.common_pins(tag, server, major)}  IF obj_description(to_regclass('rtgip.evidence_v3'), 'pg_class') IS DISTINCT FROM {G.q(G.AR3_MARKER)} THEN
     RAISE EXCEPTION '{tag}_stop: ar3 (rtgip/3) is not applied';
   END IF;
-{dark(tag, 'stop')}  SELECT string_agg(rolname, ',' ORDER BY rolname COLLATE "C") INTO v_s FROM pg_roles WHERE rolname LIKE 'rtgip%';
+{pre_dark}  SELECT string_agg(rolname, ',' ORDER BY rolname COLLATE "C") INTO v_s FROM pg_roles WHERE rolname LIKE 'rtgip%';
   IF v_s IS DISTINCT FROM '{ROLES}' THEN
     RAISE EXCEPTION '{tag}_stop: rtgip roles are (%), expected ({ROLES}); rtgip_edge exists already or the role set drifted', coalesce(v_s, 'none');
   END IF;
@@ -464,7 +560,7 @@ BEGIN
      OR has_table_privilege('rtgip_edge', 'rtgip.delivery_config', 'UPDATE') OR has_column_privilege('rtgip_edge', 'rtgip.outbox', 'body', 'SELECT') THEN
     RAISE EXCEPTION '{tag}_check: rtgip_edge holds more than its reads';
   END IF;
-{dark(tag, 'check')}  RAISE NOTICE '{tag}_ok: rtgip_edge LOGIN NOINHERIT, SET-only on 4 duty roles, read grants and policies for the runtime';
+{post_dark}{jwt_notice(tag)}  RAISE NOTICE '{tag}_ok: rtgip_edge LOGIN NOINHERIT, SET-only on 4 duty roles, read grants and policies for the runtime';
 END
 $p2al$;
 """
@@ -573,6 +669,13 @@ def build(server=PROD["server"], major=17):
                                                               "Order: invert 10 to 07 first, then restore 01, 02, 03, 04, 05, then re-apply 07 to 10."],
                         f"{num}-{key}.disable.sql") + component_inner(num, key, text, server, major, restore=True)
         files[f"{num}-{key}.restore.sql"] = G.wrap(f"p2al-{num}-{key}.restore", rinner)
+    files["02b-S3-dark.sql"] = G.wrap("p2al-02b-S3-dark", header("02b", "S3 RPCs dark (revoke authenticated EXECUTE)", [
+        "Revokes EXECUTE from PUBLIC, anon and authenticated on the 14 vehicle_history_* / integration_* RPCs 02 grants to signed-in",
+        "staff, so PR #46's database half lands dark. service_role keeps its grant; the runtime, R and E call none of them. ACLs are",
+        "not part of the S3 digest, which the post-check re-asserts."], "02b-S3-dark.inverse.sql") + s3b_inner(server, major))
+    files["02b-S3-dark.inverse.sql"] = G.wrap("p2al-02b-S3-dark.inverse", header("02b", "S3 RPCs re-granted", [
+        "Grants EXECUTE to authenticated on the same 14 RPCs, exactly what 02 granted (used when the vehicle history feature ships)."],
+        "re-run 02b-S3-dark.sql") + s3b_inner(server, major, True))
     files["06-H.sql"] = G.wrap("p2al-06-H", header("06", "H sandbox_exec write revoke", [
         "Embeds the staging H_sandbox_exec.sql (f0132f8b) and H2_sandbox_exec_sequence.sql (d61c7858) byte for byte, plus the same revokes",
         "for any other sandbox_exec_<ref> role. Revokes only."], "IRREVERSIBLE by design: re-granting sandbox_exec writes is never wanted.") + h_inner(server, major))
@@ -592,10 +695,36 @@ def build(server=PROD["server"], major=17):
         "membership in the four duty roles, SELECT on the rows the runtime reads as itself, and a SELECT policy TO rtgip_edge on each."],
         "10-EDGE.inverse.sql") + edge_inner(server, major))
     files["10-EDGE.inverse.sql"] = G.wrap("p2al-10-EDGE.inverse", header("10", "rtgip_edge inverse", ["Removes the login, its memberships, grants and policies."], "re-run 10-EDGE.sql") + edge_inner(server, major, True))
+    stg = STAGING_AL_SERVER if server == PROD["server"] else server
+    files["10-EDGE.staging-rehearsal.sql"] = G.wrap("p2al-10-EDGE.staging-rehearsal", header("10", "rtgip_edge login (staging rehearsal)", [
+        "Byte-equal to 10-EDGE.sql except the server pin and the dark pre/post check, which here keeps staging's enrolled rows.",
+        "Run on AutoLabels Staging, point the staging runtime's RTGIP_EDGE_DB_URL at rtgip_edge, prove one publish and one inbound."],
+        "10-EDGE.staging-rehearsal.inverse.sql", staging=True) + edge_inner(stg, 17 if stg == STAGING_AL_SERVER else major, staging=True))
+    files["10-EDGE.staging-rehearsal.inverse.sql"] = G.wrap("p2al-10-EDGE.staging-rehearsal.inverse", header("10", "rtgip_edge inverse (staging rehearsal)",
+        ["Removes the staging rtgip_edge login, its memberships, grants and policies."], "re-run 10-EDGE.staging-rehearsal.sql", staging=True)
+        + edge_inner(stg, 17 if stg == STAGING_AL_SERVER else major, True, staging=True))
+    files["10-EDGE.preread.readonly.sql"] = preread()
     files["T1-connections.template.sql"] = conn_template(server, major)
     files["T2-K5-v3-al.template.sql"] = k5_file(server, major)
     files["T2-K5-v3-al.inverse.template.sql"] = k5_file(server, major, inverse=True)
     return files
+
+
+def preread():
+    return f"""-- AutoLabels PRODUCTION read before step 10 (M-1). READ ONLY. Lists the SECURITY DEFINER functions in schema public that
+-- PUBLIC may execute (so a direct login such as rtgip_edge may) and whose body reads request.jwt.claims, auth.uid(),
+-- auth.role() or auth.jwt(). A direct login can set request.jwt.claims itself and call these as any user or as
+-- service_role; a PostgREST caller cannot. The second query lists every PUBLIC-executable SECURITY DEFINER function in
+-- public, because one may read the claims through a helper. The owner accepts or revokes each on the step 10 card;
+-- nothing here changes a grant. Run it again after step 10 (the fingerprint repeats both counts).
+SELECT p.oid::regprocedure AS function, pg_get_userbyid(p.proowner) AS owner, 'reads jwt claims' AS why
+  FROM pg_proc p WHERE {JWT_DEFINERS_WHERE}
+UNION ALL
+SELECT p.oid::regprocedure, pg_get_userbyid(p.proowner), 'public-executable definer'
+  FROM pg_proc p WHERE {PUBLIC_DEFINERS_WHERE}
+     AND NOT (p.prosrc ~* '(request\\.jwt\\.claim|auth\\.(uid|role|jwt)[[:space:]]*\\()')
+ ORDER BY 3, 1;
+"""
 
 
 def fingerprint():
@@ -637,7 +766,20 @@ SELECT host(inet_server_addr()) AS addr,
          WHERE am.member = to_regrole('rtgip_edge') AND am.set_option AND NOT am.inherit_option AND NOT am.admin_option) = '{",".join(sorted(EDGE_SET))}' AS edge_memberships_ok,
        NOT EXISTS (SELECT 1 FROM pg_roles r WHERE (r.rolname IN ('anon','authenticated','service_role') OR r.rolname LIKE 'sandbox\\_exec%')
                      AND (has_schema_privilege(r.oid, 'rtgip', 'USAGE') OR has_schema_privilege(r.oid, 'rtgip_fx', 'USAGE')
-                          OR EXISTS (SELECT 1 FROM pg_proc p WHERE p.pronamespace IN ('rtgip'::regnamespace, 'rtgip_fx'::regnamespace) AND has_function_privilege(r.oid, p.oid, 'EXECUTE')))) AS api_closed_ok,
+                          OR has_schema_privilege(r.oid, 'rtgip_src', 'USAGE')
+                          OR EXISTS (SELECT 1 FROM pg_proc p WHERE p.pronamespace IN ('rtgip'::regnamespace, 'rtgip_fx'::regnamespace, 'rtgip_src'::regnamespace) AND has_function_privilege(r.oid, p.oid, 'EXECUTE')))) AS api_closed_ok,
+       NOT EXISTS (SELECT 1 FROM unnest({"ARRAY[" + ", ".join(G.q(f) for f in S3_RPCS) + "]::text[]"}) f(sig) WHERE to_regprocedure(f.sig) IS NULL
+                     OR has_function_privilege('authenticated', to_regprocedure(f.sig), 'EXECUTE') OR has_function_privilege('anon', to_regprocedure(f.sig), 'EXECUTE')) AS s3_rpcs_dark_ok,
+       EXISTS (SELECT 1 FROM pg_roles r WHERE r.rolname = 'rtgip_edge' AND has_schema_privilege(r.oid, 'public', 'USAGE')) AS edge_public_usage,
+       (SELECT string_agg(c.relname || '.' || a.attname, ',' ORDER BY c.relname || '.' || a.attname COLLATE "C")
+          FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid, aclexplode(a.attacl) x
+         WHERE x.grantee = to_regrole('rtgip_edge') AND x.privilege_type = 'SELECT' AND NOT a.attisdropped)
+         = '{",".join(sorted([f"{rel.split('.')[1]}.{c}" for rel, cols in EDGE_COLS.items() for c in cols] + [f"outbox.{c}" for c in EDGE_OUTBOX_COLS]))}' AS edge_column_grants_ok,
+       NOT EXISTS (SELECT 1 FROM pg_proc p, pg_roles r WHERE r.rolname = 'rtgip_edge' AND p.pronamespace = 'public'::regnamespace
+                     AND has_function_privilege(r.oid, p.oid, 'EXECUTE') AND (p.proacl IS NOT NULL AND EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = r.oid))) AS edge_no_own_public_grant_ok,
+       (SELECT count(*) FROM pg_proc p WHERE {JWT_DEFINERS_WHERE}) AS edge_jwt_definers,
+       (SELECT coalesce(string_agg(p.oid::regprocedure::text, '; ' ORDER BY p.oid::regprocedure::text COLLATE "C"), '') FROM pg_proc p WHERE {JWT_DEFINERS_WHERE}) AS edge_jwt_definer_list,
+       (SELECT count(*) FROM pg_proc p WHERE {PUBLIC_DEFINERS_WHERE}) AS public_definers,
        NOT EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'rtgip' AND c.relkind = 'r' AND NOT c.relrowsecurity) AS rtgip_rls_ok;
 """
 
@@ -650,12 +792,12 @@ def write_all(outdir, files):
 
 
 def sums(files):
-    out = []
-    for name in sorted(files):
-        out.append(f"{G.sha(files[name])}  {name}")
-        if "$p2wrapfile$" in files[name]:
-            out.append(f"{G.sha(G.unwrap(files[name]))}  {name} (inner text, checked by the wrapper)")
-    return "\n".join(out) + "\n"
+    """SHA256SUMS is sha256sum -c compatible; SHA256SUMS.inner lists each wrapped file's inner text, which its wrapper checks."""
+    return "".join(f"{G.sha(files[n])}  {n}\n" for n in sorted(files))
+
+
+def inner_sums(files):
+    return "".join(f"{G.sha(G.unwrap(files[n]))}  {n}\n" for n in sorted(files) if "$p2wrapfile$" in files[n])
 
 
 def all_files(server=PROD["server"], major=17):
@@ -688,6 +830,7 @@ def main():
     s = open(os.path.join(SRC, "al-hosted-fingerprint.sql"), encoding="utf-8").read()
     assert G.sha(s) == SRC_PINS["al-hosted-fingerprint.sql"]
     files = all_files(server, a.major)
+    files["SHA256SUMS.inner"] = inner_sums(files)
     files["SHA256SUMS"] = sums(files)
     if a.rehearsal:
         write_all(a.rehearsal, files)
