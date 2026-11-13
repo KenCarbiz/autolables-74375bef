@@ -1,9 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { matchesLegacyServiceRole, readCredentials } from "../_shared/functionAuth.ts";
 import { PipelineError, processImportJob, reconcile, type Db } from "../_shared/filescom/pipeline.ts";
+import { isServiceOrCron } from "../_shared/supabase.ts";
 
-// Files.com inventory worker. Invoked by pg_cron (schedule_files_inventory_worker)
-// with the service-role credential, never by a browser. Each run optionally
+// Files.com inventory worker. Invoked by pg_cron with the shared x-cron-secret
+// (every schedule here carries the anon key as its bearer and Vault holds no
+// service key, so a service-role-only gate could never be scheduled), or by a
+// caller holding the service-role key; never by a browser. Each run optionally
 // reconciles the folder against processed versions, then drains a few due
 // jobs from the durable queue. Pause and emergency stop are enforced by the
 // claim functions and again by the per-store apply.
@@ -15,7 +18,7 @@ const MAX_JOBS = 3;
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json(405, { error: "method_not_allowed" });
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  if (!(await matchesLegacyServiceRole(readCredentials(req), serviceKey))) return json(401, { error: "unauthorized" });
+  if (!(await matchesLegacyServiceRole(readCredentials(req), serviceKey)) && !isServiceOrCron(req)) return json(401, { error: "unauthorized" });
   const key = Deno.env.get("FILESCOM_API_KEY");
   if (!key) return json(409, { error: "FILESCOM_API_KEY_missing" });
   let body: Record<string, unknown> = {};

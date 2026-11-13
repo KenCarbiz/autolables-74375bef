@@ -45,6 +45,7 @@ const NOT_YET_ON_SHARED_GATE = new Set<string>([]);
 const MUST_USE_SHARED_GATE = [
   "passport-lead-escalation",
   "send-passport-document-deliveries",
+  "files-inventory-worker",
 ];
 
 describe("cron shared-secret env var name", () => {
