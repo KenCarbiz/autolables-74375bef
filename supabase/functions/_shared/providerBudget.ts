@@ -8,11 +8,12 @@ import { billingProductForUrl, MC_CALL_PRICE_USD } from "./mcCost.ts";
 import { outcomeForAnswer, parseAdmitRow, settlementForAnswer, type AdmitResult, type ProviderCallOutcome } from "./providerBudgetPolicy.ts";
 import { catalogProductForUrl, requestDedupeKey } from "./marketcheck/catalogKeys.ts";
 import { readQuotaHeaders } from "./marketcheck/responseSemantics.ts";
+import { checkCallPolicy, normalizeVin } from "./marketcheck/callPolicy.ts";
 
 export const MARKETCHECK_ACCOUNT_REF = "marketcheck_primary";
 
 // deno-lint-ignore no-explicit-any
-type RpcClient = { rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: any; error: any }> };
+type RpcClient = { rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: any; error: any }>; from?: (table: string) => any };
 
 export interface AdmitArgs {
   url: string;
@@ -48,6 +49,11 @@ export async function admitProviderCall(admin: RpcClient | null | undefined, a: 
   }
   const provider = a.provider || "marketcheck";
   const product = a.product || billingProductForUrl(a.url);
+  if (provider === "marketcheck") {
+    const policy = await checkCallPolicy(admin, { caller: a.caller, essential: a.essential === true, tenantId: a.tenantId ?? null, vin: a.vin ?? null, product });
+    if (!policy.admitted) return { admitted: false, eventId: null, monthCalls: null, cap: null, reserve: null, reason: "call_policy", policyReason: policy.reason };
+    if (a.vin) a = { ...a, vin: normalizeVin(a.vin) };
+  }
   if (provider === "marketcheck" && a.tenantId && a.vin) {
     const store = await admitStoreEnrichment(admin, a, product);
     if (!store.admitted) return { admitted: false, eventId: null, monthCalls: null, cap: null, reserve: null, reason: "store_policy" };

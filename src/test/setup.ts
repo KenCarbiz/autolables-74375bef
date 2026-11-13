@@ -27,3 +27,8 @@ if (typeof window !== "undefined") {
     }),
   });
 }
+
+// The MarketCheck master switch defaults to off. Suites written before it
+// existed assert the database gates, so they run with the policy bypassed;
+// callPolicy.test.ts covers the switch itself.
+process.env.MARKETCHECK_MODE ??= "unrestricted";
