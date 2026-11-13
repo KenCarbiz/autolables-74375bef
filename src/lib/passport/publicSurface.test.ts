@@ -211,9 +211,9 @@ describe("governed passport data states no market claim", () => {
 describe("every applicable surface reaches the same decision", () => {
   const governedRoutes = PUBLIC_MARKET_SURFACE_REGISTRY.filter((s) => s.governance === "governed");
 
-  it("registers at least the six known claim-bearing routes", () => {
-    expect(governedRoutes.length).toBeGreaterThanOrEqual(6);
-    for (const route of ["/v/:slug", "/v-classic/:slug", "/v/:slug/great-buy", "/v/:slug/:section", "/v/:slug/vehicle-history"]) {
+  it("registers at least the five known claim-bearing routes", () => {
+    expect(governedRoutes.length).toBeGreaterThanOrEqual(5);
+    for (const route of ["/v/:slug", "/v-classic/:slug", "/v/:slug/great-buy", "/v/:slug/:section"]) {
       expect(governedRoutes.map((s) => s.route)).toContain(route);
     }
   });

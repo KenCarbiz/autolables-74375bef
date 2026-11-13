@@ -2,7 +2,7 @@
 // for: typical, sparse, zero values, stale data, unknown history, title brand,
 // accident, open recall, decode conflict, absent range and extreme prediction.
 // Each expected value is worked by hand in MARKETPASS_SCORING_SPEC.md section 8
-// under the same name. All rules here are PROPOSED, not approved.
+// under the same name. Rules approved 13 Nov 2026 (version 1.0.0).
 
 import { describe, expect, it } from "vitest";
 import { buildMarketPassAssessment, identityConflicts } from "./assessment";

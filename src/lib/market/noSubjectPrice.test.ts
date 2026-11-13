@@ -307,7 +307,7 @@ describe("the neutral wording", () => {
 describe("every claim-bearing public route agrees", () => {
   it("governs the same decision through the one shared boundary", () => {
     const governedRoutes = PUBLIC_MARKET_SURFACE_REGISTRY.filter((s) => s.governance === "governed");
-    expect(governedRoutes.length).toBeGreaterThanOrEqual(6);
+    expect(governedRoutes.length).toBeGreaterThanOrEqual(5);
     const hook = read("src/hooks/usePublicListing.ts");
     expect(hook).toMatch(/governPublicListing\(fetched\)/);
     expect(hook).toMatch(/marketClaim/);

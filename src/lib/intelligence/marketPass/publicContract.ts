@@ -41,6 +41,7 @@ export function toPublicContract(a: MarketPassAssessment): MarketPassPublicContr
     state: pf.state,
     label: pf.label,
     explanation: pf.explanation,
+    explanationWithoutPrice: pf.explanationWithoutPrice,
     segments: segmentsCopy(pf.segments),
     segmentIndex: pf.segmentIndex,
     ariaLabel: gaugeAriaLabel("Price Fairness", pf.label, pf.segmentIndex, pf.segments.length, pf.explanation),

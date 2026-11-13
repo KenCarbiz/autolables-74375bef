@@ -369,7 +369,6 @@ function buildConfirm(listing: NextPassportListing): NextPassportData["confirm"]
   return {
     state: "success",
     items: [
-      { label: "View the vehicle history report", href: slug ? `/v/${slug}/vehicle-history` : undefined },
       { label: "View all documents", href: slug ? `/v/${slug}/documents` : undefined },
     ],
     note: "Confirm equipment, coverage and final figures with the dealership before purchase.",

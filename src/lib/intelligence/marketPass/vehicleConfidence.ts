@@ -1,4 +1,4 @@
-// ── Vehicle Confidence (PROPOSED) ──────────────────────────────────────────
+// ── Vehicle Confidence (approved 1.0.0) ──────────────────────────────────────────
 //
 // What the evidence on record says about the vehicle itself. The input type
 // has no price, market or demand field, so nothing about the deal can move
@@ -129,7 +129,8 @@ export function buildVehicleConfidence(input: VehicleConfidenceInput): VehicleCo
     const dc = input.dataConfidence.level;
     if (eligible && dc !== "limited" && isExactIdentity(input.identity.matchLevel)) {
       state = "assessed";
-      segmentIndex = usedSegmentForScore(score.score as number);
+      // A low score with no adverse finding is "review recommended", never "concerns reported".
+      segmentIndex = Math.max(1, usedSegmentForScore(score.score as number));
       if (dc === "moderate" && segmentIndex > 3) { segmentIndex = 3; reasons.push("data_confidence_moderate_caps_segment_3"); }
       label = segments[segmentIndex].label;
       explanation = `Based on verified title, condition and recall evidence for this VIN. ${c.findings.slice(0, 2).join(" ")}`.trim();

@@ -2,7 +2,7 @@
 // Mirror of src/lib/intelligence/marketPass/marketDesirability.ts, copied so the edge runtime can
 // bundle the engine (Supabase ships only supabase/functions/). Edit the
 // source file and run `bun run sync:edge-sticker`.
-// ── Market Desirability, dealer only (PROPOSED) ────────────────────────────
+// ── Market Desirability, dealer only (approved 1.0.0) ────────────────────────────
 //
 // One construct: how fast this cohort turns over in its market. Market days
 // supply and the inferred-sold days-on-market median both measure it, so

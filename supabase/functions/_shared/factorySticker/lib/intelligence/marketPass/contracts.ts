@@ -10,8 +10,10 @@
 //   Market Desirability  dealer   0-100 market supply and turnover; no page views
 //   Data Confidence      dealer   0-100 evidence coverage, freshness, authority, conflicts
 //
-// Every equation, threshold and label here is PROPOSED and not approved by the
-// owner. It runs only behind the marketpass_v2 flag, which defaults off.
+// The rules were approved by the owner on 13 Nov 2026 (decision 17), version
+// 1.0.0. Decision 13 (market evidence in Data Confidence) is unanswered, so
+// market evidence stays out of Data Confidence. It runs only behind the
+// marketpass_v2 flag, which defaults off.
 //
 // The gauge segments, their labels and colors travel inside the contract, so a
 // renderer (AutoLabels or AutoFilm) draws what the server decided and holds no
@@ -19,16 +21,16 @@
 
 import type { AuthorityClass, FreshnessState } from "../contracts.ts";
 
-export const MARKETPASS_ASSESSMENT_VERSION = "marketpass-assessment-0.1.0-proposed";
-export const PRICE_FAIRNESS_VERSION = "price-fairness-0.1.0-proposed";
-export const VEHICLE_CONFIDENCE_VERSION = "vehicle-confidence-0.1.0-proposed";
-export const MARKET_DESIRABILITY_VERSION = "market-desirability-0.1.0-proposed";
-export const MARKETPASS_DATA_CONFIDENCE_VERSION = "marketpass-data-confidence-0.1.0-proposed";
+export const MARKETPASS_ASSESSMENT_VERSION = "marketpass-assessment-1.0.0";
+export const PRICE_FAIRNESS_VERSION = "price-fairness-1.0.0";
+export const VEHICLE_CONFIDENCE_VERSION = "vehicle-confidence-1.0.0";
+export const MARKET_DESIRABILITY_VERSION = "market-desirability-1.0.0";
+export const MARKETPASS_DATA_CONFIDENCE_VERSION = "marketpass-data-confidence-1.0.0";
 export const MARKETPASS_PUBLIC_CONTRACT_VERSION = "marketpass-public-0.1.0";
 export const MARKETPASS_DEALER_CONTRACT_VERSION = "marketpass-dealer-0.1.0";
 
-/** Marks every rule set as a proposal until the owner signs it off. */
-export const MARKETPASS_RULES_STATUS = "proposed_not_approved" as const;
+/** Owner approved the rule sets on 13 Nov 2026 (decision 17). */
+export const MARKETPASS_RULES_STATUS = "approved" as const;
 
 export type VehicleType = "new" | "used";
 
@@ -122,6 +124,8 @@ export interface PriceFairnessAssessment {
   state: Extract<IndicatorState, "assessed" | "qualified" | "unavailable">;
   label: string;
   explanation: string;
+  /** The same sentence with no dollar amount, price percentage or MSRP figure, for a dealer who hides price. */
+  explanationWithoutPrice: string;
   segments: GaugeSegment[];
   segmentIndex: number | null;
   basis: "market_value_estimate" | "factory_msrp" | "none";
@@ -263,6 +267,8 @@ export interface PublicIndicator {
 }
 
 export interface PublicPriceFairness extends PublicIndicator {
+  /** Additive and optional so older readers still accept the contract. Names no dollar amount, price percentage or MSRP figure. */
+  explanationWithoutPrice?: string;
   basis: PriceFairnessAssessment["basis"];
   benchmarkLabel: string | null;
   benchmarkIsEstimate: boolean;
