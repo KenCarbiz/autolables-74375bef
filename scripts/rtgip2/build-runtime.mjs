@@ -1,7 +1,6 @@
 // Deterministic build of supabase/functions/_shared/rtgip2-runtime.bundle.js from the runtime
 // source. `node scripts/rtgip2/build-runtime.mjs` writes it; `--check` fails when it is stale;
 // `--out <file>` writes the build somewhere else (the reproducibility test builds twice that way).
-// `--key-import` selects the one-time staging key-import bundle instead (rtgip2-key-import.bundle.js).
 // The runtime bundle carries the rtgip/3 modules (src/lib/rooftopos-parked/rtgip3/) through runtime.ts.
 // Its sha256 is printed and written beside it as rtgip2-runtime.bundle.js.sha256: that digest is the
 // rtgip/3-attest/1 `verifier` (the app secret RTGIP3_VERIFIER_DIGEST, counterpart of the Gateway's).
@@ -15,8 +14,6 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 export const ENTRY = "src/lib/rooftopos-parked/rtgip2-autolabels/runtime-entry.ts";
 export const OUTFILE = path.join(ROOT, "supabase/functions/_shared/rtgip2-runtime.bundle.js");
-export const KEY_IMPORT_ENTRY = "src/lib/rooftopos-parked/rtgip2-autolabels/key-import-entry.ts";
-export const KEY_IMPORT_OUTFILE = path.join(ROOT, "supabase/functions/_shared/rtgip2-key-import.bundle.js");
 export const SHA_SUFFIX = ".sha256";
 export const bundleSha256 = (text) => createHash("sha256").update(text, "utf8").digest("hex");
 export const shaLine = (text, file) => `${bundleSha256(text)}  ${path.basename(file)}\n`;
@@ -66,17 +63,16 @@ export async function buildRuntime(entry = ENTRY) {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  const keyImport = process.argv.includes("--key-import");
-  const outfile = keyImport ? KEY_IMPORT_OUTFILE : OUTFILE;
-  const text = await buildRuntime(keyImport ? KEY_IMPORT_ENTRY : ENTRY);
-  const sidecar = !keyImport;
+  const outfile = OUTFILE;
+  const text = await buildRuntime(ENTRY);
+  const sidecar = true;
   if (process.argv.includes("--check")) {
     const stale =
       !existsSync(outfile) ||
       readFileSync(outfile, "utf8") !== text ||
       (sidecar && (!existsSync(outfile + SHA_SUFFIX) || readFileSync(outfile + SHA_SUFFIX, "utf8") !== shaLine(text, outfile)));
     if (stale) {
-      console.error(`${path.basename(outfile)} is stale: run node scripts/rtgip2/build-runtime.mjs${keyImport ? " --key-import" : ""}`);
+      console.error(`${path.basename(outfile)} is stale: run node scripts/rtgip2/build-runtime.mjs`);
       process.exit(1);
     }
   } else {

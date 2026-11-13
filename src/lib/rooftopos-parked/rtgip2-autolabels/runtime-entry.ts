@@ -23,6 +23,24 @@ export const APP_BINDINGS = {
 
 const env = (name: string): string | undefined => (globalThis as unknown as { Deno: { env: { get(n: string): string | undefined } } }).Deno.env.get(name);
 
+/**
+ * The function secret RTGIP_EDGE_DB_URL, accepted only for the dedicated login rtgip_edge (rtgip_edge.<ref> through
+ * the pooler). Any other user, the postgres owner included, or no URL throws before a connection is opened.
+ */
+export function edgeDbUrl(value: string | undefined): string {
+  let user = "";
+  let scheme = "";
+  try {
+    const u = new URL(value ?? "");
+    scheme = u.protocol;
+    user = decodeURIComponent(u.username);
+  } catch {
+    throw new Error("rtgip_edge_db_url_invalid");
+  }
+  if ((scheme !== "postgres:" && scheme !== "postgresql:") || !/^rtgip_edge(\.[a-z0-9]{20})?$/.test(user)) throw new Error("rtgip_edge_db_url_invalid");
+  return value as string;
+}
+
 export function createEntryRuntime(opts: { compiledEnabled: boolean }) {
   return createAppRuntime({
     ...APP_BINDINGS,
@@ -31,6 +49,6 @@ export function createEntryRuntime(opts: { compiledEnabled: boolean }) {
     gatewayOrigins: GATEWAY_ORIGINS,
     env,
     // The dedicated login rtgip_edge (function secret RTGIP_EDGE_DB_URL), never the postgres owner.
-    sql: () => postgres(env("RTGIP_EDGE_DB_URL") ?? "", { prepare: false, max: 3, idle_timeout: 5, onnotice: () => {} }),
+    sql: () => postgres(edgeDbUrl(env("RTGIP_EDGE_DB_URL")), { prepare: false, max: 3, idle_timeout: 5, onnotice: () => {} }),
   });
 }

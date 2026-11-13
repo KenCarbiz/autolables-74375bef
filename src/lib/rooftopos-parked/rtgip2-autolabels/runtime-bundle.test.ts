@@ -15,6 +15,7 @@ import {
   RTGIP2_RUNTIME_MODE,
   createAppRuntime,
   createEntryRuntime,
+  edgeDbUrl,
 } from "./runtime-entry.ts";
 import { GATEWAY_ORIGIN_PLACEHOLDER } from "./runtime-config.ts";
 import type { Sql } from "../rtgip2-runtime/runtime.ts";
@@ -147,7 +148,7 @@ describe("the entry runtime with the real constants", () => {
     RTGIP2_RUNTIME_MODE: "production",
     SUPABASE_URL: `https://${PRODUCTION_REF}.supabase.co`,
     SUPABASE_SERVICE_ROLE_KEY: "k".repeat(24),
-    RTGIP_EDGE_DB_URL: "postgres://nobody@127.0.0.1:1/none",
+    RTGIP_EDGE_DB_URL: "postgres://rtgip_edge@127.0.0.1:1/none",
   };
   const noDb = (() => {
     throw new Error("the database must not be reached");
@@ -195,11 +196,33 @@ describe("the entry runtime with the real constants", () => {
       const sql = { begin: async (fn: (t: typeof tx) => unknown) => fn(tx), unsafe: tx.unsafe, end: async () => {} };
       return sql as unknown as Sql;
     }) as () => Sql;
-    for (const p of [{ "rtgip-protocol": "rtgip/2" }, {}]) {
+    for (const p of [{ "rtgip-protocol": "rtgip/2" }, {}] as Record<string, string>[]) {
       const rt = runtime(prodEnv, fakeSql);
       const r = await rt.inbound(new Request("https://fn.test/", { method: "POST", headers: { "content-type": "application/json", ...p }, body: "{}" }));
       expect([r.status, ((await r.json()) as { reason: string }).reason]).toEqual([403, "protocol_not_accepted"]);
     }
     expect(queries.join("\n")).not.toMatch(/signing_keys|vault/);
+  });
+});
+
+describe("the rtgip_edge database URL", () => {
+  it("is accepted only for the login rtgip_edge, directly or through the pooler as rtgip_edge.<ref>", () => {
+    for (const ok of [
+      "postgres://rtgip_edge@db.example.test:5432/postgres",
+      `postgresql://rtgip_edge.${PRODUCTION_REF}@pooler.example.test:6543/postgres`,
+    ])
+      expect(edgeDbUrl(ok)).toBe(ok);
+    for (const bad of [
+      undefined,
+      "",
+      "postgres://postgres@db.example.test:5432/postgres",
+      `postgres://postgres.${PRODUCTION_REF}@pooler.example.test:6543/postgres`,
+      "postgres://authenticator@db.example.test/postgres",
+      "postgres://rtgip_edge_admin@db.example.test/postgres",
+      "postgres://rtgip_edge.short@db.example.test/postgres",
+      "https://rtgip_edge@db.example.test/postgres",
+      "not a url",
+    ])
+      expect(() => edgeDbUrl(bad)).toThrow("rtgip_edge_db_url_invalid");
   });
 });
