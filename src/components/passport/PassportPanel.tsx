@@ -8,7 +8,7 @@ import {
 import { toast } from "sonner";
 import { listingHero } from "@/lib/photos";
 import type { PassportData, PricePoint, OemWarrantyView } from "@/lib/passportV2Data";
-import { fmt$, listingEquipment, historyReportName, deriveSoldClaims, deriveRating, ratingTier, compSampleView, cohortExplanation, CREDIBLE_AVG_DOM_MAX } from "@/lib/passportV2Data";
+import { fmt$, listingEquipment, historyReportName, deriveSoldClaims, deriveRating, compSampleView, cohortExplanation, CREDIBLE_AVG_DOM_MAX } from "@/lib/passportV2Data";
 import { packetVisible } from "@/lib/packetModules";
 import { trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
 import { oemCoverageRows, type CoverageKey } from "@/lib/oemWarranty";
@@ -473,10 +473,10 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
             </div>
 
             {factors.length > 0 && (
-              <Section title="Rating Factors" sub="Only measured factors are scored — each shows the evidence behind it.">
+              <Section title="Evidence Factors" sub="Only measured factors are listed, each with the evidence behind it.">
                 <div className={`${CARD} p-4 space-y-4`}>{factors.map((f) => (
                   <div key={f.key}>
-                    <FactorBar label={f.label} pct={f.score as number} status={ratingTier(f.score).label} />
+                    <FactorBar label={f.label} status="Measured" />
                     {f.evidence.length > 0 && <ul className="mt-1.5 space-y-0.5">{f.evidence.map((e) => <li key={e} className="text-[11px] text-[#94A3B8] leading-snug">{e}</li>)}</ul>}
                   </div>
                 ))}</div>
@@ -498,10 +498,10 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
           {coverageCard}
 
           {factors.length > 0 && (
-            <Section title="Rating Factors" sub="Only measured factors are scored — each shows the evidence behind it.">
+            <Section title="Evidence Factors" sub="Only measured factors are listed, each with the evidence behind it.">
               <div className={`${CARD} p-4 space-y-4`}>{factors.map((f) => (
                 <div key={f.key}>
-                  <FactorBar label={f.label} pct={f.score as number} status={ratingTier(f.score).label} />
+                  <FactorBar label={f.label} status="Measured" />
                   {f.evidence.length > 0 && <ul className="mt-1.5 space-y-0.5">{f.evidence.map((e) => <li key={e} className="text-[11px] text-[#94A3B8] leading-snug">{e}</li>)}</ul>}
                 </div>
               ))}</div>
@@ -1534,7 +1534,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       if (groups.Comfort?.length) loveReasons.push("Premium ride comfort");
       if (groups.Technology?.length) loveReasons.push("Modern technology and connectivity");
       if (premium) loveReasons.push("Luxury interior appointments");
-      if (isGreat) loveReasons.push("Exceptional value versus the market");
+      if (isGreat) loveReasons.push("Priced below the estimated market value");
       const catIcon: Record<string, React.ElementType> = { Performance: Gauge, Safety: ShieldCheck, Technology: Star, Comfort: Heart, Exterior: Car, Interior: Users };
       // Mobile command-center data (badges/cards/rows open the dedicated reports).
       const overviewBadges = ([
@@ -2281,18 +2281,12 @@ const Gauge3 = ({ value }: { value: number }) => (
 
 // Factors without enough data are omitted upstream, so every rendered row
 // carries a positive status chip — "Pending" never reaches a customer.
-const FactorBar = ({ label, pct, status }: { label: string; pct: number; status?: string }) => {
-  const s = status ?? (pct >= 85 ? "Strong" : "Good");
-  return (
-    <div>
-      <div className="flex justify-between items-center gap-2 text-[12px] mb-1">
-        <span className="text-[#0F172A] font-medium">{label}</span>
-        <span className={`text-[10px] font-bold rounded-full border px-2 py-0.5 shrink-0 ${s === "Strong" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-emerald-50/60 text-emerald-700 border-emerald-100"}`}>{s}</span>
-      </div>
-      <div className="h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-[#2563EB]" style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} /></div>
-    </div>
-  );
-};
+const FactorBar = ({ label, status }: { label: string; status: string }) => (
+  <div className="flex justify-between items-center gap-2 text-[12px] mb-1">
+    <span className="text-[#0F172A] font-medium">{label}</span>
+    <span className="text-[10px] font-bold rounded-full border px-2 py-0.5 shrink-0 bg-emerald-50/60 text-emerald-700 border-emerald-100">{status}</span>
+  </div>
+);
 
 const Source = ({ name, on }: { name: string; on: boolean }) => (
   <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-[12px] font-semibold ${on ? "border-emerald-200 bg-emerald-50/60 text-[#0F172A]" : "border-[#E6E8EC] bg-white text-[#94A3B8]"}`}>
