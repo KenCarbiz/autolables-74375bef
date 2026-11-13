@@ -1,4 +1,4 @@
-// ── Market Desirability, dealer only (PROPOSED) ────────────────────────────
+// ── Market Desirability, dealer only (approved 1.0.0) ────────────────────────────
 //
 // One construct: how fast this cohort turns over in its market. Market days
 // supply and the inferred-sold days-on-market median both measure it, so

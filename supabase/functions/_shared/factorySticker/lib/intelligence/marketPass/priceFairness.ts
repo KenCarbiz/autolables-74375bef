@@ -2,7 +2,7 @@
 // Mirror of src/lib/intelligence/marketPass/priceFairness.ts, copied so the edge runtime can
 // bundle the engine (Supabase ships only supabase/functions/). Edit the
 // source file and run `bun run sync:edge-sticker`.
-// ── Price Fairness (PROPOSED) ──────────────────────────────────────────────
+// ── Price Fairness (approved 1.0.0) ──────────────────────────────────────────────
 //
 // Used: the comparison price measured against AutoLabels Market Value V3 by
 // the Deal Rating. A segment is lit only when the value rests on a
@@ -156,11 +156,14 @@ function usedFairness(input: PriceFairnessInput): PriceFairnessAssessment {
   const segments = USED_PRICE_FAIRNESS_SEGMENTS;
   let label: string;
   let explanation: string;
+  let explanationWithoutPrice: string;
   if (state === "assessed" && segmentIndex != null && deal.deltaDollars != null && deal.deltaPct != null) {
     label = segments[segmentIndex].label;
     const dir = deal.deltaDollars < 0 ? "below" : deal.deltaDollars > 0 ? "above" : "at";
     const amount = dir === "at" ? "Priced at" : `Priced ${money(deal.deltaDollars)} (${pct(deal.deltaPct)}) ${dir}`;
     explanation = `${amount} the AutoLabels market value estimate, which is calculated from ${comps?.analyzedCount ?? 0} comparable listings${comps?.geography.radiusMiles ? ` within ${comps.geography.radiusMiles} miles` : ""}. The estimate is not a transaction price.`;
+    const basisText = `the AutoLabels market value estimate, which is calculated from ${comps?.analyzedCount ?? 0} comparable listings${comps?.geography.radiusMiles ? ` within ${comps.geography.radiusMiles} miles` : ""}. The estimate is not a transaction price.`;
+    explanationWithoutPrice = `${dir === "at" ? "Priced at" : `Priced ${dir}`} ${basisText}`;
   } else if (state === "qualified") {
     label = "Limited market evidence";
     explanation = compsUsed
@@ -170,6 +173,7 @@ function usedFairness(input: PriceFairnessInput): PriceFairnessAssessment {
     label = "Not enough market data";
     explanation = `Price fairness is not available because ${unavailableReason(reasons)}.`;
   }
+  explanationWithoutPrice ??= explanation;
   const show = state === "assessed";
   const used = mv.signals.filter((s) => s.used).map((s) => s.key);
   return {
@@ -179,6 +183,7 @@ function usedFairness(input: PriceFairnessInput): PriceFairnessAssessment {
     state,
     label,
     explanation,
+    explanationWithoutPrice,
     segments,
     segmentIndex,
     basis: mv.estimatedValue != null ? "market_value_estimate" : "none",
@@ -227,10 +232,12 @@ function newFairness(input: PriceFairnessInput): PriceFairnessAssessment {
   const segments = NEW_PRICE_FAIRNESS_SEGMENTS;
   let label: string;
   let explanation: string;
+  let explanationWithoutPrice: string;
   if (segmentIndex != null && deltaDollars != null && deltaPct != null && verifiedMsrp != null) {
     label = segments[segmentIndex].label;
     const rel = deltaDollars === 0 ? "equal to" : `${money(deltaDollars)} (${pct(deltaPct)}) ${deltaDollars < 0 ? "below" : "above"}`;
     explanation = `Priced ${rel} the factory MSRP of ${money(verifiedMsrp)} for this exact build. This compares the price with the manufacturer's sticker, not with other vehicles for sale.`;
+    explanationWithoutPrice = `Priced ${deltaDollars === 0 ? "equal to" : deltaDollars < 0 ? "below" : "above"} the factory MSRP for this exact build. This compares the price with the manufacturer's sticker, not with other vehicles for sale.`;
   } else if (state === "qualified") {
     label = "Limited price evidence";
     explanation = "The factory MSRP is verified, but how this price treats dealer fees is not confirmed, so it is not rated.";
@@ -238,6 +245,7 @@ function newFairness(input: PriceFairnessInput): PriceFairnessAssessment {
     label = "Not enough price data";
     explanation = `Price fairness is not available because ${unavailableReason(reasons)}.`;
   }
+  explanationWithoutPrice ??= explanation;
   const show = state === "assessed";
   return {
     indicator: "price_fairness",
@@ -246,6 +254,7 @@ function newFairness(input: PriceFairnessInput): PriceFairnessAssessment {
     state,
     label,
     explanation,
+    explanationWithoutPrice,
     segments,
     segmentIndex,
     basis: verifiedMsrp != null ? "factory_msrp" : "none",

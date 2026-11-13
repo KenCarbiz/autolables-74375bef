@@ -1,13 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import {
   buildListingHistory,
   describeListingPeriod,
   describeListingOdometer,
   describeListingSpan,
   type ListingHistoryEntry,
-} from "@/pages/VehiclePassportHistory";
+} from "@/lib/passport/listingHistory";
 
 // history_payload.entries is marketplace ADVERTISING data. The whole risk of
 // surfacing it is that it reads like a vehicle history report or like an
@@ -258,29 +256,5 @@ describe("the real MarketCheck entry shape", () => {
     expect(new Set(h.records.map((r) => r.key)).size).toBe(7);
     expect(h.sightings).toBe(50);
     expect(h.atSourceCap).toBe(true);
-  });
-});
-
-describe("the page's own copy", () => {
-  const src = readFileSync(join(__dirname, "..", "VehiclePassportHistory.tsx"), "utf8");
-  // Everything between the section title and the end of the disclosure card.
-  const advertising = src.slice(src.indexOf("Advertising history —"));
-
-  it("says plainly that this is not a vehicle history report", () => {
-    expect(advertising).toContain("not a vehicle history report");
-    expect(advertising).toContain("no accident, title, service, or ownership records");
-  });
-
-  it("never characterises a price movement as a drop, a cut, or a reduction", () => {
-    for (const word of [/price drop/i, /\bprice cut\b/i, /\breduced\b/i, /\bslashed\b/i, /\bmarked down\b/i, /\bdiscounted\b/i]) {
-      expect(advertising).not.toMatch(word);
-    }
-  });
-
-  it("never labels these records as CARFAX, AutoCheck, or verified", () => {
-    const disclosure = advertising.slice(0, advertising.indexOf("const ListingSection"));
-    for (const word of [/carfax/i, /autocheck/i, /\bverified\b/i]) {
-      expect(disclosure).not.toMatch(word);
-    }
   });
 });

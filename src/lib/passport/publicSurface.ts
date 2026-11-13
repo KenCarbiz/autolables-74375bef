@@ -201,7 +201,6 @@ export const PUBLIC_MARKET_SURFACE_REGISTRY: readonly PublicMarketSurface[] = [
   { route: "/v-classic/:slug", entry: "src/pages/PublicListing.tsx", governance: "governed" },
   { route: "/v/:slug/great-buy", entry: "src/pages/VehiclePassportGreatBuy.tsx", governance: "governed" },
   { route: "/v/:slug/:section", entry: "src/pages/VehiclePassportV2Detail.tsx", governance: "governed" },
-  { route: "/v/:slug/vehicle-history", entry: "src/pages/VehiclePassportHistory.tsx", governance: "governed" },
   {
     route: "/v/:slug/verification",
     entry: "src/pages/VehiclePassportVerification.tsx",

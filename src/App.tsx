@@ -18,6 +18,7 @@ import AdminGate from "@/components/layout/AdminGate";
 import { navModeForRole } from "@/components/layout/adminNav";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { ADMIN_CHILD_ROUTE_ELEMENTS } from "@/pages/admin/childRoutes";
+import VehicleHistoryRedirect from "./components/passport/VehicleHistoryRedirect";
 
 const GatedLayout = () => (
   <EntitlementGate app="autolabels">
@@ -184,7 +185,6 @@ const VehiclePassportNext = lazy(() => import("./pages/VehiclePassportNext"));
 const VehiclePassportVerification = lazy(() => import("./pages/VehiclePassportVerification"));
 const VehiclePassportDocuments = lazy(() => import("./pages/VehiclePassportDocuments"));
 const VehiclePassportGreatBuy = lazy(() => import("./pages/VehiclePassportGreatBuy"));
-const VehiclePassportHistory = lazy(() => import("./pages/VehiclePassportHistory"));
 const VehiclePassportDealer = lazy(() => import("./pages/VehiclePassportDealer"));
 const PublicDocuments = lazy(() => import("./pages/PublicDocuments"));
 const PrepSignOff = lazy(() => import("./pages/PrepSignOff"));
@@ -307,7 +307,8 @@ const App = () => (
                       <Route path="/v/:slug/verification" element={<VehiclePassportVerification />} />
                       <Route path="/v/:slug/documents" element={<VehiclePassportDocuments />} />
                       <Route path="/v/:slug/great-buy" element={<VehiclePassportGreatBuy />} />
-                      <Route path="/v/:slug/vehicle-history" element={<VehiclePassportHistory />} />
+                      {/* Retired standalone History & Title page; old links land on the Passport. */}
+                      <Route path="/v/:slug/vehicle-history" element={<VehicleHistoryRedirect />} />
                       <Route path="/v/:slug/dealer" element={<VehiclePassportDealer />} />
                       <Route path="/v/:slug/:section" element={<VehiclePassportV2Detail />} />
                       {/* Classic page kept for rollback/comparison */}

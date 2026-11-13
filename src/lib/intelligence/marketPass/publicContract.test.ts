@@ -38,12 +38,12 @@ describe("the public contract is an allowlist", () => {
     expect(Object.keys(c.vehicle).sort()).toEqual(["vehicleType", "vin"]);
     expect(Object.keys(c.priceFairness).sort()).toEqual([
       "ariaLabel", "basis", "benchmarkIsEstimate", "benchmarkLabel", "comparables", "deltaDenominator", "deltaDollars",
-      "deltaPct", "evidence", "explanation", "label", "segmentIndex", "segments", "state", "version",
+      "deltaPct", "evidence", "explanation", "explanationWithoutPrice", "label", "segmentIndex", "segments", "state", "version",
     ]);
     expect(Object.keys(c.vehicleConfidence).sort()).toEqual([
       "ariaLabel", "evidence", "explanation", "findings", "gaps", "label", "segmentIndex", "segments", "state", "version",
     ]);
-    expect(c.rulesStatus).toBe("proposed_not_approved");
+    expect(c.rulesStatus).toBe("approved");
   });
 
   it("a new private field on the assessment does not reach the public contract", () => {
@@ -76,15 +76,44 @@ describe("the public contract is an allowlist", () => {
 
   it("every indicator is versioned and the inputs hash ignores page views and the clock", () => {
     const a = assess();
-    expect(a.priceFairness.version).toMatch(/proposed$/);
-    expect(a.vehicleConfidence.version).toMatch(/proposed$/);
-    expect(a.marketDesirability.version).toMatch(/proposed$/);
-    expect(a.dataConfidence.version).toMatch(/proposed$/);
+    expect(a.priceFairness.version).toMatch(/-1\.0\.0$/);
+    expect(a.vehicleConfidence.version).toMatch(/-1\.0\.0$/);
+    expect(a.marketDesirability.version).toMatch(/-1\.0\.0$/);
+    expect(a.dataConfidence.version).toMatch(/-1\.0\.0$/);
     const later = buildMarketPassAssessment({ row: { ...loadedRow(), view_count: 1 }, settings: settings(), nowMs: NOW + 3_600_000 });
     expect(later.inputsHash).toBe(a.inputsHash);
     expect(later.computedAt).not.toBe(a.computedAt);
     const repriced = assess({ ...loadedRow(), price: 30000 });
     expect(repriced.inputsHash).not.toBe(a.inputsHash);
+  });
+});
+
+describe("the dollar-free price explanation", () => {
+  const DOLLAR = /\$|\d{1,3},\d{3}|\d+(\.\d+)?\s*%|MSRP of/;
+  const rows = () => [
+    loadedRow(), newRow(), usedRow(), usedRow({ price: 33000, advertised_price_before_doc: 33000 }),
+    usedRow({ price: 0, advertised_price_before_doc: 0 }), usedRow({ price: null, advertised_price_before_doc: null }),
+    newRow({ price: null, advertised_price_before_doc: null }),
+  ];
+
+  it("names no dollar amount, percentage or MSRP figure for any fixture, and the priced one still reads as a sentence", () => {
+    for (const row of rows()) {
+      const pf = toPublicContract(assess(row)).priceFairness;
+      expect(pf.explanationWithoutPrice, pf.label).toBeTruthy();
+      expect(pf.explanationWithoutPrice).not.toMatch(DOLLAR);
+    }
+    const used = toPublicContract(assess(loadedRow())).priceFairness;
+    expect(used.explanation).toMatch(DOLLAR);
+    expect(used.explanationWithoutPrice).toMatch(/^Priced (below|above|at) the AutoLabels market value estimate/);
+    const fresh = toPublicContract(assess(newRow())).priceFairness;
+    expect(fresh.explanationWithoutPrice).not.toContain("$");
+  });
+
+  it("plant: the check fails when a dollar figure leaks into the sentence", () => {
+    const pf = toPublicContract(assess(loadedRow())).priceFairness;
+    expect(pf.explanation).toMatch(DOLLAR);
+    expect(pf.explanation).toContain("$");
+    expect(`${pf.explanationWithoutPrice} Priced $1,100 below.`).toMatch(DOLLAR);
   });
 });
 
