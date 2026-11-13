@@ -1,0 +1,37 @@
+{
+  "schema": "rtgip2-runtime-provenance/1",
+  "runtime": {
+    "ar1-isolation.test.ts": "ee4b790098f630e6704108d1afee6e7bda0007deabc0de0d14f4db7aa198de90",
+    "ar1-kat.test.ts": "a75823df64a9f73f017a343368070a6687c607f375f93ca98e66a82132ffad62",
+    "pg-harness.ts": "3c1c2f93d1ef995581426303e00208ba289160ba76b7edec04317c2438a72224",
+    "provenance.test.ts": "49dd53c6c2f2507ade35fb652cea98a6ff48ebffdebe0605c1dd4efa4e221c3f",
+    "runtime-v3.test.ts": "ae9a228734f688419b86959c9647228f46766f7d83eea36c0f2478e3db783c5b",
+    "runtime.test.ts": "872962cbb6087da4a5f0c83859eeb79dd7c33d88b7c33e01d321cf1bd45e64c0",
+    "runtime.ts": "99cdf560129dec38c505cf27f4d4e6db575c047a5c9f5d7991e9724bc6a09100",
+    "source-chain.ts": "7fdffaab9cda8b28d4ec2d010c8f6919834102882dcf70d8d3cf263e0bf6745f"
+  },
+  "core": {
+    "admission.ts": "993cd8852fe90586a8c68b828ab9fd5debede3a651de9dbe920ed92ef3fcc870",
+    "delivery.ts": "bd5a8c3113f461d98aa6c62e6723066798d1749786425a83c8dc7109e08e2f93",
+    "produce.ts": "e0edfafa441d19f1bd85af10654272e6d246a5c3dfa050b9fa17de91b41b78f1",
+    "protocol.ts": "dfa5ba596d752c264230e192639fb7068ac50bcb3c6ff9be839b83c3e1eaa7c9",
+    "receipt-query.ts": "bd5955f58444722540240cc5117b288138aa916bcd95988dde24252ee8936018",
+    "receipt-v2.ts": "835407a7708ea822c728eb92f50398278040cf7725164da94105ba81564bb5ec"
+  },
+  "rtgip3": {
+    "rtgip2/core.ts": "652016be864c76b8a71800d49685d40d9864d3613dfe0f326585a0f8f235c353",
+    "rtgip3/core3.ts": "ab702ad4d3f935f778a7eee21f57f49ad9f4c181efa1512a8ab318c0f99038e5",
+    "rtgip3/keys3.ts": "a453dd92355916af63456253396be2174087e6f02eab8f43eac94fd3badb1146",
+    "rtgip3/receipt-query3.ts": "3b523f7d401b4b19e35a51b7df2dbfa031f8d3df6146e090a3cb87f6b8c03a74",
+    "rtgip3/receipt3.ts": "e3c00b69a2754aa580fc971a46d465d05f6901c160aeb4b8b6cb273017149608",
+    "rtgip3/sig.ts": "5a5923ef14cb394099ddc813868f30bc04fc43b4387b0317053aba1e88db6a56"
+  },
+  "bundle": {
+    "builder": "scripts/rtgip2/build-runtime.mjs",
+    "esbuild": {
+      "autocurb": "0.21.5",
+      "autoframe": "0.25.12",
+      "autolabels": "0.25.12"
+    }
+  }
+}

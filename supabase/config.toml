@@ -92,3 +92,16 @@ verify_jwt = false
 # Supabase JWT. Authentication is the X-Files-Signature-V2 HMAC in the handler.
 [functions.files-inventory-notify]
 verify_jwt = false
+
+# RooftopOS rtgip app runtime (dark until its gates are opened by separate approvals).
+# rtgip-inbound is authenticated by the Gateway signature, which the runtime and
+# rtgip.inbox_admit_v3 verify; rtgip-dispatch accepts only its own bearer check;
+# rtgip-publish needs a signed-in user and re-derives that user's permission from rows.
+[functions.rtgip-inbound]
+verify_jwt = false
+
+[functions.rtgip-dispatch]
+verify_jwt = false
+
+[functions.rtgip-publish]
+verify_jwt = true

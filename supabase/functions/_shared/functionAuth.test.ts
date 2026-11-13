@@ -547,6 +547,11 @@ describe("edge function gateway configuration", () => {
       // Files.com folder webhooks carry no Supabase JWT; the receiver
       // verifies X-Files-Signature-V2 against FILESCOM_WEBHOOK_SECRET.
       "files-inventory-notify": false,
+      // RooftopOS rtgip: inbound is authenticated by the Gateway signature and
+      // dispatch by its own bearer check; publish is called by signed-in staff.
+      "rtgip-inbound": false,
+      "rtgip-dispatch": false,
+      "rtgip-publish": true,
     });
   });
 

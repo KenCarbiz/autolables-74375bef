@@ -1,0 +1,2935 @@
+{
+ "schema": "rooftopos/ar1/rtgip2-gateway-kat/2",
+ "version": 2,
+ "status": "PROPOSAL. Implements the AR-1 strict option 1 receipt-contract amendment A1-1..A1-6 (k2/D2-ANALYSIS-r2 section 4). Not approved; do not treat as the ratified contract.",
+ "note": "Synthetic only. Every secret is sha256('rooftopos-ar1-kat-synthetic|<key_id>') and must never be provisioned. Key ids carry a kat- prefix so they can never collide with the real -2 ids (stg-<app>-2, gw-<app>-2). Attacker stand-ins use sha256('rooftopos-ar1-kat-synthetic|attacker-guess|<key_id>').",
+ "generated_by": "scripts/ar1-gateway-kat.ts",
+ "t0": 1800000000,
+ "now": 1800000010,
+ "protocols": {
+  "envelope": "rtgip/2",
+  "receipt": "rtgip/2-receipt/2",
+  "forward": "rtgip/2-forward/1",
+  "query": "rtgip/2-receipt-query/1"
+ },
+ "contract": {
+  "stages": {
+   "gateway_admission": [
+    "admitted"
+   ],
+   "target_inbox": [
+    "applied",
+    "duplicate",
+    "stale_ignored",
+    "held",
+    "quarantined"
+   ],
+   "consumer_commit": [
+    "applied",
+    "stale_ignored"
+   ],
+   "gateway_confirmation": [
+    "consumer_committed",
+    "target_quarantined"
+   ]
+  },
+  "gateway_confirmation": "issuer gateway, recipient source_app, prev_receipt_sha256 = digest(adm_S), signed with gw-<source>, issued only after the Gateway verified and stored the target chain; held gets none until final",
+  "source_rule": "the source MAC-verifies exactly [adm_S] or [adm_S, gateway_confirmation] with its own store; target receipts are evidence only",
+  "admission_per_recipient": "adm_T has the same unsigned fields as adm_S except key_id; signed with gw-<target>, signed once, stored, reused byte for byte on every retry; it is the rtgip-admission-receipt header and the anchor (prev) of target_inbox",
+  "key_audience": "app keys: owner <app>, audience gateway. Gateway keys: owner gateway, audience <app>, bound only to connections that app is an end of. A key with no audience is unusable",
+  "receipt_query_response": "{reason:null, receipts:[adm_S] or [adm_S, gateway_confirmation], target_evidence:[adm_T, target_inbox, consumer_commit?] (unverified at the source)}",
+  "h4_direct_export": "retired: no app holds another app's key"
+ },
+ "keys": [
+  {
+   "key_id": "kat-stg-autolabels-2",
+   "owner": "autolabels",
+   "dialect": "rtgip/2",
+   "connection_ids": [
+    "conn:autolabels>autocurb:tnt-syn-northwind",
+    "conn:autocurb>autolabels:tnt-syn-northwind",
+    "conn:autolabels>autoframe:tnt-syn-northwind",
+    "conn:autoframe>autolabels:tnt-syn-northwind",
+    "conn:autolabels>autocurb:tnt-syn-southwind"
+   ],
+   "status": "current",
+   "not_before": 1799913600,
+   "not_after": 1802592000,
+   "secret": "e553878d8a3a0f4d45242a6612609bb292ccf4ab1beb3a91a8a41f2f342efe0f",
+   "audience": "gateway"
+  },
+  {
+   "key_id": "kat-gw-autolabels-2",
+   "owner": "gateway",
+   "dialect": "rtgip/2",
+   "connection_ids": [
+    "conn:autolabels>autocurb:tnt-syn-northwind",
+    "conn:autocurb>autolabels:tnt-syn-northwind",
+    "conn:autolabels>autoframe:tnt-syn-northwind",
+    "conn:autoframe>autolabels:tnt-syn-northwind",
+    "conn:autolabels>autocurb:tnt-syn-southwind"
+   ],
+   "status": "current",
+   "not_before": 1799913600,
+   "not_after": 1802592000,
+   "secret": "981db848bbf455c45a95c80ffd6cfe852ca3799ae74e99447e5eb66d47f980a5",
+   "audience": "autolabels"
+  },
+  {
+   "key_id": "kat-stg-autocurb-2",
+   "owner": "autocurb",
+   "dialect": "rtgip/2",
+   "connection_ids": [
+    "conn:autolabels>autocurb:tnt-syn-northwind",
+    "conn:autocurb>autolabels:tnt-syn-northwind",
+    "conn:autocurb>autoframe:tnt-syn-northwind",
+    "conn:autoframe>autocurb:tnt-syn-northwind",
+    "conn:autolabels>autocurb:tnt-syn-southwind"
+   ],
+   "status": "current",
+   "not_before": 1799913600,
+   "not_after": 1802592000,
+   "secret": "7b94375a26be86e05b34e1bb4cec884001e678072b89b08b34a6356ddd4d4e55",
+   "audience": "gateway"
+  },
+  {
+   "key_id": "kat-gw-autocurb-2",
+   "owner": "gateway",
+   "dialect": "rtgip/2",
+   "connection_ids": [
+    "conn:autolabels>autocurb:tnt-syn-northwind",
+    "conn:autocurb>autolabels:tnt-syn-northwind",
+    "conn:autocurb>autoframe:tnt-syn-northwind",
+    "conn:autoframe>autocurb:tnt-syn-northwind",
+    "conn:autolabels>autocurb:tnt-syn-southwind"
+   ],
+   "status": "current",
+   "not_before": 1799913600,
+   "not_after": 1802592000,
+   "secret": "c12b9b309b7c945f2e4d828550a3dc3b530661d24f6081422b9c1b0526b56b59",
+   "audience": "autocurb"
+  },
+  {
+   "key_id": "kat-stg-autoframe-2",
+   "owner": "autoframe",
+   "dialect": "rtgip/2",
+   "connection_ids": [
+    "conn:autolabels>autoframe:tnt-syn-northwind",
+    "conn:autoframe>autolabels:tnt-syn-northwind",
+    "conn:autocurb>autoframe:tnt-syn-northwind",
+    "conn:autoframe>autocurb:tnt-syn-northwind"
+   ],
+   "status": "current",
+   "not_before": 1799913600,
+   "not_after": 1802592000,
+   "secret": "ff0a32c8ed45b99500f93a9cd2932755b56caf2a83aa6a84add4057ad00cd6c9",
+   "audience": "gateway"
+  },
+  {
+   "key_id": "kat-gw-autoframe-2",
+   "owner": "gateway",
+   "dialect": "rtgip/2",
+   "connection_ids": [
+    "conn:autolabels>autoframe:tnt-syn-northwind",
+    "conn:autoframe>autolabels:tnt-syn-northwind",
+    "conn:autocurb>autoframe:tnt-syn-northwind",
+    "conn:autoframe>autocurb:tnt-syn-northwind"
+   ],
+   "status": "current",
+   "not_before": 1799913600,
+   "not_after": 1802592000,
+   "secret": "cea1ea66a618d5cd1fcd9de2bb9e204a046f6094292c26610c9ee211234e6fd0",
+   "audience": "autoframe"
+  },
+  {
+   "key_id": "kat-stg-autolabels-1",
+   "owner": "autolabels",
+   "dialect": "rtgip/2",
+   "connection_ids": [
+    "conn:autolabels>autocurb:tnt-syn-northwind",
+    "conn:autocurb>autolabels:tnt-syn-northwind",
+    "conn:autolabels>autoframe:tnt-syn-northwind",
+    "conn:autoframe>autolabels:tnt-syn-northwind",
+    "conn:autolabels>autocurb:tnt-syn-southwind"
+   ],
+   "status": "current",
+   "not_before": 1799913600,
+   "not_after": 1802592000,
+   "secret": "232d11f195bc52048b341ca9a21843526709869c9f8055650a304ff18a92d5c8",
+   "audience": null
+  },
+  {
+   "key_id": "kat-stg-gateway-1",
+   "owner": "gateway",
+   "dialect": "rtgip/2",
+   "connection_ids": [
+    "conn:autolabels>autocurb:tnt-syn-northwind",
+    "conn:autocurb>autolabels:tnt-syn-northwind",
+    "conn:autolabels>autoframe:tnt-syn-northwind",
+    "conn:autoframe>autolabels:tnt-syn-northwind",
+    "conn:autocurb>autoframe:tnt-syn-northwind",
+    "conn:autoframe>autocurb:tnt-syn-northwind",
+    "conn:autolabels>autocurb:tnt-syn-southwind"
+   ],
+   "status": "current",
+   "not_before": 1799913600,
+   "not_after": 1802592000,
+   "secret": "10e46ad542a3226ce7319bbc841f2c06712823dd48add7da98faba7a840aea77",
+   "audience": null
+  }
+ ],
+ "key_stores": {
+  "gateway": [
+   "kat-stg-autolabels-2",
+   "kat-gw-autolabels-2",
+   "kat-stg-autocurb-2",
+   "kat-gw-autocurb-2",
+   "kat-stg-autoframe-2",
+   "kat-gw-autoframe-2",
+   "kat-stg-autolabels-1",
+   "kat-stg-gateway-1"
+  ],
+  "autolabels": [
+   "kat-stg-autolabels-2",
+   "kat-gw-autolabels-2"
+  ],
+  "autocurb": [
+   "kat-stg-autocurb-2",
+   "kat-gw-autocurb-2"
+  ],
+  "autoframe": [
+   "kat-stg-autoframe-2",
+   "kat-gw-autoframe-2"
+  ]
+ },
+ "connections": [
+  {
+   "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+   "source_app": "autolabels",
+   "target_app": "autocurb",
+   "tenant_id": "tnt-syn-northwind",
+   "rooftop_ids": [
+    "rf-nw-01"
+   ],
+   "event_types": [
+    "vehicle.identity_registered",
+    "inventory.status_changed",
+    "custody.episode_opened",
+    "custody.episode_closed",
+    "sale.milestone_recorded",
+    "listing.price_published"
+   ],
+   "purposes": [
+    "inventory_sync",
+    "custody_evidence"
+   ],
+   "producer_enabled": true,
+   "reader_enabled": true,
+   "status": "active"
+  },
+  {
+   "connection_id": "conn:autocurb>autolabels:tnt-syn-northwind",
+   "source_app": "autocurb",
+   "target_app": "autolabels",
+   "tenant_id": "tnt-syn-northwind",
+   "rooftop_ids": [
+    "rf-nw-01"
+   ],
+   "event_types": [
+    "appraisal.completed",
+    "acquisition.milestone_recorded",
+    "acquisition.purchase_completed"
+   ],
+   "purposes": [
+    "acquisition_evidence",
+    "custody_evidence"
+   ],
+   "producer_enabled": true,
+   "reader_enabled": true,
+   "status": "active"
+  },
+  {
+   "connection_id": "conn:autolabels>autoframe:tnt-syn-northwind",
+   "source_app": "autolabels",
+   "target_app": "autoframe",
+   "tenant_id": "tnt-syn-northwind",
+   "rooftop_ids": [
+    "rf-nw-01"
+   ],
+   "event_types": [
+    "vehicle.identity_registered",
+    "inventory.status_changed",
+    "custody.episode_opened",
+    "custody.episode_closed",
+    "sale.milestone_recorded",
+    "listing.availability_changed"
+   ],
+   "purposes": [
+    "inventory_sync",
+    "custody_evidence"
+   ],
+   "producer_enabled": true,
+   "reader_enabled": true,
+   "status": "active"
+  },
+  {
+   "connection_id": "conn:autoframe>autolabels:tnt-syn-northwind",
+   "source_app": "autoframe",
+   "target_app": "autolabels",
+   "tenant_id": "tnt-syn-northwind",
+   "rooftop_ids": [
+    "rf-nw-01"
+   ],
+   "event_types": [
+    "media.approved",
+    "media.revoked"
+   ],
+   "purposes": [
+    "media_reference"
+   ],
+   "producer_enabled": true,
+   "reader_enabled": true,
+   "status": "active"
+  },
+  {
+   "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+   "source_app": "autocurb",
+   "target_app": "autoframe",
+   "tenant_id": "tnt-syn-northwind",
+   "rooftop_ids": [
+    "rf-nw-01"
+   ],
+   "event_types": [
+    "appraisal.completed",
+    "acquisition.purchase_completed"
+   ],
+   "purposes": [
+    "acquisition_evidence"
+   ],
+   "producer_enabled": true,
+   "reader_enabled": true,
+   "status": "active"
+  },
+  {
+   "connection_id": "conn:autoframe>autocurb:tnt-syn-northwind",
+   "source_app": "autoframe",
+   "target_app": "autocurb",
+   "tenant_id": "tnt-syn-northwind",
+   "rooftop_ids": [
+    "rf-nw-01"
+   ],
+   "event_types": [
+    "media.approved",
+    "media.revoked"
+   ],
+   "purposes": [
+    "media_reference"
+   ],
+   "producer_enabled": true,
+   "reader_enabled": true,
+   "status": "active"
+  },
+  {
+   "connection_id": "conn:autolabels>autocurb:tnt-syn-southwind",
+   "source_app": "autolabels",
+   "target_app": "autocurb",
+   "tenant_id": "tnt-syn-southwind",
+   "rooftop_ids": [
+    "rf-sw-01"
+   ],
+   "event_types": [
+    "vehicle.identity_registered",
+    "inventory.status_changed",
+    "custody.episode_opened",
+    "custody.episode_closed",
+    "sale.milestone_recorded",
+    "listing.price_published"
+   ],
+   "purposes": [
+    "inventory_sync",
+    "custody_evidence"
+   ],
+   "producer_enabled": true,
+   "reader_enabled": true,
+   "status": "active"
+  }
+ ],
+ "deliveries": [
+  {
+   "name": "autolabels->autocurb committed",
+   "case": "committed",
+   "route": "autolabels->autocurb",
+   "event_type": "vehicle.identity_registered",
+   "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+   "source_app": "autolabels",
+   "target_app": "autocurb",
+   "body": "{\"aggregate\":{\"domain\":\"identity\",\"id\":\"inst-syn-0001\",\"prev_revision\":null,\"revision\":1,\"type\":\"vehicle_instance\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"event_type\":\"vehicle.identity_registered\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autolabels\",\"event_id\":\"al-id-1\",\"revision\":1},\"payload\":{\"make\":\"Synthetic\",\"model\":\"Sedan\",\"registered_at\":\"2027-01-15T15:00:00Z\",\"stock_number\":\"SYN1001\",\"trim\":null,\"year\":2024},\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"protocol\":\"rtgip/2\",\"purpose\":\"inventory_sync\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"schema_version\":2,\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
+   "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+   "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+   "h1_source_submission": {
+    "signer_key": "kat-stg-autolabels-2",
+    "headers": {
+     "rtgip-protocol": "rtgip/2",
+     "rtgip-key-id": "kat-stg-autolabels-2",
+     "rtgip-signer": "autolabels",
+     "rtgip-timestamp": "1800000000",
+     "rtgip-nonce": "kat_ar1_src_00000000",
+     "rtgip-scope": "autolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+     "rtgip-signature": "rtgip2=b00901e98eb1e9937e1e328e147718d94c9c7fbe9431c9c40156a31f987eee61"
+    }
+   },
+   "admission_source": {
+    "receipt": {
+     "protocol": "rtgip/2-receipt/2",
+     "receipt_version": 2,
+     "kind": "gateway_admission",
+     "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+     "route": "autolabels->autocurb",
+     "source_app": "autolabels",
+     "target_app": "autocurb",
+     "tenant_id": "tnt-syn-northwind",
+     "rooftop_id": "rf-nw-01",
+     "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+     "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+     "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+     "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+     "issuer": "gateway",
+     "recipient": "autolabels",
+     "outcome": "admitted",
+     "issued_at": 1800000000,
+     "prev_receipt_sha256": null,
+     "key_id": "kat-gw-autolabels-2",
+     "signature": "c4ea62d409f45222f3f87fd2b4053bbf6e6faeeb2151e7d935af336494f39db7"
+    },
+    "signed_bytes": "rtgip/2-receipt/2\n{\"connection_id\":\"conn:autolabels>autocurb:tnt-syn-northwind\",\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"envelope_sha256\":\"f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"issued_at\":1800000000,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autolabels-2\",\"kind\":\"gateway_admission\",\"outcome\":\"admitted\",\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"prev_receipt_sha256\":null,\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autolabels\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\"}",
+    "digest": "9fb30d912fd75537c3a297c6da870e8052e769b453dac4c5e88bf709da110c48"
+   },
+   "admission_target": {
+    "receipt": {
+     "protocol": "rtgip/2-receipt/2",
+     "receipt_version": 2,
+     "kind": "gateway_admission",
+     "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+     "route": "autolabels->autocurb",
+     "source_app": "autolabels",
+     "target_app": "autocurb",
+     "tenant_id": "tnt-syn-northwind",
+     "rooftop_id": "rf-nw-01",
+     "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+     "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+     "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+     "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+     "issuer": "gateway",
+     "recipient": "autolabels",
+     "outcome": "admitted",
+     "issued_at": 1800000000,
+     "prev_receipt_sha256": null,
+     "key_id": "kat-gw-autocurb-2",
+     "signature": "9f4157a48c22a97662f88bbe7f401323c2a107cd17194321c776f62c7823143e"
+    },
+    "signed_bytes": "rtgip/2-receipt/2\n{\"connection_id\":\"conn:autolabels>autocurb:tnt-syn-northwind\",\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"envelope_sha256\":\"f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"issued_at\":1800000000,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autocurb-2\",\"kind\":\"gateway_admission\",\"outcome\":\"admitted\",\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"prev_receipt_sha256\":null,\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autolabels\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\"}",
+    "digest": "5e14b9220a952752b7323ed391d933dfcab93344443cbf9375eef98a899bd120"
+   },
+   "forward": {
+    "protocol": "rtgip/2-forward/1",
+    "signer_key": "kat-gw-autocurb-2",
+    "headers": {
+     "content-type": "application/json",
+     "rtgip-protocol": "rtgip/2",
+     "rtgip-key-id": "kat-gw-autocurb-2",
+     "rtgip-signer": "gateway",
+     "rtgip-timestamp": "1800000001",
+     "rtgip-nonce": "kat_ar1_fwd_00000000",
+     "rtgip-scope": "autolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+     "rtgip-signature": "rtgip2=3892cbbc628368deac4c091954abcae3f1aa55b7366b4c55e8fa5b2b0d379f32",
+     "rtgip-admission-receipt": "eyJjb25uZWN0aW9uX2lkIjoiY29ubjphdXRvbGFiZWxzPmF1dG9jdXJiOnRudC1zeW4tbm9ydGh3aW5kIiwiZGVsaXZlcnlfaWQiOiJkZTE0NDU4YzBjY2I1YzEwMTQxYmIxNjIwY2ZkNGFhNzJjMTI4YTM2YzJlN2M5ODUzZDc3NjVhZTg5MGM2NjA2IiwiZW52ZWxvcGVfc2hhMjU2IjoiZjhhNzQyMDk5NDU5M2Y1YzdiYzE3ZGI2MmM5Y2I0MmNkZDI0NGIxMzM4MTdmODFkNTUyNjc3NDdhMGEzMTI1NyIsImV2ZW50X2lkIjoiNGQ0M2ZjM2QtYzU2Yy01ZWU4LThhNDMtZjJiYzM2NzFkNjMxIiwiaXNzdWVkX2F0IjoxODAwMDAwMDAwLCJpc3N1ZXIiOiJnYXRld2F5Iiwia2V5X2lkIjoia2F0LWd3LWF1dG9jdXJiLTIiLCJraW5kIjoiZ2F0ZXdheV9hZG1pc3Npb24iLCJvdXRjb21lIjoiYWRtaXR0ZWQiLCJwYXlsb2FkX3NoYTI1NiI6ImEzM2ZhYzU1MWRkNWZlYTZjODlhYTgyNGM5NDMxYjYyNTBmMGM4ODRjMWU0NWFjZjU1Nzg3MWJhZjdkNjUyMDAiLCJwcmV2X3JlY2VpcHRfc2hhMjU2IjpudWxsLCJwcm90b2NvbCI6InJ0Z2lwLzItcmVjZWlwdC8yIiwicmVjZWlwdF92ZXJzaW9uIjoyLCJyZWNpcGllbnQiOiJhdXRvbGFiZWxzIiwicm9vZnRvcF9pZCI6InJmLW53LTAxIiwicm91dGUiOiJhdXRvbGFiZWxzLT5hdXRvY3VyYiIsInNpZ25hdHVyZSI6IjlmNDE1N2E0OGMyMmE5NzY2MmY4OGJiZTdmNDAxMzIzYzJhMTA3Y2QxNzE5NDMyMWM3NzZmNjJjNzgyMzE0M2UiLCJzb3VyY2VfYXBwIjoiYXV0b2xhYmVscyIsInRhcmdldF9hcHAiOiJhdXRvY3VyYiIsInRlbmFudF9pZCI6InRudC1zeW4tbm9ydGh3aW5kIn0"
+    }
+   },
+   "target_chain": {
+    "receipts": [
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "gateway_admission",
+      "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+      "route": "autolabels->autocurb",
+      "source_app": "autolabels",
+      "target_app": "autocurb",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+      "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+      "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+      "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+      "issuer": "gateway",
+      "recipient": "autolabels",
+      "outcome": "admitted",
+      "issued_at": 1800000000,
+      "prev_receipt_sha256": null,
+      "key_id": "kat-gw-autocurb-2",
+      "signature": "9f4157a48c22a97662f88bbe7f401323c2a107cd17194321c776f62c7823143e"
+     },
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "target_inbox",
+      "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+      "route": "autolabels->autocurb",
+      "source_app": "autolabels",
+      "target_app": "autocurb",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+      "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+      "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+      "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+      "issuer": "autocurb",
+      "recipient": "gateway",
+      "outcome": "applied",
+      "issued_at": 1800000002,
+      "prev_receipt_sha256": "5e14b9220a952752b7323ed391d933dfcab93344443cbf9375eef98a899bd120",
+      "key_id": "kat-stg-autocurb-2",
+      "signature": "10436364761c266dcede8de1373453118b84da92c72ebb216edcd811cfa00ba8"
+     },
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "consumer_commit",
+      "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+      "route": "autolabels->autocurb",
+      "source_app": "autolabels",
+      "target_app": "autocurb",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+      "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+      "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+      "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+      "issuer": "autocurb",
+      "recipient": "gateway",
+      "outcome": "applied",
+      "issued_at": 1800000003,
+      "prev_receipt_sha256": "c60d08df499238a5138cbe2066ba7323ee8495d98c48e1b09c2e36464a62f8e6",
+      "key_id": "kat-stg-autocurb-2",
+      "signature": "35d132d59d81d253bbfc33ed2b1ad513fde4aedec511d67cf5a0efd8be26f0e2"
+     }
+    ],
+    "signed_bytes": [
+     "rtgip/2-receipt/2\n{\"connection_id\":\"conn:autolabels>autocurb:tnt-syn-northwind\",\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"envelope_sha256\":\"f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"issued_at\":1800000000,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autocurb-2\",\"kind\":\"gateway_admission\",\"outcome\":\"admitted\",\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"prev_receipt_sha256\":null,\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autolabels\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\"}",
+     "rtgip/2-receipt/2\n{\"connection_id\":\"conn:autolabels>autocurb:tnt-syn-northwind\",\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"envelope_sha256\":\"f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"issued_at\":1800000002,\"issuer\":\"autocurb\",\"key_id\":\"kat-stg-autocurb-2\",\"kind\":\"target_inbox\",\"outcome\":\"applied\",\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"prev_receipt_sha256\":\"5e14b9220a952752b7323ed391d933dfcab93344443cbf9375eef98a899bd120\",\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"gateway\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\"}",
+     "rtgip/2-receipt/2\n{\"connection_id\":\"conn:autolabels>autocurb:tnt-syn-northwind\",\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"envelope_sha256\":\"f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"issued_at\":1800000003,\"issuer\":\"autocurb\",\"key_id\":\"kat-stg-autocurb-2\",\"kind\":\"consumer_commit\",\"outcome\":\"applied\",\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"prev_receipt_sha256\":\"c60d08df499238a5138cbe2066ba7323ee8495d98c48e1b09c2e36464a62f8e6\",\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"gateway\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\"}"
+    ],
+    "digests": [
+     "5e14b9220a952752b7323ed391d933dfcab93344443cbf9375eef98a899bd120",
+     "c60d08df499238a5138cbe2066ba7323ee8495d98c48e1b09c2e36464a62f8e6",
+     "44fecf6db00a4b15c2162695bd0883b49cc6d1564a94bf1085b5285a06613f08"
+    ]
+   },
+   "gateway_confirmation": {
+    "receipt": {
+     "protocol": "rtgip/2-receipt/2",
+     "receipt_version": 2,
+     "kind": "gateway_confirmation",
+     "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+     "route": "autolabels->autocurb",
+     "source_app": "autolabels",
+     "target_app": "autocurb",
+     "tenant_id": "tnt-syn-northwind",
+     "rooftop_id": "rf-nw-01",
+     "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+     "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+     "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+     "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+     "issuer": "gateway",
+     "recipient": "autolabels",
+     "outcome": "consumer_committed",
+     "issued_at": 1800000005,
+     "prev_receipt_sha256": "9fb30d912fd75537c3a297c6da870e8052e769b453dac4c5e88bf709da110c48",
+     "key_id": "kat-gw-autolabels-2",
+     "signature": "cb135f4a9dd7e776bcf3ebd033bcf14ab3433cf6d1a4a5182f72cd7eb78c0699"
+    },
+    "signed_bytes": "rtgip/2-receipt/2\n{\"connection_id\":\"conn:autolabels>autocurb:tnt-syn-northwind\",\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"envelope_sha256\":\"f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"issued_at\":1800000005,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autolabels-2\",\"kind\":\"gateway_confirmation\",\"outcome\":\"consumer_committed\",\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"prev_receipt_sha256\":\"9fb30d912fd75537c3a297c6da870e8052e769b453dac4c5e88bf709da110c48\",\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autolabels\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\"}",
+    "digest": "c71360e80bf1d189af6fb196a35626c61641fe141024348850475baec3840f88"
+   },
+   "receipt_query": {
+    "signer_key": "kat-stg-autolabels-2",
+    "headers": {
+     "rtgip-key-id": "kat-stg-autolabels-2",
+     "rtgip-timestamp": "1800000010",
+     "rtgip-nonce": "kat_ar1_qry_00000000",
+     "rtgip-signature": "508dec1433d209660003e033a837dc6643216836f5eddecc4064814c0cd31fb2"
+    },
+    "body": "{\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"protocol\":\"rtgip/2-receipt-query/1\"}",
+    "response": {
+     "reason": null,
+     "receipts": [
+      {
+       "protocol": "rtgip/2-receipt/2",
+       "receipt_version": 2,
+       "kind": "gateway_admission",
+       "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+       "route": "autolabels->autocurb",
+       "source_app": "autolabels",
+       "target_app": "autocurb",
+       "tenant_id": "tnt-syn-northwind",
+       "rooftop_id": "rf-nw-01",
+       "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+       "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+       "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+       "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+       "issuer": "gateway",
+       "recipient": "autolabels",
+       "outcome": "admitted",
+       "issued_at": 1800000000,
+       "prev_receipt_sha256": null,
+       "key_id": "kat-gw-autolabels-2",
+       "signature": "c4ea62d409f45222f3f87fd2b4053bbf6e6faeeb2151e7d935af336494f39db7"
+      },
+      {
+       "protocol": "rtgip/2-receipt/2",
+       "receipt_version": 2,
+       "kind": "gateway_confirmation",
+       "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+       "route": "autolabels->autocurb",
+       "source_app": "autolabels",
+       "target_app": "autocurb",
+       "tenant_id": "tnt-syn-northwind",
+       "rooftop_id": "rf-nw-01",
+       "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+       "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+       "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+       "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+       "issuer": "gateway",
+       "recipient": "autolabels",
+       "outcome": "consumer_committed",
+       "issued_at": 1800000005,
+       "prev_receipt_sha256": "9fb30d912fd75537c3a297c6da870e8052e769b453dac4c5e88bf709da110c48",
+       "key_id": "kat-gw-autolabels-2",
+       "signature": "cb135f4a9dd7e776bcf3ebd033bcf14ab3433cf6d1a4a5182f72cd7eb78c0699"
+      }
+     ],
+     "target_evidence": [
+      {
+       "protocol": "rtgip/2-receipt/2",
+       "receipt_version": 2,
+       "kind": "gateway_admission",
+       "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+       "route": "autolabels->autocurb",
+       "source_app": "autolabels",
+       "target_app": "autocurb",
+       "tenant_id": "tnt-syn-northwind",
+       "rooftop_id": "rf-nw-01",
+       "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+       "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+       "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+       "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+       "issuer": "gateway",
+       "recipient": "autolabels",
+       "outcome": "admitted",
+       "issued_at": 1800000000,
+       "prev_receipt_sha256": null,
+       "key_id": "kat-gw-autocurb-2",
+       "signature": "9f4157a48c22a97662f88bbe7f401323c2a107cd17194321c776f62c7823143e"
+      },
+      {
+       "protocol": "rtgip/2-receipt/2",
+       "receipt_version": 2,
+       "kind": "target_inbox",
+       "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+       "route": "autolabels->autocurb",
+       "source_app": "autolabels",
+       "target_app": "autocurb",
+       "tenant_id": "tnt-syn-northwind",
+       "rooftop_id": "rf-nw-01",
+       "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+       "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+       "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+       "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+       "issuer": "autocurb",
+       "recipient": "gateway",
+       "outcome": "applied",
+       "issued_at": 1800000002,
+       "prev_receipt_sha256": "5e14b9220a952752b7323ed391d933dfcab93344443cbf9375eef98a899bd120",
+       "key_id": "kat-stg-autocurb-2",
+       "signature": "10436364761c266dcede8de1373453118b84da92c72ebb216edcd811cfa00ba8"
+      },
+      {
+       "protocol": "rtgip/2-receipt/2",
+       "receipt_version": 2,
+       "kind": "consumer_commit",
+       "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+       "route": "autolabels->autocurb",
+       "source_app": "autolabels",
+       "target_app": "autocurb",
+       "tenant_id": "tnt-syn-northwind",
+       "rooftop_id": "rf-nw-01",
+       "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+       "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+       "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+       "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+       "issuer": "autocurb",
+       "recipient": "gateway",
+       "outcome": "applied",
+       "issued_at": 1800000003,
+       "prev_receipt_sha256": "c60d08df499238a5138cbe2066ba7323ee8495d98c48e1b09c2e36464a62f8e6",
+       "key_id": "kat-stg-autocurb-2",
+       "signature": "35d132d59d81d253bbfc33ed2b1ad513fde4aedec511d67cf5a0efd8be26f0e2"
+      }
+     ]
+    },
+    "response_canonical": "{\"reason\":null,\"receipts\":[{\"connection_id\":\"conn:autolabels>autocurb:tnt-syn-northwind\",\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"envelope_sha256\":\"f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"issued_at\":1800000000,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autolabels-2\",\"kind\":\"gateway_admission\",\"outcome\":\"admitted\",\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"prev_receipt_sha256\":null,\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autolabels\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"signature\":\"c4ea62d409f45222f3f87fd2b4053bbf6e6faeeb2151e7d935af336494f39db7\",\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\"},{\"connection_id\":\"conn:autolabels>autocurb:tnt-syn-northwind\",\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"envelope_sha256\":\"f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"issued_at\":1800000005,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autolabels-2\",\"kind\":\"gateway_confirmation\",\"outcome\":\"consumer_committed\",\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"prev_receipt_sha256\":\"9fb30d912fd75537c3a297c6da870e8052e769b453dac4c5e88bf709da110c48\",\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autolabels\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"signature\":\"cb135f4a9dd7e776bcf3ebd033bcf14ab3433cf6d1a4a5182f72cd7eb78c0699\",\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\"}],\"target_evidence\":[{\"connection_id\":\"conn:autolabels>autocurb:tnt-syn-northwind\",\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"envelope_sha256\":\"f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"issued_at\":1800000000,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autocurb-2\",\"kind\":\"gateway_admission\",\"outcome\":\"admitted\",\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"prev_receipt_sha256\":null,\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autolabels\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"signature\":\"9f4157a48c22a97662f88bbe7f401323c2a107cd17194321c776f62c7823143e\",\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\"},{\"connection_id\":\"conn:autolabels>autocurb:tnt-syn-northwind\",\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"envelope_sha256\":\"f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"issued_at\":1800000002,\"issuer\":\"autocurb\",\"key_id\":\"kat-stg-autocurb-2\",\"kind\":\"target_inbox\",\"outcome\":\"applied\",\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"prev_receipt_sha256\":\"5e14b9220a952752b7323ed391d933dfcab93344443cbf9375eef98a899bd120\",\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"gateway\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"signature\":\"10436364761c266dcede8de1373453118b84da92c72ebb216edcd811cfa00ba8\",\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\"},{\"connection_id\":\"conn:autolabels>autocurb:tnt-syn-northwind\",\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"envelope_sha256\":\"f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"issued_at\":1800000003,\"issuer\":\"autocurb\",\"key_id\":\"kat-stg-autocurb-2\",\"kind\":\"consumer_commit\",\"outcome\":\"applied\",\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"prev_receipt_sha256\":\"c60d08df499238a5138cbe2066ba7323ee8495d98c48e1b09c2e36464a62f8e6\",\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"gateway\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"signature\":\"35d132d59d81d253bbfc33ed2b1ad513fde4aedec511d67cf5a0efd8be26f0e2\",\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\"}]}"
+   }
+  },
+  {
+   "name": "autocurb->autoframe committed",
+   "case": "committed",
+   "route": "autocurb->autoframe",
+   "event_type": "appraisal.completed",
+   "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+   "source_app": "autocurb",
+   "target_app": "autoframe",
+   "body": "{\"aggregate\":{\"domain\":\"appraisal\",\"id\":\"apr:55555555-5555-4555-8555-555555555555\",\"prev_revision\":null,\"revision\":1,\"type\":\"appraisal\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"fe850cf2-d95c-5258-b996-1215f0753a3f\",\"event_type\":\"appraisal.completed\",\"occurred_at\":\"2027-01-15T14:02:00Z\",\"origin\":{\"app\":\"autocurb\",\"event_id\":\"ac-apr-1\",\"revision\":1},\"payload\":{\"appraisal_ref\":\"apr:55555555-5555-4555-8555-555555555555\",\"audit_ref\":\"led-5555-2\",\"finalized_at\":\"2027-01-15T14:02:00Z\",\"verified_by_ref\":\"staff:44444444-4444-4444-8444-444444444444\",\"verified_state\":\"finalized\"},\"payload_sha256\":\"732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5\",\"protocol\":\"rtgip/2\",\"purpose\":\"acquisition_evidence\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autocurb->autoframe\",\"schema_version\":2,\"source_app\":\"autocurb\",\"target_app\":\"autoframe\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
+   "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+   "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+   "h1_source_submission": {
+    "signer_key": "kat-stg-autocurb-2",
+    "headers": {
+     "rtgip-protocol": "rtgip/2",
+     "rtgip-key-id": "kat-stg-autocurb-2",
+     "rtgip-signer": "autocurb",
+     "rtgip-timestamp": "1800000000",
+     "rtgip-nonce": "kat_ar1_src_10000000",
+     "rtgip-scope": "autocurb;autoframe;tnt-syn-northwind;rf-nw-01;appraisal.completed;2;acquisition_evidence;fe850cf2-d95c-5258-b996-1215f0753a3f",
+     "rtgip-signature": "rtgip2=afbb75064b2a979484975f21b7d7abe892a62c88f1006f9029e751ca16c17a88"
+    }
+   },
+   "admission_source": {
+    "receipt": {
+     "protocol": "rtgip/2-receipt/2",
+     "receipt_version": 2,
+     "kind": "gateway_admission",
+     "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+     "route": "autocurb->autoframe",
+     "source_app": "autocurb",
+     "target_app": "autoframe",
+     "tenant_id": "tnt-syn-northwind",
+     "rooftop_id": "rf-nw-01",
+     "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+     "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+     "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+     "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+     "issuer": "gateway",
+     "recipient": "autocurb",
+     "outcome": "admitted",
+     "issued_at": 1800000000,
+     "prev_receipt_sha256": null,
+     "key_id": "kat-gw-autocurb-2",
+     "signature": "8c24d818b90b901b1375bd502a185563639834fe78027e75b78bd0856df8a921"
+    },
+    "signed_bytes": "rtgip/2-receipt/2\n{\"connection_id\":\"conn:autocurb>autoframe:tnt-syn-northwind\",\"delivery_id\":\"ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9\",\"envelope_sha256\":\"4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644\",\"event_id\":\"fe850cf2-d95c-5258-b996-1215f0753a3f\",\"issued_at\":1800000000,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autocurb-2\",\"kind\":\"gateway_admission\",\"outcome\":\"admitted\",\"payload_sha256\":\"732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5\",\"prev_receipt_sha256\":null,\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autocurb\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autocurb->autoframe\",\"source_app\":\"autocurb\",\"target_app\":\"autoframe\",\"tenant_id\":\"tnt-syn-northwind\"}",
+    "digest": "8ca733431e210c6247c643cb3c9fcbd43be73701ac8df67dc4376c9553ed5419"
+   },
+   "admission_target": {
+    "receipt": {
+     "protocol": "rtgip/2-receipt/2",
+     "receipt_version": 2,
+     "kind": "gateway_admission",
+     "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+     "route": "autocurb->autoframe",
+     "source_app": "autocurb",
+     "target_app": "autoframe",
+     "tenant_id": "tnt-syn-northwind",
+     "rooftop_id": "rf-nw-01",
+     "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+     "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+     "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+     "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+     "issuer": "gateway",
+     "recipient": "autocurb",
+     "outcome": "admitted",
+     "issued_at": 1800000000,
+     "prev_receipt_sha256": null,
+     "key_id": "kat-gw-autoframe-2",
+     "signature": "754611f5a50870a3aa09ef24bd4f24df2da6b88a83192f44618fd07edad9ae46"
+    },
+    "signed_bytes": "rtgip/2-receipt/2\n{\"connection_id\":\"conn:autocurb>autoframe:tnt-syn-northwind\",\"delivery_id\":\"ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9\",\"envelope_sha256\":\"4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644\",\"event_id\":\"fe850cf2-d95c-5258-b996-1215f0753a3f\",\"issued_at\":1800000000,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autoframe-2\",\"kind\":\"gateway_admission\",\"outcome\":\"admitted\",\"payload_sha256\":\"732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5\",\"prev_receipt_sha256\":null,\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autocurb\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autocurb->autoframe\",\"source_app\":\"autocurb\",\"target_app\":\"autoframe\",\"tenant_id\":\"tnt-syn-northwind\"}",
+    "digest": "8d6a1a6e6fda550c705ef3f2c78b397b2b566c247accf3870beb826af8d336fb"
+   },
+   "forward": {
+    "protocol": "rtgip/2-forward/1",
+    "signer_key": "kat-gw-autoframe-2",
+    "headers": {
+     "content-type": "application/json",
+     "rtgip-protocol": "rtgip/2",
+     "rtgip-key-id": "kat-gw-autoframe-2",
+     "rtgip-signer": "gateway",
+     "rtgip-timestamp": "1800000001",
+     "rtgip-nonce": "kat_ar1_fwd_10000000",
+     "rtgip-scope": "autocurb;autoframe;tnt-syn-northwind;rf-nw-01;appraisal.completed;2;acquisition_evidence;fe850cf2-d95c-5258-b996-1215f0753a3f",
+     "rtgip-signature": "rtgip2=c32ea36a9d21df9c44b2365688107dd8775801d18cd9d6ccef9bfe98c3978566",
+     "rtgip-admission-receipt": "eyJjb25uZWN0aW9uX2lkIjoiY29ubjphdXRvY3VyYj5hdXRvZnJhbWU6dG50LXN5bi1ub3J0aHdpbmQiLCJkZWxpdmVyeV9pZCI6ImZmNDk5NTg0MWE0YWY3ZGNkMWYyMTgzZGRiYWRlNDI5ODlhYjk5OWU3MDE1NjYwMTY2NTM0MDI3MDMzY2EwYzkiLCJlbnZlbG9wZV9zaGEyNTYiOiI0ZDI3ZWMzZjdkNjJlY2I1OTkxYWRmOGNhYzU2NTQxMmE5MThiNDk2YzNhYzM4MzVkOWYzNzQxY2I5ZjM5NjQ0IiwiZXZlbnRfaWQiOiJmZTg1MGNmMi1kOTVjLTUyNTgtYjk5Ni0xMjE1ZjA3NTNhM2YiLCJpc3N1ZWRfYXQiOjE4MDAwMDAwMDAsImlzc3VlciI6ImdhdGV3YXkiLCJrZXlfaWQiOiJrYXQtZ3ctYXV0b2ZyYW1lLTIiLCJraW5kIjoiZ2F0ZXdheV9hZG1pc3Npb24iLCJvdXRjb21lIjoiYWRtaXR0ZWQiLCJwYXlsb2FkX3NoYTI1NiI6IjczMmQ0YzI0Y2RhNWRiNDE0ZjQzMjBjNmU5YzJjNzhhMDhkZGNjNWFmZDFkYWVkZWViY2Y1YzllYjg0MjEyYzUiLCJwcmV2X3JlY2VpcHRfc2hhMjU2IjpudWxsLCJwcm90b2NvbCI6InJ0Z2lwLzItcmVjZWlwdC8yIiwicmVjZWlwdF92ZXJzaW9uIjoyLCJyZWNpcGllbnQiOiJhdXRvY3VyYiIsInJvb2Z0b3BfaWQiOiJyZi1udy0wMSIsInJvdXRlIjoiYXV0b2N1cmItPmF1dG9mcmFtZSIsInNpZ25hdHVyZSI6Ijc1NDYxMWY1YTUwODcwYTNhYTA5ZWYyNGJkNGYyNGRmMmRhNmI4OGE4MzE5MmY0NDYxOGZkMDdlZGFkOWFlNDYiLCJzb3VyY2VfYXBwIjoiYXV0b2N1cmIiLCJ0YXJnZXRfYXBwIjoiYXV0b2ZyYW1lIiwidGVuYW50X2lkIjoidG50LXN5bi1ub3J0aHdpbmQifQ"
+    }
+   },
+   "target_chain": {
+    "receipts": [
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "gateway_admission",
+      "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+      "route": "autocurb->autoframe",
+      "source_app": "autocurb",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+      "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+      "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+      "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+      "issuer": "gateway",
+      "recipient": "autocurb",
+      "outcome": "admitted",
+      "issued_at": 1800000000,
+      "prev_receipt_sha256": null,
+      "key_id": "kat-gw-autoframe-2",
+      "signature": "754611f5a50870a3aa09ef24bd4f24df2da6b88a83192f44618fd07edad9ae46"
+     },
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "target_inbox",
+      "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+      "route": "autocurb->autoframe",
+      "source_app": "autocurb",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+      "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+      "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+      "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+      "issuer": "autoframe",
+      "recipient": "gateway",
+      "outcome": "applied",
+      "issued_at": 1800000002,
+      "prev_receipt_sha256": "8d6a1a6e6fda550c705ef3f2c78b397b2b566c247accf3870beb826af8d336fb",
+      "key_id": "kat-stg-autoframe-2",
+      "signature": "7c5d0fd8e2a1d349150ec5064290df1a78ac622026a00fbecdde1bf5d9380649"
+     },
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "consumer_commit",
+      "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+      "route": "autocurb->autoframe",
+      "source_app": "autocurb",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+      "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+      "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+      "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+      "issuer": "autoframe",
+      "recipient": "gateway",
+      "outcome": "applied",
+      "issued_at": 1800000003,
+      "prev_receipt_sha256": "d10782ab6d31e9abad144ef5cf3675ec09764999000d746fd01117ff6935630b",
+      "key_id": "kat-stg-autoframe-2",
+      "signature": "e1e4b7ec74fd992e1d27404619ffc9b770a132a7b508a1dfb72aca786a907078"
+     }
+    ],
+    "signed_bytes": [
+     "rtgip/2-receipt/2\n{\"connection_id\":\"conn:autocurb>autoframe:tnt-syn-northwind\",\"delivery_id\":\"ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9\",\"envelope_sha256\":\"4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644\",\"event_id\":\"fe850cf2-d95c-5258-b996-1215f0753a3f\",\"issued_at\":1800000000,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autoframe-2\",\"kind\":\"gateway_admission\",\"outcome\":\"admitted\",\"payload_sha256\":\"732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5\",\"prev_receipt_sha256\":null,\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autocurb\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autocurb->autoframe\",\"source_app\":\"autocurb\",\"target_app\":\"autoframe\",\"tenant_id\":\"tnt-syn-northwind\"}",
+     "rtgip/2-receipt/2\n{\"connection_id\":\"conn:autocurb>autoframe:tnt-syn-northwind\",\"delivery_id\":\"ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9\",\"envelope_sha256\":\"4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644\",\"event_id\":\"fe850cf2-d95c-5258-b996-1215f0753a3f\",\"issued_at\":1800000002,\"issuer\":\"autoframe\",\"key_id\":\"kat-stg-autoframe-2\",\"kind\":\"target_inbox\",\"outcome\":\"applied\",\"payload_sha256\":\"732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5\",\"prev_receipt_sha256\":\"8d6a1a6e6fda550c705ef3f2c78b397b2b566c247accf3870beb826af8d336fb\",\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"gateway\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autocurb->autoframe\",\"source_app\":\"autocurb\",\"target_app\":\"autoframe\",\"tenant_id\":\"tnt-syn-northwind\"}",
+     "rtgip/2-receipt/2\n{\"connection_id\":\"conn:autocurb>autoframe:tnt-syn-northwind\",\"delivery_id\":\"ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9\",\"envelope_sha256\":\"4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644\",\"event_id\":\"fe850cf2-d95c-5258-b996-1215f0753a3f\",\"issued_at\":1800000003,\"issuer\":\"autoframe\",\"key_id\":\"kat-stg-autoframe-2\",\"kind\":\"consumer_commit\",\"outcome\":\"applied\",\"payload_sha256\":\"732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5\",\"prev_receipt_sha256\":\"d10782ab6d31e9abad144ef5cf3675ec09764999000d746fd01117ff6935630b\",\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"gateway\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autocurb->autoframe\",\"source_app\":\"autocurb\",\"target_app\":\"autoframe\",\"tenant_id\":\"tnt-syn-northwind\"}"
+    ],
+    "digests": [
+     "8d6a1a6e6fda550c705ef3f2c78b397b2b566c247accf3870beb826af8d336fb",
+     "d10782ab6d31e9abad144ef5cf3675ec09764999000d746fd01117ff6935630b",
+     "f375651b88f6ffa47ea73887c87b5ee8ef36f7134dde06439bb945b4cef3f0d5"
+    ]
+   },
+   "gateway_confirmation": {
+    "receipt": {
+     "protocol": "rtgip/2-receipt/2",
+     "receipt_version": 2,
+     "kind": "gateway_confirmation",
+     "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+     "route": "autocurb->autoframe",
+     "source_app": "autocurb",
+     "target_app": "autoframe",
+     "tenant_id": "tnt-syn-northwind",
+     "rooftop_id": "rf-nw-01",
+     "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+     "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+     "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+     "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+     "issuer": "gateway",
+     "recipient": "autocurb",
+     "outcome": "consumer_committed",
+     "issued_at": 1800000005,
+     "prev_receipt_sha256": "8ca733431e210c6247c643cb3c9fcbd43be73701ac8df67dc4376c9553ed5419",
+     "key_id": "kat-gw-autocurb-2",
+     "signature": "965d49883a8ae30d56fb565de9b1c718e6487a425151f8e2e709716b472e565f"
+    },
+    "signed_bytes": "rtgip/2-receipt/2\n{\"connection_id\":\"conn:autocurb>autoframe:tnt-syn-northwind\",\"delivery_id\":\"ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9\",\"envelope_sha256\":\"4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644\",\"event_id\":\"fe850cf2-d95c-5258-b996-1215f0753a3f\",\"issued_at\":1800000005,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autocurb-2\",\"kind\":\"gateway_confirmation\",\"outcome\":\"consumer_committed\",\"payload_sha256\":\"732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5\",\"prev_receipt_sha256\":\"8ca733431e210c6247c643cb3c9fcbd43be73701ac8df67dc4376c9553ed5419\",\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autocurb\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autocurb->autoframe\",\"source_app\":\"autocurb\",\"target_app\":\"autoframe\",\"tenant_id\":\"tnt-syn-northwind\"}",
+    "digest": "4ac19595de177d581dd616d949135ace9ac09c2a11ecd457744f55bb9b80c6b2"
+   },
+   "receipt_query": {
+    "signer_key": "kat-stg-autocurb-2",
+    "headers": {
+     "rtgip-key-id": "kat-stg-autocurb-2",
+     "rtgip-timestamp": "1800000010",
+     "rtgip-nonce": "kat_ar1_qry_10000000",
+     "rtgip-signature": "3312a4ef49bcca41b1daf5b4f896ae03d7663a51728ced50e6c8bf198b660560"
+    },
+    "body": "{\"delivery_id\":\"ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9\",\"event_id\":\"fe850cf2-d95c-5258-b996-1215f0753a3f\",\"protocol\":\"rtgip/2-receipt-query/1\"}",
+    "response": {
+     "reason": null,
+     "receipts": [
+      {
+       "protocol": "rtgip/2-receipt/2",
+       "receipt_version": 2,
+       "kind": "gateway_admission",
+       "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+       "route": "autocurb->autoframe",
+       "source_app": "autocurb",
+       "target_app": "autoframe",
+       "tenant_id": "tnt-syn-northwind",
+       "rooftop_id": "rf-nw-01",
+       "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+       "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+       "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+       "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+       "issuer": "gateway",
+       "recipient": "autocurb",
+       "outcome": "admitted",
+       "issued_at": 1800000000,
+       "prev_receipt_sha256": null,
+       "key_id": "kat-gw-autocurb-2",
+       "signature": "8c24d818b90b901b1375bd502a185563639834fe78027e75b78bd0856df8a921"
+      },
+      {
+       "protocol": "rtgip/2-receipt/2",
+       "receipt_version": 2,
+       "kind": "gateway_confirmation",
+       "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+       "route": "autocurb->autoframe",
+       "source_app": "autocurb",
+       "target_app": "autoframe",
+       "tenant_id": "tnt-syn-northwind",
+       "rooftop_id": "rf-nw-01",
+       "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+       "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+       "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+       "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+       "issuer": "gateway",
+       "recipient": "autocurb",
+       "outcome": "consumer_committed",
+       "issued_at": 1800000005,
+       "prev_receipt_sha256": "8ca733431e210c6247c643cb3c9fcbd43be73701ac8df67dc4376c9553ed5419",
+       "key_id": "kat-gw-autocurb-2",
+       "signature": "965d49883a8ae30d56fb565de9b1c718e6487a425151f8e2e709716b472e565f"
+      }
+     ],
+     "target_evidence": [
+      {
+       "protocol": "rtgip/2-receipt/2",
+       "receipt_version": 2,
+       "kind": "gateway_admission",
+       "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+       "route": "autocurb->autoframe",
+       "source_app": "autocurb",
+       "target_app": "autoframe",
+       "tenant_id": "tnt-syn-northwind",
+       "rooftop_id": "rf-nw-01",
+       "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+       "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+       "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+       "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+       "issuer": "gateway",
+       "recipient": "autocurb",
+       "outcome": "admitted",
+       "issued_at": 1800000000,
+       "prev_receipt_sha256": null,
+       "key_id": "kat-gw-autoframe-2",
+       "signature": "754611f5a50870a3aa09ef24bd4f24df2da6b88a83192f44618fd07edad9ae46"
+      },
+      {
+       "protocol": "rtgip/2-receipt/2",
+       "receipt_version": 2,
+       "kind": "target_inbox",
+       "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+       "route": "autocurb->autoframe",
+       "source_app": "autocurb",
+       "target_app": "autoframe",
+       "tenant_id": "tnt-syn-northwind",
+       "rooftop_id": "rf-nw-01",
+       "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+       "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+       "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+       "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+       "issuer": "autoframe",
+       "recipient": "gateway",
+       "outcome": "applied",
+       "issued_at": 1800000002,
+       "prev_receipt_sha256": "8d6a1a6e6fda550c705ef3f2c78b397b2b566c247accf3870beb826af8d336fb",
+       "key_id": "kat-stg-autoframe-2",
+       "signature": "7c5d0fd8e2a1d349150ec5064290df1a78ac622026a00fbecdde1bf5d9380649"
+      },
+      {
+       "protocol": "rtgip/2-receipt/2",
+       "receipt_version": 2,
+       "kind": "consumer_commit",
+       "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+       "route": "autocurb->autoframe",
+       "source_app": "autocurb",
+       "target_app": "autoframe",
+       "tenant_id": "tnt-syn-northwind",
+       "rooftop_id": "rf-nw-01",
+       "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+       "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+       "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+       "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+       "issuer": "autoframe",
+       "recipient": "gateway",
+       "outcome": "applied",
+       "issued_at": 1800000003,
+       "prev_receipt_sha256": "d10782ab6d31e9abad144ef5cf3675ec09764999000d746fd01117ff6935630b",
+       "key_id": "kat-stg-autoframe-2",
+       "signature": "e1e4b7ec74fd992e1d27404619ffc9b770a132a7b508a1dfb72aca786a907078"
+      }
+     ]
+    },
+    "response_canonical": "{\"reason\":null,\"receipts\":[{\"connection_id\":\"conn:autocurb>autoframe:tnt-syn-northwind\",\"delivery_id\":\"ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9\",\"envelope_sha256\":\"4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644\",\"event_id\":\"fe850cf2-d95c-5258-b996-1215f0753a3f\",\"issued_at\":1800000000,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autocurb-2\",\"kind\":\"gateway_admission\",\"outcome\":\"admitted\",\"payload_sha256\":\"732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5\",\"prev_receipt_sha256\":null,\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autocurb\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autocurb->autoframe\",\"signature\":\"8c24d818b90b901b1375bd502a185563639834fe78027e75b78bd0856df8a921\",\"source_app\":\"autocurb\",\"target_app\":\"autoframe\",\"tenant_id\":\"tnt-syn-northwind\"},{\"connection_id\":\"conn:autocurb>autoframe:tnt-syn-northwind\",\"delivery_id\":\"ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9\",\"envelope_sha256\":\"4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644\",\"event_id\":\"fe850cf2-d95c-5258-b996-1215f0753a3f\",\"issued_at\":1800000005,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autocurb-2\",\"kind\":\"gateway_confirmation\",\"outcome\":\"consumer_committed\",\"payload_sha256\":\"732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5\",\"prev_receipt_sha256\":\"8ca733431e210c6247c643cb3c9fcbd43be73701ac8df67dc4376c9553ed5419\",\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autocurb\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autocurb->autoframe\",\"signature\":\"965d49883a8ae30d56fb565de9b1c718e6487a425151f8e2e709716b472e565f\",\"source_app\":\"autocurb\",\"target_app\":\"autoframe\",\"tenant_id\":\"tnt-syn-northwind\"}],\"target_evidence\":[{\"connection_id\":\"conn:autocurb>autoframe:tnt-syn-northwind\",\"delivery_id\":\"ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9\",\"envelope_sha256\":\"4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644\",\"event_id\":\"fe850cf2-d95c-5258-b996-1215f0753a3f\",\"issued_at\":1800000000,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autoframe-2\",\"kind\":\"gateway_admission\",\"outcome\":\"admitted\",\"payload_sha256\":\"732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5\",\"prev_receipt_sha256\":null,\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autocurb\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autocurb->autoframe\",\"signature\":\"754611f5a50870a3aa09ef24bd4f24df2da6b88a83192f44618fd07edad9ae46\",\"source_app\":\"autocurb\",\"target_app\":\"autoframe\",\"tenant_id\":\"tnt-syn-northwind\"},{\"connection_id\":\"conn:autocurb>autoframe:tnt-syn-northwind\",\"delivery_id\":\"ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9\",\"envelope_sha256\":\"4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644\",\"event_id\":\"fe850cf2-d95c-5258-b996-1215f0753a3f\",\"issued_at\":1800000002,\"issuer\":\"autoframe\",\"key_id\":\"kat-stg-autoframe-2\",\"kind\":\"target_inbox\",\"outcome\":\"applied\",\"payload_sha256\":\"732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5\",\"prev_receipt_sha256\":\"8d6a1a6e6fda550c705ef3f2c78b397b2b566c247accf3870beb826af8d336fb\",\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"gateway\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autocurb->autoframe\",\"signature\":\"7c5d0fd8e2a1d349150ec5064290df1a78ac622026a00fbecdde1bf5d9380649\",\"source_app\":\"autocurb\",\"target_app\":\"autoframe\",\"tenant_id\":\"tnt-syn-northwind\"},{\"connection_id\":\"conn:autocurb>autoframe:tnt-syn-northwind\",\"delivery_id\":\"ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9\",\"envelope_sha256\":\"4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644\",\"event_id\":\"fe850cf2-d95c-5258-b996-1215f0753a3f\",\"issued_at\":1800000003,\"issuer\":\"autoframe\",\"key_id\":\"kat-stg-autoframe-2\",\"kind\":\"consumer_commit\",\"outcome\":\"applied\",\"payload_sha256\":\"732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5\",\"prev_receipt_sha256\":\"d10782ab6d31e9abad144ef5cf3675ec09764999000d746fd01117ff6935630b\",\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"gateway\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autocurb->autoframe\",\"signature\":\"e1e4b7ec74fd992e1d27404619ffc9b770a132a7b508a1dfb72aca786a907078\",\"source_app\":\"autocurb\",\"target_app\":\"autoframe\",\"tenant_id\":\"tnt-syn-northwind\"}]}"
+   }
+  },
+  {
+   "name": "autoframe->autolabels committed",
+   "case": "committed",
+   "route": "autoframe->autolabels",
+   "event_type": "media.approved",
+   "connection_id": "conn:autoframe>autolabels:tnt-syn-northwind",
+   "source_app": "autoframe",
+   "target_app": "autolabels",
+   "body": "{\"aggregate\":{\"domain\":\"media\",\"id\":\"med-syn-1\",\"prev_revision\":null,\"revision\":1,\"type\":\"media\"},\"causation_id\":\"appr-syn-1\",\"classification\":\"shared_media_meta\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"59f10325-b592-52e8-aa15-4d92dc976467\",\"event_type\":\"media.approved\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autoframe\",\"event_id\":\"af-evt-1\",\"revision\":1},\"payload\":{\"approval_audit_ref\":\"audit-af-1\",\"approved_at\":\"2027-01-15T15:00:00Z\",\"approved_by_ref\":\"af-staff:44444444-4444-4444-8444-444444444444\",\"content_sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"height\":1000,\"media_id\":\"med-syn-1\",\"media_order\":1,\"orientation\":\"landscape\",\"preset_key\":\"studio\",\"preset_version\":1,\"rendition_id\":\"rend-syn-1\",\"shot_type\":\"front_34\",\"storage_ref\":{\"bucket\":\"autoframe-media\",\"object_key\":\"tnt-syn-northwind/rf-nw-01/inst-syn-0001/med-syn-1/derived/studio-v1-r1.webp\"},\"width\":1500},\"payload_sha256\":\"0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace\",\"protocol\":\"rtgip/2\",\"purpose\":\"media_reference\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autoframe->autolabels\",\"schema_version\":2,\"source_app\":\"autoframe\",\"target_app\":\"autolabels\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
+   "envelope_sha256": "55d2f8340f7e53dd77c50b26496f8fed8bece0a9a65438175d58bba4ba3dd972",
+   "delivery_id": "8cb807f8de56fc3a927d3d85676789dfe3f8fc696c7fb7864efb0b8ce2936dcb",
+   "h1_source_submission": {
+    "signer_key": "kat-stg-autoframe-2",
+    "headers": {
+     "rtgip-protocol": "rtgip/2",
+     "rtgip-key-id": "kat-stg-autoframe-2",
+     "rtgip-signer": "autoframe",
+     "rtgip-timestamp": "1800000000",
+     "rtgip-nonce": "kat_ar1_src_20000000",
+     "rtgip-scope": "autoframe;autolabels;tnt-syn-northwind;rf-nw-01;media.approved;2;media_reference;59f10325-b592-52e8-aa15-4d92dc976467",
+     "rtgip-signature": "rtgip2=850075f734b8e5896c197bb11e2a503e43a153a5910f3d64c7113d230b5031fa"
+    }
+   },
+   "admission_source": {
+    "receipt": {
+     "protocol": "rtgip/2-receipt/2",
+     "receipt_version": 2,
+     "kind": "gateway_admission",
+     "event_id": "59f10325-b592-52e8-aa15-4d92dc976467",
+     "route": "autoframe->autolabels",
+     "source_app": "autoframe",
+     "target_app": "autolabels",
+     "tenant_id": "tnt-syn-northwind",
+     "rooftop_id": "rf-nw-01",
+     "connection_id": "conn:autoframe>autolabels:tnt-syn-northwind",
+     "payload_sha256": "0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace",
+     "envelope_sha256": "55d2f8340f7e53dd77c50b26496f8fed8bece0a9a65438175d58bba4ba3dd972",
+     "delivery_id": "8cb807f8de56fc3a927d3d85676789dfe3f8fc696c7fb7864efb0b8ce2936dcb",
+     "issuer": "gateway",
+     "recipient": "autoframe",
+     "outcome": "admitted",
+     "issued_at": 1800000000,
+     "prev_receipt_sha256": null,
+     "key_id": "kat-gw-autoframe-2",
+     "signature": "1d837bd94ed568813bb9bca699072391cbea5898389776b46712dd5febe7b995"
+    },
+    "signed_bytes": "rtgip/2-receipt/2\n{\"connection_id\":\"conn:autoframe>autolabels:tnt-syn-northwind\",\"delivery_id\":\"8cb807f8de56fc3a927d3d85676789dfe3f8fc696c7fb7864efb0b8ce2936dcb\",\"envelope_sha256\":\"55d2f8340f7e53dd77c50b26496f8fed8bece0a9a65438175d58bba4ba3dd972\",\"event_id\":\"59f10325-b592-52e8-aa15-4d92dc976467\",\"issued_at\":1800000000,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autoframe-2\",\"kind\":\"gateway_admission\",\"outcome\":\"admitted\",\"payload_sha256\":\"0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace\",\"prev_receipt_sha256\":null,\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autoframe\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autoframe->autolabels\",\"source_app\":\"autoframe\",\"target_app\":\"autolabels\",\"tenant_id\":\"tnt-syn-northwind\"}",
+    "digest": "f03c500ae5bca5753b984c10af06de5026ac2b77ebd923e5baa7178ac995a10d"
+   },
+   "admission_target": {
+    "receipt": {
+     "protocol": "rtgip/2-receipt/2",
+     "receipt_version": 2,
+     "kind": "gateway_admission",
+     "event_id": "59f10325-b592-52e8-aa15-4d92dc976467",
+     "route": "autoframe->autolabels",
+     "source_app": "autoframe",
+     "target_app": "autolabels",
+     "tenant_id": "tnt-syn-northwind",
+     "rooftop_id": "rf-nw-01",
+     "connection_id": "conn:autoframe>autolabels:tnt-syn-northwind",
+     "payload_sha256": "0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace",
+     "envelope_sha256": "55d2f8340f7e53dd77c50b26496f8fed8bece0a9a65438175d58bba4ba3dd972",
+     "delivery_id": "8cb807f8de56fc3a927d3d85676789dfe3f8fc696c7fb7864efb0b8ce2936dcb",
+     "issuer": "gateway",
+     "recipient": "autoframe",
+     "outcome": "admitted",
+     "issued_at": 1800000000,
+     "prev_receipt_sha256": null,
+     "key_id": "kat-gw-autolabels-2",
+     "signature": "7a1c2af5ded042de8c08ef2cdff35105a31ee9be8417b293e884825b324855b8"
+    },
+    "signed_bytes": "rtgip/2-receipt/2\n{\"connection_id\":\"conn:autoframe>autolabels:tnt-syn-northwind\",\"delivery_id\":\"8cb807f8de56fc3a927d3d85676789dfe3f8fc696c7fb7864efb0b8ce2936dcb\",\"envelope_sha256\":\"55d2f8340f7e53dd77c50b26496f8fed8bece0a9a65438175d58bba4ba3dd972\",\"event_id\":\"59f10325-b592-52e8-aa15-4d92dc976467\",\"issued_at\":1800000000,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autolabels-2\",\"kind\":\"gateway_admission\",\"outcome\":\"admitted\",\"payload_sha256\":\"0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace\",\"prev_receipt_sha256\":null,\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autoframe\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autoframe->autolabels\",\"source_app\":\"autoframe\",\"target_app\":\"autolabels\",\"tenant_id\":\"tnt-syn-northwind\"}",
+    "digest": "e3fb212fbd8661bd319f2f3f53bbcff8c37946d0b5bcb6a599e1c8aa7809101c"
+   },
+   "forward": {
+    "protocol": "rtgip/2-forward/1",
+    "signer_key": "kat-gw-autolabels-2",
+    "headers": {
+     "content-type": "application/json",
+     "rtgip-protocol": "rtgip/2",
+     "rtgip-key-id": "kat-gw-autolabels-2",
+     "rtgip-signer": "gateway",
+     "rtgip-timestamp": "1800000001",
+     "rtgip-nonce": "kat_ar1_fwd_20000000",
+     "rtgip-scope": "autoframe;autolabels;tnt-syn-northwind;rf-nw-01;media.approved;2;media_reference;59f10325-b592-52e8-aa15-4d92dc976467",
+     "rtgip-signature": "rtgip2=78b434b6499e722becd0cd1cc1d0bd52cc6e25d1431e1b2a1a5bbd221a07e5ca",
+     "rtgip-admission-receipt": "eyJjb25uZWN0aW9uX2lkIjoiY29ubjphdXRvZnJhbWU-YXV0b2xhYmVsczp0bnQtc3luLW5vcnRod2luZCIsImRlbGl2ZXJ5X2lkIjoiOGNiODA3ZjhkZTU2ZmMzYTkyN2QzZDg1Njc2Nzg5ZGZlM2Y4ZmM2OTZjN2ZiNzg2NGVmYjBiOGNlMjkzNmRjYiIsImVudmVsb3BlX3NoYTI1NiI6IjU1ZDJmODM0MGY3ZTUzZGQ3N2M1MGIyNjQ5NmY4ZmVkOGJlY2UwYTlhNjU0MzgxNzVkNThiYmE0YmEzZGQ5NzIiLCJldmVudF9pZCI6IjU5ZjEwMzI1LWI1OTItNTJlOC1hYTE1LTRkOTJkYzk3NjQ2NyIsImlzc3VlZF9hdCI6MTgwMDAwMDAwMCwiaXNzdWVyIjoiZ2F0ZXdheSIsImtleV9pZCI6ImthdC1ndy1hdXRvbGFiZWxzLTIiLCJraW5kIjoiZ2F0ZXdheV9hZG1pc3Npb24iLCJvdXRjb21lIjoiYWRtaXR0ZWQiLCJwYXlsb2FkX3NoYTI1NiI6IjBkYTA2MDRiMGI5YTQzMzk3MTYwYzJkNTg5M2I5ZTgxNzUyMGM5YWZkZjgyYzA5ODRkZmY2OTk3NWRhYmJhY2UiLCJwcmV2X3JlY2VpcHRfc2hhMjU2IjpudWxsLCJwcm90b2NvbCI6InJ0Z2lwLzItcmVjZWlwdC8yIiwicmVjZWlwdF92ZXJzaW9uIjoyLCJyZWNpcGllbnQiOiJhdXRvZnJhbWUiLCJyb29mdG9wX2lkIjoicmYtbnctMDEiLCJyb3V0ZSI6ImF1dG9mcmFtZS0-YXV0b2xhYmVscyIsInNpZ25hdHVyZSI6IjdhMWMyYWY1ZGVkMDQyZGU4YzA4ZWYyY2RmZjM1MTA1YTMxZWU5YmU4NDE3YjI5M2U4ODQ4MjViMzI0ODU1YjgiLCJzb3VyY2VfYXBwIjoiYXV0b2ZyYW1lIiwidGFyZ2V0X2FwcCI6ImF1dG9sYWJlbHMiLCJ0ZW5hbnRfaWQiOiJ0bnQtc3luLW5vcnRod2luZCJ9"
+    }
+   },
+   "target_chain": {
+    "receipts": [
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "gateway_admission",
+      "event_id": "59f10325-b592-52e8-aa15-4d92dc976467",
+      "route": "autoframe->autolabels",
+      "source_app": "autoframe",
+      "target_app": "autolabels",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autoframe>autolabels:tnt-syn-northwind",
+      "payload_sha256": "0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace",
+      "envelope_sha256": "55d2f8340f7e53dd77c50b26496f8fed8bece0a9a65438175d58bba4ba3dd972",
+      "delivery_id": "8cb807f8de56fc3a927d3d85676789dfe3f8fc696c7fb7864efb0b8ce2936dcb",
+      "issuer": "gateway",
+      "recipient": "autoframe",
+      "outcome": "admitted",
+      "issued_at": 1800000000,
+      "prev_receipt_sha256": null,
+      "key_id": "kat-gw-autolabels-2",
+      "signature": "7a1c2af5ded042de8c08ef2cdff35105a31ee9be8417b293e884825b324855b8"
+     },
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "target_inbox",
+      "event_id": "59f10325-b592-52e8-aa15-4d92dc976467",
+      "route": "autoframe->autolabels",
+      "source_app": "autoframe",
+      "target_app": "autolabels",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autoframe>autolabels:tnt-syn-northwind",
+      "payload_sha256": "0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace",
+      "envelope_sha256": "55d2f8340f7e53dd77c50b26496f8fed8bece0a9a65438175d58bba4ba3dd972",
+      "delivery_id": "8cb807f8de56fc3a927d3d85676789dfe3f8fc696c7fb7864efb0b8ce2936dcb",
+      "issuer": "autolabels",
+      "recipient": "gateway",
+      "outcome": "applied",
+      "issued_at": 1800000002,
+      "prev_receipt_sha256": "e3fb212fbd8661bd319f2f3f53bbcff8c37946d0b5bcb6a599e1c8aa7809101c",
+      "key_id": "kat-stg-autolabels-2",
+      "signature": "95bc217052fc472d10fbf578be72f54e453ccb3a8c82537e7edde4e6831e3234"
+     },
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "consumer_commit",
+      "event_id": "59f10325-b592-52e8-aa15-4d92dc976467",
+      "route": "autoframe->autolabels",
+      "source_app": "autoframe",
+      "target_app": "autolabels",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autoframe>autolabels:tnt-syn-northwind",
+      "payload_sha256": "0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace",
+      "envelope_sha256": "55d2f8340f7e53dd77c50b26496f8fed8bece0a9a65438175d58bba4ba3dd972",
+      "delivery_id": "8cb807f8de56fc3a927d3d85676789dfe3f8fc696c7fb7864efb0b8ce2936dcb",
+      "issuer": "autolabels",
+      "recipient": "gateway",
+      "outcome": "applied",
+      "issued_at": 1800000003,
+      "prev_receipt_sha256": "f100a516ac293a95786612ff50be5fb5d81d7a7bce23b54d5e9e4fe0c58d833a",
+      "key_id": "kat-stg-autolabels-2",
+      "signature": "fdc3e9f4edff485b0a2112fb77bf518f291bcf12ad6d7149e31e9954eaa5ae89"
+     }
+    ],
+    "signed_bytes": [
+     "rtgip/2-receipt/2\n{\"connection_id\":\"conn:autoframe>autolabels:tnt-syn-northwind\",\"delivery_id\":\"8cb807f8de56fc3a927d3d85676789dfe3f8fc696c7fb7864efb0b8ce2936dcb\",\"envelope_sha256\":\"55d2f8340f7e53dd77c50b26496f8fed8bece0a9a65438175d58bba4ba3dd972\",\"event_id\":\"59f10325-b592-52e8-aa15-4d92dc976467\",\"issued_at\":1800000000,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autolabels-2\",\"kind\":\"gateway_admission\",\"outcome\":\"admitted\",\"payload_sha256\":\"0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace\",\"prev_receipt_sha256\":null,\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autoframe\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autoframe->autolabels\",\"source_app\":\"autoframe\",\"target_app\":\"autolabels\",\"tenant_id\":\"tnt-syn-northwind\"}",
+     "rtgip/2-receipt/2\n{\"connection_id\":\"conn:autoframe>autolabels:tnt-syn-northwind\",\"delivery_id\":\"8cb807f8de56fc3a927d3d85676789dfe3f8fc696c7fb7864efb0b8ce2936dcb\",\"envelope_sha256\":\"55d2f8340f7e53dd77c50b26496f8fed8bece0a9a65438175d58bba4ba3dd972\",\"event_id\":\"59f10325-b592-52e8-aa15-4d92dc976467\",\"issued_at\":1800000002,\"issuer\":\"autolabels\",\"key_id\":\"kat-stg-autolabels-2\",\"kind\":\"target_inbox\",\"outcome\":\"applied\",\"payload_sha256\":\"0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace\",\"prev_receipt_sha256\":\"e3fb212fbd8661bd319f2f3f53bbcff8c37946d0b5bcb6a599e1c8aa7809101c\",\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"gateway\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autoframe->autolabels\",\"source_app\":\"autoframe\",\"target_app\":\"autolabels\",\"tenant_id\":\"tnt-syn-northwind\"}",
+     "rtgip/2-receipt/2\n{\"connection_id\":\"conn:autoframe>autolabels:tnt-syn-northwind\",\"delivery_id\":\"8cb807f8de56fc3a927d3d85676789dfe3f8fc696c7fb7864efb0b8ce2936dcb\",\"envelope_sha256\":\"55d2f8340f7e53dd77c50b26496f8fed8bece0a9a65438175d58bba4ba3dd972\",\"event_id\":\"59f10325-b592-52e8-aa15-4d92dc976467\",\"issued_at\":1800000003,\"issuer\":\"autolabels\",\"key_id\":\"kat-stg-autolabels-2\",\"kind\":\"consumer_commit\",\"outcome\":\"applied\",\"payload_sha256\":\"0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace\",\"prev_receipt_sha256\":\"f100a516ac293a95786612ff50be5fb5d81d7a7bce23b54d5e9e4fe0c58d833a\",\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"gateway\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autoframe->autolabels\",\"source_app\":\"autoframe\",\"target_app\":\"autolabels\",\"tenant_id\":\"tnt-syn-northwind\"}"
+    ],
+    "digests": [
+     "e3fb212fbd8661bd319f2f3f53bbcff8c37946d0b5bcb6a599e1c8aa7809101c",
+     "f100a516ac293a95786612ff50be5fb5d81d7a7bce23b54d5e9e4fe0c58d833a",
+     "0c1ce90355d2f88ed46480b81f319c510d60a734a2186f2a594c80829bff2545"
+    ]
+   },
+   "gateway_confirmation": {
+    "receipt": {
+     "protocol": "rtgip/2-receipt/2",
+     "receipt_version": 2,
+     "kind": "gateway_confirmation",
+     "event_id": "59f10325-b592-52e8-aa15-4d92dc976467",
+     "route": "autoframe->autolabels",
+     "source_app": "autoframe",
+     "target_app": "autolabels",
+     "tenant_id": "tnt-syn-northwind",
+     "rooftop_id": "rf-nw-01",
+     "connection_id": "conn:autoframe>autolabels:tnt-syn-northwind",
+     "payload_sha256": "0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace",
+     "envelope_sha256": "55d2f8340f7e53dd77c50b26496f8fed8bece0a9a65438175d58bba4ba3dd972",
+     "delivery_id": "8cb807f8de56fc3a927d3d85676789dfe3f8fc696c7fb7864efb0b8ce2936dcb",
+     "issuer": "gateway",
+     "recipient": "autoframe",
+     "outcome": "consumer_committed",
+     "issued_at": 1800000005,
+     "prev_receipt_sha256": "f03c500ae5bca5753b984c10af06de5026ac2b77ebd923e5baa7178ac995a10d",
+     "key_id": "kat-gw-autoframe-2",
+     "signature": "46424ee6355912663b53b0eae29d35fe7f13b96fdb0457a20b936cc1489c9df5"
+    },
+    "signed_bytes": "rtgip/2-receipt/2\n{\"connection_id\":\"conn:autoframe>autolabels:tnt-syn-northwind\",\"delivery_id\":\"8cb807f8de56fc3a927d3d85676789dfe3f8fc696c7fb7864efb0b8ce2936dcb\",\"envelope_sha256\":\"55d2f8340f7e53dd77c50b26496f8fed8bece0a9a65438175d58bba4ba3dd972\",\"event_id\":\"59f10325-b592-52e8-aa15-4d92dc976467\",\"issued_at\":1800000005,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autoframe-2\",\"kind\":\"gateway_confirmation\",\"outcome\":\"consumer_committed\",\"payload_sha256\":\"0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace\",\"prev_receipt_sha256\":\"f03c500ae5bca5753b984c10af06de5026ac2b77ebd923e5baa7178ac995a10d\",\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autoframe\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autoframe->autolabels\",\"source_app\":\"autoframe\",\"target_app\":\"autolabels\",\"tenant_id\":\"tnt-syn-northwind\"}",
+    "digest": "925ec301d6c2736e0cebce78bc0a8d6ed322b52e300755241db717ea501afa17"
+   },
+   "receipt_query": {
+    "signer_key": "kat-stg-autoframe-2",
+    "headers": {
+     "rtgip-key-id": "kat-stg-autoframe-2",
+     "rtgip-timestamp": "1800000010",
+     "rtgip-nonce": "kat_ar1_qry_20000000",
+     "rtgip-signature": "bace1f862503103423a9260d6d51361e53ff1be5006ec07f6383c2000817af4e"
+    },
+    "body": "{\"delivery_id\":\"8cb807f8de56fc3a927d3d85676789dfe3f8fc696c7fb7864efb0b8ce2936dcb\",\"event_id\":\"59f10325-b592-52e8-aa15-4d92dc976467\",\"protocol\":\"rtgip/2-receipt-query/1\"}",
+    "response": {
+     "reason": null,
+     "receipts": [
+      {
+       "protocol": "rtgip/2-receipt/2",
+       "receipt_version": 2,
+       "kind": "gateway_admission",
+       "event_id": "59f10325-b592-52e8-aa15-4d92dc976467",
+       "route": "autoframe->autolabels",
+       "source_app": "autoframe",
+       "target_app": "autolabels",
+       "tenant_id": "tnt-syn-northwind",
+       "rooftop_id": "rf-nw-01",
+       "connection_id": "conn:autoframe>autolabels:tnt-syn-northwind",
+       "payload_sha256": "0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace",
+       "envelope_sha256": "55d2f8340f7e53dd77c50b26496f8fed8bece0a9a65438175d58bba4ba3dd972",
+       "delivery_id": "8cb807f8de56fc3a927d3d85676789dfe3f8fc696c7fb7864efb0b8ce2936dcb",
+       "issuer": "gateway",
+       "recipient": "autoframe",
+       "outcome": "admitted",
+       "issued_at": 1800000000,
+       "prev_receipt_sha256": null,
+       "key_id": "kat-gw-autoframe-2",
+       "signature": "1d837bd94ed568813bb9bca699072391cbea5898389776b46712dd5febe7b995"
+      },
+      {
+       "protocol": "rtgip/2-receipt/2",
+       "receipt_version": 2,
+       "kind": "gateway_confirmation",
+       "event_id": "59f10325-b592-52e8-aa15-4d92dc976467",
+       "route": "autoframe->autolabels",
+       "source_app": "autoframe",
+       "target_app": "autolabels",
+       "tenant_id": "tnt-syn-northwind",
+       "rooftop_id": "rf-nw-01",
+       "connection_id": "conn:autoframe>autolabels:tnt-syn-northwind",
+       "payload_sha256": "0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace",
+       "envelope_sha256": "55d2f8340f7e53dd77c50b26496f8fed8bece0a9a65438175d58bba4ba3dd972",
+       "delivery_id": "8cb807f8de56fc3a927d3d85676789dfe3f8fc696c7fb7864efb0b8ce2936dcb",
+       "issuer": "gateway",
+       "recipient": "autoframe",
+       "outcome": "consumer_committed",
+       "issued_at": 1800000005,
+       "prev_receipt_sha256": "f03c500ae5bca5753b984c10af06de5026ac2b77ebd923e5baa7178ac995a10d",
+       "key_id": "kat-gw-autoframe-2",
+       "signature": "46424ee6355912663b53b0eae29d35fe7f13b96fdb0457a20b936cc1489c9df5"
+      }
+     ],
+     "target_evidence": [
+      {
+       "protocol": "rtgip/2-receipt/2",
+       "receipt_version": 2,
+       "kind": "gateway_admission",
+       "event_id": "59f10325-b592-52e8-aa15-4d92dc976467",
+       "route": "autoframe->autolabels",
+       "source_app": "autoframe",
+       "target_app": "autolabels",
+       "tenant_id": "tnt-syn-northwind",
+       "rooftop_id": "rf-nw-01",
+       "connection_id": "conn:autoframe>autolabels:tnt-syn-northwind",
+       "payload_sha256": "0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace",
+       "envelope_sha256": "55d2f8340f7e53dd77c50b26496f8fed8bece0a9a65438175d58bba4ba3dd972",
+       "delivery_id": "8cb807f8de56fc3a927d3d85676789dfe3f8fc696c7fb7864efb0b8ce2936dcb",
+       "issuer": "gateway",
+       "recipient": "autoframe",
+       "outcome": "admitted",
+       "issued_at": 1800000000,
+       "prev_receipt_sha256": null,
+       "key_id": "kat-gw-autolabels-2",
+       "signature": "7a1c2af5ded042de8c08ef2cdff35105a31ee9be8417b293e884825b324855b8"
+      },
+      {
+       "protocol": "rtgip/2-receipt/2",
+       "receipt_version": 2,
+       "kind": "target_inbox",
+       "event_id": "59f10325-b592-52e8-aa15-4d92dc976467",
+       "route": "autoframe->autolabels",
+       "source_app": "autoframe",
+       "target_app": "autolabels",
+       "tenant_id": "tnt-syn-northwind",
+       "rooftop_id": "rf-nw-01",
+       "connection_id": "conn:autoframe>autolabels:tnt-syn-northwind",
+       "payload_sha256": "0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace",
+       "envelope_sha256": "55d2f8340f7e53dd77c50b26496f8fed8bece0a9a65438175d58bba4ba3dd972",
+       "delivery_id": "8cb807f8de56fc3a927d3d85676789dfe3f8fc696c7fb7864efb0b8ce2936dcb",
+       "issuer": "autolabels",
+       "recipient": "gateway",
+       "outcome": "applied",
+       "issued_at": 1800000002,
+       "prev_receipt_sha256": "e3fb212fbd8661bd319f2f3f53bbcff8c37946d0b5bcb6a599e1c8aa7809101c",
+       "key_id": "kat-stg-autolabels-2",
+       "signature": "95bc217052fc472d10fbf578be72f54e453ccb3a8c82537e7edde4e6831e3234"
+      },
+      {
+       "protocol": "rtgip/2-receipt/2",
+       "receipt_version": 2,
+       "kind": "consumer_commit",
+       "event_id": "59f10325-b592-52e8-aa15-4d92dc976467",
+       "route": "autoframe->autolabels",
+       "source_app": "autoframe",
+       "target_app": "autolabels",
+       "tenant_id": "tnt-syn-northwind",
+       "rooftop_id": "rf-nw-01",
+       "connection_id": "conn:autoframe>autolabels:tnt-syn-northwind",
+       "payload_sha256": "0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace",
+       "envelope_sha256": "55d2f8340f7e53dd77c50b26496f8fed8bece0a9a65438175d58bba4ba3dd972",
+       "delivery_id": "8cb807f8de56fc3a927d3d85676789dfe3f8fc696c7fb7864efb0b8ce2936dcb",
+       "issuer": "autolabels",
+       "recipient": "gateway",
+       "outcome": "applied",
+       "issued_at": 1800000003,
+       "prev_receipt_sha256": "f100a516ac293a95786612ff50be5fb5d81d7a7bce23b54d5e9e4fe0c58d833a",
+       "key_id": "kat-stg-autolabels-2",
+       "signature": "fdc3e9f4edff485b0a2112fb77bf518f291bcf12ad6d7149e31e9954eaa5ae89"
+      }
+     ]
+    },
+    "response_canonical": "{\"reason\":null,\"receipts\":[{\"connection_id\":\"conn:autoframe>autolabels:tnt-syn-northwind\",\"delivery_id\":\"8cb807f8de56fc3a927d3d85676789dfe3f8fc696c7fb7864efb0b8ce2936dcb\",\"envelope_sha256\":\"55d2f8340f7e53dd77c50b26496f8fed8bece0a9a65438175d58bba4ba3dd972\",\"event_id\":\"59f10325-b592-52e8-aa15-4d92dc976467\",\"issued_at\":1800000000,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autoframe-2\",\"kind\":\"gateway_admission\",\"outcome\":\"admitted\",\"payload_sha256\":\"0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace\",\"prev_receipt_sha256\":null,\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autoframe\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autoframe->autolabels\",\"signature\":\"1d837bd94ed568813bb9bca699072391cbea5898389776b46712dd5febe7b995\",\"source_app\":\"autoframe\",\"target_app\":\"autolabels\",\"tenant_id\":\"tnt-syn-northwind\"},{\"connection_id\":\"conn:autoframe>autolabels:tnt-syn-northwind\",\"delivery_id\":\"8cb807f8de56fc3a927d3d85676789dfe3f8fc696c7fb7864efb0b8ce2936dcb\",\"envelope_sha256\":\"55d2f8340f7e53dd77c50b26496f8fed8bece0a9a65438175d58bba4ba3dd972\",\"event_id\":\"59f10325-b592-52e8-aa15-4d92dc976467\",\"issued_at\":1800000005,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autoframe-2\",\"kind\":\"gateway_confirmation\",\"outcome\":\"consumer_committed\",\"payload_sha256\":\"0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace\",\"prev_receipt_sha256\":\"f03c500ae5bca5753b984c10af06de5026ac2b77ebd923e5baa7178ac995a10d\",\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autoframe\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autoframe->autolabels\",\"signature\":\"46424ee6355912663b53b0eae29d35fe7f13b96fdb0457a20b936cc1489c9df5\",\"source_app\":\"autoframe\",\"target_app\":\"autolabels\",\"tenant_id\":\"tnt-syn-northwind\"}],\"target_evidence\":[{\"connection_id\":\"conn:autoframe>autolabels:tnt-syn-northwind\",\"delivery_id\":\"8cb807f8de56fc3a927d3d85676789dfe3f8fc696c7fb7864efb0b8ce2936dcb\",\"envelope_sha256\":\"55d2f8340f7e53dd77c50b26496f8fed8bece0a9a65438175d58bba4ba3dd972\",\"event_id\":\"59f10325-b592-52e8-aa15-4d92dc976467\",\"issued_at\":1800000000,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autolabels-2\",\"kind\":\"gateway_admission\",\"outcome\":\"admitted\",\"payload_sha256\":\"0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace\",\"prev_receipt_sha256\":null,\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autoframe\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autoframe->autolabels\",\"signature\":\"7a1c2af5ded042de8c08ef2cdff35105a31ee9be8417b293e884825b324855b8\",\"source_app\":\"autoframe\",\"target_app\":\"autolabels\",\"tenant_id\":\"tnt-syn-northwind\"},{\"connection_id\":\"conn:autoframe>autolabels:tnt-syn-northwind\",\"delivery_id\":\"8cb807f8de56fc3a927d3d85676789dfe3f8fc696c7fb7864efb0b8ce2936dcb\",\"envelope_sha256\":\"55d2f8340f7e53dd77c50b26496f8fed8bece0a9a65438175d58bba4ba3dd972\",\"event_id\":\"59f10325-b592-52e8-aa15-4d92dc976467\",\"issued_at\":1800000002,\"issuer\":\"autolabels\",\"key_id\":\"kat-stg-autolabels-2\",\"kind\":\"target_inbox\",\"outcome\":\"applied\",\"payload_sha256\":\"0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace\",\"prev_receipt_sha256\":\"e3fb212fbd8661bd319f2f3f53bbcff8c37946d0b5bcb6a599e1c8aa7809101c\",\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"gateway\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autoframe->autolabels\",\"signature\":\"95bc217052fc472d10fbf578be72f54e453ccb3a8c82537e7edde4e6831e3234\",\"source_app\":\"autoframe\",\"target_app\":\"autolabels\",\"tenant_id\":\"tnt-syn-northwind\"},{\"connection_id\":\"conn:autoframe>autolabels:tnt-syn-northwind\",\"delivery_id\":\"8cb807f8de56fc3a927d3d85676789dfe3f8fc696c7fb7864efb0b8ce2936dcb\",\"envelope_sha256\":\"55d2f8340f7e53dd77c50b26496f8fed8bece0a9a65438175d58bba4ba3dd972\",\"event_id\":\"59f10325-b592-52e8-aa15-4d92dc976467\",\"issued_at\":1800000003,\"issuer\":\"autolabels\",\"key_id\":\"kat-stg-autolabels-2\",\"kind\":\"consumer_commit\",\"outcome\":\"applied\",\"payload_sha256\":\"0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace\",\"prev_receipt_sha256\":\"f100a516ac293a95786612ff50be5fb5d81d7a7bce23b54d5e9e4fe0c58d833a\",\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"gateway\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autoframe->autolabels\",\"signature\":\"fdc3e9f4edff485b0a2112fb77bf518f291bcf12ad6d7149e31e9954eaa5ae89\",\"source_app\":\"autoframe\",\"target_app\":\"autolabels\",\"tenant_id\":\"tnt-syn-northwind\"}]}"
+   }
+  },
+  {
+   "name": "autolabels->autocurb quarantined",
+   "case": "quarantined",
+   "route": "autolabels->autocurb",
+   "event_type": "vehicle.identity_registered",
+   "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+   "source_app": "autolabels",
+   "target_app": "autocurb",
+   "body": "{\"aggregate\":{\"domain\":\"identity\",\"id\":\"inst-syn-0001\",\"prev_revision\":null,\"revision\":1,\"type\":\"vehicle_instance\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"event_type\":\"vehicle.identity_registered\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autolabels\",\"event_id\":\"al-id-1\",\"revision\":1},\"payload\":{\"make\":\"Synthetic\",\"model\":\"Sedan\",\"registered_at\":\"2027-01-15T15:00:00Z\",\"stock_number\":\"SYN1001\",\"trim\":null,\"year\":2024},\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"protocol\":\"rtgip/2\",\"purpose\":\"inventory_sync\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"schema_version\":2,\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
+   "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+   "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+   "h1_source_submission": {
+    "signer_key": "kat-stg-autolabels-2",
+    "headers": {
+     "rtgip-protocol": "rtgip/2",
+     "rtgip-key-id": "kat-stg-autolabels-2",
+     "rtgip-signer": "autolabels",
+     "rtgip-timestamp": "1800000000",
+     "rtgip-nonce": "kat_ar1_src_30000000",
+     "rtgip-scope": "autolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+     "rtgip-signature": "rtgip2=d7df47f874c4ef118c28a096d6ea08f3a1593c8d4d5fde9a4d317f7b4364c2c4"
+    }
+   },
+   "admission_source": {
+    "receipt": {
+     "protocol": "rtgip/2-receipt/2",
+     "receipt_version": 2,
+     "kind": "gateway_admission",
+     "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+     "route": "autolabels->autocurb",
+     "source_app": "autolabels",
+     "target_app": "autocurb",
+     "tenant_id": "tnt-syn-northwind",
+     "rooftop_id": "rf-nw-01",
+     "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+     "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+     "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+     "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+     "issuer": "gateway",
+     "recipient": "autolabels",
+     "outcome": "admitted",
+     "issued_at": 1800000000,
+     "prev_receipt_sha256": null,
+     "key_id": "kat-gw-autolabels-2",
+     "signature": "c4ea62d409f45222f3f87fd2b4053bbf6e6faeeb2151e7d935af336494f39db7"
+    },
+    "signed_bytes": "rtgip/2-receipt/2\n{\"connection_id\":\"conn:autolabels>autocurb:tnt-syn-northwind\",\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"envelope_sha256\":\"f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"issued_at\":1800000000,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autolabels-2\",\"kind\":\"gateway_admission\",\"outcome\":\"admitted\",\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"prev_receipt_sha256\":null,\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autolabels\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\"}",
+    "digest": "9fb30d912fd75537c3a297c6da870e8052e769b453dac4c5e88bf709da110c48"
+   },
+   "admission_target": {
+    "receipt": {
+     "protocol": "rtgip/2-receipt/2",
+     "receipt_version": 2,
+     "kind": "gateway_admission",
+     "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+     "route": "autolabels->autocurb",
+     "source_app": "autolabels",
+     "target_app": "autocurb",
+     "tenant_id": "tnt-syn-northwind",
+     "rooftop_id": "rf-nw-01",
+     "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+     "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+     "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+     "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+     "issuer": "gateway",
+     "recipient": "autolabels",
+     "outcome": "admitted",
+     "issued_at": 1800000000,
+     "prev_receipt_sha256": null,
+     "key_id": "kat-gw-autocurb-2",
+     "signature": "9f4157a48c22a97662f88bbe7f401323c2a107cd17194321c776f62c7823143e"
+    },
+    "signed_bytes": "rtgip/2-receipt/2\n{\"connection_id\":\"conn:autolabels>autocurb:tnt-syn-northwind\",\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"envelope_sha256\":\"f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"issued_at\":1800000000,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autocurb-2\",\"kind\":\"gateway_admission\",\"outcome\":\"admitted\",\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"prev_receipt_sha256\":null,\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autolabels\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\"}",
+    "digest": "5e14b9220a952752b7323ed391d933dfcab93344443cbf9375eef98a899bd120"
+   },
+   "forward": {
+    "protocol": "rtgip/2-forward/1",
+    "signer_key": "kat-gw-autocurb-2",
+    "headers": {
+     "content-type": "application/json",
+     "rtgip-protocol": "rtgip/2",
+     "rtgip-key-id": "kat-gw-autocurb-2",
+     "rtgip-signer": "gateway",
+     "rtgip-timestamp": "1800000001",
+     "rtgip-nonce": "kat_ar1_fwd_30000000",
+     "rtgip-scope": "autolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+     "rtgip-signature": "rtgip2=f6decf93623c290d97dd848df01f7ae2472396b19792d61780c7616575344ae8",
+     "rtgip-admission-receipt": "eyJjb25uZWN0aW9uX2lkIjoiY29ubjphdXRvbGFiZWxzPmF1dG9jdXJiOnRudC1zeW4tbm9ydGh3aW5kIiwiZGVsaXZlcnlfaWQiOiJkZTE0NDU4YzBjY2I1YzEwMTQxYmIxNjIwY2ZkNGFhNzJjMTI4YTM2YzJlN2M5ODUzZDc3NjVhZTg5MGM2NjA2IiwiZW52ZWxvcGVfc2hhMjU2IjoiZjhhNzQyMDk5NDU5M2Y1YzdiYzE3ZGI2MmM5Y2I0MmNkZDI0NGIxMzM4MTdmODFkNTUyNjc3NDdhMGEzMTI1NyIsImV2ZW50X2lkIjoiNGQ0M2ZjM2QtYzU2Yy01ZWU4LThhNDMtZjJiYzM2NzFkNjMxIiwiaXNzdWVkX2F0IjoxODAwMDAwMDAwLCJpc3N1ZXIiOiJnYXRld2F5Iiwia2V5X2lkIjoia2F0LWd3LWF1dG9jdXJiLTIiLCJraW5kIjoiZ2F0ZXdheV9hZG1pc3Npb24iLCJvdXRjb21lIjoiYWRtaXR0ZWQiLCJwYXlsb2FkX3NoYTI1NiI6ImEzM2ZhYzU1MWRkNWZlYTZjODlhYTgyNGM5NDMxYjYyNTBmMGM4ODRjMWU0NWFjZjU1Nzg3MWJhZjdkNjUyMDAiLCJwcmV2X3JlY2VpcHRfc2hhMjU2IjpudWxsLCJwcm90b2NvbCI6InJ0Z2lwLzItcmVjZWlwdC8yIiwicmVjZWlwdF92ZXJzaW9uIjoyLCJyZWNpcGllbnQiOiJhdXRvbGFiZWxzIiwicm9vZnRvcF9pZCI6InJmLW53LTAxIiwicm91dGUiOiJhdXRvbGFiZWxzLT5hdXRvY3VyYiIsInNpZ25hdHVyZSI6IjlmNDE1N2E0OGMyMmE5NzY2MmY4OGJiZTdmNDAxMzIzYzJhMTA3Y2QxNzE5NDMyMWM3NzZmNjJjNzgyMzE0M2UiLCJzb3VyY2VfYXBwIjoiYXV0b2xhYmVscyIsInRhcmdldF9hcHAiOiJhdXRvY3VyYiIsInRlbmFudF9pZCI6InRudC1zeW4tbm9ydGh3aW5kIn0"
+    }
+   },
+   "target_chain": {
+    "receipts": [
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "gateway_admission",
+      "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+      "route": "autolabels->autocurb",
+      "source_app": "autolabels",
+      "target_app": "autocurb",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+      "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+      "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+      "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+      "issuer": "gateway",
+      "recipient": "autolabels",
+      "outcome": "admitted",
+      "issued_at": 1800000000,
+      "prev_receipt_sha256": null,
+      "key_id": "kat-gw-autocurb-2",
+      "signature": "9f4157a48c22a97662f88bbe7f401323c2a107cd17194321c776f62c7823143e"
+     },
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "target_inbox",
+      "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+      "route": "autolabels->autocurb",
+      "source_app": "autolabels",
+      "target_app": "autocurb",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+      "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+      "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+      "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+      "issuer": "autocurb",
+      "recipient": "gateway",
+      "outcome": "quarantined",
+      "issued_at": 1800000002,
+      "prev_receipt_sha256": "5e14b9220a952752b7323ed391d933dfcab93344443cbf9375eef98a899bd120",
+      "key_id": "kat-stg-autocurb-2",
+      "signature": "5b992eb40db9db7379a363902bed7f74eec2e535db5776afeff97612edad128f"
+     }
+    ],
+    "signed_bytes": [
+     "rtgip/2-receipt/2\n{\"connection_id\":\"conn:autolabels>autocurb:tnt-syn-northwind\",\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"envelope_sha256\":\"f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"issued_at\":1800000000,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autocurb-2\",\"kind\":\"gateway_admission\",\"outcome\":\"admitted\",\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"prev_receipt_sha256\":null,\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autolabels\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\"}",
+     "rtgip/2-receipt/2\n{\"connection_id\":\"conn:autolabels>autocurb:tnt-syn-northwind\",\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"envelope_sha256\":\"f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"issued_at\":1800000002,\"issuer\":\"autocurb\",\"key_id\":\"kat-stg-autocurb-2\",\"kind\":\"target_inbox\",\"outcome\":\"quarantined\",\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"prev_receipt_sha256\":\"5e14b9220a952752b7323ed391d933dfcab93344443cbf9375eef98a899bd120\",\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"gateway\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\"}"
+    ],
+    "digests": [
+     "5e14b9220a952752b7323ed391d933dfcab93344443cbf9375eef98a899bd120",
+     "534e16657f3df74ca3e8a97d3325f0efe7187876ec352c64143072afa949dab9"
+    ]
+   },
+   "gateway_confirmation": {
+    "receipt": {
+     "protocol": "rtgip/2-receipt/2",
+     "receipt_version": 2,
+     "kind": "gateway_confirmation",
+     "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+     "route": "autolabels->autocurb",
+     "source_app": "autolabels",
+     "target_app": "autocurb",
+     "tenant_id": "tnt-syn-northwind",
+     "rooftop_id": "rf-nw-01",
+     "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+     "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+     "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+     "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+     "issuer": "gateway",
+     "recipient": "autolabels",
+     "outcome": "target_quarantined",
+     "issued_at": 1800000005,
+     "prev_receipt_sha256": "9fb30d912fd75537c3a297c6da870e8052e769b453dac4c5e88bf709da110c48",
+     "key_id": "kat-gw-autolabels-2",
+     "signature": "99ce6fb5db03dbe6a6254134c3e0645cc66868444ba6b21a60b518f54ab039cd"
+    },
+    "signed_bytes": "rtgip/2-receipt/2\n{\"connection_id\":\"conn:autolabels>autocurb:tnt-syn-northwind\",\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"envelope_sha256\":\"f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"issued_at\":1800000005,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autolabels-2\",\"kind\":\"gateway_confirmation\",\"outcome\":\"target_quarantined\",\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"prev_receipt_sha256\":\"9fb30d912fd75537c3a297c6da870e8052e769b453dac4c5e88bf709da110c48\",\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autolabels\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\"}",
+    "digest": "5b49628c7abb3bde7013e5fceab18755e90ffcfcd1d4ae80b080fb0b70665e29"
+   },
+   "receipt_query": {
+    "signer_key": "kat-stg-autolabels-2",
+    "headers": {
+     "rtgip-key-id": "kat-stg-autolabels-2",
+     "rtgip-timestamp": "1800000010",
+     "rtgip-nonce": "kat_ar1_qry_30000000",
+     "rtgip-signature": "b81d5da614961e93676c450f1501422ac614cb8ba8eb4a560f7407ecd764cccb"
+    },
+    "body": "{\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"protocol\":\"rtgip/2-receipt-query/1\"}",
+    "response": {
+     "reason": null,
+     "receipts": [
+      {
+       "protocol": "rtgip/2-receipt/2",
+       "receipt_version": 2,
+       "kind": "gateway_admission",
+       "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+       "route": "autolabels->autocurb",
+       "source_app": "autolabels",
+       "target_app": "autocurb",
+       "tenant_id": "tnt-syn-northwind",
+       "rooftop_id": "rf-nw-01",
+       "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+       "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+       "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+       "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+       "issuer": "gateway",
+       "recipient": "autolabels",
+       "outcome": "admitted",
+       "issued_at": 1800000000,
+       "prev_receipt_sha256": null,
+       "key_id": "kat-gw-autolabels-2",
+       "signature": "c4ea62d409f45222f3f87fd2b4053bbf6e6faeeb2151e7d935af336494f39db7"
+      },
+      {
+       "protocol": "rtgip/2-receipt/2",
+       "receipt_version": 2,
+       "kind": "gateway_confirmation",
+       "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+       "route": "autolabels->autocurb",
+       "source_app": "autolabels",
+       "target_app": "autocurb",
+       "tenant_id": "tnt-syn-northwind",
+       "rooftop_id": "rf-nw-01",
+       "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+       "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+       "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+       "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+       "issuer": "gateway",
+       "recipient": "autolabels",
+       "outcome": "target_quarantined",
+       "issued_at": 1800000005,
+       "prev_receipt_sha256": "9fb30d912fd75537c3a297c6da870e8052e769b453dac4c5e88bf709da110c48",
+       "key_id": "kat-gw-autolabels-2",
+       "signature": "99ce6fb5db03dbe6a6254134c3e0645cc66868444ba6b21a60b518f54ab039cd"
+      }
+     ],
+     "target_evidence": [
+      {
+       "protocol": "rtgip/2-receipt/2",
+       "receipt_version": 2,
+       "kind": "gateway_admission",
+       "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+       "route": "autolabels->autocurb",
+       "source_app": "autolabels",
+       "target_app": "autocurb",
+       "tenant_id": "tnt-syn-northwind",
+       "rooftop_id": "rf-nw-01",
+       "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+       "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+       "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+       "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+       "issuer": "gateway",
+       "recipient": "autolabels",
+       "outcome": "admitted",
+       "issued_at": 1800000000,
+       "prev_receipt_sha256": null,
+       "key_id": "kat-gw-autocurb-2",
+       "signature": "9f4157a48c22a97662f88bbe7f401323c2a107cd17194321c776f62c7823143e"
+      },
+      {
+       "protocol": "rtgip/2-receipt/2",
+       "receipt_version": 2,
+       "kind": "target_inbox",
+       "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+       "route": "autolabels->autocurb",
+       "source_app": "autolabels",
+       "target_app": "autocurb",
+       "tenant_id": "tnt-syn-northwind",
+       "rooftop_id": "rf-nw-01",
+       "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+       "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+       "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+       "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+       "issuer": "autocurb",
+       "recipient": "gateway",
+       "outcome": "quarantined",
+       "issued_at": 1800000002,
+       "prev_receipt_sha256": "5e14b9220a952752b7323ed391d933dfcab93344443cbf9375eef98a899bd120",
+       "key_id": "kat-stg-autocurb-2",
+       "signature": "5b992eb40db9db7379a363902bed7f74eec2e535db5776afeff97612edad128f"
+      }
+     ]
+    },
+    "response_canonical": "{\"reason\":null,\"receipts\":[{\"connection_id\":\"conn:autolabels>autocurb:tnt-syn-northwind\",\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"envelope_sha256\":\"f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"issued_at\":1800000000,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autolabels-2\",\"kind\":\"gateway_admission\",\"outcome\":\"admitted\",\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"prev_receipt_sha256\":null,\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autolabels\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"signature\":\"c4ea62d409f45222f3f87fd2b4053bbf6e6faeeb2151e7d935af336494f39db7\",\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\"},{\"connection_id\":\"conn:autolabels>autocurb:tnt-syn-northwind\",\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"envelope_sha256\":\"f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"issued_at\":1800000005,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autolabels-2\",\"kind\":\"gateway_confirmation\",\"outcome\":\"target_quarantined\",\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"prev_receipt_sha256\":\"9fb30d912fd75537c3a297c6da870e8052e769b453dac4c5e88bf709da110c48\",\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autolabels\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"signature\":\"99ce6fb5db03dbe6a6254134c3e0645cc66868444ba6b21a60b518f54ab039cd\",\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\"}],\"target_evidence\":[{\"connection_id\":\"conn:autolabels>autocurb:tnt-syn-northwind\",\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"envelope_sha256\":\"f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"issued_at\":1800000000,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autocurb-2\",\"kind\":\"gateway_admission\",\"outcome\":\"admitted\",\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"prev_receipt_sha256\":null,\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autolabels\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"signature\":\"9f4157a48c22a97662f88bbe7f401323c2a107cd17194321c776f62c7823143e\",\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\"},{\"connection_id\":\"conn:autolabels>autocurb:tnt-syn-northwind\",\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"envelope_sha256\":\"f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"issued_at\":1800000002,\"issuer\":\"autocurb\",\"key_id\":\"kat-stg-autocurb-2\",\"kind\":\"target_inbox\",\"outcome\":\"quarantined\",\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"prev_receipt_sha256\":\"5e14b9220a952752b7323ed391d933dfcab93344443cbf9375eef98a899bd120\",\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"gateway\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"signature\":\"5b992eb40db9db7379a363902bed7f74eec2e535db5776afeff97612edad128f\",\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\"}]}"
+   }
+  },
+  {
+   "name": "autolabels->autocurb held (no confirmation yet)",
+   "case": "held",
+   "route": "autolabels->autocurb",
+   "event_type": "vehicle.identity_registered",
+   "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+   "source_app": "autolabels",
+   "target_app": "autocurb",
+   "body": "{\"aggregate\":{\"domain\":\"identity\",\"id\":\"inst-syn-0001\",\"prev_revision\":null,\"revision\":1,\"type\":\"vehicle_instance\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"event_type\":\"vehicle.identity_registered\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autolabels\",\"event_id\":\"al-id-1\",\"revision\":1},\"payload\":{\"make\":\"Synthetic\",\"model\":\"Sedan\",\"registered_at\":\"2027-01-15T15:00:00Z\",\"stock_number\":\"SYN1001\",\"trim\":null,\"year\":2024},\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"protocol\":\"rtgip/2\",\"purpose\":\"inventory_sync\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"schema_version\":2,\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
+   "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+   "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+   "h1_source_submission": {
+    "signer_key": "kat-stg-autolabels-2",
+    "headers": {
+     "rtgip-protocol": "rtgip/2",
+     "rtgip-key-id": "kat-stg-autolabels-2",
+     "rtgip-signer": "autolabels",
+     "rtgip-timestamp": "1800000000",
+     "rtgip-nonce": "kat_ar1_src_40000000",
+     "rtgip-scope": "autolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+     "rtgip-signature": "rtgip2=9f6ce408406f439e38e3860e6ddbd695a4a442a0d5bee8eea839b039f4fb704d"
+    }
+   },
+   "admission_source": {
+    "receipt": {
+     "protocol": "rtgip/2-receipt/2",
+     "receipt_version": 2,
+     "kind": "gateway_admission",
+     "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+     "route": "autolabels->autocurb",
+     "source_app": "autolabels",
+     "target_app": "autocurb",
+     "tenant_id": "tnt-syn-northwind",
+     "rooftop_id": "rf-nw-01",
+     "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+     "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+     "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+     "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+     "issuer": "gateway",
+     "recipient": "autolabels",
+     "outcome": "admitted",
+     "issued_at": 1800000000,
+     "prev_receipt_sha256": null,
+     "key_id": "kat-gw-autolabels-2",
+     "signature": "c4ea62d409f45222f3f87fd2b4053bbf6e6faeeb2151e7d935af336494f39db7"
+    },
+    "signed_bytes": "rtgip/2-receipt/2\n{\"connection_id\":\"conn:autolabels>autocurb:tnt-syn-northwind\",\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"envelope_sha256\":\"f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"issued_at\":1800000000,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autolabels-2\",\"kind\":\"gateway_admission\",\"outcome\":\"admitted\",\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"prev_receipt_sha256\":null,\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autolabels\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\"}",
+    "digest": "9fb30d912fd75537c3a297c6da870e8052e769b453dac4c5e88bf709da110c48"
+   },
+   "admission_target": {
+    "receipt": {
+     "protocol": "rtgip/2-receipt/2",
+     "receipt_version": 2,
+     "kind": "gateway_admission",
+     "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+     "route": "autolabels->autocurb",
+     "source_app": "autolabels",
+     "target_app": "autocurb",
+     "tenant_id": "tnt-syn-northwind",
+     "rooftop_id": "rf-nw-01",
+     "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+     "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+     "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+     "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+     "issuer": "gateway",
+     "recipient": "autolabels",
+     "outcome": "admitted",
+     "issued_at": 1800000000,
+     "prev_receipt_sha256": null,
+     "key_id": "kat-gw-autocurb-2",
+     "signature": "9f4157a48c22a97662f88bbe7f401323c2a107cd17194321c776f62c7823143e"
+    },
+    "signed_bytes": "rtgip/2-receipt/2\n{\"connection_id\":\"conn:autolabels>autocurb:tnt-syn-northwind\",\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"envelope_sha256\":\"f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"issued_at\":1800000000,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autocurb-2\",\"kind\":\"gateway_admission\",\"outcome\":\"admitted\",\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"prev_receipt_sha256\":null,\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autolabels\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\"}",
+    "digest": "5e14b9220a952752b7323ed391d933dfcab93344443cbf9375eef98a899bd120"
+   },
+   "forward": {
+    "protocol": "rtgip/2-forward/1",
+    "signer_key": "kat-gw-autocurb-2",
+    "headers": {
+     "content-type": "application/json",
+     "rtgip-protocol": "rtgip/2",
+     "rtgip-key-id": "kat-gw-autocurb-2",
+     "rtgip-signer": "gateway",
+     "rtgip-timestamp": "1800000001",
+     "rtgip-nonce": "kat_ar1_fwd_40000000",
+     "rtgip-scope": "autolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+     "rtgip-signature": "rtgip2=a2277be2e2bdc5c4b307c1e9bfe172682c5fb470a81bbdf5a02c6557adb83298",
+     "rtgip-admission-receipt": "eyJjb25uZWN0aW9uX2lkIjoiY29ubjphdXRvbGFiZWxzPmF1dG9jdXJiOnRudC1zeW4tbm9ydGh3aW5kIiwiZGVsaXZlcnlfaWQiOiJkZTE0NDU4YzBjY2I1YzEwMTQxYmIxNjIwY2ZkNGFhNzJjMTI4YTM2YzJlN2M5ODUzZDc3NjVhZTg5MGM2NjA2IiwiZW52ZWxvcGVfc2hhMjU2IjoiZjhhNzQyMDk5NDU5M2Y1YzdiYzE3ZGI2MmM5Y2I0MmNkZDI0NGIxMzM4MTdmODFkNTUyNjc3NDdhMGEzMTI1NyIsImV2ZW50X2lkIjoiNGQ0M2ZjM2QtYzU2Yy01ZWU4LThhNDMtZjJiYzM2NzFkNjMxIiwiaXNzdWVkX2F0IjoxODAwMDAwMDAwLCJpc3N1ZXIiOiJnYXRld2F5Iiwia2V5X2lkIjoia2F0LWd3LWF1dG9jdXJiLTIiLCJraW5kIjoiZ2F0ZXdheV9hZG1pc3Npb24iLCJvdXRjb21lIjoiYWRtaXR0ZWQiLCJwYXlsb2FkX3NoYTI1NiI6ImEzM2ZhYzU1MWRkNWZlYTZjODlhYTgyNGM5NDMxYjYyNTBmMGM4ODRjMWU0NWFjZjU1Nzg3MWJhZjdkNjUyMDAiLCJwcmV2X3JlY2VpcHRfc2hhMjU2IjpudWxsLCJwcm90b2NvbCI6InJ0Z2lwLzItcmVjZWlwdC8yIiwicmVjZWlwdF92ZXJzaW9uIjoyLCJyZWNpcGllbnQiOiJhdXRvbGFiZWxzIiwicm9vZnRvcF9pZCI6InJmLW53LTAxIiwicm91dGUiOiJhdXRvbGFiZWxzLT5hdXRvY3VyYiIsInNpZ25hdHVyZSI6IjlmNDE1N2E0OGMyMmE5NzY2MmY4OGJiZTdmNDAxMzIzYzJhMTA3Y2QxNzE5NDMyMWM3NzZmNjJjNzgyMzE0M2UiLCJzb3VyY2VfYXBwIjoiYXV0b2xhYmVscyIsInRhcmdldF9hcHAiOiJhdXRvY3VyYiIsInRlbmFudF9pZCI6InRudC1zeW4tbm9ydGh3aW5kIn0"
+    }
+   },
+   "target_chain": {
+    "receipts": [
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "gateway_admission",
+      "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+      "route": "autolabels->autocurb",
+      "source_app": "autolabels",
+      "target_app": "autocurb",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+      "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+      "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+      "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+      "issuer": "gateway",
+      "recipient": "autolabels",
+      "outcome": "admitted",
+      "issued_at": 1800000000,
+      "prev_receipt_sha256": null,
+      "key_id": "kat-gw-autocurb-2",
+      "signature": "9f4157a48c22a97662f88bbe7f401323c2a107cd17194321c776f62c7823143e"
+     },
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "target_inbox",
+      "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+      "route": "autolabels->autocurb",
+      "source_app": "autolabels",
+      "target_app": "autocurb",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+      "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+      "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+      "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+      "issuer": "autocurb",
+      "recipient": "gateway",
+      "outcome": "held",
+      "issued_at": 1800000002,
+      "prev_receipt_sha256": "5e14b9220a952752b7323ed391d933dfcab93344443cbf9375eef98a899bd120",
+      "key_id": "kat-stg-autocurb-2",
+      "signature": "083d362a5aab3e011322f964c2ba9d0e462be1a5897dcfa828f36f66224f2c0e"
+     }
+    ],
+    "signed_bytes": [
+     "rtgip/2-receipt/2\n{\"connection_id\":\"conn:autolabels>autocurb:tnt-syn-northwind\",\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"envelope_sha256\":\"f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"issued_at\":1800000000,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autocurb-2\",\"kind\":\"gateway_admission\",\"outcome\":\"admitted\",\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"prev_receipt_sha256\":null,\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autolabels\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\"}",
+     "rtgip/2-receipt/2\n{\"connection_id\":\"conn:autolabels>autocurb:tnt-syn-northwind\",\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"envelope_sha256\":\"f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"issued_at\":1800000002,\"issuer\":\"autocurb\",\"key_id\":\"kat-stg-autocurb-2\",\"kind\":\"target_inbox\",\"outcome\":\"held\",\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"prev_receipt_sha256\":\"5e14b9220a952752b7323ed391d933dfcab93344443cbf9375eef98a899bd120\",\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"gateway\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\"}"
+    ],
+    "digests": [
+     "5e14b9220a952752b7323ed391d933dfcab93344443cbf9375eef98a899bd120",
+     "94ae4f57ee013cc9eec9892f41bf837227ec5e0faee7432ca315d157e304472b"
+    ]
+   },
+   "gateway_confirmation": null,
+   "receipt_query": {
+    "signer_key": "kat-stg-autolabels-2",
+    "headers": {
+     "rtgip-key-id": "kat-stg-autolabels-2",
+     "rtgip-timestamp": "1800000010",
+     "rtgip-nonce": "kat_ar1_qry_40000000",
+     "rtgip-signature": "ad6b864883e877687eb9b22dd55c3fc1936db102369aee4da0d236dfbb781486"
+    },
+    "body": "{\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"protocol\":\"rtgip/2-receipt-query/1\"}",
+    "response": {
+     "reason": null,
+     "receipts": [
+      {
+       "protocol": "rtgip/2-receipt/2",
+       "receipt_version": 2,
+       "kind": "gateway_admission",
+       "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+       "route": "autolabels->autocurb",
+       "source_app": "autolabels",
+       "target_app": "autocurb",
+       "tenant_id": "tnt-syn-northwind",
+       "rooftop_id": "rf-nw-01",
+       "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+       "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+       "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+       "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+       "issuer": "gateway",
+       "recipient": "autolabels",
+       "outcome": "admitted",
+       "issued_at": 1800000000,
+       "prev_receipt_sha256": null,
+       "key_id": "kat-gw-autolabels-2",
+       "signature": "c4ea62d409f45222f3f87fd2b4053bbf6e6faeeb2151e7d935af336494f39db7"
+      }
+     ],
+     "target_evidence": [
+      {
+       "protocol": "rtgip/2-receipt/2",
+       "receipt_version": 2,
+       "kind": "gateway_admission",
+       "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+       "route": "autolabels->autocurb",
+       "source_app": "autolabels",
+       "target_app": "autocurb",
+       "tenant_id": "tnt-syn-northwind",
+       "rooftop_id": "rf-nw-01",
+       "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+       "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+       "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+       "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+       "issuer": "gateway",
+       "recipient": "autolabels",
+       "outcome": "admitted",
+       "issued_at": 1800000000,
+       "prev_receipt_sha256": null,
+       "key_id": "kat-gw-autocurb-2",
+       "signature": "9f4157a48c22a97662f88bbe7f401323c2a107cd17194321c776f62c7823143e"
+      },
+      {
+       "protocol": "rtgip/2-receipt/2",
+       "receipt_version": 2,
+       "kind": "target_inbox",
+       "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+       "route": "autolabels->autocurb",
+       "source_app": "autolabels",
+       "target_app": "autocurb",
+       "tenant_id": "tnt-syn-northwind",
+       "rooftop_id": "rf-nw-01",
+       "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+       "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+       "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+       "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+       "issuer": "autocurb",
+       "recipient": "gateway",
+       "outcome": "held",
+       "issued_at": 1800000002,
+       "prev_receipt_sha256": "5e14b9220a952752b7323ed391d933dfcab93344443cbf9375eef98a899bd120",
+       "key_id": "kat-stg-autocurb-2",
+       "signature": "083d362a5aab3e011322f964c2ba9d0e462be1a5897dcfa828f36f66224f2c0e"
+      }
+     ]
+    },
+    "response_canonical": "{\"reason\":null,\"receipts\":[{\"connection_id\":\"conn:autolabels>autocurb:tnt-syn-northwind\",\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"envelope_sha256\":\"f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"issued_at\":1800000000,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autolabels-2\",\"kind\":\"gateway_admission\",\"outcome\":\"admitted\",\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"prev_receipt_sha256\":null,\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autolabels\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"signature\":\"c4ea62d409f45222f3f87fd2b4053bbf6e6faeeb2151e7d935af336494f39db7\",\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\"}],\"target_evidence\":[{\"connection_id\":\"conn:autolabels>autocurb:tnt-syn-northwind\",\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"envelope_sha256\":\"f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"issued_at\":1800000000,\"issuer\":\"gateway\",\"key_id\":\"kat-gw-autocurb-2\",\"kind\":\"gateway_admission\",\"outcome\":\"admitted\",\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"prev_receipt_sha256\":null,\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"autolabels\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"signature\":\"9f4157a48c22a97662f88bbe7f401323c2a107cd17194321c776f62c7823143e\",\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\"},{\"connection_id\":\"conn:autolabels>autocurb:tnt-syn-northwind\",\"delivery_id\":\"de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606\",\"envelope_sha256\":\"f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"issued_at\":1800000002,\"issuer\":\"autocurb\",\"key_id\":\"kat-stg-autocurb-2\",\"kind\":\"target_inbox\",\"outcome\":\"held\",\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"prev_receipt_sha256\":\"5e14b9220a952752b7323ed391d933dfcab93344443cbf9375eef98a899bd120\",\"protocol\":\"rtgip/2-receipt/2\",\"receipt_version\":2,\"recipient\":\"gateway\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"signature\":\"083d362a5aab3e011322f964c2ba9d0e462be1a5897dcfa828f36f66224f2c0e\",\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\"}]}"
+   }
+  }
+ ],
+ "refusals": [
+  {
+   "id": "A1a",
+   "mirrors": "k2 A1, O1-B4a",
+   "name": "AL forwards an AF event into AC with the Gateway key it holds (gw-autolabels)",
+   "error": "unknown_key",
+   "vector": {
+    "check": "target_forward",
+    "node": "autocurb",
+    "headers": {
+     "rtgip-protocol": "rtgip/2",
+     "rtgip-key-id": "kat-gw-autolabels-2",
+     "rtgip-signer": "gateway",
+     "rtgip-timestamp": "1800000001",
+     "rtgip-nonce": "kat_ar1_a1a000000000",
+     "rtgip-scope": "autoframe;autocurb;tnt-syn-northwind;rf-nw-01;media.approved;2;media_reference;d7585915-76f1-5677-bf1b-ed0cb19d0fb9",
+     "rtgip-signature": "rtgip2=6dbae9d13b2545b18be8f05c17405c4adae4292dea09766deeb41146cccc8dbb"
+    },
+    "body": "{\"aggregate\":{\"domain\":\"media\",\"id\":\"med-syn-1\",\"prev_revision\":null,\"revision\":1,\"type\":\"media\"},\"causation_id\":\"appr-syn-1\",\"classification\":\"shared_media_meta\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"d7585915-76f1-5677-bf1b-ed0cb19d0fb9\",\"event_type\":\"media.approved\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autoframe\",\"event_id\":\"af-evt-1\",\"revision\":1},\"payload\":{\"approval_audit_ref\":\"audit-af-1\",\"approved_at\":\"2027-01-15T15:00:00Z\",\"approved_by_ref\":\"af-staff:44444444-4444-4444-8444-444444444444\",\"content_sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"height\":1000,\"media_id\":\"med-syn-1\",\"media_order\":1,\"orientation\":\"landscape\",\"preset_key\":\"studio\",\"preset_version\":1,\"rendition_id\":\"rend-syn-1\",\"shot_type\":\"front_34\",\"storage_ref\":{\"bucket\":\"autoframe-media\",\"object_key\":\"tnt-syn-northwind/rf-nw-01/inst-syn-0001/med-syn-1/derived/studio-v1-r1.webp\"},\"width\":1500},\"payload_sha256\":\"0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace\",\"protocol\":\"rtgip/2\",\"purpose\":\"media_reference\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autoframe->autocurb\",\"schema_version\":2,\"source_app\":\"autoframe\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}"
+   }
+  },
+  {
+   "id": "A1b",
+   "mirrors": "k2 A1, O1-B4a",
+   "name": "AL forwards an AF event into AC under AC's Gateway key id with its own secret",
+   "error": "bad_signature",
+   "vector": {
+    "check": "target_forward",
+    "node": "autocurb",
+    "headers": {
+     "rtgip-protocol": "rtgip/2",
+     "rtgip-key-id": "kat-gw-autocurb-2",
+     "rtgip-signer": "gateway",
+     "rtgip-timestamp": "1800000001",
+     "rtgip-nonce": "kat_ar1_a1b000000000",
+     "rtgip-scope": "autoframe;autocurb;tnt-syn-northwind;rf-nw-01;media.approved;2;media_reference;d7585915-76f1-5677-bf1b-ed0cb19d0fb9",
+     "rtgip-signature": "rtgip2=6552f1d3f33917502df7b566ee9f4dd81cd1ae64e7947084042c5ec8ad27a4be"
+    },
+    "body": "{\"aggregate\":{\"domain\":\"media\",\"id\":\"med-syn-1\",\"prev_revision\":null,\"revision\":1,\"type\":\"media\"},\"causation_id\":\"appr-syn-1\",\"classification\":\"shared_media_meta\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"d7585915-76f1-5677-bf1b-ed0cb19d0fb9\",\"event_type\":\"media.approved\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autoframe\",\"event_id\":\"af-evt-1\",\"revision\":1},\"payload\":{\"approval_audit_ref\":\"audit-af-1\",\"approved_at\":\"2027-01-15T15:00:00Z\",\"approved_by_ref\":\"af-staff:44444444-4444-4444-8444-444444444444\",\"content_sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"height\":1000,\"media_id\":\"med-syn-1\",\"media_order\":1,\"orientation\":\"landscape\",\"preset_key\":\"studio\",\"preset_version\":1,\"rendition_id\":\"rend-syn-1\",\"shot_type\":\"front_34\",\"storage_ref\":{\"bucket\":\"autoframe-media\",\"object_key\":\"tnt-syn-northwind/rf-nw-01/inst-syn-0001/med-syn-1/derived/studio-v1-r1.webp\"},\"width\":1500},\"payload_sha256\":\"0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace\",\"protocol\":\"rtgip/2\",\"purpose\":\"media_reference\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autoframe->autocurb\",\"schema_version\":2,\"source_app\":\"autoframe\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}"
+   }
+  },
+  {
+   "id": "A1c",
+   "mirrors": "k2 A1 (admission header)",
+   "name": "AL attaches an admission receipt for AC signed with gw-autolabels",
+   "error": "ack_key_not_authorized",
+   "vector": {
+    "check": "target_admission",
+    "node": "autocurb",
+    "delivery": "af->ac (attack only)",
+    "receipt": {
+     "protocol": "rtgip/2-receipt/2",
+     "receipt_version": 2,
+     "kind": "gateway_admission",
+     "event_id": "d7585915-76f1-5677-bf1b-ed0cb19d0fb9",
+     "route": "autoframe->autocurb",
+     "source_app": "autoframe",
+     "target_app": "autocurb",
+     "tenant_id": "tnt-syn-northwind",
+     "rooftop_id": "rf-nw-01",
+     "connection_id": "conn:autoframe>autocurb:tnt-syn-northwind",
+     "payload_sha256": "0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace",
+     "envelope_sha256": "2c7d8d2c5b03b54fc9667be23c943a1890e8b6c70a390cfc06d97e910a787cd7",
+     "delivery_id": "8fca2609d6802c7799a5285efcb5c7a0efaf97095a16e2d486ec28ef55c3a9d3",
+     "issuer": "gateway",
+     "recipient": "autoframe",
+     "outcome": "admitted",
+     "issued_at": 1800000000,
+     "prev_receipt_sha256": null,
+     "key_id": "kat-gw-autolabels-2",
+     "signature": "eb84f514dc74962df2e38235111f4f87895b7e869f5b22cd17fd5f7f1c5ad876"
+    }
+   }
+  },
+  {
+   "id": "A2a",
+   "mirrors": "k2 A2a",
+   "name": "AL mints an admission and confirmation for AC's delivery with gw-autolabels",
+   "error": "ack_key_not_authorized",
+   "vector": {
+    "check": "source_chain",
+    "node": "autocurb",
+    "delivery": "autocurb->autoframe committed",
+    "receipts": [
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "gateway_admission",
+      "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+      "route": "autocurb->autoframe",
+      "source_app": "autocurb",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+      "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+      "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+      "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+      "issuer": "gateway",
+      "recipient": "autocurb",
+      "outcome": "admitted",
+      "issued_at": 1800000000,
+      "prev_receipt_sha256": null,
+      "key_id": "kat-gw-autolabels-2",
+      "signature": "2cfcbb464dda0d285c56ab070f2b7f574439bf0ef7ed42e569970b76e1dddcc2"
+     },
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "gateway_confirmation",
+      "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+      "route": "autocurb->autoframe",
+      "source_app": "autocurb",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+      "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+      "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+      "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+      "issuer": "gateway",
+      "recipient": "autocurb",
+      "outcome": "consumer_committed",
+      "issued_at": 1800000005,
+      "prev_receipt_sha256": "3aa1f4bccde6fc02241c4e1d47ca338d76e008abf506639643e6f61bc284192c",
+      "key_id": "kat-gw-autolabels-2",
+      "signature": "5cb96cf9bda24d9561d9d129e8d3b70993a4df3cda01ba6a0e194423273c4ff8"
+     }
+    ]
+   }
+  },
+  {
+   "id": "A2b",
+   "mirrors": "k2 A2b, C2f",
+   "name": "AL forges AC's confirmation under gw-autocurb's id with its own secret, on the genuine admission",
+   "error": "ack_bad_signature",
+   "vector": {
+    "check": "source_chain",
+    "node": "autocurb",
+    "delivery": "autocurb->autoframe committed",
+    "receipts": [
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "gateway_admission",
+      "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+      "route": "autocurb->autoframe",
+      "source_app": "autocurb",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+      "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+      "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+      "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+      "issuer": "gateway",
+      "recipient": "autocurb",
+      "outcome": "admitted",
+      "issued_at": 1800000000,
+      "prev_receipt_sha256": null,
+      "key_id": "kat-gw-autocurb-2",
+      "signature": "8c24d818b90b901b1375bd502a185563639834fe78027e75b78bd0856df8a921"
+     },
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "gateway_confirmation",
+      "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+      "route": "autocurb->autoframe",
+      "source_app": "autocurb",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+      "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+      "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+      "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+      "issuer": "gateway",
+      "recipient": "autocurb",
+      "outcome": "consumer_committed",
+      "issued_at": 1800000005,
+      "prev_receipt_sha256": "8ca733431e210c6247c643cb3c9fcbd43be73701ac8df67dc4376c9553ed5419",
+      "key_id": "kat-gw-autocurb-2",
+      "signature": "337d6755377353f57d86264693b0a54b9f2e83f6703d623e190d0b4ae5879fc4"
+     }
+    ]
+   }
+  },
+  {
+   "id": "A2c",
+   "mirrors": "k2 A2b, A1-2",
+   "name": "the source no longer accepts a target-receipt chain at all (old full chain shape)",
+   "error": "ack_chain_shape",
+   "vector": {
+    "check": "source_chain",
+    "node": "autocurb",
+    "delivery": "autocurb->autoframe committed",
+    "receipts": [
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "gateway_admission",
+      "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+      "route": "autocurb->autoframe",
+      "source_app": "autocurb",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+      "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+      "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+      "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+      "issuer": "gateway",
+      "recipient": "autocurb",
+      "outcome": "admitted",
+      "issued_at": 1800000000,
+      "prev_receipt_sha256": null,
+      "key_id": "kat-gw-autocurb-2",
+      "signature": "8c24d818b90b901b1375bd502a185563639834fe78027e75b78bd0856df8a921"
+     },
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "target_inbox",
+      "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+      "route": "autocurb->autoframe",
+      "source_app": "autocurb",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+      "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+      "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+      "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+      "issuer": "autoframe",
+      "recipient": "gateway",
+      "outcome": "applied",
+      "issued_at": 1800000002,
+      "prev_receipt_sha256": "8d6a1a6e6fda550c705ef3f2c78b397b2b566c247accf3870beb826af8d336fb",
+      "key_id": "kat-stg-autoframe-2",
+      "signature": "e9393c92f2fff966ae07cd2784541432b4f4392e6fbfdc8815a4780d025026b0"
+     },
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "consumer_commit",
+      "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+      "route": "autocurb->autoframe",
+      "source_app": "autocurb",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+      "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+      "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+      "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+      "issuer": "autoframe",
+      "recipient": "gateway",
+      "outcome": "applied",
+      "issued_at": 1800000003,
+      "prev_receipt_sha256": "5d00b88c8115b9bd0ae5fc5939db0b71f371e7d986da408ac6dd9d8a9d4b168f",
+      "key_id": "kat-stg-autoframe-2",
+      "signature": "4fd20bcd72fb16f0a90577ee34777da9d5242d6b93e1eb4e41585c8093cfaf2c"
+     }
+    ]
+   }
+  },
+  {
+   "id": "A2d",
+   "mirrors": "A1-3 per-recipient",
+   "name": "the target's admission receipt (gw-autoframe) is refused at the source AC",
+   "error": "ack_key_not_authorized",
+   "vector": {
+    "check": "source_chain",
+    "node": "autocurb",
+    "delivery": "autocurb->autoframe committed",
+    "receipts": [
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "gateway_admission",
+      "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+      "route": "autocurb->autoframe",
+      "source_app": "autocurb",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+      "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+      "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+      "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+      "issuer": "gateway",
+      "recipient": "autocurb",
+      "outcome": "admitted",
+      "issued_at": 1800000000,
+      "prev_receipt_sha256": null,
+      "key_id": "kat-gw-autoframe-2",
+      "signature": "754611f5a50870a3aa09ef24bd4f24df2da6b88a83192f44618fd07edad9ae46"
+     }
+    ]
+   }
+  },
+  {
+   "id": "A3a",
+   "mirrors": "k2 A3, O1-B4b",
+   "name": "AL forwards an AC event into AF with gw-autolabels",
+   "error": "unknown_key",
+   "vector": {
+    "check": "target_forward",
+    "node": "autoframe",
+    "headers": {
+     "rtgip-protocol": "rtgip/2",
+     "rtgip-key-id": "kat-gw-autolabels-2",
+     "rtgip-signer": "gateway",
+     "rtgip-timestamp": "1800000001",
+     "rtgip-nonce": "kat_ar1_a3a000000000",
+     "rtgip-scope": "autocurb;autoframe;tnt-syn-northwind;rf-nw-01;appraisal.completed;2;acquisition_evidence;fe850cf2-d95c-5258-b996-1215f0753a3f",
+     "rtgip-signature": "rtgip2=c73917efb5ffbe87417c7119f2caa2759c0cea3016f68837da560ebd672519f8"
+    },
+    "body": "{\"aggregate\":{\"domain\":\"appraisal\",\"id\":\"apr:55555555-5555-4555-8555-555555555555\",\"prev_revision\":null,\"revision\":1,\"type\":\"appraisal\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"fe850cf2-d95c-5258-b996-1215f0753a3f\",\"event_type\":\"appraisal.completed\",\"occurred_at\":\"2027-01-15T14:02:00Z\",\"origin\":{\"app\":\"autocurb\",\"event_id\":\"ac-apr-1\",\"revision\":1},\"payload\":{\"appraisal_ref\":\"apr:55555555-5555-4555-8555-555555555555\",\"audit_ref\":\"led-5555-2\",\"finalized_at\":\"2027-01-15T14:02:00Z\",\"verified_by_ref\":\"staff:44444444-4444-4444-8444-444444444444\",\"verified_state\":\"finalized\"},\"payload_sha256\":\"732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5\",\"protocol\":\"rtgip/2\",\"purpose\":\"acquisition_evidence\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autocurb->autoframe\",\"schema_version\":2,\"source_app\":\"autocurb\",\"target_app\":\"autoframe\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}"
+   }
+  },
+  {
+   "id": "A3b",
+   "mirrors": "k2 A3, O1-B4b",
+   "name": "AL forwards an AC event into AF under gw-autoframe's id with its own secret",
+   "error": "bad_signature",
+   "vector": {
+    "check": "target_forward",
+    "node": "autoframe",
+    "headers": {
+     "rtgip-protocol": "rtgip/2",
+     "rtgip-key-id": "kat-gw-autoframe-2",
+     "rtgip-signer": "gateway",
+     "rtgip-timestamp": "1800000001",
+     "rtgip-nonce": "kat_ar1_a3b000000000",
+     "rtgip-scope": "autocurb;autoframe;tnt-syn-northwind;rf-nw-01;appraisal.completed;2;acquisition_evidence;fe850cf2-d95c-5258-b996-1215f0753a3f",
+     "rtgip-signature": "rtgip2=2161db2679fe1d6557fb87cce102319bb8ffda24329d63e067443df1dd9dc58d"
+    },
+    "body": "{\"aggregate\":{\"domain\":\"appraisal\",\"id\":\"apr:55555555-5555-4555-8555-555555555555\",\"prev_revision\":null,\"revision\":1,\"type\":\"appraisal\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"fe850cf2-d95c-5258-b996-1215f0753a3f\",\"event_type\":\"appraisal.completed\",\"occurred_at\":\"2027-01-15T14:02:00Z\",\"origin\":{\"app\":\"autocurb\",\"event_id\":\"ac-apr-1\",\"revision\":1},\"payload\":{\"appraisal_ref\":\"apr:55555555-5555-4555-8555-555555555555\",\"audit_ref\":\"led-5555-2\",\"finalized_at\":\"2027-01-15T14:02:00Z\",\"verified_by_ref\":\"staff:44444444-4444-4444-8444-444444444444\",\"verified_state\":\"finalized\"},\"payload_sha256\":\"732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5\",\"protocol\":\"rtgip/2\",\"purpose\":\"acquisition_evidence\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autocurb->autoframe\",\"schema_version\":2,\"source_app\":\"autocurb\",\"target_app\":\"autoframe\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}"
+   }
+  },
+  {
+   "id": "B1a",
+   "mirrors": "k2 B1, O1-B1a",
+   "name": "AL submits AF's envelope under stg-autoframe's id with its own secret",
+   "error": "bad_signature",
+   "vector": {
+    "check": "gateway_submission",
+    "headers": {
+     "rtgip-protocol": "rtgip/2",
+     "rtgip-key-id": "kat-stg-autoframe-2",
+     "rtgip-signer": "autoframe",
+     "rtgip-timestamp": "1800000000",
+     "rtgip-nonce": "kat_ar1_b1a000000000",
+     "rtgip-scope": "autoframe;autolabels;tnt-syn-northwind;rf-nw-01;media.approved;2;media_reference;59f10325-b592-52e8-aa15-4d92dc976467",
+     "rtgip-signature": "rtgip2=e568efcd11cb80ceca238be1e7dc2e489b7d0f532a3868b94a2030ba341cca24"
+    },
+    "body": "{\"aggregate\":{\"domain\":\"media\",\"id\":\"med-syn-1\",\"prev_revision\":null,\"revision\":1,\"type\":\"media\"},\"causation_id\":\"appr-syn-1\",\"classification\":\"shared_media_meta\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"59f10325-b592-52e8-aa15-4d92dc976467\",\"event_type\":\"media.approved\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autoframe\",\"event_id\":\"af-evt-1\",\"revision\":1},\"payload\":{\"approval_audit_ref\":\"audit-af-1\",\"approved_at\":\"2027-01-15T15:00:00Z\",\"approved_by_ref\":\"af-staff:44444444-4444-4444-8444-444444444444\",\"content_sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"height\":1000,\"media_id\":\"med-syn-1\",\"media_order\":1,\"orientation\":\"landscape\",\"preset_key\":\"studio\",\"preset_version\":1,\"rendition_id\":\"rend-syn-1\",\"shot_type\":\"front_34\",\"storage_ref\":{\"bucket\":\"autoframe-media\",\"object_key\":\"tnt-syn-northwind/rf-nw-01/inst-syn-0001/med-syn-1/derived/studio-v1-r1.webp\"},\"width\":1500},\"payload_sha256\":\"0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace\",\"protocol\":\"rtgip/2\",\"purpose\":\"media_reference\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autoframe->autolabels\",\"schema_version\":2,\"source_app\":\"autoframe\",\"target_app\":\"autolabels\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}"
+   }
+  },
+  {
+   "id": "B1b",
+   "mirrors": "k2 B1, O1-B1b",
+   "name": "AL submits AF's envelope with its own key",
+   "error": "source_impersonation",
+   "vector": {
+    "check": "gateway_submission",
+    "headers": {
+     "rtgip-protocol": "rtgip/2",
+     "rtgip-key-id": "kat-stg-autolabels-2",
+     "rtgip-signer": "autolabels",
+     "rtgip-timestamp": "1800000000",
+     "rtgip-nonce": "kat_ar1_b1b000000000",
+     "rtgip-scope": "autoframe;autolabels;tnt-syn-northwind;rf-nw-01;media.approved;2;media_reference;59f10325-b592-52e8-aa15-4d92dc976467",
+     "rtgip-signature": "rtgip2=ade1aa2a1a953785fe38e047e4a3671a1ed7751bbab278e9eadd67e8aca39b73"
+    },
+    "body": "{\"aggregate\":{\"domain\":\"media\",\"id\":\"med-syn-1\",\"prev_revision\":null,\"revision\":1,\"type\":\"media\"},\"causation_id\":\"appr-syn-1\",\"classification\":\"shared_media_meta\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"59f10325-b592-52e8-aa15-4d92dc976467\",\"event_type\":\"media.approved\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autoframe\",\"event_id\":\"af-evt-1\",\"revision\":1},\"payload\":{\"approval_audit_ref\":\"audit-af-1\",\"approved_at\":\"2027-01-15T15:00:00Z\",\"approved_by_ref\":\"af-staff:44444444-4444-4444-8444-444444444444\",\"content_sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"height\":1000,\"media_id\":\"med-syn-1\",\"media_order\":1,\"orientation\":\"landscape\",\"preset_key\":\"studio\",\"preset_version\":1,\"rendition_id\":\"rend-syn-1\",\"shot_type\":\"front_34\",\"storage_ref\":{\"bucket\":\"autoframe-media\",\"object_key\":\"tnt-syn-northwind/rf-nw-01/inst-syn-0001/med-syn-1/derived/studio-v1-r1.webp\"},\"width\":1500},\"payload_sha256\":\"0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace\",\"protocol\":\"rtgip/2\",\"purpose\":\"media_reference\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autoframe->autolabels\",\"schema_version\":2,\"source_app\":\"autoframe\",\"target_app\":\"autolabels\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}"
+   }
+  },
+  {
+   "id": "B1c",
+   "mirrors": "A1-4 audience",
+   "name": "AL submits with the Gateway key it holds (audience autolabels, not gateway)",
+   "error": "unknown_key",
+   "vector": {
+    "check": "gateway_submission",
+    "headers": {
+     "rtgip-protocol": "rtgip/2",
+     "rtgip-key-id": "kat-gw-autolabels-2",
+     "rtgip-signer": "gateway",
+     "rtgip-timestamp": "1800000000",
+     "rtgip-nonce": "kat_ar1_b1c000000000",
+     "rtgip-scope": "autoframe;autolabels;tnt-syn-northwind;rf-nw-01;media.approved;2;media_reference;59f10325-b592-52e8-aa15-4d92dc976467",
+     "rtgip-signature": "rtgip2=3f532d84409084d2cdf05917d056d7fed53f8c4b01cb06bf287868b0f0fa1909"
+    },
+    "body": "{\"aggregate\":{\"domain\":\"media\",\"id\":\"med-syn-1\",\"prev_revision\":null,\"revision\":1,\"type\":\"media\"},\"causation_id\":\"appr-syn-1\",\"classification\":\"shared_media_meta\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"59f10325-b592-52e8-aa15-4d92dc976467\",\"event_type\":\"media.approved\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autoframe\",\"event_id\":\"af-evt-1\",\"revision\":1},\"payload\":{\"approval_audit_ref\":\"audit-af-1\",\"approved_at\":\"2027-01-15T15:00:00Z\",\"approved_by_ref\":\"af-staff:44444444-4444-4444-8444-444444444444\",\"content_sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"height\":1000,\"media_id\":\"med-syn-1\",\"media_order\":1,\"orientation\":\"landscape\",\"preset_key\":\"studio\",\"preset_version\":1,\"rendition_id\":\"rend-syn-1\",\"shot_type\":\"front_34\",\"storage_ref\":{\"bucket\":\"autoframe-media\",\"object_key\":\"tnt-syn-northwind/rf-nw-01/inst-syn-0001/med-syn-1/derived/studio-v1-r1.webp\"},\"width\":1500},\"payload_sha256\":\"0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace\",\"protocol\":\"rtgip/2\",\"purpose\":\"media_reference\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autoframe->autolabels\",\"schema_version\":2,\"source_app\":\"autoframe\",\"target_app\":\"autolabels\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}"
+   }
+  },
+  {
+   "id": "B1d",
+   "mirrors": "A1-4 audience",
+   "name": "a legacy key with no audience is not usable, even for the owner's own event",
+   "error": "unknown_key",
+   "vector": {
+    "check": "gateway_submission",
+    "headers": {
+     "rtgip-protocol": "rtgip/2",
+     "rtgip-key-id": "kat-stg-autolabels-1",
+     "rtgip-signer": "autolabels",
+     "rtgip-timestamp": "1800000000",
+     "rtgip-nonce": "kat_ar1_b1d000000000",
+     "rtgip-scope": "autolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+     "rtgip-signature": "rtgip2=531ad9febfc5a2291ee3106b35933a7688cad49e87dd81e7446785e0ff611044"
+    },
+    "body": "{\"aggregate\":{\"domain\":\"identity\",\"id\":\"inst-syn-0001\",\"prev_revision\":null,\"revision\":1,\"type\":\"vehicle_instance\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"event_type\":\"vehicle.identity_registered\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autolabels\",\"event_id\":\"al-id-1\",\"revision\":1},\"payload\":{\"make\":\"Synthetic\",\"model\":\"Sedan\",\"registered_at\":\"2027-01-15T15:00:00Z\",\"stock_number\":\"SYN1001\",\"trim\":null,\"year\":2024},\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"protocol\":\"rtgip/2\",\"purpose\":\"inventory_sync\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"schema_version\":2,\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}"
+   }
+  },
+  {
+   "id": "B2a",
+   "mirrors": "k2 B2, O1-B2a",
+   "name": "AL signs AF's inbox receipt with its own key",
+   "error": "ack_key_not_authorized",
+   "vector": {
+    "check": "gateway_target_chain",
+    "delivery": "al->af (attack only)",
+    "receipts": [
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "gateway_admission",
+      "event_id": "14e42632-49ff-557e-9f5a-03bd88d335a5",
+      "route": "autolabels->autoframe",
+      "source_app": "autolabels",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autolabels>autoframe:tnt-syn-northwind",
+      "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+      "envelope_sha256": "d6406404cc7638e15a1cfc8dcd093c6ba257337de3136dc4160d2f6527fd0c01",
+      "delivery_id": "6d441466847dc4ec54c140bf6b1eda9e0827cb805b8dd123e42cc70b9a556ec9",
+      "issuer": "gateway",
+      "recipient": "autolabels",
+      "outcome": "admitted",
+      "issued_at": 1800000000,
+      "prev_receipt_sha256": null,
+      "key_id": "kat-gw-autoframe-2",
+      "signature": "165b1aa3faf9e035d7705784661ba61267f65c323ca27af445a569d1b07579f2"
+     },
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "target_inbox",
+      "event_id": "14e42632-49ff-557e-9f5a-03bd88d335a5",
+      "route": "autolabels->autoframe",
+      "source_app": "autolabels",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autolabels>autoframe:tnt-syn-northwind",
+      "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+      "envelope_sha256": "d6406404cc7638e15a1cfc8dcd093c6ba257337de3136dc4160d2f6527fd0c01",
+      "delivery_id": "6d441466847dc4ec54c140bf6b1eda9e0827cb805b8dd123e42cc70b9a556ec9",
+      "issuer": "autoframe",
+      "recipient": "gateway",
+      "outcome": "applied",
+      "issued_at": 1800000002,
+      "prev_receipt_sha256": "2d5f7d1d26bca8c16f06f01b07c6775c7a199654d0dfb4a0009d694f04f8284e",
+      "key_id": "kat-stg-autolabels-2",
+      "signature": "cede25af42198bb5769a5ad1fa189f295cec5e221c3b3c801fbb0e4ce20fd6f3"
+     }
+    ]
+   }
+  },
+  {
+   "id": "B2b",
+   "mirrors": "k2 B2, O1-B2b",
+   "name": "AL signs AF's inbox receipt under stg-autoframe's id with its own secret",
+   "error": "ack_bad_signature",
+   "vector": {
+    "check": "gateway_target_chain",
+    "delivery": "al->af (attack only)",
+    "receipts": [
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "gateway_admission",
+      "event_id": "14e42632-49ff-557e-9f5a-03bd88d335a5",
+      "route": "autolabels->autoframe",
+      "source_app": "autolabels",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autolabels>autoframe:tnt-syn-northwind",
+      "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+      "envelope_sha256": "d6406404cc7638e15a1cfc8dcd093c6ba257337de3136dc4160d2f6527fd0c01",
+      "delivery_id": "6d441466847dc4ec54c140bf6b1eda9e0827cb805b8dd123e42cc70b9a556ec9",
+      "issuer": "gateway",
+      "recipient": "autolabels",
+      "outcome": "admitted",
+      "issued_at": 1800000000,
+      "prev_receipt_sha256": null,
+      "key_id": "kat-gw-autoframe-2",
+      "signature": "165b1aa3faf9e035d7705784661ba61267f65c323ca27af445a569d1b07579f2"
+     },
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "target_inbox",
+      "event_id": "14e42632-49ff-557e-9f5a-03bd88d335a5",
+      "route": "autolabels->autoframe",
+      "source_app": "autolabels",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autolabels>autoframe:tnt-syn-northwind",
+      "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+      "envelope_sha256": "d6406404cc7638e15a1cfc8dcd093c6ba257337de3136dc4160d2f6527fd0c01",
+      "delivery_id": "6d441466847dc4ec54c140bf6b1eda9e0827cb805b8dd123e42cc70b9a556ec9",
+      "issuer": "autoframe",
+      "recipient": "gateway",
+      "outcome": "applied",
+      "issued_at": 1800000002,
+      "prev_receipt_sha256": "2d5f7d1d26bca8c16f06f01b07c6775c7a199654d0dfb4a0009d694f04f8284e",
+      "key_id": "kat-stg-autoframe-2",
+      "signature": "61010b0c2e02eabb158b960c3787e9ae67fb699f4f4d66ca70c1049dd9363b28"
+     }
+    ]
+   }
+  },
+  {
+   "id": "B2c",
+   "mirrors": "A1-3",
+   "name": "a target chain anchored on the source's admission (gw-autolabels) instead of adm_T is refused",
+   "error": "ack_key_not_authorized",
+   "vector": {
+    "check": "gateway_target_chain",
+    "delivery": "al->af (attack only)",
+    "receipts": [
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "gateway_admission",
+      "event_id": "14e42632-49ff-557e-9f5a-03bd88d335a5",
+      "route": "autolabels->autoframe",
+      "source_app": "autolabels",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autolabels>autoframe:tnt-syn-northwind",
+      "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+      "envelope_sha256": "d6406404cc7638e15a1cfc8dcd093c6ba257337de3136dc4160d2f6527fd0c01",
+      "delivery_id": "6d441466847dc4ec54c140bf6b1eda9e0827cb805b8dd123e42cc70b9a556ec9",
+      "issuer": "gateway",
+      "recipient": "autolabels",
+      "outcome": "admitted",
+      "issued_at": 1800000000,
+      "prev_receipt_sha256": null,
+      "key_id": "kat-gw-autolabels-2",
+      "signature": "98287639076deeda5050e3dd1e10ecc1d7b750093f11497ea3b88f2a89ca8988"
+     },
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "target_inbox",
+      "event_id": "14e42632-49ff-557e-9f5a-03bd88d335a5",
+      "route": "autolabels->autoframe",
+      "source_app": "autolabels",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autolabels>autoframe:tnt-syn-northwind",
+      "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+      "envelope_sha256": "d6406404cc7638e15a1cfc8dcd093c6ba257337de3136dc4160d2f6527fd0c01",
+      "delivery_id": "6d441466847dc4ec54c140bf6b1eda9e0827cb805b8dd123e42cc70b9a556ec9",
+      "issuer": "autoframe",
+      "recipient": "gateway",
+      "outcome": "applied",
+      "issued_at": 1800000002,
+      "prev_receipt_sha256": "db00f0171df04e383b60d5422e2b24af9c1cc45b247914a7d07a0261ea85e905",
+      "key_id": "kat-stg-autoframe-2",
+      "signature": "87834c7f6c8859d0f6dfeac04a01eacf48f1b63a4e876f9cb2b82471f8ce38b7"
+     }
+    ]
+   }
+  },
+  {
+   "id": "B3a",
+   "mirrors": "k2 B3, O1-B3a",
+   "name": "AL queries AC's delivery with its own key",
+   "error": "delivery_not_found",
+   "vector": {
+    "check": "receipt_query",
+    "delivery": "autocurb->autoframe committed",
+    "headers": {
+     "rtgip-key-id": "kat-stg-autolabels-2",
+     "rtgip-timestamp": "1800000010",
+     "rtgip-nonce": "kat_ar1_b3a000000000",
+     "rtgip-signature": "35c67942dd225ad7336fe1be1fe26e469348da6260800f316b9ab9456c63d79f"
+    },
+    "body": "{\"delivery_id\":\"ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9\",\"event_id\":\"fe850cf2-d95c-5258-b996-1215f0753a3f\",\"protocol\":\"rtgip/2-receipt-query/1\"}"
+   }
+  },
+  {
+   "id": "B3b",
+   "mirrors": "k2 B3, O1-B3b",
+   "name": "AL queries as AC under stg-autocurb's id with its own secret",
+   "error": "bad_signature",
+   "vector": {
+    "check": "receipt_query",
+    "delivery": "autocurb->autoframe committed",
+    "headers": {
+     "rtgip-key-id": "kat-stg-autocurb-2",
+     "rtgip-timestamp": "1800000010",
+     "rtgip-nonce": "kat_ar1_b3b000000000",
+     "rtgip-signature": "9fee12ea8977864db610226d39f3015257eec0e553ca5216146fa0bbebb168aa"
+    },
+    "body": "{\"delivery_id\":\"ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9\",\"event_id\":\"fe850cf2-d95c-5258-b996-1215f0753a3f\",\"protocol\":\"rtgip/2-receipt-query/1\"}"
+   }
+  },
+  {
+   "id": "B3c",
+   "mirrors": "A1-4 audience",
+   "name": "a Gateway key (audience autolabels) is not a query key",
+   "error": "unknown_key",
+   "vector": {
+    "check": "receipt_query",
+    "delivery": "autocurb->autoframe committed",
+    "headers": {
+     "rtgip-key-id": "kat-gw-autolabels-2",
+     "rtgip-timestamp": "1800000010",
+     "rtgip-nonce": "kat_ar1_b3c000000000",
+     "rtgip-signature": "9bb79e6520f4e588851ee072078fc15f0fa513ab3089e6f4faa8f6618ab0c0f9"
+    },
+    "body": "{\"delivery_id\":\"ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9\",\"event_id\":\"fe850cf2-d95c-5258-b996-1215f0753a3f\",\"protocol\":\"rtgip/2-receipt-query/1\"}"
+   }
+  },
+  {
+   "id": "C1d",
+   "mirrors": "k2 C1d, O1-B4c",
+   "name": "AL sends its own event straight to AC, bypassing the Gateway",
+   "error": "unknown_key",
+   "vector": {
+    "check": "target_forward",
+    "node": "autocurb",
+    "headers": {
+     "rtgip-protocol": "rtgip/2",
+     "rtgip-key-id": "kat-stg-autolabels-2",
+     "rtgip-signer": "autolabels",
+     "rtgip-timestamp": "1800000001",
+     "rtgip-nonce": "kat_ar1_c1d000000000",
+     "rtgip-scope": "autolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+     "rtgip-signature": "rtgip2=fda5d3da1bb3c2c1bd864be67ee1eb150edfd67a3b90c1f9657cd3b7dd1b601d"
+    },
+    "body": "{\"aggregate\":{\"domain\":\"identity\",\"id\":\"inst-syn-0001\",\"prev_revision\":null,\"revision\":1,\"type\":\"vehicle_instance\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"event_type\":\"vehicle.identity_registered\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autolabels\",\"event_id\":\"al-id-1\",\"revision\":1},\"payload\":{\"make\":\"Synthetic\",\"model\":\"Sedan\",\"registered_at\":\"2027-01-15T15:00:00Z\",\"stock_number\":\"SYN1001\",\"trim\":null,\"year\":2024},\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"protocol\":\"rtgip/2\",\"purpose\":\"inventory_sync\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"schema_version\":2,\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}"
+   }
+  },
+  {
+   "id": "C1e",
+   "mirrors": "k2 C1e, A1-3",
+   "name": "the source's admission receipt (gw-autolabels) is refused at the target AC",
+   "error": "ack_key_not_authorized",
+   "vector": {
+    "check": "target_admission",
+    "node": "autocurb",
+    "delivery": "autolabels->autocurb committed",
+    "receipt": {
+     "protocol": "rtgip/2-receipt/2",
+     "receipt_version": 2,
+     "kind": "gateway_admission",
+     "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+     "route": "autolabels->autocurb",
+     "source_app": "autolabels",
+     "target_app": "autocurb",
+     "tenant_id": "tnt-syn-northwind",
+     "rooftop_id": "rf-nw-01",
+     "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+     "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+     "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+     "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+     "issuer": "gateway",
+     "recipient": "autolabels",
+     "outcome": "admitted",
+     "issued_at": 1800000000,
+     "prev_receipt_sha256": null,
+     "key_id": "kat-gw-autolabels-2",
+     "signature": "c4ea62d409f45222f3f87fd2b4053bbf6e6faeeb2151e7d935af336494f39db7"
+    }
+   }
+  },
+  {
+   "id": "C1f",
+   "mirrors": "A1-4, stg-gateway no longer shared",
+   "name": "an admission signed with the legacy shared Gateway key is refused at the target",
+   "error": "ack_key_not_authorized",
+   "vector": {
+    "check": "target_admission",
+    "node": "autocurb",
+    "delivery": "autolabels->autocurb committed",
+    "receipt": {
+     "protocol": "rtgip/2-receipt/2",
+     "receipt_version": 2,
+     "kind": "gateway_admission",
+     "event_id": "4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+     "route": "autolabels->autocurb",
+     "source_app": "autolabels",
+     "target_app": "autocurb",
+     "tenant_id": "tnt-syn-northwind",
+     "rooftop_id": "rf-nw-01",
+     "connection_id": "conn:autolabels>autocurb:tnt-syn-northwind",
+     "payload_sha256": "a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200",
+     "envelope_sha256": "f8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+     "delivery_id": "de14458c0ccb5c10141bb1620cfd4aa72c128a36c2e7c9853d7765ae890c6606",
+     "issuer": "gateway",
+     "recipient": "autolabels",
+     "outcome": "admitted",
+     "issued_at": 1800000000,
+     "prev_receipt_sha256": null,
+     "key_id": "kat-stg-gateway-1",
+     "signature": "0b4f08b433b84ab0be247ddb7ba8803dd206abf13cad72b23f177c23900f64cb"
+    }
+   }
+  },
+  {
+   "id": "C2e",
+   "mirrors": "k2 C2e",
+   "name": "AL mints AC's confirmation with gw-autolabels",
+   "error": "ack_key_not_authorized",
+   "vector": {
+    "check": "source_chain",
+    "node": "autocurb",
+    "delivery": "autocurb->autoframe committed",
+    "receipts": [
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "gateway_admission",
+      "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+      "route": "autocurb->autoframe",
+      "source_app": "autocurb",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+      "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+      "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+      "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+      "issuer": "gateway",
+      "recipient": "autocurb",
+      "outcome": "admitted",
+      "issued_at": 1800000000,
+      "prev_receipt_sha256": null,
+      "key_id": "kat-gw-autocurb-2",
+      "signature": "8c24d818b90b901b1375bd502a185563639834fe78027e75b78bd0856df8a921"
+     },
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "gateway_confirmation",
+      "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+      "route": "autocurb->autoframe",
+      "source_app": "autocurb",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+      "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+      "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+      "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+      "issuer": "gateway",
+      "recipient": "autocurb",
+      "outcome": "consumer_committed",
+      "issued_at": 1800000005,
+      "prev_receipt_sha256": "8ca733431e210c6247c643cb3c9fcbd43be73701ac8df67dc4376c9553ed5419",
+      "key_id": "kat-gw-autolabels-2",
+      "signature": "ce96f9351391b33f11e8388304fca2b6f6bc56e2fb97616574321881934e74f9"
+     }
+    ]
+   }
+  },
+  {
+   "id": "C2f",
+   "mirrors": "k2 C2f",
+   "name": "the target's own key cannot confirm at the source",
+   "error": "ack_key_not_authorized",
+   "vector": {
+    "check": "source_chain",
+    "node": "autocurb",
+    "delivery": "autocurb->autoframe committed",
+    "receipts": [
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "gateway_admission",
+      "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+      "route": "autocurb->autoframe",
+      "source_app": "autocurb",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+      "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+      "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+      "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+      "issuer": "gateway",
+      "recipient": "autocurb",
+      "outcome": "admitted",
+      "issued_at": 1800000000,
+      "prev_receipt_sha256": null,
+      "key_id": "kat-gw-autocurb-2",
+      "signature": "8c24d818b90b901b1375bd502a185563639834fe78027e75b78bd0856df8a921"
+     },
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "gateway_confirmation",
+      "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+      "route": "autocurb->autoframe",
+      "source_app": "autocurb",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+      "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+      "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+      "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+      "issuer": "gateway",
+      "recipient": "autocurb",
+      "outcome": "consumer_committed",
+      "issued_at": 1800000005,
+      "prev_receipt_sha256": "8ca733431e210c6247c643cb3c9fcbd43be73701ac8df67dc4376c9553ed5419",
+      "key_id": "kat-stg-autoframe-2",
+      "signature": "fac7247a551c47ae188ed89dace9c2d8d605e8c30dbce497e1ad51b95f84581b"
+     }
+    ]
+   }
+  },
+  {
+   "id": "C2g",
+   "mirrors": "A1-1 prev = adm_S",
+   "name": "a confirmation anchored on adm_T, not on the source's admission",
+   "error": "ack_missing_previous_stage",
+   "vector": {
+    "check": "source_chain",
+    "node": "autocurb",
+    "delivery": "autocurb->autoframe committed",
+    "receipts": [
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "gateway_admission",
+      "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+      "route": "autocurb->autoframe",
+      "source_app": "autocurb",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+      "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+      "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+      "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+      "issuer": "gateway",
+      "recipient": "autocurb",
+      "outcome": "admitted",
+      "issued_at": 1800000000,
+      "prev_receipt_sha256": null,
+      "key_id": "kat-gw-autocurb-2",
+      "signature": "8c24d818b90b901b1375bd502a185563639834fe78027e75b78bd0856df8a921"
+     },
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "gateway_confirmation",
+      "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+      "route": "autocurb->autoframe",
+      "source_app": "autocurb",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+      "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+      "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+      "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+      "issuer": "gateway",
+      "recipient": "autocurb",
+      "outcome": "consumer_committed",
+      "issued_at": 1800000005,
+      "prev_receipt_sha256": "8d6a1a6e6fda550c705ef3f2c78b397b2b566c247accf3870beb826af8d336fb",
+      "key_id": "kat-gw-autocurb-2",
+      "signature": "2b539e5666506dee6c284206c97d01cf7c9c5f756e0885bd00faa1318fe7ffe0"
+     }
+    ]
+   }
+  },
+  {
+   "id": "C2h",
+   "mirrors": "A1-1 shape",
+   "name": "a confirmation with a target outcome (applied)",
+   "error": "ack_unsupported_version_or_shape",
+   "vector": {
+    "check": "source_chain",
+    "node": "autocurb",
+    "delivery": "autocurb->autoframe committed",
+    "receipts": [
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "gateway_admission",
+      "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+      "route": "autocurb->autoframe",
+      "source_app": "autocurb",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+      "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+      "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+      "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+      "issuer": "gateway",
+      "recipient": "autocurb",
+      "outcome": "admitted",
+      "issued_at": 1800000000,
+      "prev_receipt_sha256": null,
+      "key_id": "kat-gw-autocurb-2",
+      "signature": "8c24d818b90b901b1375bd502a185563639834fe78027e75b78bd0856df8a921"
+     },
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "gateway_confirmation",
+      "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+      "route": "autocurb->autoframe",
+      "source_app": "autocurb",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+      "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+      "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+      "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+      "issuer": "gateway",
+      "recipient": "autocurb",
+      "outcome": "applied",
+      "issued_at": 1800000005,
+      "prev_receipt_sha256": "8ca733431e210c6247c643cb3c9fcbd43be73701ac8df67dc4376c9553ed5419",
+      "key_id": "kat-gw-autocurb-2",
+      "signature": "dc006f0c0f818861b15ba1d15b62137ba3689f75ad1250d551156e1557728dec"
+     }
+    ]
+   }
+  },
+  {
+   "id": "C2i",
+   "mirrors": "A1-1 recipient",
+   "name": "a confirmation addressed to the target",
+   "error": "ack_wrong_recipient",
+   "vector": {
+    "check": "source_chain",
+    "node": "autocurb",
+    "delivery": "autocurb->autoframe committed",
+    "receipts": [
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "gateway_admission",
+      "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+      "route": "autocurb->autoframe",
+      "source_app": "autocurb",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+      "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+      "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+      "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+      "issuer": "gateway",
+      "recipient": "autocurb",
+      "outcome": "admitted",
+      "issued_at": 1800000000,
+      "prev_receipt_sha256": null,
+      "key_id": "kat-gw-autocurb-2",
+      "signature": "8c24d818b90b901b1375bd502a185563639834fe78027e75b78bd0856df8a921"
+     },
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "gateway_confirmation",
+      "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+      "route": "autocurb->autoframe",
+      "source_app": "autocurb",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+      "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+      "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+      "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+      "issuer": "gateway",
+      "recipient": "autoframe",
+      "outcome": "consumer_committed",
+      "issued_at": 1800000005,
+      "prev_receipt_sha256": "8ca733431e210c6247c643cb3c9fcbd43be73701ac8df67dc4376c9553ed5419",
+      "key_id": "kat-gw-autocurb-2",
+      "signature": "3761087010f819def490582cee2a20e191b0fbb56f5a3c294ac141a13ab1256b"
+     }
+    ]
+   }
+  },
+  {
+   "id": "C2j",
+   "mirrors": "A1-1 time order",
+   "name": "a confirmation issued before the admission",
+   "error": "ack_stage_time_reversed",
+   "vector": {
+    "check": "source_chain",
+    "node": "autocurb",
+    "delivery": "autocurb->autoframe committed",
+    "receipts": [
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "gateway_admission",
+      "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+      "route": "autocurb->autoframe",
+      "source_app": "autocurb",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+      "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+      "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+      "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+      "issuer": "gateway",
+      "recipient": "autocurb",
+      "outcome": "admitted",
+      "issued_at": 1800000000,
+      "prev_receipt_sha256": null,
+      "key_id": "kat-gw-autocurb-2",
+      "signature": "8c24d818b90b901b1375bd502a185563639834fe78027e75b78bd0856df8a921"
+     },
+     {
+      "protocol": "rtgip/2-receipt/2",
+      "receipt_version": 2,
+      "kind": "gateway_confirmation",
+      "event_id": "fe850cf2-d95c-5258-b996-1215f0753a3f",
+      "route": "autocurb->autoframe",
+      "source_app": "autocurb",
+      "target_app": "autoframe",
+      "tenant_id": "tnt-syn-northwind",
+      "rooftop_id": "rf-nw-01",
+      "connection_id": "conn:autocurb>autoframe:tnt-syn-northwind",
+      "payload_sha256": "732d4c24cda5db414f4320c6e9c2c78a08ddcc5afd1daedeebcf5c9eb84212c5",
+      "envelope_sha256": "4d27ec3f7d62ecb5991adf8cac565412a918b496c3ac3835d9f3741cb9f39644",
+      "delivery_id": "ff4995841a4af7dcd1f2183ddbade42989ab999e7015660166534027033ca0c9",
+      "issuer": "gateway",
+      "recipient": "autocurb",
+      "outcome": "consumer_committed",
+      "issued_at": 1799999999,
+      "prev_receipt_sha256": "8ca733431e210c6247c643cb3c9fcbd43be73701ac8df67dc4376c9553ed5419",
+      "key_id": "kat-gw-autocurb-2",
+      "signature": "ba8f6a01c40ac2d0afb7bcd1148ed70505fad9d1d713e25e4116ade865af42c0"
+     }
+    ]
+   }
+  }
+ ],
+ "attack_deliveries": {
+  "af->ac (attack only)": {
+   "connection_id": "conn:autoframe>autocurb:tnt-syn-northwind",
+   "delivery_id": "8fca2609d6802c7799a5285efcb5c7a0efaf97095a16e2d486ec28ef55c3a9d3",
+   "body": "{\"aggregate\":{\"domain\":\"media\",\"id\":\"med-syn-1\",\"prev_revision\":null,\"revision\":1,\"type\":\"media\"},\"causation_id\":\"appr-syn-1\",\"classification\":\"shared_media_meta\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"d7585915-76f1-5677-bf1b-ed0cb19d0fb9\",\"event_type\":\"media.approved\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autoframe\",\"event_id\":\"af-evt-1\",\"revision\":1},\"payload\":{\"approval_audit_ref\":\"audit-af-1\",\"approved_at\":\"2027-01-15T15:00:00Z\",\"approved_by_ref\":\"af-staff:44444444-4444-4444-8444-444444444444\",\"content_sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"height\":1000,\"media_id\":\"med-syn-1\",\"media_order\":1,\"orientation\":\"landscape\",\"preset_key\":\"studio\",\"preset_version\":1,\"rendition_id\":\"rend-syn-1\",\"shot_type\":\"front_34\",\"storage_ref\":{\"bucket\":\"autoframe-media\",\"object_key\":\"tnt-syn-northwind/rf-nw-01/inst-syn-0001/med-syn-1/derived/studio-v1-r1.webp\"},\"width\":1500},\"payload_sha256\":\"0da0604b0b9a43397160c2d5893b9e817520c9afdf82c0984dff69975dabbace\",\"protocol\":\"rtgip/2\",\"purpose\":\"media_reference\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autoframe->autocurb\",\"schema_version\":2,\"source_app\":\"autoframe\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}"
+  },
+  "al->af (attack only)": {
+   "connection_id": "conn:autolabels>autoframe:tnt-syn-northwind",
+   "delivery_id": "6d441466847dc4ec54c140bf6b1eda9e0827cb805b8dd123e42cc70b9a556ec9",
+   "body": "{\"aggregate\":{\"domain\":\"identity\",\"id\":\"inst-syn-0001\",\"prev_revision\":null,\"revision\":1,\"type\":\"vehicle_instance\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"14e42632-49ff-557e-9f5a-03bd88d335a5\",\"event_type\":\"vehicle.identity_registered\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autolabels\",\"event_id\":\"al-id-1\",\"revision\":1},\"payload\":{\"make\":\"Synthetic\",\"model\":\"Sedan\",\"registered_at\":\"2027-01-15T15:00:00Z\",\"stock_number\":\"SYN1001\",\"trim\":null,\"year\":2024},\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"protocol\":\"rtgip/2\",\"purpose\":\"inventory_sync\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autoframe\",\"schema_version\":2,\"source_app\":\"autolabels\",\"target_app\":\"autoframe\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}"
+  }
+ },
+ "checks": {
+  "gateway_submission": "verifyDelivery(headers, body, {registry: Gateway view of app keys with audience gateway, expectedSigner: source, nowSec: t0})",
+  "target_forward": "verifyDelivery(headers, body, {registry: key_stores[node], expectedSigner: gateway, receiver: node, nowSec: t0+1})",
+  "target_admission": "verifyReceiptV2(receipt, {kind: gateway_admission}, key_stores[node], now)",
+  "source_chain": "verifySourceChain(receipts, expectation, key_stores[node], now)",
+  "gateway_target_chain": "verifyReceiptV2(last, {kind: last.kind}, Gateway view of app keys (audience gateway) + Gateway keys with audience = target, now, preceding receipts)",
+  "receipt_query": "verifyReceiptQuery(headers, body, {registry: Gateway view of app keys with audience gateway, nowSec: now, lookup: the delivery's source record})"
+ },
+ "counts": {
+  "deliveries": 5,
+  "refusals": 28
+ }
+}

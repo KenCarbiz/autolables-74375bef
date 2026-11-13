@@ -1,0 +1,161 @@
+{
+  "spec": "rtgip/3-refusal-policy/1",
+  "freeze": "rtgip/3-contract-freeze/1",
+  "status": "candidate: not installed anywhere, not peer-negotiated",
+  "extends": "rtgip/2-refusal-policy/1 (the Gateway ingress mapping in src/lib/gateway/rtgip2/handler.server.ts refusalStatus, GW-F6)",
+  "rule": "Everything inherited keeps its status and meaning. A permanent refusal never looks retryable; 503 is reserved for outcomes whose durability is unknown, for a node that cannot sign, and for a local verification fault where nothing was written and a retry is safe.",
+  "inherited": {
+    "400": [
+      "unknown_rtgip_header",
+      "duplicate_or_invalid_header",
+      "missing_headers",
+      "missing_nonce",
+      "malformed_json",
+      "body_not_canonical",
+      "payload_hash_mismatch",
+      "event_id_not_derived",
+      "protocol_mismatch",
+      "scope_mismatch",
+      "unmappable_event",
+      "invalid_nonce"
+    ],
+    "401": [
+      "unknown_key",
+      "key_dialect_mismatch",
+      "key_revoked",
+      "key_outside_validity",
+      "signer_key_mismatch",
+      "signer_not_gateway",
+      "signer_not_source",
+      "timestamp_out_of_window",
+      "bad_signature",
+      "nonce_reused"
+    ],
+    "403": [
+      "ambiguous_connection",
+      "ambiguous_or_unauthorized_connection",
+      "ambiguous_or_unauthorized_mapping",
+      "connection_revoked",
+      "dialect_held",
+      "event_not_granted",
+      "event_not_on_route",
+      "key_not_bound_to_connection",
+      "no_connection_for_tenant",
+      "not_source_authority",
+      "producer_disabled",
+      "purpose_not_allowed",
+      "purpose_not_granted",
+      "reader_disabled",
+      "rooftop_not_granted",
+      "route_reserved",
+      "source_impersonation",
+      "unknown_route",
+      "wrong_destination",
+      "admission_forbidden",
+      "rooftop_not_active",
+      "labels_event_reused",
+      "episode_already_bound",
+      "episode_previously_revoked"
+    ],
+    "409": [
+      "admission_conflict"
+    ],
+    "413": [
+      "body_too_large"
+    ]
+  },
+  "inherited_receipt_query": {
+    "note": "The receipt-query endpoint (queryRefusalStatus) maps these differently from the ingress; rtgip/3-receipt-query/2 keeps that mapping.",
+    "400": [
+      "missing_headers",
+      "invalid_nonce",
+      "malformed_json",
+      "body_not_canonical",
+      "invalid_query"
+    ],
+    "404": [
+      "delivery_not_found"
+    ]
+  },
+  "added": {
+    "400": [
+      "signature_malformed",
+      "origin_missing",
+      "attest_shape",
+      "attest_missing",
+      "admission_missing"
+    ],
+    "401": [
+      "key_not_pinned",
+      "alg_mismatch",
+      "origin_bad_signature",
+      "origin_too_old",
+      "attest_stale"
+    ],
+    "403": [
+      "protocol_not_accepted",
+      "origin_mismatch",
+      "attest_key_mismatch",
+      "attest_msg_mismatch",
+      "attest_sig_mismatch"
+    ],
+    "503": [
+      "no_signing_key",
+      "verification_unavailable"
+    ]
+  },
+  "added_meaning": {
+    "protocol_not_accepted": "the connection's accept set does not contain the presented protocol",
+    "key_not_pinned": "the key row exists but its fingerprint is not in RTGIP3_KEY_PINS, or the stored fingerprint is not sha256(public_key)",
+    "alg_mismatch": "key alg is not ed25519",
+    "signature_malformed": "not 128 lowercase hex, or S is not below the group order L",
+    "origin_missing": "a forward carries no rtgip-origin header",
+    "origin_bad_signature": "the origin signature does not verify over the source H1 message for the forwarded body",
+    "origin_mismatch": "origin signer, key owner, envelope source or scope disagree, or the origin is not canonical JSON of exactly the six fields",
+    "origin_too_old": "origin timestamp older than 7 days, or more than 300 s in the future",
+    "attest_shape": "the attestation document is malformed",
+    "attest_missing": "an expected role has no item, or an extra item is present",
+    "attest_key_mismatch": "item key id or pk_sha256 disagrees with the key row or the recomputed message",
+    "attest_msg_mismatch": "item msg_sha256 is not the digest of the message SQL recomputed",
+    "attest_sig_mismatch": "item sig is not the signature SQL received",
+    "attest_stale": "verified_at is not within 60 s of the database clock",
+    "no_signing_key": "the node's signing key failed its load-time self-test or is absent; the node refuses to sign",
+    "admission_missing": "a forward carries no rtgip-admission-receipt header; the Gateway admission is mandatory at the target",
+    "verification_unavailable": "the only wire answer for a local verification fault (any attest_* code, a lock wait, clock skew between a node's edge and its database); the detail is logged locally"
+  },
+  "local_verdicts": {
+    "note": "Source-side receipt and chain verdicts. They are never HTTP responses; they decide whether a returned chain is accepted.",
+    "codes": [
+      "invalid_receipt_shape",
+      "chain_shape",
+      "ack_unexpected_previous_stage",
+      "ack_missing_previous_stage",
+      "ack_stage_time_reversed",
+      "ack_commit_without_effect",
+      "ack_wrong_event_id",
+      "ack_wrong_route",
+      "ack_wrong_source_app",
+      "ack_wrong_target_app",
+      "ack_wrong_tenant_id",
+      "ack_wrong_rooftop_id",
+      "ack_wrong_connection_id",
+      "ack_wrong_payload_sha256",
+      "ack_wrong_envelope_sha256",
+      "ack_wrong_delivery_id",
+      "ack_wrong_issuer",
+      "ack_wrong_recipient",
+      "ack_wrong_stage"
+    ]
+  },
+  "peer_visible": {
+    "note": "Codes that describe a node's own configuration or internals are never sent to a peer; the peer sees the mapped code.",
+    "attest_shape": "verification_unavailable",
+    "attest_missing": "verification_unavailable",
+    "attest_key_mismatch": "verification_unavailable",
+    "attest_msg_mismatch": "verification_unavailable",
+    "attest_sig_mismatch": "verification_unavailable",
+    "attest_stale": "verification_unavailable",
+    "key_not_pinned": "unknown_key"
+  },
+  "added_local_only": "The attest_* and key_not_pinned statuses under added are internal: they classify the local log entry and are never sent to a peer; see peer_visible."
+}
