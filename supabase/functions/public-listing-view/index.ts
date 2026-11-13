@@ -80,7 +80,7 @@ serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     if (!supabaseUrl || !serviceKey) return json(500, { error: "supabase not configured" });
 
-    const { slug, session } = await req.json().catch(() => ({}));
+    const { slug, session, internal } = await req.json().catch(() => ({}));
     if (!slug || typeof slug !== "string") return json(400, { error: "slug required" });
     const sessionId = typeof session === "string" ? session.slice(0, 80) : "";
 
@@ -93,6 +93,11 @@ serve(async (req) => {
     // them made their own cars read as "sold or unpublished".
     const bearer = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+    // A server-to-server read (marketpass-assessment ?view=page) that needs the
+    // row exactly as the Passport receives it. It carries the service-role key,
+    // so it is trusted: it is not a shopper view, so it is not throttled, not
+    // counted, and never notifies the dealer.
+    const isInternal = internal === true && bearer === serviceKey;
     let isAuthenticated = false;
     if (bearer && bearer !== anonKey) {
       const { data: who } = await admin.auth.getUser(bearer).catch(() => ({ data: null }));
@@ -106,7 +111,7 @@ serve(async (req) => {
     const fiveMinAgo = new Date(Date.now() - 5 * 60_000).toISOString();
     const oneHrAgo = new Date(Date.now() - 60 * 60_000).toISOString();
 
-    const [fiveMinRes, oneHrRes] = isAuthenticated ? [{ count: 0 }, { count: 0 }] : await Promise.all([
+    const [fiveMinRes, oneHrRes] = isAuthenticated || isInternal ? [{ count: 0 }, { count: 0 }] : await Promise.all([
       admin
         .from("audit_log")
         .select("id", { head: true, count: "exact" })
@@ -123,7 +128,7 @@ serve(async (req) => {
     const fiveMinCount = fiveMinRes.count ?? 0;
     const oneHrCount = oneHrRes.count ?? 0;
 
-    if (!isAuthenticated && (fiveMinCount >= 60 || oneHrCount >= 300)) {
+    if (!isAuthenticated && !isInternal && (fiveMinCount >= 60 || oneHrCount >= 300)) {
       return json(429, { error: "rate_limited", retry_after: 60 }, { "Retry-After": "60" });
     }
 
@@ -631,7 +636,7 @@ serve(async (req) => {
     } catch { /* alternatives optional — module hides when absent */ }
 
     // ── Bump view count + record audit event
-    await Promise.all([
+    if (!isInternal) await Promise.all([
       admin.rpc("increment_listing_view", { _slug: lookupSlug }),
       admin.from("audit_log").insert({
         action: "listing_viewed",
@@ -650,7 +655,7 @@ serve(async (req) => {
     // (or, with no session, once per VIN / 6h) so the salesperson gets a real
     // heads-up without being buried by repeat opens, refreshes, or scrapers.
     try {
-      if (row.tenant_id) {
+      if (row.tenant_id && !isInternal) {
         const { data: prof } = await admin
           .from("dealer_profiles").select("settings").eq("tenant_id", row.tenant_id).maybeSingle();
         const s = (prof?.settings ?? {}) as Record<string, unknown>;
