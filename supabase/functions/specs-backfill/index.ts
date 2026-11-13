@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { shouldDecodeVin, MAX_SPEC_ATTEMPTS } from "../_shared/factorySticker/lib/sourceData.ts";
 import { adminClient, SERVICE_KEY, SUPABASE_URL, isServiceOrCron } from "../_shared/supabase.ts";
 import { preflight, json } from "../_shared/http.ts";
+import { readCallPolicy } from "../_shared/marketcheck/callPolicy.ts";
 
 // Allow a signed-in admin user to trigger the backfill manually from the app.
 // Verifies the caller's JWT, then checks user_roles for the 'admin' role.
@@ -175,6 +176,10 @@ serve(async (req) => {
   }
   const body = await req.json().catch(() => ({})) as { depth?: number };
   const depth = typeof body.depth === "number" ? body.depth : 0;
+
+  if (!readCallPolicy().scheduledRefresh) {
+    return json(200, { ok: true, skipped: "scheduled_refresh_disabled", depth });
+  }
 
   // One sweep at a time. Each link in the chain re-takes the lock and
   // extends it, so the run holds it start to finish while an expiry still
