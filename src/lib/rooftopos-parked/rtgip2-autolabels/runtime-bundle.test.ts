@@ -15,10 +15,11 @@ import {
   RTGIP2_RUNTIME_MODE,
   createAppRuntime,
   createEntryRuntime,
+  EDGE_DB_OPTIONS,
   edgeDbUrl,
 } from "./runtime-entry.ts";
 import { GATEWAY_ORIGIN_PLACEHOLDER } from "./runtime-config.ts";
-import type { Sql } from "../rtgip2-runtime/runtime.ts";
+import { keySecretName3, type Sql } from "../rtgip2-runtime/runtime.ts";
 
 const root = (rel: string) => path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..", rel);
 const read = (rel: string) => readFileSync(root(rel), "utf8");
@@ -224,5 +225,19 @@ describe("the rtgip_edge database URL", () => {
       "not a url",
     ])
       expect(() => edgeDbUrl(bad)).toThrow("rtgip_edge_db_url_invalid");
+  });
+
+  it("never lets the URL turn TLS off, and the connection forces ssl require", () => {
+    const base = `postgresql://rtgip_edge.${PRODUCTION_REF}@pooler.example.test:6543/postgres`;
+    for (const q of ["?sslmode=require", "?sslmode=verify-full", "?ssl=require", "?sslmode=REQUIRE"]) expect(edgeDbUrl(base + q)).toBe(base + q);
+    for (const q of ["?sslmode=disable", "?sslmode=allow", "?sslmode=prefer", "?ssl=false", "?ssl=disable", "?sslmode=require&sslmode=disable"])
+      expect(() => edgeDbUrl(base + q)).toThrow("rtgip_edge_db_url_invalid");
+    expect(EDGE_DB_OPTIONS.ssl).toBe("require");
+    const bundle = readFileSync(root("supabase/functions/_shared/rtgip2-runtime.bundle.js"), "utf8");
+    expect(bundle).toMatch(/ssl: "require"/);
+  });
+
+  it("names the AutoLabels production signing-key secret as the runtime derives it", () => {
+    expect(keySecretName3("prd-autolabels-ed1")).toBe("RTGIP3_SIGNING_KEY_PRD_AUTOLABELS_ED1");
   });
 });

@@ -3691,16 +3691,21 @@ var env = (name) => globalThis.Deno.env.get(name);
 function edgeDbUrl(value) {
   let user = "";
   let scheme = "";
+  let tls = [];
   try {
     const u = new URL(value ?? "");
     scheme = u.protocol;
     user = decodeURIComponent(u.username);
+    tls = [...u.searchParams.getAll("sslmode"), ...u.searchParams.getAll("ssl")].map((v) => v.toLowerCase());
   } catch {
     throw new Error("rtgip_edge_db_url_invalid");
   }
   if (scheme !== "postgres:" && scheme !== "postgresql:" || !/^rtgip_edge(\.[a-z0-9]{20})?$/.test(user)) throw new Error("rtgip_edge_db_url_invalid");
+  if (tls.some((v) => v !== "require" && v !== "verify-ca" && v !== "verify-full")) throw new Error("rtgip_edge_db_url_invalid");
   return value;
 }
+var EDGE_DB_OPTIONS = { prepare: false, max: 3, idle_timeout: 5, ssl: "require", onnotice: () => {
+} };
 function createEntryRuntime(opts) {
   return createAppRuntime({
     ...APP_BINDINGS,
@@ -3709,12 +3714,12 @@ function createEntryRuntime(opts) {
     gatewayOrigins: GATEWAY_ORIGINS,
     env,
     // The dedicated login rtgip_edge (function secret RTGIP_EDGE_DB_URL), never the postgres owner.
-    sql: () => postgres(edgeDbUrl(env("RTGIP_EDGE_DB_URL")), { prepare: false, max: 3, idle_timeout: 5, onnotice: () => {
-    } })
+    sql: () => postgres(edgeDbUrl(env("RTGIP_EDGE_DB_URL")), EDGE_DB_OPTIONS)
   });
 }
 export {
   APP_BINDINGS,
+  EDGE_DB_OPTIONS,
   GATEWAY_ORIGINS,
   PROJECT_REF,
   RTGIP2_APP_RUNTIME_ENABLED,

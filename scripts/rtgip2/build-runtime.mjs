@@ -17,6 +17,8 @@ export const OUTFILE = path.join(ROOT, "supabase/functions/_shared/rtgip2-runtim
 export const SHA_SUFFIX = ".sha256";
 export const bundleSha256 = (text) => createHash("sha256").update(text, "utf8").digest("hex");
 export const shaLine = (text, file) => `${bundleSha256(text)}  ${path.basename(file)}\n`;
+// The exact driver the staging AutoLabels runtime ran (bdbe070a bundle). package.json's postgres ^3.4.9 is only the
+// copy tsc and vitest resolve; the deployed bundle imports this specifier.
 export const POSTGRES_SPECIFIER = "npm:postgres@3.4.5";
 // The production Gateway origin (src/lib/rooftopos-parked/rtgip2-autolabels/runtime-config.ts). Unset,
 // the bundle keeps the .invalid placeholder and refuses every dispatch. Set, it must be a bare https
@@ -40,7 +42,15 @@ const plugin = {
   },
 };
 
+// esbuild is pinned exactly: the version recorded for autolabels in the runtime's PROVENANCE.json. Another version
+// may emit different bytes and so a different RTGIP3_VERIFIER_DIGEST, so the build refuses it.
+export const PINNED_ESBUILD = JSON.parse(
+  readFileSync(path.join(ROOT, "src/lib/rooftopos-parked/rtgip2-runtime/PROVENANCE.json"), "utf8"),
+).bundle.esbuild.autolabels;
+
 export async function buildRuntime(entry = ENTRY) {
+  if (ESBUILD_VERSION !== PINNED_ESBUILD)
+    throw new Error(`esbuild ${ESBUILD_VERSION} is not the pinned ${PINNED_ESBUILD} (PROVENANCE.json bundle.esbuild.autolabels)`);
   const r = await build({
     absWorkingDir: ROOT,
     entryPoints: [entry],

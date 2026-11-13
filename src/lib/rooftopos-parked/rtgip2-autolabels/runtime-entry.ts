@@ -30,16 +30,24 @@ const env = (name: string): string | undefined => (globalThis as unknown as { De
 export function edgeDbUrl(value: string | undefined): string {
   let user = "";
   let scheme = "";
+  let tls: string[] = [];
   try {
     const u = new URL(value ?? "");
     scheme = u.protocol;
     user = decodeURIComponent(u.username);
+    tls = [...u.searchParams.getAll("sslmode"), ...u.searchParams.getAll("ssl")].map((v) => v.toLowerCase());
   } catch {
     throw new Error("rtgip_edge_db_url_invalid");
   }
   if ((scheme !== "postgres:" && scheme !== "postgresql:") || !/^rtgip_edge(\.[a-z0-9]{20})?$/.test(user)) throw new Error("rtgip_edge_db_url_invalid");
+  if (tls.some((v) => v !== "require" && v !== "verify-ca" && v !== "verify-full")) throw new Error("rtgip_edge_db_url_invalid");
   return value as string;
 }
+
+// TLS is forced whatever the URL says (postgres.js lets this option override sslmode in the URL). "require" encrypts
+// without verifying the chain: Supabase's database and pooler certificates chain to the Supabase root CA, which is
+// not in Deno's trust store, so verify-full would refuse every connection until that CA is shipped as `ssl: { ca }`.
+export const EDGE_DB_OPTIONS = { prepare: false, max: 3, idle_timeout: 5, ssl: "require", onnotice: () => {} } as const;
 
 export function createEntryRuntime(opts: { compiledEnabled: boolean }) {
   return createAppRuntime({
@@ -49,6 +57,6 @@ export function createEntryRuntime(opts: { compiledEnabled: boolean }) {
     gatewayOrigins: GATEWAY_ORIGINS,
     env,
     // The dedicated login rtgip_edge (function secret RTGIP_EDGE_DB_URL), never the postgres owner.
-    sql: () => postgres(edgeDbUrl(env("RTGIP_EDGE_DB_URL")), { prepare: false, max: 3, idle_timeout: 5, onnotice: () => {} }),
+    sql: () => postgres(edgeDbUrl(env("RTGIP_EDGE_DB_URL")), EDGE_DB_OPTIONS),
   });
 }
