@@ -16,6 +16,7 @@
 import { json, preflight } from "../_shared/http.ts";
 import { SUPABASE_URL, SERVICE_KEY, adminClient } from "../_shared/supabase.ts";
 import { admitProviderCall, recordProviderCall } from "../_shared/providerBudget.ts";
+import { properMedian, trimCohortOutliers, splitCohortRows, describeCohort } from "../_shared/compCohort.ts";
 
 const MC_KEY = Deno.env.get("MARKETCHECK_API_KEY_1") || Deno.env.get("MARKETCHECK_API_KEY") || "";
 const MC_BASE = "https://api.marketcheck.com/v2";
@@ -96,6 +97,11 @@ Deno.serve(async (req) => {
     // draining quota — MarketCheck is spent at most once per vehicle per TTL.
     const cacheSlug = String(row.slug || slug);
     const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // comps move slowly
+    // A payload cached before the cohort fix was built from a price band at or
+    // above our own price. It may still be shown as a list, but its median and
+    // count carry no claim.
+    const legacySafe = (p: Record<string, unknown>): Record<string, unknown> =>
+      p.cohort ? p : { ...p, median: null, count: null, legacyBiasedSelection: true };
     const respond = async (payload: Record<string, unknown>) => {
       await admin.from("marketcheck_comps_cache")
         .upsert({ slug: cacheSlug, tenant_id: row.tenant_id ?? null, payload, cached_at: new Date().toISOString() }, { onConflict: "slug" })
@@ -106,11 +112,11 @@ Deno.serve(async (req) => {
       .select("payload, cached_at").eq("slug", cacheSlug).maybeSingle();
     const cacheAgeMs = hit?.payload && hit.cached_at ? Date.now() - new Date(hit.cached_at as string).getTime() : null;
     if (cacheAgeMs != null && cacheAgeMs < CACHE_TTL_MS) {
-      return json(200, { ...(hit!.payload as Record<string, unknown>), cached: true });
+      return json(200, { ...legacySafe(hit!.payload as Record<string, unknown>), cached: true });
     }
     if (!(await callerMayRefresh(req, admin, row.tenant_id ?? null))) {
       if (cacheAgeMs != null && cacheAgeMs < PUBLIC_STALE_MAX_MS) {
-        return json(200, { ...(hit!.payload as Record<string, unknown>), cached: true, stale: true });
+        return json(200, { ...legacySafe(hit!.payload as Record<string, unknown>), cached: true, stale: true });
       }
       return json(200, { available: false, reason: "not_cached" });
     }
@@ -120,56 +126,76 @@ Deno.serve(async (req) => {
     const dealer = (row.dealer_snapshot || {}) as Record<string, unknown>;
     const zip = String(dealer.zip || row.vehicle_zip || "").trim();
     const trim = String(row.trim || "").trim();
-    const normDealer = (s: unknown) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
-    const ownName = normDealer(dealer.name ?? dealer.display_name);
     const subjectVin = String(row.vin || "").toUpperCase();
+    const dealerName = (dealer.name ?? dealer.display_name) as string | null ?? null;
 
-    // Same equipment level wherever possible (trim-matched), and never the
-    // dealer's own rooftop — a mismatched comp set reads as "off" and sends
-    // shoppers elsewhere. Try trim-matched first; relax to model-level only if
-    // that yields nothing usable.
-    const priceForBand = num(row.price);
-    const buildParams = (useTrim: boolean) => {
-      const p = new URLSearchParams({ api_key: MC_KEY, car_type: row.condition === "new" ? "new" : "used", rows: "20", sort_by: "price", sort_order: "asc", stats: "price" });
+    // Price-independent cohort: year / make / model / trim / radius / mileage
+    // band only. The comp set must never be shaped by our asking price, so no
+    // price_range is sent and no price ratio is applied afterwards. Rows are
+    // the nearest ones (sort_by dist; a provider rejection retries once with
+    // the provider default order). Dealers' comp_settings may still narrow the
+    // cohort by mileage band, trim and drivetrain, none of which depend on
+    // price; their value_building / price-ratio settings are intentionally
+    // ignored here because they filter comparables by our own price.
+    const { data: prof } = await admin.from("dealer_profiles").select("settings").eq("tenant_id", row.tenant_id).maybeSingle();
+    const cset = (((prof?.settings as Record<string, unknown>)?.comp_settings as Record<string, unknown>) || {}) as Record<string, unknown>;
+    const bandNum = Number(cset.mileageBandPercent);
+    const bandPercent: number | null = cset.requireSimilarMileageBand === false ? null : (Number.isFinite(bandNum) && bandNum > 0 ? bandNum : 25);
+    const sameTrimRule = cset.requireSameTrimWhenAvailable !== false;
+    const sameDtRule = cset.requireSameDrivetrainWhenAvailable !== false;
+    const ourMiles = num(row.mileage);
+    const carType = row.condition === "new" ? "new" : "used";
+    const milesBand = carType === "used" && bandPercent != null && ourMiles != null && ourMiles > 0
+      ? `${Math.max(0, Math.floor(ourMiles * (1 - bandPercent / 100)))}-${Math.ceil(ourMiles * (1 + bandPercent / 100))}`
+      : null;
+    const buildParams = (useTrim: boolean, sortByDist: boolean) => {
+      const p = new URLSearchParams({ api_key: MC_KEY, car_type: carType, rows: "50" });
+      if (zip && sortByDist) { p.set("sort_by", "dist"); p.set("sort_order", "asc"); }
       if (year && /^\d{4}$/.test(year)) p.set("year", year);
       if (make) p.set("make", make);
       if (model.length) p.set("model", model.join(" "));
       if (useTrim && trim) p.set("trim", trim);
       if (zip) { p.set("zip", zip); p.set("radius", "150"); }
-      // Scope the search UPWARD from our price (mirrors vehicle-enrich's
-      // banding): a price-ascending unbounded search returns the 20 CHEAPEST
-      // cars in the market, which the value filter below then discards.
-      if (priceForBand) p.set("price_range", `${Math.round(priceForBand)}-${Math.round(priceForBand * 1.35)}`);
+      if (milesBand) p.set("miles_range", milesBand);
       return p;
     };
-    const usable = (b: { listings?: unknown }) => (Array.isArray(b?.listings) ? b.listings : [])
-      .filter((l: Record<string, unknown>) => {
-        if (String(l.vin || "").toUpperCase() === subjectVin) return false;
-        const cn = normDealer((l.dealer as Record<string, unknown>)?.name ?? l.seller_name);
-        if (ownName && cn && (cn.includes(ownName) || ownName.includes(cn))) return false;
-        if (Number(l.dist) === 0) return false;
-        return true;
-      });
 
+    let sortBasis = zip ? "distance" : "provider_default";
     const fetchPass = async (useTrim: boolean) => {
-      const url = `${MC_BASE}/search/car/active?${buildParams(useTrim).toString()}`;
-      // A public page may not spend the month's reserve: a denied call reads
-      // as the provider declining, and the page shows its honest pending state.
-      const gate = await admitProviderCall(admin, { url, caller: "marketcheck-comps", tenantId: row.tenant_id ?? null, vin: subjectVin || null });
-      if (!gate.admitted) return { ok: false as const, status: 0, b: {} as Record<string, unknown>, budgetDenied: true as const };
-      const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
-      await recordProviderCall(admin, gate.eventId, res.status, res.status === 429 ? await res.clone().text().catch(() => "") : null);
-      if (!res.ok) return { ok: false as const, status: res.status, b: {} as Record<string, unknown>, budgetDenied: false as const };
-      // deno-lint-ignore no-explicit-any
-      const b: any = await res.json().catch(() => ({}));
-      return { ok: true as const, status: res.status, b };
+      const call = async (sortByDist: boolean) => {
+        const url = `${MC_BASE}/search/car/active?${buildParams(useTrim, sortByDist).toString()}`;
+        // A public page may not spend the month's reserve: a denied call reads
+        // as the provider declining, and the page shows its honest pending state.
+        const gate = await admitProviderCall(admin, { url, caller: "marketcheck-comps", tenantId: row.tenant_id ?? null, vin: subjectVin || null });
+        if (!gate.admitted) return { ok: false as const, status: 0, b: {} as Record<string, unknown>, budgetDenied: true as const };
+        const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+        await recordProviderCall(admin, gate.eventId, res.status, res.status === 429 ? await res.clone().text().catch(() => "") : null);
+        if (!res.ok) return { ok: false as const, status: res.status, b: {} as Record<string, unknown>, budgetDenied: false as const };
+        // deno-lint-ignore no-explicit-any
+        const b: any = await res.json().catch(() => ({}));
+        return { ok: true as const, status: res.status, b };
+      };
+      let out = await call(!!zip && sortBasis === "distance");
+      if (!out.ok && !out.budgetDenied && out.status >= 400 && out.status < 500 && zip && sortBasis === "distance") {
+        sortBasis = "provider_default";
+        out = await call(false);
+      }
+      return out;
     };
 
     let pass = await fetchPass(true);
     if (!pass.ok) return json(200, { available: false, reason: pass.budgetDenied ? "budget_denied" : `provider_${pass.status}` });
-    let filtered = usable(pass.b);
-    if (filtered.length === 0 && trim) { pass = await fetchPass(false); filtered = pass.ok ? usable(pass.b) : filtered; }
+    let usedTrim = !!trim;
+    // deno-lint-ignore no-explicit-any
+    const listingsOf = (b: any): Record<string, unknown>[] => (Array.isArray(b?.listings) ? b.listings : []);
+    let split = splitCohortRows(listingsOf(pass.b), subjectVin, dealerName);
+    if (split.rows.length === 0 && trim) {
+      pass = await fetchPass(false);
+      usedTrim = false;
+      if (pass.ok) split = splitCohortRows(listingsOf(pass.b), subjectVin, dealerName);
+    }
     const b = pass.b;
+    const filtered = split.rows;
 
     const mapped = filtered.map((l: Record<string, unknown>) => ({
       vin: l.vin ?? null,
@@ -183,21 +209,7 @@ Deno.serve(async (req) => {
       dom: num(l.dom) ?? num((l as Record<string, unknown>).dom_active),
     }));
 
-    // ── Value-building comp strategy (mirrors src/lib/compStrategy.ts) ──
-    // Comps are sales support: by default only show comps priced at or above
-    // this vehicle (up to a 1.35x sanity ceiling), similar mileage, same trim/
-    // drivetrain where both sides are known. Dealers can widen the strategy
-    // in admin. Filtering only removes real comps — never fabricates.
-    const { data: prof } = await admin.from("dealer_profiles").select("settings").eq("tenant_id", row.tenant_id).maybeSingle();
-    const cs = { compStrategy: "value_building", minimumCompPriceRatio: 1.0, maximumCompPriceRatio: 1.35, includeLowerPricedComps: false, lowerPricedCompTolerancePercent: 3, requireSimilarMileageBand: true, mileageBandPercent: 25, requireSameTrimWhenAvailable: true, requireSameDrivetrainWhenAvailable: true, ...(((prof?.settings as Record<string, unknown>)?.comp_settings as Record<string, unknown>) || {}) } as Record<string, never> & {
-      compStrategy: string; minimumCompPriceRatio: number; maximumCompPriceRatio: number; includeLowerPricedComps: boolean;
-      lowerPricedCompTolerancePercent: number; requireSimilarMileageBand: boolean; mileageBandPercent: number;
-      requireSameTrimWhenAvailable: boolean; requireSameDrivetrainWhenAvailable: boolean;
-    };
-    const ourPrice = num(row.price);
-    const ourMiles = num(row.mileage);
-    const mcAttrs = (row.mc_attributes || {}) as Record<string, unknown>;
-    const ourDrivetrain = String(mcAttrs.drivetrain || mcAttrs.drive_type || "");
+    const ourDrivetrain = String(((row.mc_attributes || {}) as Record<string, unknown>).drivetrain || ((row.mc_attributes || {}) as Record<string, unknown>).drive_type || "");
     const normalize = (s: unknown) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
     const normDt = (s: unknown) => {
       const v = normalize(s);
@@ -207,44 +219,45 @@ Deno.serve(async (req) => {
       if (/^(rwd|rearwheeldrive)$/.test(v)) return "rwd";
       return v;
     };
-    const inBand = (m: number | null) => m == null || ourMiles == null || Math.abs(m - ourMiles) <= ourMiles * (cs.mileageBandPercent / 100);
-    const valueFiltered = cs.compStrategy === "all_comps" ? mapped : mapped.filter((c) => {
-      let priceOk = true;
-      if (ourPrice != null && c.price != null) {
-        if (cs.compStrategy === "value_building") {
-          const floor = cs.includeLowerPricedComps ? ourPrice * (1 - cs.lowerPricedCompTolerancePercent / 100) : ourPrice * cs.minimumCompPriceRatio;
-          priceOk = c.price >= floor && c.price <= ourPrice * cs.maximumCompPriceRatio;
-        } else {
-          priceOk = c.price >= ourPrice * 0.8 && c.price <= ourPrice * cs.maximumCompPriceRatio;
-        }
-      }
-      const mileageOk = !cs.requireSimilarMileageBand || inBand(c.miles);
-      const trimOk = cs.compStrategy !== "value_building" || !cs.requireSameTrimWhenAvailable || !trim || !c.trim || normalize(c.trim) === normalize(trim);
-      const dtOk = cs.compStrategy !== "value_building" || !cs.requireSameDrivetrainWhenAvailable || !ourDrivetrain || !c.drivetrain || normDt(c.drivetrain) === normDt(ourDrivetrain);
-      return priceOk && mileageOk && trimOk && dtOk;
-    });
+    const trimOk = (c: { trim: string | null }) => !sameTrimRule || !trim || !c.trim || normalize(c.trim) === normalize(trim);
+    const dtOk = (c: { drivetrain: string | null }) => !sameDtRule || !ourDrivetrain || !c.drivetrain || normDt(c.drivetrain) === normDt(ourDrivetrain);
+    const qualified = mapped.filter((c) => trimOk(c) && dtOk(c));
+    const trimmed = trimCohortOutliers(qualified);
+    const analysed = trimmed.analysed;
+    const sortedPrices = analysed.map((c) => c.price as number).sort((a, z) => a - z);
+    const median = properMedian(sortedPrices);
     const scoreComp = (c: typeof mapped[number]) => {
-      let s = 0;
-      if (trim && c.trim && normalize(c.trim) === normalize(trim)) s += 30;
-      if (ourDrivetrain && c.drivetrain && normDt(c.drivetrain) === normDt(ourDrivetrain)) s += 20;
-      if (c.miles != null && ourMiles != null && inBand(c.miles)) s += 20;
-      if (ourPrice != null && c.price != null && c.price >= ourPrice) s += 25;
-      if (ourPrice != null && c.price != null && c.price > ourPrice) s += 10;
-      if (c.distance != null && c.distance <= 25) s += 10;
-      if (c.dom != null && c.dom <= 90) s += 5;
-      return s;
+      let sc = 0;
+      if (trim && c.trim && normalize(c.trim) === normalize(trim)) sc += 30;
+      if (ourDrivetrain && c.drivetrain && normDt(c.drivetrain) === normDt(ourDrivetrain)) sc += 20;
+      if (c.distance != null && c.distance <= 25) sc += 10;
+      return sc;
     };
-    const comparables = valueFiltered.sort((a, b2) => scoreComp(b2) - scoreComp(a)).slice(0, 8);
+    const comparables = [...analysed].sort((a, b2) => scoreComp(b2) - scoreComp(a) || (a.distance ?? 1e9) - (b2.distance ?? 1e9)).slice(0, 8);
 
     const nf = typeof b?.num_found === "number" ? b.num_found : parseInt(String(b?.num_found ?? ""), 10);
-    const count = Number.isFinite(nf) ? nf : comparables.length;
-    const stats = b?.stats?.price || {};
-    const median = num(stats.median) ?? num(stats.mean);
+    const totalMatches = Number.isFinite(nf) ? nf : null;
+    const rawListings = listingsOf(b).length;
 
-    if (count === 0 && mapped.length === 0) return await respond({ available: false, reason: "no_comps" });
-    if (comparables.length === 0) return await respond({ available: false, reason: "no_value_comps" });
+    if ((totalMatches ?? 0) === 0 && mapped.length === 0) return await respond({ available: false, reason: "no_comps" });
+    if (analysed.length === 0) return await respond({ available: false, reason: "no_comps_analyzed" });
 
-    return await respond({ available: true, count, median, comparables, ourPrice, strategy: cs.compStrategy, checkedAt: new Date().toISOString() });
+    const cohort = describeCohort({
+      totalMatches, returned: rawListings, analysed: analysed.length, sortBasis,
+      radius: zip ? 150 : null, year: year && /^\d{4}$/.test(year) ? year : null,
+      trim: usedTrim && trim ? trim : null,
+      milesBand: milesBand ? { percent: bandPercent, range: milesBand } : null,
+      subject: split.subjectCount, own: split.ownRows.length,
+      unpriced: trimmed.unpriced, mismatch: mapped.length - qualified.length, outliers: trimmed.outliers,
+      outlierRule: trimmed.rule,
+    });
+    // `count` keeps its old name for cached-payload readers but is total
+    // provider matches; `analyzedCount` is the records the median is built on.
+    return await respond({
+      available: true, count: totalMatches ?? analysed.length, totalMatches, analyzedCount: analysed.length,
+      median, medianBasis: "median asking price of the analyzed cohort rows", comparables, ourPrice: num(row.price),
+      strategy: "price_independent_cohort", cohort, checkedAt: new Date().toISOString(),
+    });
   } catch (err) {
     return json(200, { available: false, reason: err instanceof Error ? err.message : "unknown" });
   }

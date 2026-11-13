@@ -938,12 +938,12 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
       key: "market", name: "Market value", ...s, material: false, highSeverity: false,
       status,
       finding: !known ? null
-        : below != null ? `Compared against live market data — priced ${fmt$(below)} below the market average.`
-        : "Compared against live market data for similar vehicles.",
+        : below != null ? `Compared against a provider market estimate — priced ${fmt$(below)} below the estimated market value.`
+        : "Compared against a provider market estimate for similar vehicles.",
       reviewNote: null,
       evidence: [
-        { label: "Market average", value: d.marketAvg != null ? fmt$(d.marketAvg) : null },
-        { label: "Position", value: below != null ? `${fmt$(below)} below market` : known ? "At market" : null },
+        { label: "Estimated market value", value: d.marketAvg != null ? fmt$(d.marketAvg) : null },
+        { label: "Position", value: below != null ? `${fmt$(below)} est. below market` : known ? "Near estimated market value" : null },
         { label: "Source", value: FAMILY_META.live_market.label },
       ],
       facts: { scope: "vin", marketAvg: d.marketAvg, belowMarket: d.belowMarket, marketCheckedAt: d.marketCheckedAt ?? null },

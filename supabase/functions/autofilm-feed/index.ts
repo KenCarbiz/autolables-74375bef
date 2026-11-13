@@ -36,16 +36,20 @@ import { factAuthority } from "../_shared/factorySticker/lib/vehicleTruth/preced
 //   has_more: boolean,
 //   next_cursor: string | null, // pass back as ?cursor= to continue
 //   identity_incomplete: number, // rows with no discrete make (see below)
-//   vehicles: [ the listing row, minus LOT_FEED_DENY, plus discrete
-//     year/make/model, trim, stock_number, body_style, msrp, market_value,
-//     savings, photos[], passport_url, documents_url, window_sticker_url,
-//     window_sticker_kind ]
+//   vehicles: [ the listing row projected through the explicit public-field
+//     allowlist (_shared/publicListingProjection.ts; market_payload and
+//     comparables withheld), plus discrete year/make/model, trim,
+//     stock_number, body_style, msrp, market_value (a provider ESTIMATE,
+//     with market_value_label and market_value_retrieved_at = our retrieval
+//     time, not a provider observation time), savings, photos[],
+//     passport_url, documents_url, window_sticker_url, window_sticker_kind ]
 // }
 //
-// The row goes out whole rather than field by field. Naming fields is what
-// shipped 140 vehicles with no `make` — the consumer filters on
-// make IS NOT NULL, so every one synced clean and was then invisible on every
-// screen, which looks identical to the feed not working at all.
+// Identity (year/make/model) is derived and set explicitly on every row and
+// counted in identity_incomplete: a hand-picked projection once shipped 140
+// vehicles with no `make`. Dealer-only intelligence (market percentile,
+// price-cut counts, fee internals, Black Book, internal scores) is not on the
+// allowlist and does not leave.
 //
 // Security model:
 //   - Shared-secret key, timing-safe compared. Read-only; the key
@@ -236,11 +240,10 @@ serve(async (req) => {
       });
     }
 
-    // select("*"), not a named list. The named list is what shipped 140
-    // vehicles with no `make`: nothing named it, so nothing carried it, and
-    // AutoFilm's screens filter on make IS NOT NULL — every car synced clean
-    // and was then invisible. What may NOT go out is named instead, in
-    // LOT_FEED_DENY, where withholding a field is a deliberate act.
+    // select("*") reads the full row; shapeLotRow then projects it through the
+    // explicit allowlist (publicListingProjection.ts), so a column nobody
+    // named is read here and dropped there. make/model/year are derived and
+    // set explicitly because AutoFilm's screens filter on make IS NOT NULL.
     // updated_since narrows the count as well as the page. A total that counted
     // the whole lot while the rows carried only the changed ones would make the
     // caller's "rows must equal total" check fail every incremental pull.

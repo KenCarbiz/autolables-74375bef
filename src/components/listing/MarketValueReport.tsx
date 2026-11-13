@@ -44,7 +44,7 @@ export default function MarketValueReport({ listing }: { listing: VehicleListing
         {isDeal && (
           <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[12px] font-semibold text-emerald-700">
             <TrendingDown className="w-3.5 h-3.5" />
-            {usd(below as number)} below market
+            {usd(below as number)} est. below market
           </span>
         )}
       </div>

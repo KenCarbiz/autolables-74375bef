@@ -274,3 +274,26 @@ describe("new vehicles", () => {
     expect(r.hardGates).toEqual([]);
   });
 });
+
+describe("a title review that is only missing evidence", () => {
+  const gapOnly = (): TitleOdometerSummary => ({
+    ...title("REVIEW_REQUIRED", "not_checked"),
+    reasons: ["report_missing_odometer", "odometer_no_readings"],
+  });
+
+  it("is not treated as an unresolved title brand", () => {
+    expect(evaluateHardGates({ ...strong(), titleOdometer: gapOnly() })).not.toContain("unresolved_title_brand");
+  });
+
+  it("caps like an unverified title rather than blocking", () => {
+    const r = buildBuyerRecommendation({ ...strong(), titleOdometer: gapOnly() });
+    const unverified = buildBuyerRecommendation({ ...strong(), titleOdometer: title("NOT_VERIFIED", "not_checked") });
+    expect(r.state).toBe(unverified.state);
+    expect(r.hardGates).toEqual([]);
+  });
+
+  it("a review with a substantive reason still gates", () => {
+    const t = { ...title("REVIEW_REQUIRED"), reasons: ["report_missing_odometer", "title_brand_unclear"] };
+    expect(evaluateHardGates({ ...strong(), titleOdometer: t })).toContain("unresolved_title_brand");
+  });
+});

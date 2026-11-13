@@ -1070,7 +1070,10 @@ serve(async (req) => {
         const condition = classifyCondition({ inventoryType: l.inventory_type, certified: l.is_certified });
         if (condition === "new") newTypeSeen++;
         segAccepted[segmentOf(condition)]++;
-        const miles = typeof l.miles === "number" ? Math.round(l.miles) : 0;
+        // A feed row without miles is "unknown", never 0. vehicle_files.mileage
+        // is NOT NULL DEFAULT 0, so the key is omitted from the write below
+        // instead of sent as 0; a migration to make it nullable is not applied.
+        const miles: number | null = typeof l.miles === "number" && Number.isFinite(l.miles) ? Math.round(l.miles) : null;
         if (stockNo) {
           const arr = stockMap.get(stockNo) || [];
           if (!arr.includes(vin)) arr.push(vin);
@@ -1102,14 +1105,14 @@ serve(async (req) => {
         if (vf) {
           await admin.from("vehicle_files").update({
             year: String(b.year || ""), make: b.make || "", model: b.model || "",
-            trim: b.trim || "", stock_number: stockNo, condition, mileage: miles,
+            trim: b.trim || "", stock_number: stockNo, condition, ...(miles != null ? { mileage: miles } : {}),
             feed_source: "marketcheck",
           }).eq("id", vf.id);
         } else {
           const { error } = await admin.from("vehicle_files").insert({
             tenant_id: cfg.tenant_id, vin,
             year: String(b.year || ""), make: b.make || "", model: b.model || "",
-            trim: b.trim || "", stock_number: stockNo, condition, mileage: miles,
+            trim: b.trim || "", stock_number: stockNo, condition, ...(miles != null ? { mileage: miles } : {}),
             feed_source: "marketcheck",
           });
           if (!error) { tenantNew++; newVehicles++; }
@@ -1406,7 +1409,7 @@ serve(async (req) => {
 
             const prevMilesRaw = priorListing.mileage;
             const prevMiles = prevMilesRaw == null ? null : Number(prevMilesRaw);
-            if (miles > 0 && prevMiles != null && prevMiles !== miles) {
+            if (miles != null && miles > 0 && prevMiles != null && prevMiles !== miles) {
               const rolledBack = miles < prevMiles - 50;
               const type = rolledBack ? "mileage_rollback" : "mileage_change";
               const base = { severity: rolledBack ? "high" : "low", requires_new_document: rolledBack };

@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
 import { type VehicleListing } from "@/hooks/useVehicleListing";
 import Logo from "@/components/brand/Logo";
-import { deriveRating, ratingTier, fmt$, listingEquipment, deriveSoldClaims, CREDIBLE_AVG_DOM_MAX } from "@/lib/passportV2Data";
+import { deriveRating, fmt$, listingEquipment, deriveSoldClaims, CREDIBLE_AVG_DOM_MAX } from "@/lib/passportV2Data";
 import { governedPassportData } from "@/lib/passport/publicSurface";
 import { deriveVerificationReport } from "@/lib/passport/verificationSummary";
 import { savingsAgainst, MARKET_METRIC_LABEL, type MarketMetricKey } from "@/lib/passport/vehicleTruth";
@@ -77,23 +77,6 @@ const GB_PRINT = `
 }
 `;
 
-// Static (non-animated) confidence ring for the printed report.
-const PrintRing = ({ score, color, size = 110 }: { score: number; color: string; size?: number }) => {
-  const r = size / 2 - 9, c = 2 * Math.PI * r;
-  return (
-    <div className="relative shrink-0" style={{ width: size, height: size }}>
-      <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full -rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#E6E8EC" strokeWidth="9" />
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="9" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - score / 100)} />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className={`${size >= 100 ? "text-[24px]" : "text-[18px]"} font-extrabold leading-none`}>{score}<span className={size >= 100 ? "text-[13px]" : "text-[10px]"}>/100</span></span>
-        {size >= 100 && <span className="text-[6.5px] font-bold tracking-[0.12em] text-[#94A3B8] mt-0.5">VEHICLE SCORE</span>}
-      </div>
-    </div>
-  );
-};
-
 const PrintCard = ({ children, className = "", tone = "default" }: { children: React.ReactNode; className?: string; tone?: "default" | "amber" | "emerald" | "blue" }) => (
   <div className={`print-avoid rounded-xl border p-3.5 ${tone === "amber" ? "border-amber-200 bg-amber-50/50" : tone === "emerald" ? "border-emerald-200 bg-emerald-50/50" : tone === "blue" ? "border-blue-200 bg-blue-50/40" : "border-[#E5E7EB] bg-white"} ${className}`}>{children}</div>
 );
@@ -102,78 +85,12 @@ const PrintH = ({ children }: { children: React.ReactNode }) => (
   <h2 className="text-[15px] font-extrabold tracking-tight text-[#0F172A]">{children}</h2>
 );
 
-const prefersReducedMotion = () =>
-  typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-// Delayed flag that drives the mount animations (ring sweep, bar fills).
-const useDrawn = () => {
-  const [drawn, setDrawn] = useState(false);
-  useEffect(() => {
-    if (prefersReducedMotion()) { setDrawn(true); return; }
-    const t = window.setTimeout(() => setDrawn(true), 80);
-    return () => window.clearTimeout(t);
-  }, []);
-  return drawn;
-};
-
-// Buy-framed projection of the single ratingTier table — the bands are
-// identical everywhere; only the framing differs. Confident without
-// overclaiming: a 69 reads as a candidate with details to confirm, never
-// "Excellent" and never a warning label.
-export const scoreTier = (s: number | null): { label: string; headline: string; verdict: string; color: string } => {
-  const t = ratingTier(s);
-  switch (t.id) {
-    case "pending": return { label: t.buyLabel, headline: "Report In Progress", verdict: "Pending Verification", color: "#94A3B8" };
-    case "exceptional": return { label: t.buyLabel, headline: "Exceptional Buy Candidate", verdict: "Exceptional Candidate — Move Forward with Confidence", color: GREEN };
-    case "strong": return { label: t.buyLabel, headline: "Strong Buy Candidate", verdict: "Strong Candidate — Move Forward with Confidence", color: GREEN };
-    case "solid": return { label: t.buyLabel, headline: "Solid Buy Candidate", verdict: "Solid Candidate — Confirm Final Details", color: BLUE_HEX };
-    case "fair": return { label: t.buyLabel, headline: "Worth Reviewing", verdict: "Fair — Confirm Key Details", color: BLUE_HEX };
-    default: return { label: t.buyLabel, headline: "Talk to the Dealer About This Vehicle", verdict: "Worth a Closer Look — Talk to the Dealer About This Vehicle", color: BLUE_HEX };
-  }
-};
-
 const H2 = ({ children }: { children: React.ReactNode }) => <h2 className="text-[19px] font-bold leading-7 tracking-tight text-[#0F172A]">{children}</h2>;
 
-// Premium confidence meter — percent + caption inside the ring.
-const ScoreRing = ({ score, color, size = 156 }: { score: number; color: string; size?: number }) => {
-  const drawn = useDrawn();
-  const r = size / 2 - 11, c = 2 * Math.PI * r;
-  const off = drawn ? c * (1 - score / 100) : c;
-  return (
-    <div className="relative shrink-0" style={{ width: size, height: size }}>
-      <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full -rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#E6E8EC" strokeWidth="11" />
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="11" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={off} style={{ transition: "stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1)" }} />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-[36px] font-extrabold text-[#0F172A] leading-none">{score}<span className="text-[18px] text-[#94A3B8]">/100</span></span>
-        <span className="text-[8.5px] font-bold tracking-[0.12em] text-[#94A3B8] mt-1">BUYING CONFIDENCE</span>
-      </div>
-    </div>
-  );
-};
-
-// Small confidence donut for the recommendation card.
-const MiniDonut = ({ pct, color, size = 84 }: { pct: number; color: string; size?: number }) => {
-  const drawn = useDrawn();
-  const r = size / 2 - 6, c = 2 * Math.PI * r;
-  const off = drawn ? c * (1 - pct / 100) : c;
-  return (
-    <div className="relative shrink-0" style={{ width: size, height: size }}>
-      <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full -rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(148,163,184,.25)" strokeWidth="7" />
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="7" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={off} style={{ transition: "stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1)" }} />
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center"><span className="text-[18px] font-extrabold text-[#0F172A]">{pct}%</span></div>
-    </div>
-  );
-};
-
-// Factor card: icon, name, score or a calm Pending state, animated bar, and
+// Factor card: icon, name, a calm Pending state, and
 // the factor's evidence lines. Pending renders in soft amber — "confirm",
 // not "warning".
 const ScoreCard = ({ icon: Icon, label, score, evidence, pendingLabel = "Pending" }: { icon: LucideIcon; label: string; score: number | null; evidence: string[]; pendingLabel?: string }) => {
-  const drawn = useDrawn();
   const pending = score == null;
   return (
     <div className={`rounded-2xl border p-4 gb-lift ${pending ? "border-amber-200 bg-amber-50/40" : "border-[#E6E8EC] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.05)]"}`}>
@@ -184,10 +101,7 @@ const ScoreCard = ({ icon: Icon, label, score, evidence, pendingLabel = "Pending
         </span>
         {pending
           ? <span className="text-[11px] font-bold text-amber-700 bg-amber-100/80 border border-amber-200 rounded-full px-2 py-0.5 shrink-0">{pendingLabel}</span>
-          : <span className="text-[15px] font-extrabold text-[#0F172A] shrink-0">{score}<span className="text-[10px] font-bold text-[#94A3B8]">/100</span></span>}
-      </div>
-      <div className={`h-2 rounded-full overflow-hidden mt-2.5 ${pending ? "bg-amber-100/70" : "bg-slate-100"}`}>
-        <div className="h-full rounded-full" style={{ width: drawn ? `${score ?? 0}%` : "0%", background: pending ? "transparent" : score! >= 80 ? "#22C55E" : score! >= 70 ? BLUE_HEX : "#94A3B8", transition: "width .9s cubic-bezier(.22,1,.36,1)" }} />
+          : null}
       </div>
       {evidence.length > 0
         ? <ul className="mt-2 space-y-1">{evidence.map((e) => <li key={e} className="text-[11px] text-[#64748B] leading-snug">{e}</li>)}</ul>
@@ -199,7 +113,7 @@ const ScoreCard = ({ icon: Icon, label, score, evidence, pendingLabel = "Pending
 // Red is reserved for true negatives (accidents, open recalls, branded
 // titles) — none of which this matrix carries. An at-market price is a
 // neutral fact, so sub-80 scores render in slate/blue, never warning colors.
-const ratingLabel = (s: number | null) => s == null ? "Confirm" : ratingTier(s).label;
+const ratingLabel = (s: number | null) => s == null ? "Confirm" : "Measured";
 const ratingPill = (s: number | null) =>
   s == null ? "bg-amber-50 text-amber-700 border-amber-200"
   : s >= 90 ? "bg-emerald-100 text-emerald-800 border-emerald-200"
@@ -262,15 +176,14 @@ const VehiclePassportGreatBuy = () => {
   const recallNeedsReview = recallStatus === "needs_confirmation" || recallStatus === "needs_attention";
   const sold = deriveSoldClaims(d, listing.mileage ?? null, listing.condition);
   const rating = deriveRating(listing, d);
-  const score = rating.overall;
-  const tier = scoreTier(score);
-  // Governance: the conclusion can never be more certain than its checks. A
-  // pending MATERIAL factor (title & history) caps an "Exceptional" verdict.
-  const materialPending = score != null && rating.factors.some((f) => f.key === "history" && f.score == null);
+  // The price-blended overall is never shown: no number, tier or verdict is
+  // derived from it on this page.
+  const tier = { headline: "Vehicle Evidence Report", verdict: "Review the evidence below and confirm final details with the dealer" };
+  const materialPending = rating.factors.some((f) => f.key === "history" && f.score == null);
   const historyBlocked = rating.factors.some((f) => f.key === "history" && f.score == null) && d.confBlockedBy.length > 0;
   const governedHeadline = historyBlocked
-    ? "Promising — Title & History Not Yet Verified"
-    : materialPending ? "Strong Candidate — One Check Pending" : tier.headline;
+    ? "Title & History Not Yet Verified"
+    : materialPending ? "One Check Pending" : tier.headline;
   // "What could change this result?" — a credible report shows its limits too.
   const whatCouldChange: string[] = [
     "Final taxes, fees, and out-the-door price",
@@ -366,7 +279,7 @@ const VehiclePassportGreatBuy = () => {
   if (isNew) why.push("New — you are the first owner");
   if (premium) why.push(`Premium trim — ${listing.trim}`);
   if (oemVerified) why.push("OEM data verified");
-  if (d.belowMarket && d.belowMarket > 0) why.push(`Priced ${fmt$(d.belowMarket)} below market`);
+  if (d.belowMarket && d.belowMarket > 0) why.push(`Priced ${fmt$(d.belowMarket)} below the estimated market value`);
   if (d.saveVsMsrp) why.push(`${fmt$(d.saveVsMsrp)} below MSRP`);
   else if (d.belowOriginalMsrp) why.push(`${fmt$(d.belowOriginalMsrp)} below original MSRP`);
   if (topPct) why.push(topPct);
@@ -418,17 +331,17 @@ const VehiclePassportGreatBuy = () => {
     // can never be read as the normalized VIN-level value or vice versa.
     { k: "Price", v: d.price != null ? fmt$(d.price) : "—", m: priceAboveAnchor ? (gbSheet?.estValue ? `Carries ${fmt$(gbSheet.estValue)} in factory packages the average comparable may not include` : "Priced to today's market for its trim") : priceComparison ? `${fmt$(priceComparison.value)} · ${priceComparison.label}${priceComparison.key === "comparable_listing_average" && d.marketMeta.trimMatched === false && listing.trim ? " (all trims)" : ""}` : isPreview ? "$71,400" : "", a: priceAboveAnchor ? null : priceAdv },
     sold.soldPrice && d.marketMeta.soldPriceMedian != null
-      ? { k: "Typical Sold Price", v: d.price != null ? fmt$(d.price) : "—", m: `${fmt$(d.marketMeta.soldPriceMedian)} (sold median, 90 days)`, a: { text: `${fmt$(sold.soldPrice.amount)} below`, good: true } }
+      ? { k: "Last Advertised Price (exited listings)", v: d.price != null ? fmt$(d.price) : "—", m: `${fmt$(d.marketMeta.soldPriceMedian)} (median last advertised price of similar listings that left the market)`, a: { text: `${fmt$(sold.soldPrice.amount)} below`, good: true } }
       : null,
     { k: "Mileage", v: listing.mileage != null ? `${listing.mileage.toLocaleString()} mi` : "—", m: avgCompMiles != null ? `${avgCompMiles.toLocaleString()} mi` : isPreview ? "24,000 mi" : "", a: avgCompMiles != null && listing.mileage != null ? (listing.mileage < avgCompMiles ? { text: "Lower mileage", good: true } : null) : isPreview ? { text: "Lower mileage", good: true } : null },
     sold.milesAdv && listing.mileage != null && d.marketMeta.soldMilesMedian != null
-      ? { k: "Miles vs Sold", v: `${listing.mileage.toLocaleString()} mi`, m: `${Math.round(d.marketMeta.soldMilesMedian).toLocaleString()} mi (sold median)`, a: { text: "Under sold median", good: true } }
+      ? { k: "Miles vs Exited Listings", v: `${listing.mileage.toLocaleString()} mi`, m: `${Math.round(d.marketMeta.soldMilesMedian).toLocaleString()} mi (median of exited listings)`, a: { text: "Under exited-listing median", good: true } }
       : null,
     d.dom != null && d.marketMeta.avgDom != null && d.marketMeta.avgDom <= CREDIBLE_AVG_DOM_MAX && d.dom <= d.marketMeta.avgDom
       ? { k: "Market Days", v: `${d.dom} days`, m: `${d.marketMeta.avgDom} days`, a: d.dom < d.marketMeta.avgDom ? { text: "Shorter time", good: true } : null }
       : null,
     sold.velocity && d.dom != null && d.marketMeta.soldDomMedian != null && d.dom < d.marketMeta.soldDomMedian
-      ? { k: "Days to Sell", v: `${d.dom} days listed`, m: `~${Math.round(d.marketMeta.soldDomMedian)} days (sold median)`, a: { text: "Moving faster", good: true } }
+      ? { k: "Days Listed vs Exited Listings", v: `${d.dom} days listed`, m: `~${Math.round(d.marketMeta.soldDomMedian)} days (median days listed, exited listings)`, a: { text: "Listed fewer days", good: true } }
       : null,
     trimCount != null && trimCount <= 5
       ? { k: "Availability", v: `1 of ${trimCount}`, m: "Builds like this nearby", a: trimCount <= 3 || sameTrimComps.length <= 2 ? { text: "Rare build", good: true } : null }
@@ -473,7 +386,7 @@ const VehiclePassportGreatBuy = () => {
   const subjectPros = [
     d.ownerCount === 1 ? "One owner" : isNew ? "New — first owner" : null,
     gbSheet?.estValue ? "Better equipment" : null,
-    d.belowMarket && d.belowMarket > 0 ? "Below market price" : null,
+    d.belowMarket && d.belowMarket > 0 ? "Below estimated market value" : null,
     d.warrantyStr && !d.warrantyExpired ? "Warranty remains" : null,
     avgCompMiles != null && listing.mileage != null && listing.mileage < avgCompMiles ? "Lower mileage" : null,
   ].filter(Boolean).slice(0, 3) as string[];
@@ -482,14 +395,13 @@ const VehiclePassportGreatBuy = () => {
   // no renamed re-displays of the same score, and dealer trust stays out.
   const matrix: { k: string; s: number | null }[] = [
     ...rating.factors.map((f) => ({ k: f.label, s: f.score })),
-    { k: "Overall", s: score },
   ];
 
   // Real, verifiable urgency signals only — no fabricated scarcity.
   const buyNow: string[] = [];
   if (gbSheet?.estValue) buyNow.push(`Built with ${fmt$(gbSheet.estValue)} in valuable factory packages.`);
   if (d.ownerCount === 1) buyNow.push("One-owner vehicles like this are becoming harder to find.");
-  if (d.belowMarket && d.belowMarket > 0) buyNow.push("Priced below the market average right now.");
+  if (d.belowMarket && d.belowMarket > 0) buyNow.push("Priced below the estimated market value.");
   if (sold.velocity) buyNow.push(`${sold.velocity}.`);
   if (d.saveVsMsrp) buyNow.push(`Priced ${fmt$(d.saveVsMsrp)} below MSRP.`);
   if (d.dom != null && d.marketMeta.avgDom != null && d.marketMeta.avgDom <= CREDIBLE_AVG_DOM_MAX && d.dom < d.marketMeta.avgDom) buyNow.push("Market days are favorable compared with similar listings.");
@@ -515,22 +427,15 @@ const VehiclePassportGreatBuy = () => {
     !isNew && (d.accidentCount == null || d.ownerCount == null) ? "vehicle history" : null,
   ].filter(Boolean) as string[];
   const recCopy =
-    score == null ? "This report is still gathering verification data. Check back shortly, or ask the dealer to complete the vehicle's verification checks."
-    : `This vehicle shows ${strengthWords.length ? strengthWords.join(", ") : "verified"} signals.${confirmWords.length ? ` Confirm ${confirmWords.join(", ")} with the dealer before moving forward.` : " The verified data in this report supports moving forward."}`;
+    `This vehicle shows ${strengthWords.length ? strengthWords.join(", ") : "verified"} signals.${confirmWords.length ? ` Confirm ${confirmWords.join(", ")} with the dealer.` : ""}`;
   const shortModel = identityFromListing(listing).model || "vehicle";
   const verifyDate = listing.prep_status?.foreman_signed_at ? new Date(listing.prep_status.foreman_signed_at).toLocaleDateString() : new Date().toLocaleDateString();
   const generatedAt = new Date().toLocaleString();
-  const recTint = score != null && score >= 80 ? "bg-emerald-50/70 border-emerald-200" : "bg-white border-[#E6E8EC]";
-  const strongTier = score != null && score >= 70;
-  const heroEndorsement =
-    score == null ? null
-    : strongTier ? "Measured price, history, demand, equipment, and coverage data indicate this vehicle is worth serious consideration."
-    : "Here's what we measured on this vehicle — price, history, demand, equipment, and coverage.";
+  const recTint = "bg-white border-[#E6E8EC]";
+  const heroEndorsement = "Here's what we measured on this vehicle: price, history, demand, equipment, and coverage.";
   const vehLabel = `${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""}`;
   const aiStrengths = [d.belowMarket && d.belowMarket > 0 ? "below-market pricing" : null, lowMiles ? "low mileage" : null, d.cleanTitle && d.accidentCount === 0 ? "a clean ownership history" : null, d.warrantyStr && !d.warrantyExpired ? "remaining factory warranty" : null, d.reviewRating != null && d.reviewRating >= 4.5 ? "strong owner satisfaction" : null].filter(Boolean).join(", ") || "verified vehicle data";
-  const aiSummary = strongTier
-    ? `This ${vehLabel} ranks among the stronger vehicles currently available in your market. It combines ${aiStrengths} ${d.belowMarket && d.belowMarket > 0 && d.price != null ? `— at ${fmt$(d.price)}, that's ${fmt$(d.belowMarket)} under comparable listings.` : "into a well-rounded purchase."}`
-    : `Here's what we verified on this ${vehLabel}: ${aiStrengths}. We'll confirm the final details with you.`;
+  const aiSummary = `Here's what we verified on this ${vehLabel}: ${aiStrengths}. We'll confirm the final details with you.`;
 
   return (
     <div className="min-h-[100svh] bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
@@ -557,18 +462,16 @@ const VehiclePassportGreatBuy = () => {
       </header>
 
       <main className="mx-auto max-w-[1260px] px-4 sm:px-6 py-6 space-y-5">
-        {/* Hero: confidence meter + verdict · vehicle snapshot */}
+        {/* Hero: evidence headline · vehicle snapshot */}
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] gap-5 items-stretch">
           <section className={`${CARD} gb-fade p-6 sm:p-8`}>
             <div className="flex flex-col sm:flex-row gap-6 sm:gap-8 items-center sm:items-start">
               <div className="flex flex-col items-center text-center shrink-0 max-w-[190px]">
-                {score != null ? <ScoreRing score={score} color={tier.color} /> : <div className="w-[156px] h-[156px] rounded-full border-2 border-dashed border-[#E6E8EC] flex items-center justify-center text-[13px] text-[#94A3B8] text-center px-6">Score pending verification</div>}
-                <p className="text-[14px] font-extrabold mt-2.5 inline-flex items-center gap-1" style={{ color: tier.color }}>{tier.label} <Info className="w-3.5 h-3.5 opacity-60" /></p>
-                <p className="text-[11px] text-[#94A3B8] mt-1 leading-snug">Built only from measured factors — price vs market, history & title, demand, equipment, and coverage.</p>
+                <p className="text-[11px] text-[#94A3B8] mt-1 leading-snug">Drawn only from measured factors: price vs market, history & title, demand, equipment, and coverage.</p>
               </div>
               <div className="text-center sm:text-left min-w-0">
                 <h1 className="text-[28px] sm:text-[32px] font-extrabold tracking-tight leading-tight">{governedHeadline}</h1>
-                {materialPending && <p className="text-[13px] font-semibold text-[#B45309] mt-1.5 max-w-[480px] mx-auto sm:mx-0">Title &amp; history verification is still being confirmed — pricing and equipment already compare favorably.</p>}
+                {materialPending && <p className="text-[13px] font-semibold text-[#B45309] mt-1.5 max-w-[480px] mx-auto sm:mx-0">Title &amp; history verification is still being confirmed.</p>}
                 {heroEndorsement && <p className={`text-[14px] ${TEXT2} mt-2 max-w-[480px] mx-auto sm:mx-0`}>{heroEndorsement}</p>}
                 {trustBadges.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-4 justify-center sm:justify-start">
@@ -627,9 +530,9 @@ const VehiclePassportGreatBuy = () => {
           </div>
         </section>
 
-        {/* Buying score breakdown: verified vs confirm-before-purchase */}
+        {/* Evidence breakdown: verified vs confirm-before-purchase */}
         <section className={`${CARD} p-5 sm:p-6`}>
-          <H2>Buying Score Breakdown</H2>
+          <H2>Evidence Breakdown</H2>
           <p className={`text-[13px] ${TEXT2} mt-1`}>We'll confirm the final details with you.</p>
           <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-700 mt-4">Verified Strengths</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-2">{verified.map((b) => <ScoreCard key={b.label} {...b} />)}</div>
@@ -744,20 +647,11 @@ const VehiclePassportGreatBuy = () => {
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-emerald-50 text-[#16A34A] border border-emerald-100"><Sparkles className="w-4 h-4" /></span>
-                <p className="text-[12px] font-bold uppercase tracking-wide text-[#64748B]">AutoLabels Recommendation</p>
+                <p className="text-[12px] font-bold uppercase tracking-wide text-[#64748B]">Evidence Summary</p>
               </div>
               <p className="text-[22px] sm:text-[24px] font-extrabold leading-tight mt-2.5 text-[#0F172A]">{tier.verdict}</p>
               <p className="text-[13.5px] leading-relaxed mt-2 max-w-[640px] text-[#334155]">{recCopy}</p>
             </div>
-            {score != null && (
-              <div className="flex items-center gap-4 shrink-0">
-                <MiniDonut pct={score} color={score >= 60 ? GREEN : tier.color} />
-                <div>
-                  <p className="text-[12px] font-bold text-[#0F172A]">Vehicle Score</p>
-                  <p className="text-[12px] text-[#64748B]">Based on the measured<br />factors in this report.</p>
-                </div>
-              </div>
-            )}
           </div>
         </section>
 
@@ -854,10 +748,7 @@ const VehiclePassportGreatBuy = () => {
                 <span className="inline-flex items-center gap-1.5 min-w-0"><b.icon className="w-3.5 h-3.5 text-[#2563EB] shrink-0" /><span className="text-[10px] font-bold truncate">{b.label}</span></span>
                 {b.score == null
                   ? <span className="text-[8.5px] font-bold text-amber-700 whitespace-nowrap">Confirm</span>
-                  : <span className="text-[11px] font-extrabold whitespace-nowrap">{b.score}<span className="text-[8px] text-[#94A3B8]">/100</span></span>}
-              </div>
-              <div className="h-[5px] rounded-full bg-slate-100 overflow-hidden mt-1.5">
-                {b.score != null && <div className="h-full rounded-full" style={{ width: `${b.score}%`, background: b.score >= 80 ? "#22C55E" : b.score >= 70 ? BLUE_HEX : "#94A3B8" }} />}
+                  : null}
               </div>
               <p className="text-[8.5px] text-[#64748B] mt-1.5 leading-snug">{b.evidence.length ? b.evidence.join(" · ") : "Confirm details with the dealer."}</p>
             </PrintCard>
@@ -884,7 +775,6 @@ const VehiclePassportGreatBuy = () => {
                 <div className="flex gap-5">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-4">
-                      {score != null ? <PrintRing score={score} color={tier.color} /> : <div className="w-[110px] h-[110px] rounded-full border-2 border-dashed border-[#E6E8EC] flex items-center justify-center text-[8.5px] text-[#94A3B8] text-center px-3 shrink-0">Score pending verification</div>}
                       <div className="min-w-0">
                         <h1 className="text-[24px] font-extrabold tracking-tight leading-tight">{tier.headline}</h1>
                         {heroEndorsement && <p className="text-[10px] text-[#64748B] mt-1 leading-relaxed">{heroEndorsement}</p>}
@@ -897,7 +787,7 @@ const VehiclePassportGreatBuy = () => {
                     )}
                     <PrintCard tone="blue" className="mt-3">
                       <p className="text-[9.5px] leading-relaxed text-[#334155]">
-                        This {listing.ymm}{listing.trim ? ` ${listing.trim}` : ""} shows {strengthWords.length ? strengthWords.join(", ") : "verified"} signals.{confirmWords.length ? ` Confirm ${confirmWords.join(", ")} with the dealer before moving forward.` : " The verified data in this report supports moving forward."}
+                        This {listing.ymm}{listing.trim ? ` ${listing.trim}` : ""} shows {strengthWords.length ? strengthWords.join(", ") : "verified"} signals.{confirmWords.length ? ` Confirm ${confirmWords.join(", ")} with the dealer.` : ""}
                       </p>
                     </PrintCard>
                   </div>
@@ -933,7 +823,7 @@ const VehiclePassportGreatBuy = () => {
                   )}
                 </PrintCard>
                 <div className="mt-4">
-                  <PrintH>Buying Score Breakdown</PrintH>
+                  <PrintH>Evidence Breakdown</PrintH>
                   <p className="text-[8.5px] text-[#64748B] mt-0.5">We'll confirm the final details with you.</p>
                   {verified.length > 0 && <p className="text-[7.5px] font-bold uppercase tracking-[0.12em] text-emerald-700 mt-2.5">Verified Strengths</p>}
                   <div className="grid grid-cols-2 gap-2 mt-1.5">{verified.map(scoreBar)}</div>
@@ -1036,17 +926,16 @@ const VehiclePassportGreatBuy = () => {
                 {pageFooter(4)}
               </section>
 
-              {/* Page 5 — Recommendation + decision + printed action block */}
+              {/* Page 5 — Summary + decision + printed action block */}
               <section className="print-page">
                 {pageHeader}
-                <PrintCard tone={score != null && score >= 80 ? "emerald" : "default"}>
-                  <p className="text-[7.5px] font-bold uppercase tracking-wide text-[#64748B]">AutoLabels Recommendation</p>
+                <PrintCard tone="default">
+                  <p className="text-[7.5px] font-bold uppercase tracking-wide text-[#64748B]">Evidence Summary</p>
                   <div className="flex items-center justify-between gap-4 mt-1">
                     <div className="min-w-0">
                       <p className="text-[16px] font-extrabold leading-tight">{tier.verdict}</p>
                       <p className="text-[9.5px] text-[#334155] leading-relaxed mt-1">{recCopy}</p>
                     </div>
-                    {score != null && <PrintRing score={score} color={score >= 60 ? GREEN : tier.color} size={72} />}
                   </div>
                 </PrintCard>
                 <div className="grid grid-cols-2 gap-3 mt-3">

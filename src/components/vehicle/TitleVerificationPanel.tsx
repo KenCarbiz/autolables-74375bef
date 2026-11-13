@@ -212,7 +212,7 @@ export const TitleVerificationPanel = ({ listingId, vin, tenantId, condition, ti
                     : <ShieldAlert className="w-5 h-5 text-amber-600" />}
                   <div>
                     <p className="text-[13.5px] font-bold text-foreground">
-                      {summary.status === "clean" ? "No title brands on record" : `${summary.brandCount + summary.junkCount} title record${summary.brandCount + summary.junkCount === 1 ? "" : "s"} found`}
+                      {summary.status === "clean" ? "No title brands on record" : summary.status === "unknown" ? "Title record could not be read" : `${summary.brandCount + summary.junkCount} title record${summary.brandCount + summary.junkCount === 1 ? "" : "s"} found`}
                     </p>
                     <p className="text-[11.5px] text-muted-foreground">NMVTIS · retrieved {fmtDate(checkedAt)} · shown for this session only</p>
                   </div>

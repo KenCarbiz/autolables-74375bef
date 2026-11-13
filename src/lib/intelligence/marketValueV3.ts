@@ -27,7 +27,7 @@ import {
   resolveFreshness, type GeographyScope, type MarketValueV3, type ProviderAgreement, type ValuationSignal,
 } from "./contracts.ts";
 
-export const MARKET_VALUE_V3_VERSION = "market-value-v3.0.0-shadow";
+export const MARKET_VALUE_V3_VERSION = "market-value-v3.1.1-shadow";
 
 /** A value older than this is a stale baseline; the used policy refreshes on this cadence. */
 export const MARKET_VALUE_V3_TTL_DAYS = 7;
@@ -64,6 +64,13 @@ export interface ComparableEvidence {
   tenantIdentityStability: "stable" | "name_only" | "none";
   concentrationUnderAllocated: boolean;
   materialContradictions: string[];
+  /**
+   * How the stored comparables were chosen. A set filtered by a price band
+   * built from the subject's own asking price is not independent evidence
+   * about that price, so it never enters the value. "not_recorded" is treated
+   * the same way; undefined keeps the v3.0 behaviour for existing callers.
+   */
+  selection?: "price_independent" | "conditioned_on_subject_price" | "not_recorded";
 }
 
 export interface ProviderPredictionEvidence {
@@ -179,6 +186,12 @@ export function buildMarketValueV3(input: MarketValueV3Input, options: MarketVal
   const compsP50 = stats && isMoney(stats.p50) && stats.effectiveSampleSize > 0 ? stats.p50 : null;
   if (!comps || compsP50 == null) {
     signals.push({ key: "comparable_distribution", estimate: compsP50, weight: null, used: false, reason: comps ? "no_effective_comparables" : "no_comparable_evidence" });
+  } else if (comps.selection === "conditioned_on_subject_price" || comps.selection === "not_recorded") {
+    const why = comps.selection === "conditioned_on_subject_price"
+      ? "comparable_selection_conditioned_on_subject_price"
+      : "comparable_selection_not_recorded";
+    signals.push({ key: "comparable_distribution", estimate: compsP50, weight: null, used: false, reason: why });
+    reasons.push(why);
   } else if (!comps.feeNormalized) {
     // Section 8: a distribution that mixes fee bases is not one distribution.
     // It stays visible as context and contributes nothing to the number.
@@ -290,24 +303,34 @@ export function buildMarketValueV3(input: MarketValueV3Input, options: MarketVal
   // ── Range: never narrower than the evidence ────────────────────────────
   let rangeLow: number | null = null;
   let rangeHigh: number | null = null;
+  let rangeMethod: MarketValueV3["rangeMethod"] = "none";
+  let rangeWidenedForDisagreement = false;
   if (estimate != null) {
     const compsUsed = used.some((c) => c.key === "comparable_distribution") && stats;
     if (compsUsed && isMoney(stats.p25) && isMoney(stats.p75)) {
       rangeLow = Math.min(stats.p25, estimate);
       rangeHigh = Math.max(stats.p75, estimate);
+      rangeMethod = "comparable_weighted_p25_p75";
     } else if (used.some((c) => c.key === "marketcheck_prediction") && isMoney(prov?.valuation?.providerRangeLow ?? null) && isMoney(prov?.valuation?.providerRangeHigh ?? null)) {
       rangeLow = Math.min(prov!.valuation!.providerRangeLow as number, estimate);
       rangeHigh = Math.max(prov!.valuation!.providerRangeHigh as number, estimate);
-    } else {
+      rangeMethod = "provider_reported_range";
+    } else if (options.fallbackRangePct != null) {
       rangeLow = estimate * (1 - fallbackRangePct);
       rangeHigh = estimate * (1 + fallbackRangePct);
+      rangeMethod = "configured_fallback_band";
+    } else {
+      // No evidence carries a spread, so there is no range to state. A band
+      // drawn at a fixed percentage around the estimate would be invented.
+      rangeMethod = "none";
     }
-    if (disagreementPct != null && disagreementPct > threshold) {
+    if (rangeLow != null && rangeHigh != null && disagreementPct != null && disagreementPct > threshold) {
       rangeLow = Math.min(rangeLow, estimate * (1 - disagreementPct));
       rangeHigh = Math.max(rangeHigh, estimate * (1 + disagreementPct));
+      rangeWidenedForDisagreement = true;
     }
-    rangeLow = Math.round(rangeLow);
-    rangeHigh = Math.round(rangeHigh);
+    rangeLow = rangeLow != null ? Math.round(rangeLow) : null;
+    rangeHigh = rangeHigh != null ? Math.round(rangeHigh) : null;
     estimate = Math.round(estimate);
   }
 
@@ -332,7 +355,9 @@ export function buildMarketValueV3(input: MarketValueV3Input, options: MarketVal
     });
     confidence = v2.confidence;
     confidenceReasons.push(...v2.reasons);
-    if (comps.relaxationSteps.length) {
+    // selectTier records the tier it starts at as step one, so one step
+    // means the tightest tier answered; relaxation is a second step onward.
+    if (comps.relaxationSteps.length > 1) {
       confidence = capConfidence(confidence, "medium");
       confidenceReasons.push(`comparable_tier_relaxed:${comps.relaxationSteps.join(">")}`);
     }
@@ -371,6 +396,8 @@ export function buildMarketValueV3(input: MarketValueV3Input, options: MarketVal
     estimatedValue: estimate,
     rangeLow,
     rangeHigh,
+    rangeMethod,
+    rangeWidenedForDisagreement,
     confidence,
     confidenceReasons: [...new Set([...confidenceReasons, ...reasons])],
     qualifiedCompCount: stats?.eligiblePrimaryCount ?? 0,

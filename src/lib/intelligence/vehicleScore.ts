@@ -14,13 +14,14 @@
 // vehicle_score_evidence is an exact-only claim.
 
 import { mayClaim } from "../market/identityMatch.ts";
+import { titleReviewIsEvidenceGapOnly } from "./titleOdometer.ts";
 import {
   SCORE_DOMAINS, SCORE_LABELS, SCORE_WEIGHTS,
   type ConditionSummary, type IdentitySummary, type ProvenanceSummary, type RecallSummary,
   type ScoreDomainKey, type ScoreDomainResult, type ScoreLabel, type TitleOdometerSummary, type VehicleScoreResult,
 } from "./contracts.ts";
 
-export const VEHICLE_SCORE_VERSION = "vehicle-score-v1.1.0-shadow";
+export const VEHICLE_SCORE_VERSION = "vehicle-score-v1.3.0-shadow";
 
 export interface DocumentationFacts {
   serviceRecordCount: number | null;
@@ -123,7 +124,11 @@ function integrityDomain(identity: IdentitySummary, title: TitleOdometerSummary)
       d.adverse.push(...brands.map((b) => `title_brand:${b}`));
     }
     if (title.state === "VERIFIED_NO_ADVERSE_REPORTED") d.evidence.push("title_no_adverse_reported");
-    if (title.state === "REVIEW_REQUIRED") {
+    // An odometer conflict is what puts a report into review; it is deducted
+    // once below, under its own name, not a second time as "review required".
+    if (titleReviewIsEvidenceGapOnly(title)) {
+      d.missing.push("title_report_evidence_gap");
+    } else if (title.state === "REVIEW_REQUIRED" && title.odometerStatus !== "conflict") {
       deduction += r.reviewRequired;
       d.adverse.push("title_review_required");
     }
@@ -267,8 +272,9 @@ function publicEligibility(domains: ScoreDomainResult[], input: VehicleScoreInpu
   for (const key of PUBLIC_SCORE_POLICY.requiredDomains) {
     if (by[key]?.score == null) reasons.push(`required_domain_not_assessed:${key}`);
   }
-  if (input.titleOdometer.state !== "VERIFIED_NO_ADVERSE_REPORTED" && input.titleOdometer.state !== "REVIEW_REQUIRED"
-      && !(input.titleOdometer.titleBrandsReported.length || input.titleOdometer.junkSalvageTotalLossReported.length)) {
+  if ((input.titleOdometer.state !== "VERIFIED_NO_ADVERSE_REPORTED" && input.titleOdometer.state !== "REVIEW_REQUIRED"
+      && !(input.titleOdometer.titleBrandsReported.length || input.titleOdometer.junkSalvageTotalLossReported.length))
+      || titleReviewIsEvidenceGapOnly(input.titleOdometer)) {
     reasons.push("title_not_verified");
   }
   if (input.condition.state !== "verified") reasons.push(`condition_${input.condition.state}`);

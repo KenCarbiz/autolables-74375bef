@@ -48,7 +48,7 @@ export function vehicleInsights(l: VehicleListing): VehicleInsight[] {
     const delta = Math.round(belowBy);
     out.push({
       id: "below-market",
-      label: `$${delta.toLocaleString()} below market`,
+      label: `$${delta.toLocaleString()} est. below market`,
       detail: `Priced $${delta.toLocaleString()} under the typical market value of $${mv.toLocaleString()} for similar vehicles.`,
       tone: "emerald",
       strength: 100,

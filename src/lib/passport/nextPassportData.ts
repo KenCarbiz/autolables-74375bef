@@ -57,6 +57,11 @@ export interface NextPassportData {
     state: NextSectionState;
     similar: number | null; belowMarket: number | null; daysOnMarket: number | null;
     position: number | null; updated: string; note: string;
+    // `updated` is OUR retrieval date, not a provider observation date; the
+    // renderer must pair it with `retrievedLabel`. `belowMarket` is an
+    // estimate-based difference and must be labelled "Est.".
+    retrievedLabel: string;
+    similarKind: "like_for_like" | "analyzed" | "matches" | null;
   };
   reasons: { state: NextSectionState; items: string[] };
   confirm: {
@@ -312,23 +317,28 @@ function buildMarket(d: PassportData, pv: (k: string) => boolean): NextPassportD
     return {
       state: d.marketAvg == null ? "pending" : "unavailable",
       similar: null, belowMarket: null, daysOnMarket: null, position: null,
-      updated, note: "",
+      updated, note: "", retrievedLabel: "Market data retrieved", similarKind: null,
     };
   }
   const position = (() => {
     if (d.price == null || d.marketAvg == null) return null;
-    const low = d.marketLow ?? d.marketAvg * 0.85;
-    const high = d.marketHigh ?? d.marketAvg * 1.15;
+    // No provider range, no scale: an invented +/-15% band would place the
+    // car on a market spread nobody measured.
+    if (d.marketLow == null || d.marketHigh == null || d.marketHigh <= d.marketLow) return null;
+    const low = d.marketLow;
+    const high = d.marketHigh;
     return Math.max(0, Math.min(1, (d.price - low) / Math.max(1, high - low)));
   })();
   return {
     state: "success",
-    similar: d.marketMeta.likeCount ?? d.marketMeta.similarCount,
+    similar: d.marketMeta.likeCount ?? d.marketMeta.analyzedCount ?? d.marketMeta.similarCount,
+    similarKind: d.marketMeta.likeCount != null ? "like_for_like" : d.marketMeta.analyzedCount != null ? "analyzed" : d.marketMeta.similarCount != null ? "matches" : null,
     belowMarket: d.belowMarket != null && d.belowMarket > 0 ? d.belowMarket : null,
     daysOnMarket: d.dom,
     position,
     updated,
     note: "",
+    retrievedLabel: "Market data retrieved",
   };
 }
 
@@ -341,7 +351,7 @@ function buildReasons({ d, report, isCpo, make }: {
 }): NextPassportData["reasons"] {
   const verified = (key: string) => report.checks.find((c) => c.key === key)?.status === "verified";
   const items = ([
-    d.belowMarket != null && d.belowMarket > 250 && !d.marketBasisWeak ? "Priced below the local market for comparable vehicles" : null,
+    d.belowMarket != null && d.belowMarket > 250 && !d.marketBasisWeak ? "Priced below the estimated market value for comparable vehicles" : null,
     d.ownerCount === 1 ? "One owner reported" : null,
     verified("title") ? "Title verified: clean" : null,
     verified("recalls") ? "No open recalls reported" : null,

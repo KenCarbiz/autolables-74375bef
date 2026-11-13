@@ -8,7 +8,7 @@ import {
 import { toast } from "sonner";
 import { listingHero } from "@/lib/photos";
 import type { PassportData, PricePoint, OemWarrantyView } from "@/lib/passportV2Data";
-import { fmt$, listingEquipment, historyReportName, deriveSoldClaims, deriveRating, ratingTier, CREDIBLE_AVG_DOM_MAX } from "@/lib/passportV2Data";
+import { fmt$, listingEquipment, historyReportName, deriveSoldClaims, deriveRating, compSampleView, cohortExplanation, CREDIBLE_AVG_DOM_MAX } from "@/lib/passportV2Data";
 import { packetVisible } from "@/lib/packetModules";
 import { trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
 import { oemCoverageRows, type CoverageKey } from "@/lib/oemWarranty";
@@ -48,10 +48,10 @@ import { buildTrustPanel, isTrustPanelKey } from "./passportTrustPanels";
 function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleListing, isPreview: boolean, go: (s: string) => void, openPanel: (k: PassportPanelKey) => void, nhtsa: NhtsaSafetyResult | null): PanelDef {
   const price = d.price, avg = d.marketAvg, low = d.marketLow, high = d.marketHigh, below = d.belowMarket;
   const isGreat = below != null && below > 0;
-  // The unified rating: overall drives every confidence ring in these panels;
-  // the factor list drives the price-confidence breakdown.
+  // The factor list drives the price-evidence breakdown. The blended overall
+  // number is deliberately NOT surfaced: a price-blended "Confidence" score let
+  // a favourable price lift the apparent trustworthiness of the vehicle.
   const rating = deriveRating(listing, d);
-  const conf = rating.overall;
   const sold = deriveSoldClaims(d, listing.mileage ?? null, listing.condition);
   // Merge enrichment market_meta (percentile, radius, similar_count, avg_dom,
   // inventory) into mc so the panels read real ingest data, not just mc_attributes.
@@ -64,32 +64,26 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
   switch (key) {
     case "market-price": {
       const year = (listing.ymm || "").match(/\b(19|20)\d{2}\b/)?.[0] ?? null;
-      const compCount = (mc.similar_count as number) ?? (mc.comparable_count as number) ?? null;
-      const radius = (mc.search_radius as number) ?? null;
+      const sampleView = compSampleView(d.marketMeta);
+      const cohortRec = d.marketMeta.cohort;
       const checkedRaw = (listing as unknown as { market_checked_at?: string }).market_checked_at
         ?? (listing.market_payload as { checked_at?: string } | null)?.checked_at ?? null;
       const checkedFresh = checkedRaw != null && Date.now() - new Date(checkedRaw).getTime() <= 14 * 86400000;
-      const updated = checkedFresh ? `Updated ${new Date(checkedRaw as string).toLocaleDateString()}` : isPreview ? "Updated today" : null;
-      const trimMatched = mc.trim_matched === true;
+      const updated = checkedFresh ? `Market data retrieved ${new Date(checkedRaw as string).toLocaleDateString()}` : isPreview ? "Market data retrieved today (preview)" : null;
       const comparedAgainst: string[] = [];
-      if (compCount != null) comparedAgainst.push(`${compCount.toLocaleString()} similar vehicles`); else if (isPreview) comparedAgainst.push("42 similar vehicles");
-      if (radius != null) comparedAgainst.push(`${radius}-mile radius`); else if (isPreview) comparedAgainst.push("150-mile radius");
-      if (trimMatched) {
-        if (year) comparedAgainst.push(`Same year (${year})`);
-        if (listing.mileage != null) comparedAgainst.push(`Similar mileage (${Math.round(listing.mileage / 1000)}k±)`);
-        if (listing.trim) comparedAgainst.push(`Same trim (${listing.trim})`);
-      } else if (compCount == null) {
+      if (cohortRec) {
+        comparedAgainst.push(...cohortExplanation(cohortRec));
+      } else if (sampleView.n != null) {
+        comparedAgainst.push(`${sampleView.n.toLocaleString()} matching listings found; the records analyzed were not recorded`);
+      } else if (isPreview) {
+        comparedAgainst.push("42 comparable vehicles analyzed", "150-mile radius");
+      } else {
         comparedAgainst.push("Similar vehicles nearby");
       }
       if (updated) comparedAgainst.push(updated);
-      const percentile = (mc.price_percentile as number) ?? null;
       const why: string[] = [];
-      if (isGreat) why.push("Priced below local market");
+      if (isGreat) why.push("Priced below the estimated market value");
       if (sold.soldPrice) why.push(sold.soldPrice.headline);
-      // price_percentile = % of comps priced below this car, so "priced lower
-      // than N%" is the complement — and only belongs in a praise list when
-      // the car actually sits in the cheaper half.
-      if (percentile != null && percentile <= 50) why.push(`Priced lower than ${100 - percentile}% of similar vehicles`); else if (isPreview && percentile == null) why.push("Priced lower than 91% of similar vehicles");
       if (listing.mileage != null && listing.mileage < 30000) why.push(`Low mileage (${listing.mileage.toLocaleString()} mi)`);
       if (d.ownerCount === 1) why.push("One owner");
       if (d.cleanTitle && d.accidentCount === 0) why.push("Clean history");
@@ -99,24 +93,24 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const marketDelta = marketSeries.length >= 2 ? marketSeries[marketSeries.length - 1] - marketSeries[0] : null;
       const mpOptValue = readBuildSheet(listing)?.estValue ?? null;
       const mpNote = isGreat
-        ? (conf != null ? `Confidence ${conf}%` : "Priced below the local market average")
+        ? "Estimated market value is a provider estimate, not a sale price"
         : mpOptValue ? `This build carries ${fmt$(mpOptValue)} in factory options` : "Priced to today's market";
       return {
         title: "Market Pricing Analysis", subtitle: "How this price compares to the market",
         primary: { label: "Request Vehicle Hold", onClick: () => go("reserve") },
         body: <>
-          <div className="md:hidden"><MHero tone={isGreat ? "green" : "blue"} icon={ShieldCheck} eyebrow={isGreat ? "Great Price" : "Today's Price"} title={isGreat ? `${fmt$(below)} Below Market` : price != null ? fmt$(price) : "Priced to Today's Market"} note={mpNote} /></div>
+          <div className="md:hidden"><MHero tone={isGreat ? "green" : "blue"} icon={ShieldCheck} eyebrow={isGreat ? "Great Price" : "Today's Price"} title={isGreat ? `${fmt$(below)} Est. Below Market` : price != null ? fmt$(price) : "Priced to Today's Market"} note={mpNote} /></div>
           <div className="hidden md:block">
             <Hero icon={ShieldCheck} tone={isGreat ? "green" : "neutral"} label={isGreat ? "Great Price" : "Today's Price"}
-              value={isGreat ? `${fmt$(below)} Below Market` : price != null ? fmt$(price) : undefined}
+              value={isGreat ? `${fmt$(below)} Est. Below Market` : price != null ? fmt$(price) : undefined}
               note={mpNote} />
           </div>
           {low != null && high != null && avg != null && price != null && price <= avg && (
             <div className={`${CARD} p-5`}>
               <div className="grid grid-cols-3 text-center mb-1">
-                <div><p className="text-[11px] text-[#64748B]">Low Market</p><p className="text-[14px] font-bold">{fmt$(low)}</p></div>
-                <div><p className="text-[11px] text-[#64748B]">Market Average</p><p className="text-[14px] font-bold">{fmt$(avg)}</p></div>
-                <div><p className="text-[11px] text-[#64748B]">High Market</p><p className="text-[14px] font-bold">{fmt$(high)}</p></div>
+                <div><p className="text-[11px] text-[#64748B]">Estimated Low</p><p className="text-[14px] font-bold">{fmt$(low)}</p></div>
+                <div><p className="text-[11px] text-[#64748B]">Estimated Market Value</p><p className="text-[14px] font-bold">{fmt$(avg)}</p></div>
+                <div><p className="text-[11px] text-[#64748B]">Estimated High</p><p className="text-[14px] font-bold">{fmt$(high)}</p></div>
               </div>
               <RangeBar low={low} avg={avg} high={high} dealer={price} />
             </div>
@@ -152,24 +146,6 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               </div>
             </Section>
           )}
-          {conf != null && conf >= 70 && (
-            <Section title="AutoLabels Confidence">
-              <div className={`${CARD} p-4 flex items-center gap-5`}>
-                <div className="flex flex-col items-center shrink-0"><Ring pct={conf} /><p className="text-[12px] font-extrabold text-[#16A34A] mt-1">{ratingTier(conf).label}</p></div>
-                <div className="min-w-0"><p className="text-[12px] text-[#64748B] mb-2">This score is built from the measured factors:</p><ul className="grid grid-cols-1 gap-1.5">{rating.factors.filter((f) => f.score != null).map((f) => <Check key={f.key}>{f.label}</Check>)}</ul></div>
-              </div>
-            </Section>
-          )}
-          {d.blackbook?.available && (d.blackbook.retailClean != null || d.blackbook.tradeinClean != null) && (
-            <Section title="Independent valuation" sub="Black Book — a third-party industry guide.">
-              <div className={`${CARD} p-4`}>
-                {d.blackbook.retailClean != null && (price == null || price <= d.blackbook.retailClean) && <StatRow label="Retail value (clean)" value={fmt$(d.blackbook.retailClean)} />}
-                {d.blackbook.tradeinClean != null && <StatRow label="Trade-in value (clean)" value={fmt$(d.blackbook.tradeinClean)} />}
-                {d.blackbook.wholesaleClean != null && <StatRow label="Wholesale value (clean)" value={fmt$(d.blackbook.wholesaleClean)} />}
-                {price != null && d.blackbook.retailClean != null && <p className={`text-[12px] font-semibold mt-2 ${price <= d.blackbook.retailClean ? "text-[#16A34A]" : "text-[#64748B]"}`}>{price <= d.blackbook.retailClean ? `${fmt$(d.blackbook.retailClean - price)} under Black Book retail` : "Priced near Black Book retail"}</p>}
-              </div>
-            </Section>
-          )}
           <Disclaimer />
         </>,
       };
@@ -188,11 +164,12 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const domFav = dom != null && (avgDomCredible != null ? dom <= avgDomCredible : dom <= 30) ? dom : null;
       const has = viewsShown != null || domFav != null;
       const radius = d.marketMeta.radius;
-      // Demand score from real inputs only — no synthetic baseline. Fewer than
+      // Market-interest score from market evidence only. Passport page views
+      // measure traffic to this page, not demand in the market, so they are
+      // shown as a plain count elsewhere and never enter this score. Fewer than
       // two real inputs is too thin to score, so the ring doesn't render.
       const score = (() => {
         const inputs: number[] = [];
-        if (viewsShown != null) inputs.push(Math.min(95, 30 + Math.round(viewsShown * 0.7)));
         if (dom != null) inputs.push(avgDom != null ? (dom <= avgDom * 0.5 ? 90 : dom <= avgDom ? 70 : dom <= avgDom * 1.5 ? 45 : 25) : dom <= 30 ? 70 : dom <= 60 ? 50 : 30);
         const ds = (mc.market_days_supply as number) ?? null;
         if (ds != null) inputs.push(ds < 30 ? 85 : ds < 60 ? 60 : 40);
@@ -207,8 +184,6 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const sellsFaster = dom != null && avgDomCredible != null && avgDomCredible > dom;
       const priceDrop = d.priceChangeTotal != null && d.priceChangeTotal < 0 ? Math.abs(d.priceChangeTotal) : null;
       const sold45 = (mc.sold_45d_estimate as number) ?? null;
-      const cutCount = (mc.comp_price_cut_count as number) ?? null;
-      const cutTotal = (mc.comp_price_cut_total as number) ?? null;
       const trimCount = (mc.trim_count as number) ?? null;
       // "Priced right from day one" is only provable when tracking actually
       // covers the listing's start; otherwise the honest claim is that no
@@ -222,7 +197,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const nearWord = radius != null ? `within ${radius} miles` : "in the region";
       const insights: string[] = [];
       if (viewsShown != null) insights.push(`${viewsShown.toLocaleString()} shoppers have viewed this vehicle`);
-      if (isGreat) insights.push(d.belowMarket && d.belowMarket > 0 ? `Priced ${fmt$(d.belowMarket)} below the local market average` : "Priced below market average — strong value");
+      if (isGreat) insights.push(d.belowMarket && d.belowMarket > 0 ? `Priced ${fmt$(d.belowMarket)} below the estimated market value` : "Priced below the estimated market value");
       if (sellsFaster) insights.push(`Similar vehicles average ${avgDomCredible} days on the market — this one is drawing interest faster`);
       // avg_dom is active-listing days on market, not time-to-sell — only real
       // sold data supports a "sell within N days" claim.
@@ -230,7 +205,6 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       else if (!sellsFaster && avgDomCredible != null && avgDomCredible <= 60) insights.push(`Similar listings average ~${avgDomCredible} days on market`);
       if (sold.velocity) insights.push(sold.velocity);
       else if (sold45 != null && sold45 > 0) insights.push(`~${sold45.toLocaleString()} sold ${nearWord} in the last 45 days (estimated)`);
-      if (cutCount != null && cutCount > 0 && cutTotal != null && cutTotal >= 5 && priceDrop == null) insights.push(`${cutCount} of ${cutTotal} comparable listings have cut their price — this one ${trackedFromListing ? "was priced right from day one" : "has not needed a price cut"}`);
       if (trimCount != null && trimCount >= 1 && trimCount <= 5) insights.push(`1 of only ${trimCount} builds like this ${nearWord}`);
       if (scarce) insights.push(invCount != null && invCount > 0 ? `Limited availability — only ${invCount} similar vehicles ${nearWord}` : `Limited similar inventory ${nearWord} right now`);
       if (priceDrop != null) insights.push(`We reduced this price ${fmt$(priceDrop)} since first tracked`);
@@ -246,18 +220,18 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       // Never show the raw days-supply / market inventory count to a customer —
       // it can be in the thousands and reads terribly. Qualitative level only.
       const kpis = [
-        { icon: Eye, label: "Active Shoppers", value: viewsShown != null ? viewsShown.toLocaleString() : isPreview ? "89" : "—" },
+        { icon: Eye, label: "Passport Views", value: viewsShown != null ? viewsShown.toLocaleString() : isPreview ? "89" : "—" },
         { icon: Car, label: "Similar Vehicles", value: supplyLevel },
         soldDom != null
-          ? { icon: Clock, label: "Avg Days to Sell", value: `${soldDom} Days` }
-          : { icon: Clock, label: "Avg Days on Market", value: avgDomCredible != null ? `${avgDomCredible} Days` : isPreview ? "12 Days" : "—" },
+          ? { icon: Clock, label: "Median Days Listed (exited listings)", value: `${soldDom} Days` }
+          : { icon: Clock, label: "Avg Days Listed (comparables)", value: avgDomCredible != null ? `${avgDomCredible} Days` : isPreview ? "12 Days" : "—" },
         { icon: TrendingUp, label: "Weekly Searches", value: isPreview ? "120" : "—" },
         { icon: Heart, label: "Saved by Shoppers", value: isPreview ? "38" : "—" },
         { icon: MapPin, label: "Local Availability", value: supplyLevel },
       ];
       const snapshot = [
         { l: "Inventory Level", v: supplyLevel },
-        { l: "Average Days on Market", v: avgDomCredible != null ? `${avgDomCredible} Days` : domFav != null ? `${domFav} Days` : isPreview ? "12 Days" : "—" },
+        { l: "Avg Days Listed (comparables)", v: avgDomCredible != null ? `${avgDomCredible} Days` : domFav != null ? `${domFav} Days` : isPreview ? "12 Days" : "—" },
         { l: "Search Activity", v: isPreview ? "Above Average" : level ?? "—" },
         { l: "Local Availability", v: supplyLevel },
         { l: "Average Price", v: avg != null && price != null && price <= avg ? fmt$(avg) : isPreview ? fmt$(61300) : "—" },
@@ -283,7 +257,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                   <div className="relative h-2 rounded-full bg-white/25"><span className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-white shadow" style={{ left: `${score}%` }} /></div>
                   <div className="flex justify-between text-[11px] font-bold opacity-80 mt-1.5"><span>LOW</span><span>HIGH</span></div>
                 </div>
-                <p className="text-[11px] opacity-80 mt-3 text-center">Updated using live market activity.</p>
+                <p className="text-[11px] opacity-80 mt-3 text-center">Based on the market data retrieved for this vehicle.</p>
               </div>
             )}
 
@@ -358,7 +332,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
             </Section>
           )}
           {(viewsShown != null || isPreview) && (
-            <Section title="Buyer activity">
+            <Section title="Passport activity">
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                 <div className={`${CARD} p-3 text-center`}>
                   <Eye className="w-4 h-4 text-[#2563EB] mx-auto" />
@@ -372,20 +346,20 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
             <Section title="Local demand">
               <div className={`${CARD} p-4`}>
                 {level != null && <StatRow label="Interest level" value={level} />}
-                {viewsShown != null && <StatRow label="Shopper views" value={viewsShown.toLocaleString()} />}
-                {(d.belowMarket ?? 0) > 0 && <StatRow label="Vs. market average" value={`${fmt$(d.belowMarket as number)} below`} />}
+                {viewsShown != null && <StatRow label="Passport page views" value={viewsShown.toLocaleString()} />}
+                {(d.belowMarket ?? 0) > 0 && <StatRow label="Vs. estimated market value" value={`${fmt$(d.belowMarket as number)} below`} />}
                 {isPreview && <StatRow label="Nearby shoppers" value="120+" />}
                 {isPreview && <StatRow label="Search frequency" value="Above average" />}
               </div>
             </Section>
             <Section title="Similar vehicles">
               <div className={`${CARD} p-4`}>
-                {(avgDomCredible != null || isPreview) && <StatRow label="Avg days on market" value={avgDomCredible != null ? `${avgDomCredible} days` : "38 days"} />}
+                {(avgDomCredible != null || isPreview) && <StatRow label="Avg days listed (comparables)" value={avgDomCredible != null ? `${avgDomCredible} days` : "38 days"} />}
                 {invCount != null && invCount < 50 ? <StatRow label="Similar vehicles nearby" value={invCount.toLocaleString()} /> : supplyLevel !== "—" && <StatRow label="Local availability" value={supplyLevel} />}
                 {domFav != null && <StatRow label="This vehicle" value={`${domFav} days listed`} />}
                 {sellsFaster && (
                   <p className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-bold text-[#16A34A]">
-                    <TrendingUp className="w-3.5 h-3.5" /> Drawing interest faster than the market average
+                    <TrendingUp className="w-3.5 h-3.5" /> Listed fewer days than the comparable average
                   </p>
                 )}
               </div>
@@ -400,7 +374,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
               <p className="text-[14px] font-extrabold text-[#16A34A]">{goodTime ? "Good time to buy" : "See it in person"}</p>
               <ul className="mt-2 space-y-1.5">
-                {isGreat && <Check>{(d.belowMarket ?? 0) > 0 ? `Priced ${fmt$(d.belowMarket as number)} below market average` : "Priced below market average"}</Check>}
+                {isGreat && <Check>{(d.belowMarket ?? 0) > 0 ? `Priced ${fmt$(d.belowMarket as number)} below the estimated market value` : "Priced below the estimated market value"}</Check>}
                 {score != null && score >= 66 && <Check>Strong shopper interest right now</Check>}
                 {scarce && <Check>Limited similar inventory {nearWord}</Check>}
                 {sold.sellTime ? <Check>{sold.sellTime}</Check> : sellsFaster && <Check>Similar vehicles average {avgDomCredible} days on market</Check>}
@@ -432,42 +406,25 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         { name: "Local Listings", on: avg != null },
         { name: "Dealer Pricing", on: true },
       ].filter((s) => s.on);
-      const compCount = (mc.similar_count as number) ?? (mc.comparable_count as number) ?? null;
-      // similar_count only — the stored sample is an API page, never the
-      // market size; without a real count show the approx/pending treatment.
-      const coverage = compCount != null ? compCount : isPreview ? 31 : null;
-      const coverageApprox = compCount == null;
+      // Records actually analyzed (cohort record); a bare provider match count
+      // is a different number and is never presented as "analyzed".
+      const sampleView = compSampleView(d.marketMeta);
+      const retrievedIso = d.marketCheckedAt || d.marketMeta.checkedAt;
+      const retrievedShort = retrievedIso ? new Date(retrievedIso).toLocaleDateString() : null;
+      const coverage = sampleView.analyzed ? sampleView.n : isPreview ? 31 : null;
+            const coverageTotal = sampleView.total;
+      const coverageDetail = d.marketMeta.cohort ? cohortExplanation(d.marketMeta.cohort) : [];
       const faqs = [
-        { q: "How often is pricing updated?", a: "Market values refresh as new comparable listings and sales are reported — typically every day the vehicle is live." },
-        { q: "What data sources are used?", a: "A blend of live market data, dealer pricing, vehicle history, recall status, and equipment decoded from the VIN." },
+        { q: "How often is pricing updated?", a: "Market values are estimates retrieved from a data provider when this listing is refreshed. The retrieval date is shown; it is not the date the provider observed the market." },
+        { q: "What data sources are used?", a: "Provider market estimates and comparable listings, dealer pricing, vehicle history, recall status, and equipment decoded from the VIN." },
       ];
       const connectedCount = sources.length;
-      // Below 70 the confidence module doesn't render at all — the panel falls
-      // through to the verified-strengths content instead of a weak score.
-      const showConf = conf != null && conf >= 70;
-      const confWord = ratingTier(conf).label;
-      const confExplain = "This score blends the measured factors below — price vs market, history, demand, equipment, and coverage. Factors without real data are left out, never guessed.";
-      const scale = showConf ? (
-        <div className="grid grid-cols-3 gap-1.5">
-          {[
-            { n: "Solid", r: "70 – 79", a: (conf as number) < 80 },
-            { n: "Strong", r: "80 – 89", a: (conf as number) >= 80 && (conf as number) < 90 },
-            { n: "Exceptional", r: "90 – 100", a: (conf as number) >= 90 },
-          ].map((b) => (
-            <div key={b.n} className={`relative text-center rounded-lg py-1.5 border ${b.a ? "bg-emerald-50 border-emerald-200" : "border-transparent"}`}>
-              {b.a && <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[9px] text-emerald-500 leading-none">▼</span>}
-              <p className={`text-[11px] font-bold leading-tight ${b.a ? "text-emerald-700" : "text-[#64748B]"}`}>{b.n}</p>
-              <p className={`text-[10px] ${b.a ? "text-emerald-600" : "text-[#94A3B8]"}`}>{b.r}</p>
-            </div>
-          ))}
-        </div>
-      ) : null;
       const coverageCard = coverage != null ? (
         <div className={`${CARD} p-4 flex items-center gap-4`}>
           <span className="w-11 h-11 rounded-xl bg-blue-50 text-[#2563EB] flex items-center justify-center shrink-0"><Users className="w-5 h-5" /></span>
           <div className="min-w-0">
-            <p className="text-[15px] font-extrabold leading-tight">{coverage.toLocaleString()}{coverageApprox ? "+" : ""} Comparable Vehicles Analyzed</p>
-            <p className="text-[12px] text-[#64748B] mt-0.5">Local listings and similar trim-level vehicles were reviewed to support this price.</p>
+            <p className="text-[15px] font-extrabold leading-tight">{coverage.toLocaleString()} Comparable Vehicles Analyzed</p>
+            <p className="text-[12px] text-[#64748B] mt-0.5">{coverageTotal != null && coverageTotal > coverage ? `Out of ${coverageTotal.toLocaleString()} matching listings. ` : ""}{coverageDetail.length ? coverageDetail.slice(1).join(". ") + "." : "Listings similar to this vehicle were reviewed."}</p>
           </div>
         </div>
       ) : null;
@@ -477,7 +434,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         </Section>
       );
       const analyzeBlock = (
-        <Section title="What AutoLabels Analyzes" sub="We analyze multiple data points to build this confidence score.">
+        <Section title="What AutoLabels Analyzes" sub="The data points considered in the factors shown here.">
           <div className={`${CARD} p-4`}><ul className="grid grid-cols-2 gap-1.5">{["Market pricing", "Mileage", "Condition", "Equipment", "Vehicle history", "Regional inventory", "Demand", "Historical pricing", "Dealer pricing"].map((b) => <Check key={b}>{b}</Check>)}</ul></div>
         </Section>
       );
@@ -488,7 +445,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const stabShift = marketSeries.length >= 2 && stabFirst ? (stabLast - stabFirst) / stabFirst : 0;
       const stabStable = Math.abs(stabShift) < 0.03;
       const stabilityBlock = marketSeries.length >= 3 && stabShift > -0.03 ? (
-        <Section title="Confidence Stability" sub="Tracked market data">
+        <Section title="Estimated Market Value Trend" sub="Tracked provider estimates">
           <div className={`${CARD} p-4`}>
             <TrendChart market={marketSeries} marketAt={marketAt} height={90} />
             <div className="flex items-start gap-2 mt-2">
@@ -501,35 +458,25 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         </Section>
       ) : null;
       return {
-        title: "Price Confidence Report", subtitle: "Why this vehicle's price is supported by verified market data",
+        title: "Price Evidence Report", subtitle: "What this vehicle's price comparison is based on",
         primary: { label: "Request Vehicle Hold", onClick: () => go("reserve") },
         footerQuestion: "Want to see it in person?", specialistLabel: "Talk to a vehicle specialist",
         footerNote: "No obligation · Dealer confirmed",
         body: <>
-          {/* ── Mobile (<768px) — premium confidence dashboard ── */}
+          {/* ── Mobile (<768px) — price evidence ── */}
           <div className="md:hidden space-y-4">
-            {showConf && (
-              <div className="rounded-2xl p-5 text-white text-center" style={{ background: "linear-gradient(160deg,#0f7a3d 0%,#16A34A 100%)" }}>
-                <div className="flex justify-center"><AnimatedRing pct={conf as number} color="#ffffff" /></div>
-                <p className="text-[13px] font-bold opacity-90 mt-2">Confidence Score</p>
-                <p className="text-[18px] font-extrabold">{confWord}</p>
-                <p className="text-[12.5px] opacity-90 mt-2 leading-snug">{confExplain}</p>
-              </div>
-            )}
-            {scale && <div className={`${CARD} p-3 pt-4`}>{scale}</div>}
-
             {coverageCard}
 
             <div className="grid grid-cols-2 gap-3">
               <div className={`${CARD} p-4 text-center`}><p className="text-[18px] font-extrabold leading-none">{connectedCount}</p><p className="text-[10px] text-[#94A3B8] mt-1">Data Sources</p></div>
-              <div className={`${CARD} p-4 text-center`}><p className="text-[18px] font-extrabold leading-none">Today</p><p className="text-[10px] text-[#94A3B8] mt-1">Updated</p></div>
+              <div className={`${CARD} p-4 text-center`}><p className="text-[14px] font-extrabold leading-tight">{retrievedShort ?? "\u2014"}</p><p className="text-[10px] text-[#94A3B8] mt-1">Market data retrieved</p></div>
             </div>
 
             {factors.length > 0 && (
-              <Section title="Rating Factors" sub="Only measured factors are scored — each shows the evidence behind it.">
+              <Section title="Evidence Factors" sub="Only measured factors are listed, each with the evidence behind it.">
                 <div className={`${CARD} p-4 space-y-4`}>{factors.map((f) => (
                   <div key={f.key}>
-                    <FactorBar label={f.label} pct={f.score as number} status={ratingTier(f.score).label} />
+                    <FactorBar label={f.label} status="Measured" />
                     {f.evidence.length > 0 && <ul className="mt-1.5 space-y-0.5">{f.evidence.map((e) => <li key={e} className="text-[11px] text-[#94A3B8] leading-snug">{e}</li>)}</ul>}
                   </div>
                 ))}</div>
@@ -548,27 +495,13 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
 
           {/* ── Desktop / tablet (≥768px) ── */}
           <div className="hidden md:block space-y-5">
-          {showConf && (
-            <div className={`${CARD} p-5`}>
-              <div className="flex items-center gap-5">
-                <div className="shrink-0"><Ring pct={conf as number} size={120} /></div>
-                <div className="min-w-0">
-                  <p className="text-[15px] font-bold">Confidence Score</p>
-                  <p className="text-[14px] font-extrabold mt-0.5" style={{ color: "#16A34A" }}>{confWord}</p>
-                  <p className="text-[12px] text-[#64748B] mt-1.5">{confExplain}</p>
-                </div>
-              </div>
-              <div className="mt-5 pt-1">{scale}</div>
-            </div>
-          )}
-
           {coverageCard}
 
           {factors.length > 0 && (
-            <Section title="Rating Factors" sub="Only measured factors are scored — each shows the evidence behind it.">
+            <Section title="Evidence Factors" sub="Only measured factors are listed, each with the evidence behind it.">
               <div className={`${CARD} p-4 space-y-4`}>{factors.map((f) => (
                 <div key={f.key}>
-                  <FactorBar label={f.label} pct={f.score as number} status={ratingTier(f.score).label} />
+                  <FactorBar label={f.label} status="Measured" />
                   {f.evidence.length > 0 && <ul className="mt-1.5 space-y-0.5">{f.evidence.map((e) => <li key={e} className="text-[11px] text-[#94A3B8] leading-snug">{e}</li>)}</ul>}
                 </div>
               ))}</div>
@@ -612,13 +545,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const savings = total != null && total < 0 ? -total : (d.belowMarket && d.belowMarket > 0 ? d.belowMarket : null);
       const trendPct = total != null && originalPrice ? Math.round((total / originalPrice) * 1000) / 10 : null;
       const marketDiff = price != null && avg != null ? price - avg : null;
-      const phPercentile = (mc.price_percentile as number) ?? null;
-      // price_percentile = % of comps priced BELOW this car — a LOW percentile
-      // means well priced, so "Top N%" uses the percentile directly. Above the
-      // median we state position neutrally instead of inventing praise.
-      const posLabel = phPercentile != null
-        ? (phPercentile <= 50 ? `Top ${Math.max(1, phPercentile)}% best priced` : "Priced within the local market range")
-        : isPreview ? "Top 15% best priced similar vehicles" : "Priced below the market average";
+      const posLabel = isPreview ? "Priced below the estimated market value for similar vehicles" : "Priced below the estimated market value";
       const goodTime = isGreat || (total != null && total < 0);
       return {
         title: "Price History", subtitle: "See how this vehicle's price has changed over time",
@@ -632,7 +559,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                   <span className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center shrink-0"><TrendingDown className="w-6 h-6" /></span>
                   <div><p className="text-[13px] font-bold uppercase tracking-wider opacity-95">{trendLabel}</p><p className="text-[26px] font-extrabold leading-tight">{savings != null ? fmt$(savings) : price != null ? fmt$(price) : ""}</p><p className="text-[12px] opacity-90">{d.belowMarket && d.belowMarket > 0 ? "Below market" : savings != null ? "Reduced since first tracked" : "Current price"}</p></div>
                 </div>
-                <p className="text-[13px] opacity-90 mt-3 leading-snug">{total != null && total < 0 && d.belowMarket && d.belowMarket > 0 ? "This vehicle has been reduced and is currently priced below market value." : total != null && total < 0 ? "This vehicle's asking price has been reduced since we began tracking it." : total != null && total > 0 ? "Priced to today's market." : "Every price adjustment is recorded for full transparency."}</p>
+                <p className="text-[13px] opacity-90 mt-3 leading-snug">{total != null && total < 0 && d.belowMarket && d.belowMarket > 0 ? "This vehicle has been reduced and is currently priced below the estimated market value." : total != null && total < 0 ? "This vehicle's asking price has been reduced since we began tracking it." : total != null && total > 0 ? "Priced to today's market." : "Every price adjustment is recorded for full transparency."}</p>
               </div>
             )}
 
@@ -652,7 +579,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                   <div className={`${CARD} p-4`}>
                     <p className="text-[12px] text-[#64748B]">Price Trend</p>
                     <p className="text-[18px] font-extrabold inline-flex items-center gap-1.5 text-[#16A34A]"><TrendingDown className="w-4 h-4" /> Down {Math.abs(trendPct)}%</p>
-                    <p className="text-[12px] text-[#64748B] mt-1 leading-snug">This vehicle's price has decreased while the market average stayed relatively stable.</p>
+                    <p className="text-[12px] text-[#64748B] mt-1 leading-snug">This vehicle's price has decreased while the estimated market value stayed relatively stable.</p>
                   </div>
                 )}
                 <Section title="Price change timeline">
@@ -673,14 +600,14 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
             {pctDiff != null && priceBand !== "above" && (
               <Section title="Market comparison">
                 <div className={`${CARD} divide-y divide-[#F1F5F9]`}>
-                  <div className="flex items-center justify-between px-4 py-3"><span className="text-[12px] text-[#64748B]">Market Average</span><span className="text-[15px] font-extrabold">{fmt$(avg)}</span></div>
+                  <div className="flex items-center justify-between px-4 py-3"><span className="text-[12px] text-[#64748B]">Estimated Market Value</span><span className="text-[15px] font-extrabold">{fmt$(avg)}</span></div>
                   <div className="flex items-center justify-between px-4 py-3"><span className="text-[12px] text-[#64748B]">Current Vehicle</span><span className="text-[15px] font-extrabold">{fmt$(price)}</span></div>
                 </div>
                 <div className={`mt-2 rounded-2xl border p-4 ${priceBand === "below" ? "border-emerald-200 bg-emerald-50/70" : "border-[#E6E8EC] bg-slate-50"}`}>
                   <div className="flex items-center justify-between">
-                    <span className="text-[13px] font-bold text-[#0F172A]">{priceBand === "below" ? "Below Market" : "Priced At Market"}</span>
+                    <span className="text-[13px] font-bold text-[#0F172A]">{priceBand === "below" ? "Est. Below Market" : "Priced Near Estimated Market"}</span>
                     <span className={`text-[14px] font-extrabold ${priceBand === "below" ? "text-[#16A34A]" : "text-[#0F172A]"}`}>
-                      {priceBand === "at" ? `Within ${Math.abs(pctDiff)}% of average` : `${marketDiff != null ? `-${fmt$(Math.abs(marketDiff))} · ` : ""}${Math.abs(pctDiff)}% below average`}
+                      {priceBand === "at" ? `Within ${Math.abs(pctDiff)}% of estimate` : `${marketDiff != null ? `-${fmt$(Math.abs(marketDiff))} · ` : ""}${Math.abs(pctDiff)}% below estimate`}
                     </span>
                   </div>
                 </div>
@@ -688,7 +615,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
             )}
             {priceBand === "above" && phOptValue ? (
               <Section title="Why this price">
-                <div className={`${CARD} p-4`}><p className="text-[13px] text-[#0F172A] leading-snug">This build carries {fmt$(phOptValue)} in factory options — the market average includes lower-equipped vehicles.</p></div>
+                <div className={`${CARD} p-4`}><p className="text-[13px] text-[#0F172A] leading-snug">This build carries {fmt$(phOptValue)} in factory options — the estimated market value may reflect lower-equipped vehicles.</p></div>
               </Section>
             ) : null}
 
@@ -705,8 +632,8 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               <div className="rounded-2xl p-5 text-white" style={{ background: "linear-gradient(160deg,#0f7a3d 0%,#16A34A 100%)" }}>
                 <p className="text-[18px] font-extrabold inline-flex items-center gap-2"><CheckCircle2 className="w-6 h-6" /> Excellent Time To Purchase</p>
                 <ul className="mt-2.5 space-y-1.5">
-                  {isGreat && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Below market average</li>}
-                  {sold.soldPrice && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Below the typical last advertised price before sale of similar vehicles</li>}
+                  {isGreat && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Below the estimated market value</li>}
+                  {sold.soldPrice && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Below the typical last advertised price of similar listings that left the market</li>}
                   {total != null && total < 0 && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Recent price reductions</li>}
                   <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Strong value at today's price</li>
                   {isGreat && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Competitive market pricing</li>}
@@ -763,16 +690,16 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
             <Section title="Market comparison">
               <div className={`${CARD} p-4`}>
                 <div className="flex items-center justify-between"><span className="text-[12px] text-[#64748B]">This vehicle</span><span className="text-[14px] font-extrabold">{fmt$(price)}</span></div>
-                <div className="flex items-center justify-between mt-1.5"><span className="text-[12px] text-[#64748B]">Average market price</span><span className="text-[14px] font-semibold text-[#0F172A]">{fmt$(avg)}</span></div>
+                <div className="flex items-center justify-between mt-1.5"><span className="text-[12px] text-[#64748B]">Estimated market value</span><span className="text-[14px] font-semibold text-[#0F172A]">{fmt$(avg)}</span></div>
                 <div className={`mt-2 pt-2 border-t border-[#F1F5F9] text-[13px] font-semibold ${priceBand === "below" ? "text-[#16A34A]" : "text-[#0F172A]"}`}>
-                  {priceBand === "below" ? `${Math.abs(pctDiff)}% below market average` : `Priced at market — within ${Math.abs(pctDiff)}% of average`}
+                  {priceBand === "below" ? `${Math.abs(pctDiff)}% below the estimated market value` : `Priced near the estimate — within ${Math.abs(pctDiff)}%`}
                 </div>
               </div>
             </Section>
           )}
           {priceBand === "above" && phOptValue ? (
             <Section title="Why this price">
-              <div className={`${CARD} p-4`}><p className="text-[13px] text-[#0F172A] leading-snug">This build carries {fmt$(phOptValue)} in factory options — the market average includes lower-equipped vehicles.</p></div>
+              <div className={`${CARD} p-4`}><p className="text-[13px] text-[#0F172A] leading-snug">This build carries {fmt$(phOptValue)} in factory options — the estimated market value may reflect lower-equipped vehicles.</p></div>
             </Section>
           ) : null}
           <Section title="Price recommendation">
@@ -780,8 +707,8 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               <p className="text-[14px] font-extrabold text-[#16A34A]">{lowest != null && price != null && price <= lowest && isGreat ? "Excellent time to purchase" : isGreat ? "Strong value right now" : "See it in person"}</p>
               <ul className="mt-2 space-y-1.5">
                 {lowest != null && price != null && price <= lowest && <Check>At its lowest recorded asking price</Check>}
-                {isGreat && <Check>Priced below the market average</Check>}
-                {sold.soldPrice && <Check>Below the typical last advertised price before sale of similar vehicles</Check>}
+                {isGreat && <Check>Priced below the estimated market value</Check>}
+                {sold.soldPrice && <Check>Below the typical last advertised price of similar listings that left the market</Check>}
                 {total != null && total < 0 && <Check>Price has trended down since first tracked</Check>}
                 {total != null && total > 0 && <Check>Priced to today's market</Check>}
                 {(total == null || total === 0) && <Check>Price has been stable — likely to hold</Check>}
@@ -853,7 +780,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       // (it can be in the thousands) — qualitative levels only, on every
       // breakpoint. The raw number stays internal to the math above.
       const supplyWord = supply == null ? null : supply < 30 ? "Tight" : supply < 60 ? "Balanced" : "Ample";
-      const highCompetition = (d.viewCount ?? 0) > 20 || isPreview;
+      const highCompetition = isPreview;
       const invInsights: { icon: React.ElementType; text: string }[] = [];
       if (changePct != null && changePct < 0) invInsights.push({ icon: TrendingDown, text: "Inventory continues to decline — lower supply means more competition." });
       if (isPreview) invInsights.push({ icon: TrendingUp, text: "New listings are entering the market slower than vehicles are selling." });
@@ -872,7 +799,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                     <div><p className="text-[13px] font-bold uppercase tracking-wider opacity-95">{changePct != null && changePct < 0 ? "Inventory Tightening" : "Inventory Stable"}</p><p className="text-[24px] font-extrabold leading-tight">{supplyWord} Supply</p></div>
                   </div>
                   {changePct != null && changePct < 0 && <p className="text-[13px] opacity-90 mt-3 leading-snug">Inventory has declined {Math.abs(changePct)}% over the past 30 days.</p>}
-                  <p className="text-[11px] opacity-80 mt-2">Updated using live market inventory.</p>
+                  <p className="text-[11px] opacity-80 mt-2">Based on the market data retrieved for this vehicle.</p>
                 </div>
 
                 {(changePct != null && changePct < 0) || avgDom != null ? (
@@ -958,7 +885,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                   <p className="text-[14px] font-extrabold text-[#16A34A]">{changePct != null && changePct < 0 ? "Inventory is tightening — good time to act" : "Solid time to purchase"}</p>
                   <ul className="mt-2 space-y-1.5">
                     {changePct != null && changePct < 0 && <Check>Fewer comparable vehicles available locally</Check>}
-                    {isGreat && <Check>This vehicle is priced below market</Check>}
+                    {isGreat && <Check>Priced below the estimated market value</Check>}
                     {supply != null && supply < 30 && <Check>Limited local availability for this configuration</Check>}
                     {d.warrantyStr && !d.warrantyExpired && <Check>Strong resale outlook with warranty remaining</Check>}
                   </ul>
@@ -1607,14 +1534,13 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       if (groups.Comfort?.length) loveReasons.push("Premium ride comfort");
       if (groups.Technology?.length) loveReasons.push("Modern technology and connectivity");
       if (premium) loveReasons.push("Luxury interior appointments");
-      if (isGreat) loveReasons.push("Exceptional value versus the market");
+      if (isGreat) loveReasons.push("Priced below the estimated market value");
       const catIcon: Record<string, React.ElementType> = { Performance: Gauge, Safety: ShieldCheck, Technology: Star, Comfort: Heart, Exterior: Car, Interior: Users };
       // Mobile command-center data (badges/cards/rows open the dedicated reports).
       const overviewBadges = ([
         d.warrantyStr ? { icon: ShieldCheck, label: "Factory Warranty", fn: () => openPanel("factory-warranty") } : null,
         d.cleanTitle && d.accidentCount === 0 ? { icon: CheckCircle2, label: "Clean History", fn: () => go("vehicle-history") } : null,
         isGreat ? { icon: BadgeCheck, label: "Great Price", fn: () => openPanel("market-price") } : null,
-        (d.viewCount ?? 0) > 20 ? { icon: Flame, label: "High Demand", fn: () => openPanel("market-demand") } : null,
       ].filter(Boolean) as { icon: React.ElementType; label: string; fn: () => void }[]).slice(0, 4);
       const aiTraits = [d.ownerCount === 1 ? "one-owner ownership" : null, d.warrantyStr ? "remaining factory warranty" : null, (d.cleanTitle && d.accidentCount === 0) ? "a clean vehicle history" : null, isGreat ? "below-market pricing" : null, (d.viewCount ?? 0) > 20 ? "strong local demand" : null].filter(Boolean) as string[];
       const aiSummary = aiTraits.length >= 2 ? `This ${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""} combines ${aiTraits.slice(0, -1).join(", ")} and ${aiTraits[aiTraits.length - 1]} — one of the strongest ${premium ? "luxury " : ""}values currently available.` : (d.overview ? d.overview.split(". ").slice(0, 2).join(". ") : `The ${listing.ymm} pairs capable performance with a well-equipped cabin.`);
@@ -1622,7 +1548,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         d.ownerCount === 1 ? { icon: Users, v: "1 Owner", s: "Personal use", fn: () => go("vehicle-history") } : null,
         d.warrantyStr ? { icon: ShieldCheck, v: d.warrantyStr, s: "Warranty left", fn: () => openPanel("factory-warranty") } : null,
         listing.mileage != null ? { icon: Gauge, v: listing.mileage.toLocaleString(), s: "Miles", fn: () => openPanel("key-specs") } : null,
-        d.belowMarket && d.belowMarket > 0 ? { icon: BadgeCheck, v: fmt$(d.belowMarket), s: "Below market", fn: () => openPanel("market-price") } : null,
+        d.belowMarket && d.belowMarket > 0 ? { icon: BadgeCheck, v: fmt$(d.belowMarket), s: "Est. below market", fn: () => openPanel("market-price") } : null,
         drivetrain ? { icon: Car, v: drivetrain, s: "Drivetrain", fn: () => openPanel("key-specs") } : null,
         d.recallClear ? { icon: CheckCircle2, v: "No Recalls", s: "Verified for this VIN", fn: () => go("vehicle-history") } : null,
       ].filter(Boolean) as { icon: React.ElementType; v: string; s: string; fn: () => void }[]).slice(0, 4);
@@ -1636,7 +1562,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         { icon: FileText, t: "Features & Equipment", s: "Packages, options, and full equipment", fn: () => openPanel("highlights") },
         { icon: Clock, t: "Price History", s: "Recent price changes", fn: () => openPanel("price-history") },
         { icon: Package, t: "Inventory Trends", s: "Local market availability", fn: () => openPanel("inventory-trend") },
-        { icon: Gauge, t: "Price Confidence", s: "Why we're confident", fn: () => openPanel("price-confidence") },
+        { icon: Gauge, t: "Price Evidence", s: "What the comparison is based on", fn: () => openPanel("price-confidence") },
       ];
       return {
         title: "Vehicle Overview", subtitle: "A complete look at this vehicle's design, technology, and ownership experience",
@@ -2339,7 +2265,7 @@ const Delta = ({ kind, delta }: { kind: "dealer" | "market"; delta: number }) =>
   if (delta <= 0) return null;
   return (
     <span className="inline-flex items-center gap-1 font-semibold text-[#64748B]">
-      <TrendingUp className="w-3.5 h-3.5" /> Market average up {fmt$(delta)} since tracking began — today's price locks it in
+      <TrendingUp className="w-3.5 h-3.5" /> Estimated market value up {fmt$(delta)} since tracking began — today's price locks it in
     </span>
   );
 };
@@ -2355,18 +2281,12 @@ const Gauge3 = ({ value }: { value: number }) => (
 
 // Factors without enough data are omitted upstream, so every rendered row
 // carries a positive status chip — "Pending" never reaches a customer.
-const FactorBar = ({ label, pct, status }: { label: string; pct: number; status?: string }) => {
-  const s = status ?? (pct >= 85 ? "Strong" : "Good");
-  return (
-    <div>
-      <div className="flex justify-between items-center gap-2 text-[12px] mb-1">
-        <span className="text-[#0F172A] font-medium">{label}</span>
-        <span className={`text-[10px] font-bold rounded-full border px-2 py-0.5 shrink-0 ${s === "Strong" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-emerald-50/60 text-emerald-700 border-emerald-100"}`}>{s}</span>
-      </div>
-      <div className="h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-[#2563EB]" style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} /></div>
-    </div>
-  );
-};
+const FactorBar = ({ label, status }: { label: string; status: string }) => (
+  <div className="flex justify-between items-center gap-2 text-[12px] mb-1">
+    <span className="text-[#0F172A] font-medium">{label}</span>
+    <span className="text-[10px] font-bold rounded-full border px-2 py-0.5 shrink-0 bg-emerald-50/60 text-emerald-700 border-emerald-100">{status}</span>
+  </div>
+);
 
 const Source = ({ name, on }: { name: string; on: boolean }) => (
   <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-[12px] font-semibold ${on ? "border-emerald-200 bg-emerald-50/60 text-[#0F172A]" : "border-[#E6E8EC] bg-white text-[#94A3B8]"}`}>
@@ -2886,7 +2806,7 @@ function MobileCtaFooter({ variant, panelKey, go, signals }: { variant: string; 
     return <div><Badge /><BlueBtn label={cta.btn} /><TrustRow items={TRUST_DEFAULT} /></div>;
   }
   if (variant === "progressive") {
-    const chips = [signals.greatPrice ? "Great Price" : null, "Verified Vehicle", signals.highConf ? "High Confidence" : null].filter(Boolean) as string[];
+    const chips = [signals.greatPrice ? "Great Price" : null, "Verified Vehicle", null].filter(Boolean) as string[];
     return (
       <div>
         <p className="text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider mb-2">You're looking at</p>
@@ -3101,7 +3021,7 @@ function PriceTimeline({ history }: { history: PricePoint[] }) {
       <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
         <div className="flex items-center gap-4 text-[11px] font-semibold">
           <span className="inline-flex items-center gap-1.5 text-[#16A34A]"><span className="w-4 border-t-2 border-[#16A34A]" /> Dealer price</span>
-          <span className="inline-flex items-center gap-1.5 text-[#64748B]"><span className="w-4 border-t-2 border-dashed border-[#2563EB]" /> Market value</span>
+          <span className="inline-flex items-center gap-1.5 text-[#64748B]"><span className="w-4 border-t-2 border-dashed border-[#2563EB]" /> Estimated market value</span>
         </div>
         <Seg value={range} onChange={(v) => setRange(v as number)} options={[{ label: "7D", value: 7 }, { label: "30D", value: 30 }, { label: "60D", value: 60 }, { label: "90D", value: 90 }, { label: "All", value: 0 }]} />
       </div>
@@ -3397,7 +3317,7 @@ export default function PassportPanel({ panel, onClose, openPanel, d, listing, i
           }),
         }) ?? buildPanel(key, d, listing, isPreview, go, openPanel, nhtsa))
       : buildPanel(key, d, listing, isPreview, go, openPanel, nhtsa);
-  const ctaSignals: CtaSignals = { greatPrice: (d.belowMarket ?? 0) > 0, highDemand: (d.viewCount ?? 0) > 20, highConf: (d.confScore ?? 0) >= 85, highlyRated: (d.reviewRating ?? 0) >= 4.5, hasWarranty: !!d.warrantyStr && !d.warrantyExpired };
+  const ctaSignals: CtaSignals = { greatPrice: (d.belowMarket ?? 0) > 0, highDemand: false, highConf: false, highlyRated: (d.reviewRating ?? 0) >= 4.5, hasWarranty: !!d.warrantyStr && !d.warrantyExpired };
   const ctaVariant = d.dealerTrust.mobileCtaVariant || "dealer_availability";
   const footer = (def.primary || def.secondary) ? (
     <>

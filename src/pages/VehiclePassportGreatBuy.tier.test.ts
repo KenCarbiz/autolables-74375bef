@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { scoreTier } from "./VehiclePassportGreatBuy";
 import { derivePassport, deriveRating, ratingTier, type VehicleRating } from "@/lib/passportV2Data";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 
@@ -123,23 +122,5 @@ describe("single tier table", () => {
     expect(ratingTier(65).label).toBe("Fair");
     expect(ratingTier(42).label).toBe("Worth a Closer Look");
     expect(ratingTier(null).id).toBe("pending");
-  });
-
-  it("keeps GreatBuy's buy framing on identical bands", () => {
-    for (const s of [97, 90, 85, 80, 75, 70, 65, 60, 42, 10]) {
-      expect(scoreTier(s).label).toBe(ratingTier(s).buyLabel);
-    }
-    expect(scoreTier(85).label).toBe("Strong Buy");
-    expect(scoreTier(null).label).toBe("Pending Verification");
-  });
-
-  it("never renders red for any tier", () => {
-    for (const s of [95, 85, 75, 65, 55, 42, 10]) expect(scoreTier(s).color).not.toBe("#DC2626");
-  });
-
-  it("frames a 60-69 score as a candidate with details to confirm — never excellent, never a warning", () => {
-    const t = scoreTier(65);
-    expect(t.label).not.toMatch(/excellent|exceptional/i);
-    expect(t.verdict).not.toMatch(/carefully|caution/i);
   });
 });

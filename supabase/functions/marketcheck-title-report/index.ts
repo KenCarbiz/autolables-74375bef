@@ -59,8 +59,8 @@ interface TitleSummary {
 }
 
 // Normalize the AAMVA VINData payload into a compact, dealer-facing summary,
-// returned for the session only. "clean" ONLY when there are zero brand records
-// AND zero junk/salvage/total-loss records, so the dealer never over-attests.
+// returned for the session only. "clean" ONLY when both record lists are present
+// and empty, so the dealer never over-attests from an empty or unrecognised body.
 // deno-lint-ignore no-explicit-any
 function summarize(raw: any): TitleSummary {
   const brandsRaw = arr(raw?.titleBrandReported);
@@ -93,8 +93,12 @@ function summarize(raw: any): TitleSummary {
   const highestOdometer = odoNums.length ? Math.max(...odoNums) : null;
 
   const hasIssue = brands.length > 0 || junkSalvage.length > 0;
+  // "clean" needs positive evidence the report was read: both record lists are
+  // present (an empty list is an answer; a missing one is not). An empty or
+  // unrecognised payload is "unknown", never "clean".
+  const recognised = Array.isArray(raw?.titleBrandReported) && Array.isArray(raw?.junkSalvageTotalLoss);
   return {
-    status: hasIssue ? "branded" : "clean",
+    status: hasIssue ? "branded" : recognised ? "clean" : "unknown",
     brandCount: brands.length,
     junkCount: junkSalvage.length,
     brands,
