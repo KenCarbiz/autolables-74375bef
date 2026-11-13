@@ -9,8 +9,8 @@
 //
 // Run: bun run sync:edge-sticker
 
-import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -46,6 +46,92 @@ export const WARRANTY_FILES = ["inServiceEvidence.ts"];
 export const WARRANTY_PREFIX = "warranty/";
 const rewriteEngineImports = (body) => body.replace(/from "\.\.\/factorySticker\//g, 'from "../');
 
+
+// The customer Passport page view (src/lib/marketPass/pageView.ts) runs the
+// same functions the locked page runs, and the edge function serves it, so the
+// closure of those functions is mirrored too. Unlike the trees above these
+// files import each other through `@/lib/...` and through paths into
+// supabase/functions/_shared, so every specifier is resolved against src/ and
+// re-pointed at where its target lands in the mirror (or in _shared, which
+// already lives under supabase/functions/). Relative specifiers gain the .ts
+// extension Deno requires. Each file is copied one key per file; nothing else
+// in these directories ships.
+export const PAGE_VIEW_FILES = [
+  "src/lib/passportV2Data.ts",
+  "src/lib/photos.ts",
+  "src/lib/packetModules.ts",
+  "src/lib/stickyButtons.ts",
+  "src/lib/oemWarranty.ts",
+  "src/lib/iihsAwards.ts",
+  "src/lib/passportRouting.ts",
+  "src/lib/priceModel.ts",
+  "src/lib/passport/comparables.ts",
+  "src/lib/passport/evidenceFingerprint.ts",
+  "src/lib/passport/fuelEconomy.ts",
+  "src/lib/passport/marketComparison.ts",
+  "src/lib/passport/saleCard.ts",
+  "src/lib/passport/sellingPrice.ts",
+  "src/lib/passport/verificationSummary.ts",
+  "src/lib/payment/estimator.ts",
+];
+export const PAGE_VIEW_DIR = "src/lib/marketPass";
+// The page view only names this type; the real interface lives in a React hook
+// file the edge runtime cannot load. The mirror carries a structural stand-in.
+export const LISTING_TYPE_KEY = "vehicleListingType.ts";
+const LISTING_TYPE_SOURCE = "src/hooks/useVehicleListing.ts";
+const LISTING_TYPE_BODY = `// deno-lint-ignore-file no-explicit-any
+export type VehicleListing = Record<string, any>;
+`;
+
+const SPECIFIER = /(\bfrom\s+|\bimport\(\s*)(["'])([^"']+)\2/g;
+const EXTENSIONS = [".ts", ".tsx", "/index.ts"];
+const SIBLING_TREES = ["vehicleTruth", "documents", "market", "vehicleFile", "intelligence", "warranty"];
+
+function resolveSource(fromFile, spec) {
+  const base = spec.startsWith("@/") ? join(root, "src", spec.slice(2)) : resolve(dirname(fromFile), spec);
+  for (const ext of ["", ...EXTENSIONS]) {
+    const candidate = base + ext;
+    if (existsSync(candidate) && statSync(candidate).isFile()) return candidate;
+  }
+  throw new Error(`sync-edge-sticker-lib: ${relative(root, fromFile)} imports ${spec}, which does not resolve`);
+}
+
+/** Where a source file lives once mirrored: an absolute path under the mirror, or under _shared. */
+function mirrorLocation(srcAbs) {
+  const rel = relative(root, srcAbs).split(sep).join("/");
+  if (rel.startsWith("supabase/functions/")) return srcAbs;
+  if (rel === LISTING_TYPE_SOURCE) return join(TARGET_DIR, LISTING_TYPE_KEY);
+  const lib = rel.match(/^src\/lib\/(.+)$/);
+  if (!lib) throw new Error(`sync-edge-sticker-lib: ${rel} has no mirror location`);
+  const inner = lib[1];
+  if (inner.startsWith("factorySticker/")) return join(TARGET_DIR, inner.slice("factorySticker/".length));
+  return join(TARGET_DIR, inner);
+}
+
+function rewriteSpecifiers(srcAbs, body) {
+  const here = dirname(mirrorLocation(srcAbs));
+  return body.replace(SPECIFIER, (whole, lead, quote, spec) => {
+    if (!spec.startsWith("@/") && !spec.startsWith(".")) return whole;
+    const target = mirrorLocation(resolveSource(srcAbs, spec));
+    let rel = relative(here, target).split(sep).join("/");
+    if (!rel.startsWith(".")) rel = `./${rel}`;
+    return `${lead}${quote}${rel}${quote}`;
+  });
+}
+
+function collectPageView(out) {
+  const files = [...PAGE_VIEW_FILES];
+  for (const name of readdirSync(join(root, PAGE_VIEW_DIR))) {
+    if (isCopyable(name)) files.push(`${PAGE_VIEW_DIR}/${name}`);
+  }
+  for (const rel of files) {
+    const abs = join(root, rel);
+    const key = relative(TARGET_DIR, mirrorLocation(abs)).split(sep).join("/");
+    out.set(key, HEADER.replace("{src}", rel) + rewriteSpecifiers(abs, readFileSync(abs, "utf8")));
+  }
+  out.set(LISTING_TYPE_KEY, HEADER.replace("{src}", LISTING_TYPE_SOURCE) + LISTING_TYPE_BODY);
+}
+
 const SKIP_DIRS = new Set(["__fixtures__", "__snapshots__", "__acceptance__"]);
 const isCopyable = (name) => name.endsWith(".ts") && !name.endsWith(".test.ts");
 
@@ -74,7 +160,7 @@ export function collect(dir, base = dir, out = new Map(), withHeader = true) {
   return out;
 }
 
-/** Every file the mirror should contain: the engine, the truth layer, shared document primitives, the Vehicle File read model, the market engine, and the intelligence layer. */
+/** Every file the mirror should contain: the engine, the truth layer, shared document primitives, the Vehicle File read model, the market engine, the intelligence layer, and the closure the customer Passport page view runs. */
 export function collectAll() {
   const out = collect(SOURCE_DIR);
   const truth = collect(TRUTH_SOURCE_DIR, TRUTH_SOURCE_DIR, new Map(), false);
@@ -104,6 +190,7 @@ export function collectAll() {
     const body = readFileSync(join(root, "src/lib/warranty", name), "utf8");
     out.set(WARRANTY_PREFIX + name, HEADER.replace("{src}", `src/lib/warranty/${name}`) + body);
   }
+  collectPageView(out);
   return out;
 }
 
