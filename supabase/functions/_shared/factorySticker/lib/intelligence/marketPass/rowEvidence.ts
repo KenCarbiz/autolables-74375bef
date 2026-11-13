@@ -163,7 +163,10 @@ export interface ComparableSelectionRecord {
 
 export function comparableSelectionFromRow(row: MarketPassRow): ComparableSelectionRecord {
   const meta = bag(row.market_meta);
-  const rec = bag(meta.comp_selection);
+  const cohort = bag(meta.cohort);
+  const rec = cohort.selection === "price_independent_cohort"
+    ? { ...cohort, price_independent: true }
+    : bag(meta.comp_selection);
   const flag = rec.price_independent;
   return {
     selection: flag === true ? "price_independent" : flag === false ? "conditioned_on_subject_price" : "not_recorded",
