@@ -15,7 +15,7 @@ import { usePublicListing } from "@/hooks/usePublicListing";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import { trackLeadSubmitted, trackCustomerEngagement } from "@/lib/engagement/customerEngagement";
 import Logo from "@/components/brand/Logo";
-import { fmt$, type PassportData } from "@/lib/passportV2Data";
+import { fmt$, cohortExplanation, type CompCohort, type PassportData } from "@/lib/passportV2Data";
 import { governedPassportData } from "@/lib/passport/publicSurface";
 import { resolvePassportBack, passportForwardPath } from "@/lib/passportReturn";
 import { deriveVerificationReport, verificationCountsLine, verificationScopeLine, VERIFICATION_STATUS_LABEL, type VerificationStatus } from "@/lib/passport/verificationSummary";
@@ -55,7 +55,7 @@ const dealRecapChips = (listing: VehicleListing, d: PassportData): string[] => {
   const cov = d.dealerCoverage.find((c) => c.mode === "included");
   const reconPoints = d.recon?.workItems.length ?? 0;
   return [
-    d.belowMarket && d.belowMarket > 0 ? `${fmt$(d.belowMarket)} below market` : null,
+    d.belowMarket && d.belowMarket > 0 ? `${fmt$(d.belowMarket)} est. below market` : null,
     bs?.estValue ? `${fmt$(bs.estValue)} in factory options` : null,
     cov?.title || null,
     reconPoints > 0 ? `${reconPoints}-point reconditioning` : null,
@@ -901,22 +901,22 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
           <SectionHeading icon={DollarSign} title="Market Price Analysis" subtitle="How this vehicle's price compares to the market." />
           {d.price != null && (hasRange || showAvg) ? (
             <Card className="p-5">
-              {d.belowMarket && d.belowMarket > 0 && presentLegacyPosition(listing.market_position).tone === "positive" && <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-600 text-white text-[13px] font-bold mb-3"><BadgeCheck className="w-4 h-4" /> Great Price · {fmt$(d.belowMarket)} below market average</div>}
+              {d.belowMarket && d.belowMarket > 0 && presentLegacyPosition(listing.market_position).tone === "positive" && <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-600 text-white text-[13px] font-bold mb-3"><BadgeCheck className="w-4 h-4" /> Great Price · {fmt$(d.belowMarket)} below the estimated market value</div>}
               {hasRange ? (
                 <div className="grid grid-cols-3 text-center text-[13px] gap-2">
-                  <div className="rounded-xl bg-slate-50 py-3"><div className="text-slate-500 text-[11px]">Market Low</div><div className="font-bold mt-0.5">{fmt$(d.marketLow)}</div></div>
+                  <div className="rounded-xl bg-slate-50 py-3"><div className="text-slate-500 text-[11px]">Estimated Low</div><div className="font-bold mt-0.5">{fmt$(d.marketLow)}</div></div>
                   <div className="rounded-xl bg-emerald-50 py-3"><div className="text-emerald-600 text-[11px]">{d.priceLabel}</div><div className="font-extrabold text-emerald-700 mt-0.5">{fmt$(d.price)}</div></div>
-                  <div className="rounded-xl bg-slate-50 py-3"><div className="text-slate-500 text-[11px]">Market High</div><div className="font-bold mt-0.5">{fmt$(d.marketHigh)}</div></div>
+                  <div className="rounded-xl bg-slate-50 py-3"><div className="text-slate-500 text-[11px]">Estimated High</div><div className="font-bold mt-0.5">{fmt$(d.marketHigh)}</div></div>
                 </div>
               ) : (
                 <div className="rounded-xl bg-emerald-50 text-center text-[13px] py-3"><div className="text-emerald-600 text-[11px]">{d.priceLabel}</div><div className="font-extrabold text-emerald-700 mt-0.5">{fmt$(d.price)}</div></div>
               )}
               {showAvg && (
                 <div className="mt-3 flex items-center justify-between text-[13px] rounded-xl bg-slate-50 px-4 py-3">
-                  <span className="text-slate-500">Market average</span><span className="font-bold">{fmt$(d.marketAvg)}</span>
+                  <span className="text-slate-500">Estimated market value</span><span className="font-bold">{fmt$(d.marketAvg)}</span>
                 </div>
               )}
-              <p className="text-[11px] text-slate-400 mt-3 leading-snug">Market values provided by third-party data sources. Actual market conditions may vary by region and time.</p>
+              <p className="text-[11px] text-slate-400 mt-3 leading-snug">Estimated values from a third-party data provider, not sale prices. Market data retrieved {d.marketCheckedAt ? new Date(d.marketCheckedAt).toLocaleDateString() : "date unavailable"}. Actual market conditions may vary by region and time.</p>
             </Card>
           ) : <Unavailable what="Market pricing" hint="Live market comparables are not yet available for this vehicle." />}
         </>
@@ -924,16 +924,16 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
     },
   },
   "market-demand": {
-    title: "Market Demand",
+    title: "Listing Activity",
     render: ({ d }) => (
       <>
-        <SectionHeading icon={TrendingUp} title="Market Demand" subtitle="Shopper interest signals for this listing." />
+        <SectionHeading icon={TrendingUp} title="Listing Activity" subtitle="Activity signals for this listing." />
         {d.viewCount != null || d.dom != null ? (
           <Card className="p-5">
-            <p className="text-xl font-extrabold text-emerald-600">{(d.viewCount ?? 0) > 20 ? "High Interest" : "Active"}</p>
+            <p className="text-xl font-extrabold text-slate-800">Listing activity</p>
             <ul className="mt-3 space-y-2.5 text-[14px]">
-              {d.viewCount != null && <li className="flex items-center gap-2.5"><CheckCircle2 className="w-4 h-4 text-emerald-600" />{d.viewCount.toLocaleString()} total views</li>}
-              {d.dom != null && <li className="flex items-center gap-2.5"><CheckCircle2 className="w-4 h-4 text-emerald-600" />{d.dom} days on market</li>}
+              {d.viewCount != null && <li className="flex items-center gap-2.5"><CheckCircle2 className="w-4 h-4 text-emerald-600" />{d.viewCount.toLocaleString()} Passport page views (not market demand)</li>}
+              {d.dom != null && <li className="flex items-center gap-2.5"><CheckCircle2 className="w-4 h-4 text-emerald-600" />{d.dom} days listed (provider count)</li>}
             </ul>
           </Card>
         ) : <Unavailable what="Demand data" hint="View and days-on-market signals appear here once the listing accrues activity." />}
@@ -941,26 +941,27 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
     ),
   },
   "price-confidence": {
-    title: "Price Confidence",
-    render: ({ d }) => (
-      <>
-        <SectionHeading icon={GaugeIcon} title="Price Confidence" subtitle="How sure we are this price is competitive." />
-        {d.belowMarket && d.belowMarket > 0 ? (
-          <Card className="p-5">
-            <p className="text-xl font-extrabold text-emerald-600">Excellent</p>
-            <p className="text-[14px] text-slate-600 mt-0.5">{fmt$(d.belowMarket)} below market average</p>
-            <ul className="mt-3 space-y-2.5 text-[14px]">
-              <li className="flex items-center gap-2.5"><CheckCircle2 className="w-4 h-4 text-emerald-600" />Priced below market average</li>
-              <li className="flex items-center gap-2.5"><CheckCircle2 className="w-4 h-4 text-emerald-600" />Backed by live market comparables</li>
-              <li className="flex items-center gap-2.5"><CheckCircle2 className="w-4 h-4 text-emerald-600" />Compared against live market data</li>
-            </ul>
-            <p className="text-[11px] text-slate-400 mt-3">Powered by live market data.</p>
-          </Card>
-        ) : d.marketAvg != null ? (
-          <Card className="p-5"><p className="text-xl font-extrabold text-blue-600">Fair</p><p className="text-[14px] text-slate-600 mt-0.5">Priced in line with the local market.</p><p className="text-[11px] text-slate-400 mt-3">Powered by live market data.</p></Card>
-        ) : <Unavailable what="Price confidence" hint="Confidence requires market comparables, which aren't available yet for this vehicle." />}
-      </>
-    ),
+    title: "Price Evidence",
+    render: ({ d }) => {
+      const retrieved = d.marketCheckedAt ? new Date(d.marketCheckedAt).toLocaleDateString() : null;
+      return (
+        <>
+          <SectionHeading icon={GaugeIcon} title="Price Evidence" subtitle="What this price is compared against." />
+          {d.belowMarket && d.belowMarket > 0 && !d.marketBasisWeak ? (
+            <Card className="p-5">
+              <p className="text-[14px] text-slate-600">{fmt$(d.belowMarket)} below the estimated market value</p>
+              <ul className="mt-3 space-y-2.5 text-[14px]">
+                <li className="flex items-center gap-2.5"><CheckCircle2 className="w-4 h-4 text-emerald-600" />Estimated market value is a provider estimate for this vehicle</li>
+                <li className="flex items-center gap-2.5"><CheckCircle2 className="w-4 h-4 text-emerald-600" />The estimate does not describe vehicle history or condition</li>
+              </ul>
+              <p className="text-[11px] text-slate-400 mt-3">{retrieved ? `Market data retrieved ${retrieved}. ` : ""}Estimates are not sale prices.</p>
+            </Card>
+          ) : d.marketAvg != null && !d.marketBasisWeak ? (
+            <Card className="p-5"><p className="text-[14px] text-slate-600">Priced near the estimated market value.</p><p className="text-[11px] text-slate-400 mt-3">{retrieved ? `Market data retrieved ${retrieved}. ` : ""}Estimates are not sale prices.</p></Card>
+          ) : <Unavailable what="Price evidence" hint="An estimated market value with enough comparable data isn't available yet for this vehicle." />}
+        </>
+      );
+    },
   },
   "price-history": {
     title: "Price History",
@@ -1367,15 +1368,15 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
 };
 
 // Comparable Vehicles — fetches the marketcheck-comps function on demand.
-// Comparable Vehicles — a sales-support view, not raw market research. The
-// server (marketcheck-comps) applies the dealer's comp strategy, which by
-// default only returns comps priced at or above this vehicle that are
-// similar enough to be a fair comparison. Aggregate stats stay market-wide
-// and honest; only the visible list is curated.
+// Comparable Vehicles — the server (marketcheck-comps) selects the cohort
+// from year / trim / drivetrain / mileage band / radius only, never from this
+// vehicle's price, so qualifying listings above and below it are both
+// analyzed. A payload without a `cohort` block predates that fix and makes no
+// median or count claim.
 const CompsSection = ({ slug, listing, d }: { slug: string; listing: VehicleListing; d: PassportData }) => {
   const [state, setState] = useState<"loading" | "ready" | "empty">("loading");
   const [reason, setReason] = useState<string | null>(null);
-  const [data, setData] = useState<{ count: number; median: number | null; comparables: { vin: string | null; price: number | null; miles: number | null; heading: string; trim: string | null; dealer: string; distance: number | null }[] } | null>(null);
+  const [data, setData] = useState<{ count: number | null; totalMatches?: number | null; analyzedCount?: number | null; median: number | null; checkedAt?: string | null; stale?: boolean; cohort?: CompCohort | null; comparables: { vin: string | null; price: number | null; miles: number | null; heading: string; trim: string | null; dealer: string; distance: number | null }[] } | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -1392,7 +1393,13 @@ const CompsSection = ({ slug, listing, d }: { slug: string; listing: VehicleList
 
   const ourPrice = d.price;
   const comps = data?.comparables ?? [];
-  const allAtOrAbove = ourPrice != null && comps.length > 0 && comps.every((c) => c.price == null || c.price >= ourPrice);
+  const cohort = data?.cohort ?? null;
+  const analyzed = cohort ? (data?.analyzedCount ?? cohort.analyzed_count) : null;
+  const totalMatches = cohort ? (data?.totalMatches ?? cohort.total_matches) : null;
+  const median = cohort ? data?.median ?? null : null;
+  const pricedBelowCohort = cohort != null && analyzed != null && analyzed >= 5 && median != null && ourPrice != null && ourPrice < median;
+  const cohortLines = cohort ? cohortExplanation(cohort) : [];
+  const retrieved = data?.checkedAt ? new Date(data.checkedAt).toLocaleDateString() : null;
 
   return (
     <>
@@ -1400,23 +1407,25 @@ const CompsSection = ({ slug, listing, d }: { slug: string; listing: VehicleList
       {state === "loading" ? (
         <Card className="p-5"><div className="space-y-3">{[0, 1, 2].map((i) => <div key={i} className="h-12 bg-slate-100 rounded-xl animate-pulse" />)}</div></Card>
       ) : state === "empty" || !data ? (
-        reason === "no_value_comps"
+        reason === "no_value_comps" || reason === "no_comps_analyzed"
           ? <Unavailable what="Comparable listings" hint="A fair comparison set isn't available for this vehicle right now." />
           : <Unavailable what="Comparable listings" hint="A live comparable set (year, trim, mileage, and price) is sourced from live market data and appears here when available for this vehicle and market." />
       ) : (
         <>
           <Card className="p-5">
             <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
-              <div><p className="text-[11px] text-slate-500">Comparable vehicles analyzed</p><p className="text-[22px] font-extrabold">{(d.marketMeta.similarCount ?? data.count).toLocaleString()}</p></div>
-              {data.median != null && ourPrice != null && data.median >= ourPrice && <div><p className="text-[11px] text-slate-500">Comparable median</p><p className="text-[22px] font-extrabold">{fmt$(data.median)}</p></div>}
+              {analyzed != null && <div><p className="text-[11px] text-slate-500">Comparable vehicles analyzed</p><p className="text-[22px] font-extrabold">{analyzed.toLocaleString()}</p>{totalMatches != null && totalMatches > analyzed && <p className="text-[11px] text-slate-400">of {totalMatches.toLocaleString()} matching listings</p>}</div>}
+              {median != null && <div><p className="text-[11px] text-slate-500">Median asking price (comparables)</p><p className="text-[22px] font-extrabold">{fmt$(median)}</p></div>}
               {ourPrice != null && <div><p className="text-[11px] text-slate-500">This vehicle</p><p className="text-[22px] font-extrabold text-[#2563EB]">{fmt$(ourPrice)}</p></div>}
             </div>
-            {allAtOrAbove && (
+            {pricedBelowCohort && median != null && analyzed != null && (
               <p className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1">
-                <CheckCircle2 className="w-3.5 h-3.5" /> This vehicle is priced below these comparable local listings.
+                <CheckCircle2 className="w-3.5 h-3.5" /> Priced below the {fmt$(median)} median asking price of the {analyzed.toLocaleString()} comparable listings analyzed.
               </p>
             )}
-            <p className="text-[11px] text-slate-400 mt-3">Market statistics from live market data.</p>
+            {cohortLines.length > 0 && <ul className="mt-3 space-y-0.5">{cohortLines.map((t) => <li key={t} className="text-[11px] text-slate-500">{t}</li>)}</ul>}
+            {!cohort && <p className="mt-3 text-[11px] text-slate-500">Listing details only: the selection method for this set was not recorded, so no count or median is shown.</p>}
+            <p className="text-[11px] text-slate-400 mt-3">Asking prices from market listings; fee treatment can differ between sellers.{retrieved ? ` Market data retrieved ${retrieved}${data.stale ? " (older saved copy)" : ""}.` : ""}</p>
           </Card>
           {comps.length > 0 && (
             <Card className="p-5 mt-4">
@@ -1443,7 +1452,7 @@ const CompsSection = ({ slug, listing, d }: { slug: string; listing: VehicleList
                   );
                 })}
               </div>
-              <p className="text-[11px] text-slate-400 mt-3">Comparable listings from live market data.</p>
+              <p className="text-[11px] text-slate-400 mt-3">Nearest comparable listings from the analyzed set, shown by distance, not by price.</p>
             </Card>
           )}
         </>

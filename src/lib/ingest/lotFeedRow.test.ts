@@ -89,9 +89,11 @@ describe("the three additions", () => {
   });
 });
 
-describe("the shape is allow-by-default", () => {
-  it("passes through a column nobody has taught it about", () => {
-    expect(shapeLotRow({ vin: "1", some_new_column_2027: "hello" }).some_new_column_2027).toBe("hello");
+describe("the shape is allowlist-only", () => {
+  it("drops a column nobody has named in the allowlist", () => {
+    const out = shapeLotRow({ vin: "1", some_new_column_2027: "hello" });
+    expect(out.some_new_column_2027).toBeUndefined();
+    expect(out.vin).toBe("1");
   });
 
   it("autofilm-feed selects the whole row rather than naming fields", () => {
@@ -696,6 +698,6 @@ describe("recall reaches a sister app with its scope attached", () => {
     expect(shopper.open_recall_count).toBeNull();
     expect(shopper.recall.model_campaign_context.state).toBe("NO_MODEL_CAMPAIGNS_FOUND");
     const view = readFileSync(join(fnDir, "public-listing-view/index.ts"), "utf8");
-    expect(view).toMatch(/applyRecallProjection\(row as Record<string, unknown>\)/);
+    expect(view).toMatch(/applyRecallProjection\(shipped\)/);
   });
 });

@@ -16,8 +16,8 @@ describe("inferred sold evidence is never described as a transaction", () => {
   it("accepts the approved vocabulary", () => {
     for (const copy of [
       "Priced $500 below the typical last advertised price before sale",
-      "Median last advertised price of 12 inferred sold listings in CT, last 90 days",
-      "14 similar vehicles inferred sold in CT in the last 90 days",
+      "Median last advertised price of 12 listings that left the market in CT",
+      "14 similar vehicles left the market in CT",
       "Similar vehicles typically leave the market within ~21 days here",
       INFERRED_SOLD_PRICE_LABEL,
     ]) {

@@ -13,21 +13,23 @@ import { join } from "node:path";
 
 const ROOT = join(__dirname, "..", "..", "..");
 const enrich = readFileSync(join(ROOT, "supabase/functions/vehicle-enrich/index.ts"), "utf8");
-const view = readFileSync(join(ROOT, "supabase/functions/public-listing-view/index.ts"), "utf8");
+const cohort = readFileSync(join(ROOT, "supabase/functions/_shared/compCohort.ts"), "utf8");
+const projection = readFileSync(join(ROOT, "supabase/functions/_shared/publicListingProjection.ts"), "utf8");
 const passport = readFileSync(join(ROOT, "src/pages/VehiclePassportGoverned.tsx"), "utf8");
 
 describe("evidence and offer are separate sets", () => {
   it("keeps the dealer's own rooftop out of the market evidence", () => {
     // A dealer's own cars are not independent evidence of the market.
-    expect(enrich).toMatch(/const rows: any\[\] = all\.filter\(\(l: any\) => notSubject\(l\) && !isOurs\(l\)\)/);
+    expect(enrich).toMatch(/const split = splitCohortRows\(all, subjectVin, dealerName\);\s+const rows = split\.rows;/);
+    expect(cohort).toMatch(/\(isOurs\(l\) \? ownRows : rows\)\.push\(l\)/);
   });
 
   it("keeps ONLY the dealer's own rooftop in the offer", () => {
-    expect(enrich).toMatch(/const groupRows: any\[\] = all\.filter\(\(l: any\) => notSubject\(l\) && isOurs\(l\)\)/);
+    expect(enrich).toMatch(/const groupRows = split\.ownRows;/);
   });
 
   it("treats a same-lot listing as ours even when the seller name differs", () => {
-    expect(enrich).toMatch(/return Number\(l\.dist\) === 0;/);
+    expect(cohort).toMatch(/return Number\(l\.dist\) === 0;/);
   });
 
   it("stores the offer under its own column, not inside comparables", () => {
@@ -48,9 +50,10 @@ describe("never detract from the car they came in on", () => {
   it("does not apply a blunt price floor to the dealer's own cars", () => {
     // A cheaper car of theirs is a sale, not a leak. The floor belongs to the
     // market evidence, where it keeps the price claim honest.
-    const offer = view.slice(view.indexOf("row.group_similar = "), view.indexOf("if (row.market_meta"));
+    const offer = projection.slice(projection.indexOf("export const projectComparables"), projection.indexOf("export const projectValueHistory"));
     expect(offer).not.toMatch(/ourPrice/);
     expect(offer).toMatch(/Number\.isFinite\(p\) && p > 0/);
+    expect(projection).toMatch(/out\.group_similar = projectComparables\(out\.group_similar/);
   });
 });
 
@@ -63,7 +66,8 @@ describe("the shopper never sees a competitor as an offer", () => {
 
   it("ships no dealer name to an anonymous page", () => {
     // Competitor identity stays off the payload, same rule the market set has.
-    const offer = view.slice(view.indexOf("row.group_similar = "), view.indexOf("if (row.market_meta"));
-    expect(offer).not.toMatch(/dealer:/);
+    expect(projection).toMatch(/const COMP_KEYS = \[[^\]]*\]/);
+    expect(projection.match(/const COMP_KEYS = \[([^\]]*)\]/)![1]).not.toMatch(/dealer|vin/);
+    expect(projection).toMatch(/opts\?\.forFeed \? OWN_STOCK_FEED_KEYS : \[\]/);
   });
 });

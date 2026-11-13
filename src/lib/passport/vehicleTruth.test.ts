@@ -175,6 +175,6 @@ describe("an unscored category is shown, and says why", () => {
 
   it("refuses a Strong headline while title and history are unverified", () => {
     expect(greatBuy).toMatch(/const historyBlocked = rating\.factors\.some\(\(f\) => f\.key === "history" && f\.score == null\) && d\.confBlockedBy\.length > 0;/);
-    expect(greatBuy).toMatch(/\? "Promising — Title & History Not Yet Verified"/);
+    expect(greatBuy).toMatch(/\? "Title & History Not Yet Verified"/);
   });
 });

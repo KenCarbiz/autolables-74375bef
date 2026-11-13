@@ -57,6 +57,11 @@ export interface NextPassportData {
     state: NextSectionState;
     similar: number | null; belowMarket: number | null; daysOnMarket: number | null;
     position: number | null; updated: string; note: string;
+    // `updated` is OUR retrieval date, not a provider observation date; the
+    // renderer must pair it with `retrievedLabel`. `belowMarket` is an
+    // estimate-based difference and must be labelled "Est.".
+    retrievedLabel: string;
+    similarKind: "like_for_like" | "analyzed" | "matches" | null;
   };
   reasons: { state: NextSectionState; items: string[] };
   confirm: {
@@ -312,7 +317,7 @@ function buildMarket(d: PassportData, pv: (k: string) => boolean): NextPassportD
     return {
       state: d.marketAvg == null ? "pending" : "unavailable",
       similar: null, belowMarket: null, daysOnMarket: null, position: null,
-      updated, note: "",
+      updated, note: "", retrievedLabel: "Market data retrieved", similarKind: null,
     };
   }
   const position = (() => {
@@ -326,12 +331,14 @@ function buildMarket(d: PassportData, pv: (k: string) => boolean): NextPassportD
   })();
   return {
     state: "success",
-    similar: d.marketMeta.likeCount ?? d.marketMeta.similarCount,
+    similar: d.marketMeta.likeCount ?? d.marketMeta.analyzedCount ?? d.marketMeta.similarCount,
+    similarKind: d.marketMeta.likeCount != null ? "like_for_like" : d.marketMeta.analyzedCount != null ? "analyzed" : d.marketMeta.similarCount != null ? "matches" : null,
     belowMarket: d.belowMarket != null && d.belowMarket > 0 ? d.belowMarket : null,
     daysOnMarket: d.dom,
     position,
     updated,
     note: "",
+    retrievedLabel: "Market data retrieved",
   };
 }
 
@@ -344,7 +351,7 @@ function buildReasons({ d, report, isCpo, make }: {
 }): NextPassportData["reasons"] {
   const verified = (key: string) => report.checks.find((c) => c.key === key)?.status === "verified";
   const items = ([
-    d.belowMarket != null && d.belowMarket > 250 && !d.marketBasisWeak ? "Priced below the local market for comparable vehicles" : null,
+    d.belowMarket != null && d.belowMarket > 250 && !d.marketBasisWeak ? "Priced below the estimated market value for comparable vehicles" : null,
     d.ownerCount === 1 ? "One owner reported" : null,
     verified("title") ? "Title verified: clean" : null,
     verified("recalls") ? "No open recalls reported" : null,

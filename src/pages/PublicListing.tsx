@@ -619,7 +619,7 @@ const PublicListingBody = () => {
                     <div>
                       <div className="text-base font-bold text-[#1a9d5c]">{belowMarket > 0 ? "Great Price" : "Market Price"}</div>
                       <div className="text-[26px] font-extrabold mt-1">{fmt$(price)}</div>
-                      {belowMarket > 0 && <div className="text-xs text-[#1a9d5c] mt-1">You save {fmt$(belowMarket)} <span className="text-[#6b727a]">below market average</span></div>}
+                      {belowMarket > 0 && <div className="text-xs text-[#1a9d5c] mt-1">You save {fmt$(belowMarket)} <span className="text-[#6b727a]">below estimated market value</span></div>}
                     </div>
                     <MarketGauge price={price} avg={marketAvg} />
                   </div>
@@ -650,7 +650,7 @@ const PublicListingBody = () => {
               <div className="text-base font-bold">Price Confidence</div>
               {(() => {
                 const points: string[] = [];
-                if (belowMarket > 0) points.push("Priced below market average");
+                if (belowMarket > 0) points.push("Priced below the estimated market value");
                 if (recall.vin.clearClaimAllowed) points.push("No open safety recalls");
                 if (accidentCount === 0) points.push("No accidents reported");
                 if (ownerCount === 1) points.push("Single owner");
@@ -663,7 +663,7 @@ const PublicListingBody = () => {
                 return (
                   <>
                     {level && <div className="text-[17px] font-bold text-[#1a9d5c] mt-3">{level}</div>}
-                    {belowMarket > 0 && <div className="text-[13px] text-[#3a4048] mt-1">This vehicle is priced below market average.</div>}
+                    {belowMarket > 0 && <div className="text-[13px] text-[#3a4048] mt-1">This vehicle is priced below the estimated market value.</div>}
                     <div className="flex flex-col gap-2 mt-[14px]">
                       {points.map((c) => (
                         <div key={c} className="flex items-center gap-2 text-[13px]">
