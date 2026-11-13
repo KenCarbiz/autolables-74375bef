@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { collectAll, TARGET_DIR, PAGE_VIEW_FILES, INTELLIGENCE_PREFIX, readMirror, TRUTH_PREFIX, WARRANTY_PREFIX } from "../../../scripts/sync-edge-sticker-lib.mjs";
@@ -88,5 +88,16 @@ describe("edge factory-sticker mirror", () => {
         expect(spec, `${key} imports ${spec}`).toMatch(/\.ts$/);
       }
     }
+  });
+
+  it("keeps the shared edge folder small enough for Lovable's ~4.5 MB per-function upload", () => {
+    const size = (dir: string): number => readdirSync(dir, { withFileTypes: true })
+      .reduce((n, e) => n + (e.isDirectory() ? size(join(dir, e.name)) : statSync(join(dir, e.name)).size), 0);
+    const fnRoot = resolve(TARGET_DIR, "../../..");
+    const shared = size(join(fnRoot, "_shared"));
+    const largestOwn = Math.max(...readdirSync(fnRoot, { withFileTypes: true })
+      .filter((e) => e.isDirectory() && !e.name.startsWith("_"))
+      .map((e) => size(join(fnRoot, e.name))));
+    expect(shared + largestOwn, `shared ${shared} + largest function ${largestOwn}`).toBeLessThan(4_300_000);
   });
 });

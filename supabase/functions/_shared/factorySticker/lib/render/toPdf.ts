@@ -2,214 +2,221 @@
 // Mirror of src/lib/factorySticker/render/toPdf.ts, copied so the edge runtime can
 // bundle the engine (Supabase ships only supabase/functions/). Edit the
 // source file and run `bun run sync:edge-sticker`.
-// pdf-lib realization of a LayoutModel. Written against a structural
-// PdfLibModule so the identical code runs with the npm package (vitest /
-// browser) and the esm.sh build (Deno edge). Output is deterministic:
-// fixed metadata dates, vector drawing (plus authorized logo rasters), no
-// randomness.
-
 import { encodeCode128 } from "./code128.ts";
 import { encodeQrMatrix } from "./qrMatrix.ts";
-import {
-  charWidthUnits,
-  measureText,
-  type LayoutFont,
-  type LayoutModel,
-  type TextPrimitive,
-} from "./layout.ts";
-
+import { charWidthUnits, measureText, type LayoutFont, type LayoutModel, type TextPrimitive, } from "./layout.ts";
 export interface PdfColor {
-  type: unknown;
+    type: unknown;
 }
-
 export interface PdfFontLike {
-  widthOfTextAtSize?(text: string, size: number): number;
+    widthOfTextAtSize?(text: string, size: number): number;
 }
-
 export interface PdfPageLike {
-  drawText(
-    text: string,
-    options: { x: number; y: number; size: number; font: PdfFontLike; color: PdfColor },
-  ): void;
-  drawRectangle(options: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-    color?: PdfColor;
-    borderColor?: PdfColor;
-    borderWidth?: number;
-  }): void;
-  drawSvgPath(path: string, options: {
-    x: number;
-    y: number;
-    color?: PdfColor;
-    borderColor?: PdfColor;
-    borderWidth?: number;
-  }): void;
-  drawImage(image: PdfImageLike, options: { x: number; y: number; width: number; height: number }): void;
+    drawText(text: string, options: {
+        x: number;
+        y: number;
+        size: number;
+        font: PdfFontLike;
+        color: PdfColor;
+    }): void;
+    drawRectangle(options: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        color?: PdfColor;
+        borderColor?: PdfColor;
+        borderWidth?: number;
+    }): void;
+    drawSvgPath(path: string, options: {
+        x: number;
+        y: number;
+        color?: PdfColor;
+        borderColor?: PdfColor;
+        borderWidth?: number;
+    }): void;
+    drawImage(image: PdfImageLike, options: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+    }): void;
 }
-
 export type PdfImageLike = object;
-
 export interface PdfDocumentLike {
-  addPage(size: [number, number]): PdfPageLike;
-  embedFont(font: string): Promise<PdfFontLike>;
-  embedPng(png: Uint8Array): Promise<PdfImageLike>;
-  setTitle(title: string): void;
-  setProducer(producer: string): void;
-  setCreator(creator: string): void;
-  setCreationDate(date: Date): void;
-  setModificationDate(date: Date): void;
-  save(): Promise<Uint8Array>;
+    addPage(size: [
+        number,
+        number
+    ]): PdfPageLike;
+    embedFont(font: string): Promise<PdfFontLike>;
+    embedPng(png: Uint8Array): Promise<PdfImageLike>;
+    setTitle(title: string): void;
+    setProducer(producer: string): void;
+    setCreator(creator: string): void;
+    setCreationDate(date: Date): void;
+    setModificationDate(date: Date): void;
+    save(): Promise<Uint8Array>;
 }
-
 export interface PdfLibModule {
-  PDFDocument: { create(): Promise<PdfDocumentLike> };
-  StandardFonts: { Helvetica: string; HelveticaBold: string; Courier: string };
-  rgb(r: number, g: number, b: number): PdfColor;
+    PDFDocument: {
+        create(): Promise<PdfDocumentLike>;
+    };
+    StandardFonts: {
+        Helvetica: string;
+        HelveticaBold: string;
+        Courier: string;
+    };
+    rgb(r: number, g: number, b: number): PdfColor;
 }
-
-function hexToRgb(hex: string): [number, number, number] {
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
-  if (!m) return [0, 0, 0];
-  const n = parseInt(m[1], 16);
-  return [((n >> 16) & 0xff) / 255, ((n >> 8) & 0xff) / 255, (n & 0xff) / 255];
+function hexToRgb(hex: string): [
+    number,
+    number,
+    number
+] {
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+    if (!m)
+        return [0, 0, 0];
+    const n = parseInt(m[1], 16);
+    return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
 }
-
 function base64ToBytes(b64: string): Uint8Array {
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
+    const bin = atob(b64);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++)
+        out[i] = bin.charCodeAt(i);
+    return out;
 }
-
 export async function realizePdf(model: LayoutModel, lib: PdfLibModule): Promise<Uint8Array> {
-  if (!model.fit.ok) throw new Error(`one_page_review_required: ${model.fit.detail}`);
-  if (model.pages.length !== 1) throw new Error(`one_page_only: layout has ${model.pages.length} pages`);
-  const doc = await lib.PDFDocument.create();
-  const fonts: Record<LayoutFont, PdfFontLike> = {
-    body: await doc.embedFont(lib.StandardFonts.Helvetica),
-    heading: await doc.embedFont(lib.StandardFonts.HelveticaBold),
-    bold: await doc.embedFont(lib.StandardFonts.HelveticaBold),
-    numeric: await doc.embedFont(lib.StandardFonts.Courier),
-  };
-  const color = (hex: string): PdfColor => {
-    const [r, g, b] = hexToRgb(hex);
-    return lib.rgb(r, g, b);
-  };
-
-  const drawTextPrim = (page: PdfPageLike, t: TextPrimitive): void => {
-    const font = fonts[t.font];
-    const spacing = t.charSpacing ?? 0;
-    const width = measureText(t.str, t.font, t.size, spacing);
-    const x0 = t.align === "right" ? t.x - width : t.align === "center" ? t.x - width / 2 : t.x;
-    const y = model.height - t.y;
-    const fill = color(t.color);
-    if (spacing > 0) {
-      let cx = x0;
-      for (const ch of t.str) {
-        page.drawText(ch, { x: cx, y, size: t.size, font, color: fill });
-        cx += (charWidthUnits(ch, t.font) / 1000) * t.size + spacing;
-      }
-    } else {
-      page.drawText(t.str, { x: x0, y, size: t.size, font, color: fill });
-    }
-  };
-
-  const images = new Map<string, PdfImageLike>();
-  for (const layoutPage of model.pages) {
-    for (const prim of layoutPage.primitives) {
-      if (prim.kind === "image" && !images.has(prim.png)) {
-        images.set(prim.png, await doc.embedPng(base64ToBytes(prim.png)));
-      }
-    }
-  }
-
-  for (const layoutPage of model.pages) {
-    const page = doc.addPage([model.width, model.height]);
-    for (const prim of layoutPage.primitives) {
-      if (prim.kind === "text") {
-        drawTextPrim(page, prim);
-      } else if (prim.kind === "rule") {
-        page.drawRectangle({
-          x: prim.x,
-          y: model.height - prim.y - prim.h,
-          width: prim.w,
-          height: prim.h,
-          color: color(prim.color),
-        });
-      } else if (prim.kind === "rect") {
-        page.drawRectangle({
-          x: prim.x,
-          y: model.height - prim.y - prim.h,
-          width: prim.w,
-          height: prim.h,
-          ...(prim.fill !== null ? { color: color(prim.fill) } : {}),
-          ...(prim.stroke !== undefined
-            ? { borderColor: color(prim.stroke), borderWidth: prim.strokeWidth ?? 0.75 }
-            : {}),
-        });
-      } else if (prim.kind === "path") {
-        // pdf-lib anchors SVG paths at (x, y) with path coordinates y-down.
-        page.drawSvgPath(prim.d, {
-          x: prim.x,
-          y: model.height - prim.y,
-          ...(prim.fill !== null ? { color: color(prim.fill) } : {}),
-          ...(prim.stroke !== undefined
-            ? { borderColor: color(prim.stroke), borderWidth: prim.strokeWidth ?? 0.75 }
-            : {}),
-        });
-      } else if (prim.kind === "image") {
-        page.drawImage(images.get(prim.png)!, {
-          x: prim.x,
-          y: model.height - prim.y - prim.h,
-          width: prim.w,
-          height: prim.h,
-        });
-      } else if (prim.kind === "barcode") {
-        const encoding = encodeCode128(prim.payload);
-        const quiet = 10;
-        const moduleW = prim.w / (encoding.totalModules + quiet * 2);
-        let mx = prim.x + quiet * moduleW;
-        const barColor = color(prim.color);
-        encoding.widths.forEach((w, i) => {
-          const width = w * moduleW;
-          if (i % 2 === 0) {
-            page.drawRectangle({
-              x: mx,
-              y: model.height - prim.y - prim.h,
-              width,
-              height: prim.h,
-              color: barColor,
-            });
-          }
-          mx += width;
-        });
-      } else {
-        const encoding = encodeQrMatrix(prim.payload);
-        const cell = prim.size / encoding.size;
-        const dark = color(prim.color);
-        for (let r = 0; r < encoding.size; r++) {
-          for (let c = 0; c < encoding.size; c++) {
-            if (!encoding.matrix[r][c]) continue;
-            page.drawRectangle({
-              x: prim.x + c * cell,
-              y: model.height - prim.y - (r + 1) * cell,
-              width: cell,
-              height: cell,
-              color: dark,
-            });
-          }
+    if (!model.fit.ok)
+        throw new Error(`one_page_review_required: ${model.fit.detail}`);
+    if (model.pages.length !== 1)
+        throw new Error(`one_page_only: layout has ${model.pages.length} pages`);
+    const doc = await lib.PDFDocument.create();
+    const fonts: Record<LayoutFont, PdfFontLike> = {
+        body: await doc.embedFont(lib.StandardFonts.Helvetica),
+        heading: await doc.embedFont(lib.StandardFonts.HelveticaBold),
+        bold: await doc.embedFont(lib.StandardFonts.HelveticaBold),
+        numeric: await doc.embedFont(lib.StandardFonts.Courier),
+    };
+    const color = (hex: string): PdfColor => {
+        const [r, g, b] = hexToRgb(hex);
+        return lib.rgb(r, g, b);
+    };
+    const drawTextPrim = (page: PdfPageLike, t: TextPrimitive): void => {
+        const font = fonts[t.font];
+        const spacing = t.charSpacing ?? 0;
+        const width = measureText(t.str, t.font, t.size, spacing);
+        const x0 = t.align === "right" ? t.x - width : t.align === "center" ? t.x - width / 2 : t.x;
+        const y = model.height - t.y;
+        const fill = color(t.color);
+        if (spacing > 0) {
+            let cx = x0;
+            for (const ch of t.str) {
+                page.drawText(ch, { x: cx, y, size: t.size, font, color: fill });
+                cx += (charWidthUnits(ch, t.font) / 1000) * t.size + spacing;
+            }
         }
-      }
+        else {
+            page.drawText(t.str, { x: x0, y, size: t.size, font, color: fill });
+        }
+    };
+    const images = new Map<string, PdfImageLike>();
+    for (const layoutPage of model.pages) {
+        for (const prim of layoutPage.primitives) {
+            if (prim.kind === "image" && !images.has(prim.png)) {
+                images.set(prim.png, await doc.embedPng(base64ToBytes(prim.png)));
+            }
+        }
     }
-  }
-
-  doc.setTitle("Factory Window Sticker");
-  doc.setProducer("AutoLabels Factory Sticker Renderer");
-  doc.setCreator("AutoLabels");
-  doc.setCreationDate(new Date(0));
-  doc.setModificationDate(new Date(0));
-  return doc.save();
+    for (const layoutPage of model.pages) {
+        const page = doc.addPage([model.width, model.height]);
+        for (const prim of layoutPage.primitives) {
+            if (prim.kind === "text") {
+                drawTextPrim(page, prim);
+            }
+            else if (prim.kind === "rule") {
+                page.drawRectangle({
+                    x: prim.x,
+                    y: model.height - prim.y - prim.h,
+                    width: prim.w,
+                    height: prim.h,
+                    color: color(prim.color),
+                });
+            }
+            else if (prim.kind === "rect") {
+                page.drawRectangle({
+                    x: prim.x,
+                    y: model.height - prim.y - prim.h,
+                    width: prim.w,
+                    height: prim.h,
+                    ...(prim.fill !== null ? { color: color(prim.fill) } : {}),
+                    ...(prim.stroke !== undefined
+                        ? { borderColor: color(prim.stroke), borderWidth: prim.strokeWidth ?? 0.75 }
+                        : {}),
+                });
+            }
+            else if (prim.kind === "path") {
+                page.drawSvgPath(prim.d, {
+                    x: prim.x,
+                    y: model.height - prim.y,
+                    ...(prim.fill !== null ? { color: color(prim.fill) } : {}),
+                    ...(prim.stroke !== undefined
+                        ? { borderColor: color(prim.stroke), borderWidth: prim.strokeWidth ?? 0.75 }
+                        : {}),
+                });
+            }
+            else if (prim.kind === "image") {
+                page.drawImage(images.get(prim.png)!, {
+                    x: prim.x,
+                    y: model.height - prim.y - prim.h,
+                    width: prim.w,
+                    height: prim.h,
+                });
+            }
+            else if (prim.kind === "barcode") {
+                const encoding = encodeCode128(prim.payload);
+                const quiet = 10;
+                const moduleW = prim.w / (encoding.totalModules + quiet * 2);
+                let mx = prim.x + quiet * moduleW;
+                const barColor = color(prim.color);
+                encoding.widths.forEach((w, i) => {
+                    const width = w * moduleW;
+                    if (i % 2 === 0) {
+                        page.drawRectangle({
+                            x: mx,
+                            y: model.height - prim.y - prim.h,
+                            width,
+                            height: prim.h,
+                            color: barColor,
+                        });
+                    }
+                    mx += width;
+                });
+            }
+            else {
+                const encoding = encodeQrMatrix(prim.payload);
+                const cell = prim.size / encoding.size;
+                const dark = color(prim.color);
+                for (let r = 0; r < encoding.size; r++) {
+                    for (let c = 0; c < encoding.size; c++) {
+                        if (!encoding.matrix[r][c])
+                            continue;
+                        page.drawRectangle({
+                            x: prim.x + c * cell,
+                            y: model.height - prim.y - (r + 1) * cell,
+                            width: cell,
+                            height: cell,
+                            color: dark,
+                        });
+                    }
+                }
+            }
+        }
+    }
+    doc.setTitle("Factory Window Sticker");
+    doc.setProducer("AutoLabels Factory Sticker Renderer");
+    doc.setCreator("AutoLabels");
+    doc.setCreationDate(new Date(0));
+    doc.setModificationDate(new Date(0));
+    return doc.save();
 }

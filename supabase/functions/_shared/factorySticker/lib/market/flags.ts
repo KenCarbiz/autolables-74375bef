@@ -2,225 +2,109 @@
 // Mirror of src/lib/market/flags.ts, copied so the edge runtime can
 // bundle the engine (Supabase ships only supabase/functions/). Edit the
 // source file and run `bun run sync:edge-sticker`.
-// ── Feature flags ──────────────────────────────────────────────────────────
-//
-// Every flag defaults OFF, and "off" is the literal default in code rather
-// than a value somebody remembered to set in a table. A missing row, an
-// unreadable settings blob and an unknown flag name all resolve to false, so
-// the failure mode of the configuration system is "V2 stays dark" instead of
-// "V2 went live on a tenant nobody reviewed".
-
 export const MARKET_FLAGS = {
-  /** Compute V2 beside production, write nothing a customer sees. */
-  market_value_v2_shadow: false,
-  /** Show the V2 view to dealer staff only. */
-  market_value_v2_admin: false,
-  /** Show the V2 view on the customer Passport. */
-  market_value_v2_public: false,
-  /** Use the documented current endpoint instead of the legacy predict path. */
-  marketcheck_current_endpoint: false,
-  /** Premium comparables endpoint. Costs money; owner approval required. */
-  marketcheck_premium_comparables: false,
-  /** Recommended pricing position, shadow only. */
-  pricing_position_v2_shadow: false,
-  /**
-   * Refuse to make a market claim about a vehicle whose own price is missing,
-   * zero, negative or implausible. OFF in production: three published pages
-   * currently render such a claim and removing them is a deliberate, canaried
-   * change, not a refactor side effect.
-   */
-  market_invalid_claim_suppression: false,
-  // ── Change order 2026-10-27 ──────────────────────────────────────────────
-  // Each of these guards a request shape or a capability whose contract has
-  // not been read from the live docs. OFF means the current behaviour; ON is
-  // an operator decision taken after the contract check, never a default.
-  /** Send the VIN exact=true MDS ladder instead of the YMM-first ladder. */
-  exact_mds: false,
-  /** Ask Inferred Sales Stats by VIN / YMMT cohorts instead of make+state. */
-  current_sales_stats: false,
-  /** Buy Sold Vehicles Summary trend evidence on the monthly cadence. */
-  sold_summary: false,
-  /** Allow a second, generic-fallback price request when exact pricing fails. */
-  generic_vin_fallback: false,
-  /** Buy Available Options Packages for configuration comparison. Never installed equipment. */
-  available_options_packages: false,
-  /** Premium Plus as the used-intake bundle, after the entitlement call. */
-  premium_plus_used_intake: false,
-  /** Premium as the used-refresh tier, after the entitlement call. */
-  premium_used_refresh: false,
-  /** Use the documented /v2/car/autorecalls/{vin} path. */
-  autorecalls_vin: false,
-  // ── Master build section 38: Vehicle Intelligence and Passport 2.0 ──────
-  // Declared ahead of their readers. Each stays inert until a server surface
-  // reads it; the public ones are only ever turned on after the shadow one
-  // has produced evidence on a canary tenant.
-  /** Compute the V3 intelligence record beside production; nothing a customer sees. */
-  market_intelligence_v3_shadow: false,
-  /** Premium Plus as the new-vehicle first-seen decode bundle. */
-  premium_plus_new_intake: false,
-  /** Fee-normalized comparable basis in the V3 engine. */
-  fee_normalized_comps: false,
-  /** Exception-based NMVTIS verification for used vehicles; spend and terms decision. */
-  nmvtis_auto_verify: false,
-  /** OEM incentives for new vehicles under the program and market cache. */
-  oem_incentives_v2: false,
-  /** Signed provider webhook intake as an invalidation signal. */
-  provider_webhooks: false,
-  /** Black Book as a live valuation signal once credentials exist. */
-  blackbook_live: false,
-  /** AutoLabels Market Value V3, shadow evidence only. */
-  market_value_v3_shadow: false,
-  /** AutoLabels Market Value V3 on a customer surface. */
-  market_value_v3_public: false,
-  /** Used Vehicle Score, shadow evidence only. */
-  vehicle_score_shadow: false,
-  /** Used Vehicle Score on a customer surface. */
-  vehicle_score_public: false,
-  /** Data Confidence beside the score. */
-  data_confidence: false,
-  /** Buyer Recommendation with its hard gates. */
-  buyer_recommendation: false,
-  /** Passport 2.0 new-vehicle experience. */
-  passport_2_new: false,
-  /** Passport 2.0 used-vehicle experience. */
-  passport_2_used: false,
-  // ── MarketPass V2, 2026-11-12. Proposed rules, not approved. ───────────
-  /** Serve the MarketPass assessment (marketpass-assessment edge function) for a tenant. */
-  marketpass_v2: false,
+    market_value_v2_shadow: false,
+    market_value_v2_admin: false,
+    market_value_v2_public: false,
+    marketcheck_current_endpoint: false,
+    marketcheck_premium_comparables: false,
+    pricing_position_v2_shadow: false,
+    market_invalid_claim_suppression: false,
+    exact_mds: false,
+    current_sales_stats: false,
+    sold_summary: false,
+    generic_vin_fallback: false,
+    available_options_packages: false,
+    premium_plus_used_intake: false,
+    premium_used_refresh: false,
+    autorecalls_vin: false,
+    market_intelligence_v3_shadow: false,
+    premium_plus_new_intake: false,
+    fee_normalized_comps: false,
+    nmvtis_auto_verify: false,
+    oem_incentives_v2: false,
+    provider_webhooks: false,
+    blackbook_live: false,
+    market_value_v3_shadow: false,
+    market_value_v3_public: false,
+    vehicle_score_shadow: false,
+    vehicle_score_public: false,
+    data_confidence: false,
+    buyer_recommendation: false,
+    passport_2_new: false,
+    passport_2_used: false,
+    marketpass_v2: false,
 } as const;
-
 export type MarketFlag = keyof typeof MARKET_FLAGS;
-
 export const MARKET_FLAG_NAMES = Object.keys(MARKET_FLAGS) as MarketFlag[];
-
-export const isMarketFlag = (v: unknown): v is MarketFlag =>
-  typeof v === "string" && (MARKET_FLAG_NAMES as string[]).includes(v);
-
-/**
- * Read one flag out of a tenant settings blob.
- *
- * Only a literal `true` turns anything on. The string "true", 1 and "yes" are
- * deliberately NOT accepted: a feed-shaped truthy value has no business
- * enabling a pricing engine, and every one of those spellings has already
- * caused a bug in this codebase (see isTruthyFlag in vehicleCondition.ts,
- * which exists because "false" is truthy in JS).
- */
+export const isMarketFlag = (v: unknown): v is MarketFlag => typeof v === "string" && (MARKET_FLAG_NAMES as string[]).includes(v);
 export function readMarketFlag(settings: unknown, flag: MarketFlag): boolean {
-  const bag = (settings ?? null) as { market_flags?: Record<string, unknown> } | null;
-  return bag?.market_flags?.[flag] === true;
+    const bag = (settings ?? null) as {
+        market_flags?: Record<string, unknown>;
+    } | null;
+    return bag?.market_flags?.[flag] === true;
 }
-
 export function readMarketFlags(settings: unknown): Record<MarketFlag, boolean> {
-  const out = {} as Record<MarketFlag, boolean>;
-  for (const flag of MARKET_FLAG_NAMES) out[flag] = readMarketFlag(settings, flag);
-  return out;
+    const out = {} as Record<MarketFlag, boolean>;
+    for (const flag of MARKET_FLAG_NAMES)
+        out[flag] = readMarketFlag(settings, flag);
+    return out;
 }
-
-// ── What "shadow" has to mean before it is a control ───────────────────────
-//
-// Six of the seven flags above have ZERO production readers. A stored `false`
-// on a flag nothing reads is not a rollout control; it is a label. Turning
-// `market_value_v2_shadow` "on" today changes nothing, produces no evidence,
-// and — worse than doing nothing — reads in an audit as though a shadow pilot
-// ran and found nothing wrong.
-//
-// This section does not wire shadow up. It states, as executable policy, the
-// conditions a future shadow reader must satisfy, so the reader is written
-// against a contract rather than against an intention. There is deliberately
-// no caller, no scheduler, no fetch and no database write here: every function
-// below is pure and safe to import from anywhere, deployed or not.
-
 export const SHADOW_CONTROL_REQUIREMENTS = [
-  "server_side_only",
-  "tenant_scoped",
-  "no_public_rendering",
-  "no_compatibility_column_write",
-  "no_automatic_provider_call",
-  "no_budget_bypass",
-  "append_only_evidence",
-  "auditable_invocation_source",
-  "immediate_off_switch",
-  "no_browser_controlled_provider_spend",
+    "server_side_only",
+    "tenant_scoped",
+    "no_public_rendering",
+    "no_compatibility_column_write",
+    "no_automatic_provider_call",
+    "no_budget_bypass",
+    "append_only_evidence",
+    "auditable_invocation_source",
+    "immediate_off_switch",
+    "no_browser_controlled_provider_spend",
 ] as const;
-
 export type ShadowControlRequirement = (typeof SHADOW_CONTROL_REQUIREMENTS)[number];
-
-/**
- * Where a shadow evaluation was asked for.
- *
- * `browser` is enumerated so it can be REFUSED by name. A page that can ask
- * the server to evaluate a vehicle is a page that can ask the server to spend
- * money, and a shadow pilot is exactly the wrong place to discover that.
- */
-export type ShadowInvocationSource =
-  | "server_scheduled"
-  | "server_operator"
-  | "browser"
-  | "unknown";
-
+export type ShadowInvocationSource = "server_scheduled" | "server_operator" | "browser" | "unknown";
 const SERVER_SOURCES: ShadowInvocationSource[] = ["server_scheduled", "server_operator"];
-
 export interface ShadowDecision {
-  /** May a shadow evaluation run at all. */
-  run: boolean;
-  /** Always false. Shadow reads stored evidence; it never buys more. */
-  allowProviderCall: false;
-  /** Always false. Shadow may not touch the columns a customer reads. */
-  allowCompatibilityWrite: false;
-  /** Always false. Shadow is invisible to customers by construction. */
-  allowPublicRender: false;
-  reasons: string[];
+    run: boolean;
+    allowProviderCall: false;
+    allowCompatibilityWrite: false;
+    allowPublicRender: false;
+    reasons: string[];
 }
-
-/**
- * Decide whether a shadow evaluation may proceed. Pure; no side effects.
- *
- * The three `allow*` fields are typed as literal `false` rather than boolean:
- * a future edit that tries to turn one on does not compile.
- */
 export function decideShadowEvaluation(input: {
-  settings: unknown;
-  tenantId: string | null | undefined;
-  source: ShadowInvocationSource;
+    settings: unknown;
+    tenantId: string | null | undefined;
+    source: ShadowInvocationSource;
 }): ShadowDecision {
-  const reasons: string[] = [];
-  const deny = (): ShadowDecision => ({
-    run: false,
-    allowProviderCall: false,
-    allowCompatibilityWrite: false,
-    allowPublicRender: false,
-    reasons,
-  });
-
-  if (!readMarketFlag(input.settings, "market_value_v2_shadow")) {
-    // The immediate off switch: absence, malformation and an explicit false
-    // all land here, so "off" is the failure mode of the whole config path.
-    reasons.push("shadow_flag_off");
-    return deny();
-  }
-  if (!input.tenantId) {
-    reasons.push("shadow_requires_tenant_scope");
-    return deny();
-  }
-  if (!SERVER_SOURCES.includes(input.source)) {
-    reasons.push(`shadow_invocation_source_rejected_${input.source}`);
-    reasons.push("no_browser_controlled_provider_spend");
-    return deny();
-  }
-
-  reasons.push("shadow_enabled", `shadow_invocation_source_${input.source}`);
-  return {
-    run: true,
-    allowProviderCall: false,
-    allowCompatibilityWrite: false,
-    allowPublicRender: false,
-    reasons,
-  };
+    const reasons: string[] = [];
+    const deny = (): ShadowDecision => ({
+        run: false,
+        allowProviderCall: false,
+        allowCompatibilityWrite: false,
+        allowPublicRender: false,
+        reasons,
+    });
+    if (!readMarketFlag(input.settings, "market_value_v2_shadow")) {
+        reasons.push("shadow_flag_off");
+        return deny();
+    }
+    if (!input.tenantId) {
+        reasons.push("shadow_requires_tenant_scope");
+        return deny();
+    }
+    if (!SERVER_SOURCES.includes(input.source)) {
+        reasons.push(`shadow_invocation_source_rejected_${input.source}`);
+        reasons.push("no_browser_controlled_provider_spend");
+        return deny();
+    }
+    reasons.push("shadow_enabled", `shadow_invocation_source_${input.source}`);
+    return {
+        run: true,
+        allowProviderCall: false,
+        allowCompatibilityWrite: false,
+        allowPublicRender: false,
+        reasons,
+    };
 }
-
-/**
- * Flags with no production reader are inert, and saying otherwise in a report
- * is how a rollout gets credited to a switch that does nothing. This is the
- * predicate a test uses to keep the claim honest against the actual tree.
- */
 export const isInertWithoutReader = (readerCount: number): boolean => readerCount === 0;

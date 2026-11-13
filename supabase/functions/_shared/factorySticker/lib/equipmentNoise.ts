@@ -2,607 +2,611 @@
 // Mirror of src/lib/factorySticker/equipmentNoise.ts, copied so the edge runtime can
 // bundle the engine (Supabase ships only supabase/functions/). Edit the
 // source file and run `bun run sync:edge-sticker`.
-// ──────────────────────────────────────────────────────────────────────
-// Decoder noise suppression and concept collapse.
-//
-// A VIN decoder emits implementation attributes, not customer-facing equipment.
-// One sunroof arrives as seven rows ("Front Sunroof", "Glass Sunroof", "Electric
-// Sunroof-Front", "Tilting Sunroof-Front", "Sliding Sunroof-Front", "One-Touch
-// Opening Sunroof-Front", "Front Panoramic Roof"); one braking system arrives as
-// six ("Brakes At Low Speed", "Automatic Braking", "Operates Above 130 Kph/78
-// Mph", …). Printing them verbatim is what makes the sticker read like a data
-// dump instead of a Monroney label.
-//
-// Two rules govern everything here:
-//   1. Never invent equipment. A concept is only emitted when a source row
-//      supports it; collapsing renames, it never adds.
-//   2. Be deterministic. The same input always produces the same output, in the
-//      same order, so the rendered sticker is reproducible.
-// ──────────────────────────────────────────────────────────────────────
-
 import { brandForMake, oemTerm, type OemBrand } from "./oemTerminology.ts";
-import {
-  findForeignTechnology, findTechnology, officialTechnologyName, type OemTechnology,
-} from "./oemTechnology.ts";
-
-/** Priority tier — page 1 fills from tier 1 up. */
+import { findForeignTechnology, findTechnology, officialTechnologyName, type OemTechnology, } from "./oemTechnology.ts";
 export type EquipmentTier = 1 | 2 | 3;
-
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
-
-// ── Noise ─────────────────────────────────────────────────────────────
-
-/** Bare color words a decoder emits as standalone "equipment". */
 const COLOR_WORDS = new Set([
-  "black", "white", "blue", "red", "green", "silver", "grey", "gray", "brown",
-  "beige", "tan", "gold", "bronze", "ivory", "charcoal", "graphite", "walnut",
-  "chrome", "titanium", "platinum", "sand", "cocoa", "ebony",
+    "black",
+    "white",
+    "blue",
+    "red",
+    "green",
+    "silver",
+    "grey",
+    "gray",
+    "brown",
+    "beige",
+    "tan",
+    "gold",
+    "bronze",
+    "ivory",
+    "charcoal",
+    "graphite",
+    "walnut",
+    "chrome",
+    "titanium",
+    "platinum",
+    "sand",
+    "cocoa",
+    "ebony",
 ]);
-
-/** Words that only ever qualify a colour, never name equipment. */
 const COLOR_MODIFIERS = new Set([
-  "midnight", "dark", "light", "deep", "metallic", "pearl", "jet", "arctic",
-  "summit", "onyx", "satin", "matte", "gloss", "medium", "very",
+    "midnight",
+    "dark",
+    "light",
+    "deep",
+    "metallic",
+    "pearl",
+    "jet",
+    "arctic",
+    "summit",
+    "onyx",
+    "satin",
+    "matte",
+    "gloss",
+    "medium",
+    "very",
 ]);
-
-// Fragments that describe HOW a system behaves rather than WHAT the car has.
 const NOISE_PATTERNS: RegExp[] = [
-  // "Operates Above 130 Kph/78 Mph", "Operates Below 50 Kph/30 Mph"
-  /^operates?\s+(above|below|between|at)\b/i,
-  // Raw dimensional decoder attributes: wheel diameter/width per corner. These
-  // are specifications, and printing four of them (often contradictory across
-  // trims) reads as noise next to "20in Aluminum Wheels".
-  /^(front|rear)\s+wheel\s+(diameter|width)\b/i,
-  /^wheel\s+(diameter|width)\b/i,
-  // Component-level implementation flags.
-  /^(visual|acoustic|audible|visual\/acoustic)\s+(warning|alert)$/i,
-  /^activates?\s+brake\s+lights?$/i,
-  /^(stop|go)\s+function$/i,
-  /^(with|w\/)\s/i,
-  // Generic taxonomy labels with no customer meaning.
-  /^(standard|optional|included|equipment|feature|other|misc|n\/?a|none|tbd)$/i,
-  /^(front|rear|left|right|driver|passenger)$/i,
-  /^\d+(\.\d+)?\s*(in|inch|mm|cm)$/i,
+    /^operates?\s+(above|below|between|at)\b/i,
+    /^(front|rear)\s+wheel\s+(diameter|width)\b/i,
+    /^wheel\s+(diameter|width)\b/i,
+    /^(visual|acoustic|audible|visual\/acoustic)\s+(warning|alert)$/i,
+    /^activates?\s+brake\s+lights?$/i,
+    /^(stop|go)\s+function$/i,
+    /^(with|w\/)\s/i,
+    /^(standard|optional|included|equipment|feature|other|misc|n\/?a|none|tbd)$/i,
+    /^(front|rear|left|right|driver|passenger)$/i,
+    /^\d+(\.\d+)?\s*(in|inch|mm|cm)$/i,
 ];
-
-/**
- * True when a decoded row is an implementation detail or taxonomy artifact
- * rather than equipment a customer would recognize.
- */
 export function isDecoderNoise(raw: string): boolean {
-  const s = norm(raw);
-  if (!s) return true;
-  if (COLOR_WORDS.has(s)) return true;
-  // A bare colour phrase ("midnight blue", "dark walnut") is still a colour.
-  const words = s.split(" ");
-  if (words.length === 2 && COLOR_WORDS.has(words[1]) && (COLOR_WORDS.has(words[0]) || COLOR_MODIFIERS.has(words[0]))) {
-    return true;
-  }
-  return NOISE_PATTERNS.some((re) => re.test(s));
+    const s = norm(raw);
+    if (!s)
+        return true;
+    if (COLOR_WORDS.has(s))
+        return true;
+    const words = s.split(" ");
+    if (words.length === 2 && COLOR_WORDS.has(words[1]) && (COLOR_WORDS.has(words[0]) || COLOR_MODIFIERS.has(words[0]))) {
+        return true;
+    }
+    return NOISE_PATTERNS.some((re) => re.test(s));
 }
-
-// ── Concept collapse ──────────────────────────────────────────────────
-
 interface ConceptRule {
-  /** Stable concept key; one row per concept survives. */
-  concept: string;
-  /** The customer-facing label printed on the sticker. */
-  canonical: string;
-  tier: EquipmentTier;
-  /** Any source row matching this belongs to the concept. */
-  match: RegExp;
-  /**
-   * When present, the canonical label is only used if a source row matches —
-   * lets "Panoramic" upgrade the generic sunroof label without inventing it.
-   */
-  upgrade?: { match: RegExp; canonical: string; concept?: string };
-  /**
-   * The WEAKER claim this rule's match also catches.
-   *
-   * The rule's `match` deliberately casts wide so related rows land on one
-   * concept, but that meant a row saying only "Forward Collision Warning"
-   * printed as "Automatic Emergency Braking", and "Lane Departure Warning"
-   * printed as "Lane Keep Assist". A warning is evidence that the car warns.
-   * It is not evidence that the car brakes or steers, and a sticker is not the
-   * place to guess: the shopper reads it as a capability the vehicle has.
-   *
-   * A row matching `match` here supports only `canonical`, unless it ALSO
-   * matches `strongEvidence` (so "forward collision warning with automatic
-   * braking" still earns the strong label). `concept` keeps the weak and
-   * strong forms in separate buckets so they never collapse into each other.
-   */
-  weaker?: { match: RegExp; canonical: string; concept: string; strongEvidence?: RegExp };
-}
-
-/**
- * Pick the strongest label a source row actually supports.
- *
- * Returns the weak form when the row only evidences the weak form, the
- * declared upgrade when the row evidences it, otherwise the rule's own
- * canonical. A source may map to an equal-or-weaker claim, never a stronger
- * one.
- */
-function evidenceLevel(rule: ConceptRule, name: string, alt = name): { bucket: string; concept: string; canonical: string } {
-  // Both spellings, because the feed uses both and the patterns are written
-  // for one or the other: "hands-?free" does not match "Hands Free", and
-  // "blind ?spot" does not match "Blind-Spot".
-  const hit = (re?: RegExp) => !!re && (re.test(name) || re.test(alt));
-  const w = rule.weaker;
-  if (w && hit(w.match) && !hit(w.strongEvidence)) {
-    // A weaker claim gets its OWN bucket: a warning row and a braking row are
-    // different facts, and sharing a bucket would let whichever arrived first
-    // name both.
-    return { bucket: w.concept, concept: w.concept, canonical: w.canonical };
-  }
-  const up = rule.upgrade;
-  if (up && hit(up.match)) {
-    // An upgrade keeps the rule's bucket. "Power Liftgate" and "Hands-Free
-    // Liftgate" are the same fitting described twice, so they must collapse to
-    // one row that takes the better label — splitting them printed both.
-    return { bucket: rule.concept, concept: up.concept ?? rule.concept, canonical: up.canonical };
-  }
-  return { bucket: rule.concept, concept: rule.concept, canonical: rule.canonical };
-}
-
-/**
- * A branded OEM system name is MORE informative than the generic concept, so it
- * is never flattened into one. "ProPILOT Assist 2.1" outranks "Adaptive Cruise
- * Control"; "Bose Performance Audio - 24 Speakers" outranks "Premium Audio
- * System". These rows still collapse their siblings — they just supply the
- * label, verbatim, from the source.
- */
-const BRANDED_SOURCE = new RegExp(
-  [
-    // Driver assistance suites — the OEM's own name for the system.
-    "propilot", "pro ?pilot", "safety shield", "super ?cruise", "bluecruise",
-    "co-?pilot ?360", "drive pilot", "honda sensing", "acurawatch", "eyesight",
-    "toyota safety sense", "lexus safety system", "distronic", "pre-?safe",
-    "driving assistant", "active driving assistant", "pilot assist", "city safety",
-    "intellisafe", "smart ?sense", "highway driving assist", "autopilot",
-    "travel assist", "iq\\.?drive", "audi pre ?sense", "i-?activsense", "mi-?pilot",
-    "activedriveassist", "nissan safety shield", "\\bbsd\\b", "\\bhda\\b",
-    "activeglide", "teammate", "dreamdrive", "innodrive", "drive wise",
-    "lanesense", "driverfocus", "attention assist", "parktronic", "parksense",
-    "parkview", "blis\\b", "side blind zone", "around view", "intellibeam",
-    "rivian autonomy", "highway assistant", "steering and lane control",
-    // Audio — brand IS the feature.
-    "bose", "burmester", "mark levinson", "harman ?kardon", "meridian", "revel",
-    "bang (&|and) olufsen", "b&o", "naim", "akg", "sony", "jbl", "infinity",
-    "klipsch", "lexicon", "dynaudio", "focal", "els studio", "fender", "beats",
-    "alpine", "rockford fosgate", "mcintosh", "sennheiser",
-    // Infotainment and connected services.
-    "sync ?[0-9]?", "uconnect", "idrive", "mbux", "comand", "\\bmmi\\b", "entune",
-    "onstar", "blue ?link", "fordpass", "starlink", "nissanconnect", "kia connect",
-    "wireless (apple )?carplay", "android auto",
-    // Drivetrain, chassis, and powertrain technologies.
-    "quattro", "xdrive", "4matic", "sh-?awd", "real time awd", "terrain response",
-    "magnetic ride control", "magneride", "adaptive air suspension", "torsen",
-    "e-?lsd", "e-?4orce", "ecoboost", "powerboost", "hemi", "duramax",
-    "power ?stroke", "\\btdi\\b", "\\btfsi\\b", "i-?vtec", "\\bvtec\\b", "skyactiv",
-    "crawl control", "trail control", "terrain management", "selec-?terrain",
-    "s-?awc", "4motion", "all4", "\\bpdk\\b", "tiptronic", "x-?mode",
-    "g\\.?o\\.?a\\.?t\\.? modes", "multi-?terrain select", "pro trailer backup",
-    "advanced trailering", "airmatic", "e-?active body control",
-    "dynamic chassis control", "\\be-?pedal\\b", "\\bi-?pedal\\b",
-    // Named body/roof/vision features.
-    "vista roof", "commandview", "panoramic vista", "magic body control",
-    "head-?up display", "night vision assist", "surround ?view", "birds-?eye view",
-    "around view monitor", "multi-?terrain monitor", "clearsight",
-    "multibeam", "digital light", "matrix(-| )design", "pixel led",
-    "panoramic view monitor", "glass canopy",
-  ].join("|"),
-  "i",
-);
-
-/** True when a source row names a specific branded system worth printing as-is. */
-export const isBrandedSource = (name: string): boolean => BRANDED_SOURCE.test(name);
-
-// Order matters: the first matching rule wins, so specific concepts precede
-// general ones.
-const CONCEPT_RULES: ConceptRule[] = [
-  {
-    concept: "aeb",
-    canonical: "Automatic Emergency Braking",
-    tier: 1,
-    match: /\b(automatic braking|automatic emergency brak|brakes? at low speed|emergency brak|forward collision|pre-?collision|pedestrian (&|and)? ?cyclist|city brak)/i,
-    weaker: {
-      // Forward-collision WARNING does not prove the car brakes itself. The
-      // strong label is earned only when the row says so.
-      match: /\b(forward collision|pre-?collision)\b/i,
-      strongEvidence: /\bbrak/i,
-      canonical: "Forward Collision Warning",
-      concept: "fcw",
-    },
-  },
-  {
-    concept: "sunroof",
-    canonical: "Power Sunroof",
-    tier: 1,
-    match: /\b(sunroofs?|moonroofs?|panoramic roof|glass roof)\b/i,
-    // A panoramic roof is a different product, so it swaps concept — and picks
-    // up that concept's OEM term (Ford's "Panoramic Vista Roof", Jeep's
-    // "CommandView", …) rather than a described variant of the plain one.
-    upgrade: { match: /\bpanoram/i, canonical: "Panoramic Sunroof", concept: "panoramic_sunroof" },
-  },
-  {
-    concept: "adaptive_cruise",
-    canonical: "Adaptive Cruise Control",
-    tier: 1,
-    match: /\b(adaptive cruise|intelligent cruise|radar cruise|stop function cruise|propilot)\b/i,
-  },
-  {
-    concept: "blind_spot",
-    canonical: "Blind Spot Monitor",
-    tier: 1,
-    match: /\b(blind ?spot|blind zone|side assist)\b/i,
-  },
-  {
-    concept: "rear_cross_traffic",
-    canonical: "Rear Cross-Traffic Alert",
-    tier: 2,
-    match: /\b(cross ?traffic|cross path)\b/i,
-  },
-  {
-    concept: "lane_keep",
-    canonical: "Lane Keep Assist",
-    tier: 1,
-    match: /\b(lane keep|lane-?keeping|lane departure|lane intervention|lanesense)\b/i,
-    weaker: {
-      // A departure WARNING is evidence the car warns. It is not evidence the
-      // car steers, and a shopper reads the printed label as a capability.
-      match: /\blane departure\b/i,
-      strongEvidence: /\b(keep|keeping|assist|intervention|steer|centering)/i,
-      canonical: "Lane Departure Warning",
-      concept: "ldw",
-    },
-  },
-  {
-    concept: "lane_centering",
-    canonical: "Lane Centering Assist",
-    tier: 2,
-    match: /\b(lane centering|lane tracing|lane following)\b/i,
-  },
-  {
-    concept: "traffic_sign_recognition",
-    canonical: "Traffic Sign Recognition",
-    tier: 3,
-    match: /\b(traffic sign|road sign|speed limit (info|assist)|speed sign)\b/i,
-  },
-  {
-    concept: "driver_attention",
-    canonical: "Driver Attention Monitor",
-    tier: 3,
-    match: /\b(driver (attention|alert|drowsiness|fatigue)|drowsy driver|attentiveness)\b/i,
-  },
-  {
-    concept: "surround_view",
-    canonical: "Surround View Camera",
-    tier: 1,
-    match: /\b(surround ?view|360-?degree camera|360°|birds-?eye view|around view|panoramic view monitor|multi-?view camera)\b/i,
-  },
-  {
-    concept: "self_parking",
-    canonical: "Automated Parking Assist",
-    tier: 2,
-    match: /\b(automated parking|automatic parking assist|active park assist|self-?parking|remote smart parking|autopark)\b/i,
-  },
-  {
-    concept: "parking_sensors",
-    canonical: "Parking Sensors",
-    tier: 3,
-    match: /\b(parking sensors?|park distance|parking distance|park assist sensors?|sonar system|parktronic)\b/i,
-  },
-  {
-    concept: "safe_exit",
-    canonical: "Safe Exit Warning",
-    tier: 3,
-    match: /\b(safe exit|exit warning)\b/i,
-  },
-  {
-    concept: "rear_seat_reminder",
-    canonical: "Rear Seat Reminder",
-    tier: 3,
-    match: /\b(rear seat reminder|rear door alert|rear occupant alert)\b/i,
-  },
-  {
-    concept: "power_liftgate",
-    canonical: "Power Liftgate",
-    tier: 2,
-    match: /\b(power (liftgate|tailgate|rear gate|back door)|hands-?free (liftgate|tailgate|access)|motion activated liftgate)\b/i,
-    upgrade: {
-      match: /\b(hands-?free|foot-?activated|kick sensor|motion activated|gesture|easy open)\b/i,
-      canonical: "Hands-Free Power Liftgate",
-      concept: "hands_free_liftgate",
-    },
-  },
-  {
-    concept: "remote_start",
-    canonical: "Remote Engine Start",
-    tier: 2,
-    match: /\bremote (engine )?start\b/i,
-  },
-  {
-    concept: "trailer_assist",
-    canonical: "Trailer Assist",
-    tier: 3,
-    match: /\b(trailer (assist|backup|reverse)|tow assist|trailering system)\b/i,
-  },
-  {
-    concept: "cruise",
-    canonical: "Cruise Control",
-    tier: 2,
-    match: /\b(cruise controls?|speed limiter|steering wheel mounted cruise)\b/i,
-    weaker: {
-      // A limiter caps speed. It does not hold one.
-      match: /\bspeed limiter\b/i,
-      strongEvidence: /\bcruise\b/i,
-      canonical: "Speed Limiter",
-      concept: "speed_limiter",
-    },
-  },
-  {
-    concept: "led_headlights",
-    canonical: "LED Headlights",
-    tier: 2,
-    match: /\b(led headlights?|led head ?lamps?|complex surface headlights?|headlights?[- ](low|high) beam)\b/i,
-    weaker: {
-      // "Headlights-Low Beam" is a decoder field name. It records which beam,
-      // not what the bulb is made of.
-      match: /\bheadlights?[- ](low|high) beam\b/i,
-      strongEvidence: /\bled\b/i,
-      canonical: "Headlamps",
-      concept: "headlamps",
-    },
-  },
-  {
-    concept: "auto_high_beam",
-    canonical: "Automatic High Beams",
-    tier: 3,
-    match: /\b(auto high beams?|automatic high beams?|high beam assist|dusk sensor)\b/i,
-    weaker: {
-      // An ambient-light sensor switches the lamps on. It says nothing about
-      // dipping the high beams for oncoming traffic.
-      match: /\bdusk sensor\b/i,
-      strongEvidence: /\bhigh beam\b/i,
-      canonical: "Automatic Headlamp Control",
-      concept: "auto_headlamps",
-    },
-  },
-  {
-    concept: "premium_audio",
-    canonical: "Audio System",
-    tier: 2,
-    match: /\b(premium brand speakers?|surround sound|subwoofer|\d+ speakers?|bose|bang (&|and) olufsen|harman|klipsch|premium audio)\b/i,
-    // A speaker count alone does not make a system premium. The word is only
-    // printed when a source row supports it.
-    upgrade: {
-      match: /\b(premium|surround sound|subwoofer|bose|bang (&|and) olufsen|harman|klipsch|burmester|revel|meridian|mark levinson)\b/i,
-      canonical: "Premium Audio System",
-    },
-  },
-  {
-    concept: "running_boards",
-    canonical: "Power Retractable Running Boards",
-    tier: 2,
-    match: /\b(running boards?|assist steps?|illuminated steps?|side steps?)\b/i,
-    weaker: {
-      // A fixed step that lights up is not a step that deploys.
-      match: /\b(illuminated steps?|side steps?|assist steps?|running boards?)\b/i,
-      strongEvidence: /\b(power|retract|deploy|automatic)/i,
-      canonical: "Running Boards",
-      concept: "fixed_running_boards",
-    },
-  },
-  {
-    concept: "anti_theft",
-    canonical: "Anti-Theft Protection",
-    tier: 3,
-    match: /\b(anti-?theft|immobilizer|interior monitoring)\b/i,
-  },
-  {
-    concept: "rear_camera",
-    canonical: "Rear View Camera",
-    tier: 1,
-    match: /\b(rear ?view (mirror\/)?cameras?|backup cameras?|rear cameras?)\b/i,
-  },
-  {
-    concept: "wheel_locks",
-    canonical: "Locking Wheel Nuts",
-    tier: 3,
-    match: /\block(ing)? (front |rear )?wheel nuts?\b/i,
-  },
-  {
-    concept: "two_tone_wheels",
-    canonical: "Two-Tone Alloy Wheels",
-    tier: 2,
-    match: /\b(two-?tone wheels?|aluminum alloy wheels?|alloy wheels?)\b/i,
-  },
-  {
-    concept: "digital_radio",
-    canonical: "Digital Radio",
-    tier: 3,
-    match: /\b(rds audio|digital radio|satellite radio|siriusxm)\b/i,
-    upgrade: { match: /\b(satellite radio|siriusxm)\b/i, canonical: "Satellite Radio" },
-  },
-  {
-    concept: "smartphone",
-    canonical: "Smartphone Integration",
-    tier: 2,
-    // CarPlay and Android Auto are deliberately NOT matched here. They used to
-    // fold into this concept and print "Apple CarPlay and Android Auto" from
-    // either one alone, asserting a platform the car may not support. A row
-    // naming a platform is already the exact printable name, so it passes
-    // through verbatim and says only what the source said.
-    match: /\b(bluetooth connection|built-?in apps|smartphone)\b/i,
-  },
-];
-
-export interface CuratedItem {
-  /** Printed label. */
-  name: string;
-  tier: EquipmentTier;
-  /** Concept key when collapsed, else null for a pass-through row. */
-  concept: string | null;
-  /** Source rows this row represents, for audit. */
-  sources: string[];
-  /** The label came verbatim from a branded OEM system name. */
-  branded?: boolean;
-  /** The catalogued manufacturer system this row names, when it names one. */
-  technology?: OemTechnology;
-}
-
-export interface CurateResult {
-  items: CuratedItem[];
-  /** Rows discarded as decoder noise. */
-  dropped: string[];
-  /** Exact repeats of a row already kept, with the row they folded into. */
-  duplicates: Array<{ item: string; keptIn: string }>;
-  /** concept -> source rows collapsed into it. */
-  collapsed: Record<string, string[]>;
-  /**
-   * Rows naming another manufacturer's technology. Almost always a crossed VIN
-   * or a description scraped from a different vehicle. Reported, never printed
-   * as though we had verified it.
-   */
-  foreign: Array<{ item: string; technology: string; owner: OemBrand }>;
-  /**
-   * Rows withheld from print because they name another manufacturer's system.
-   * Non-empty means the feed is crossed and the sticker needs review before
-   * anyone hands it to a customer.
-   */
-  quarantined: string[];
-}
-
-/**
- * Curate a decoded standard-equipment list into printable rows.
- *
- * Noise is dropped, overlapping rows collapse to one concept, and the rest pass
- * through deduplicated. Output order is stable: tier, then first appearance.
- */
-export interface CurateOptions {
-  /** Vehicle make, so each concept prints in that manufacturer's own words. */
-  make?: string | null;
-}
-
-export function curateEquipment(raw: string[], opts: CurateOptions = {}): CurateResult {
-  const brand: OemBrand = brandForMake(opts.make);
-  /** Branded source > the make's own term > the rule's neutral fallback. */
-  const labelFor = (concept: string, fallback: string) => oemTerm(concept, brand) ?? fallback;
-  const dropped: string[] = [];
-  const duplicates: Array<{ item: string; keptIn: string }> = [];
-  const collapsed: Record<string, string[]> = {};
-  const foreign: Array<{ item: string; technology: string; owner: OemBrand }> = [];
-  const quarantined: string[] = [];
-  const byConcept = new Map<string, CuratedItem>();
-  const passthrough = new Map<string, CuratedItem>();
-  const order: CuratedItem[] = [];
-
-  /**
-   * Resolve a row against the technology catalog.
-   *
-   * The catalog knows WHO owns a system, which the flat pattern list never
-   * did. A row naming another manufacturer's technology is recorded as a feed
-   * problem and treated as unbranded, so it can never supply a label — a Ford
-   * does not get to print "Mark Levinson" because a scraped description said
-   * so. A row we do own prints in the manufacturer's own rendering.
-   */
-  const resolve = (name: string): { label: string; branded: boolean; foreign?: boolean; technology?: OemTechnology } => {
-    const tech = findTechnology(name, brand);
-    if (tech) return { label: officialTechnologyName(name, brand) ?? name, branded: true, technology: tech };
-    const alien = findForeignTechnology(name, brand);
-    if (alien) {
-      foreign.push({ item: name, technology: alien.technology.name, owner: alien.owner });
-      // No label. The old return handed the raw name back, which printed
-      // "AKG Studio Reference" on a GMC verbatim, and — worse — let the row
-      // fall into concept matching, where a Nissan "ProPILOT Assist" on a
-      // Lexus came out as that Lexus's own cruise-control term. Renaming a
-      // rival's system into our marque's vocabulary is not a smaller error
-      // than printing it; it is the same false claim, harder to spot.
-      return { label: "", branded: false, foreign: true };
-    }
-    // Not catalogued either way. The flat list still recognises names we have
-    // not yet entered, so coverage gaps degrade to the old behaviour.
-    return { label: name, branded: isBrandedSource(name) };
-  };
-
-  for (const source of raw) {
-    const name = String(source ?? "").replace(/\s+/g, " ").trim();
-    if (!name) continue;
-    if (isDecoderNoise(name)) { dropped.push(name); continue; }
-
-    // Ownership first, always. Deciding this after concept matching is what
-    // allowed a foreign row to be translated instead of dropped.
-    const owned = resolve(name);
-    if (owned.foreign) { quarantined.push(name); continue; }
-
-    // The feed spells the same feature "Blind Spot", "Blind-Spot" and
-    // "BlindSpot", and only the first hit the rules — so the variants printed
-    // as separate rows. Try the hyphen-flattened copy TOO, never instead:
-    // patterns written as "hands-?free" stop matching once the hyphen is gone.
-    const matchable = name.replace(/[-\u2010-\u2015]/g, " ").replace(/\s+/g, " ");
-    const rule = CONCEPT_RULES.find((r) => r.match.test(name) || r.match.test(matchable));
-    if (rule) {
-      // The bucket is the EVIDENCE level, not the rule. A warning row and a
-      // braking row are different claims and must not fold together, or the
-      // first one seen would decide the label for both.
-      const level = evidenceLevel(rule, name, matchable);
-      (collapsed[level.bucket] ||= []).push(name);
-      const existing = byConcept.get(level.bucket);
-      if (existing) {
-        existing.sources.push(name);
-        // A branded name the marque actually owns always wins the label.
-        const r = owned;
-        if (r.branded) {
-          existing.name = r.label;
-          existing.branded = true;
-          if (r.technology) existing.technology = r.technology;
-        } else if (!existing.branded && level.canonical !== rule.canonical) {
-          // The upgrade label, earned by THIS row's evidence.
-          existing.name = labelFor(level.concept, level.canonical);
-          existing.concept = level.concept;
-        }
-        continue;
-      }
-      const r = owned;
-      const item: CuratedItem = {
-        name: r.branded ? r.label : labelFor(level.concept, level.canonical),
-        tier: rule.tier,
-        concept: level.concept,
-        sources: [name],
-        ...(r.branded ? { branded: true } : {}),
-        ...(r.technology ? { technology: r.technology } : {}),
-      };
-      byConcept.set(level.bucket, item);
-      order.push(item);
-      continue;
-    }
-
-    const key = norm(name).replace(/[^a-z0-9]+/g, "");
-    const seen = passthrough.get(key);
-    if (seen) { seen.sources.push(name); duplicates.push({ item: name, keptIn: seen.name }); continue; }
-    const r = owned;
-    const item: CuratedItem = {
-      name: r.label || name, tier: 2, concept: null, sources: [name],
-      ...(r.technology ? { technology: r.technology } : {}),
+    concept: string;
+    canonical: string;
+    tier: EquipmentTier;
+    match: RegExp;
+    upgrade?: {
+        match: RegExp;
+        canonical: string;
+        concept?: string;
     };
-    passthrough.set(key, item);
-    order.push(item);
-  }
-
-  // Stable sort: tier first, original order within a tier.
-  const items = order
-    .map((item, i) => ({ item, i }))
-    .sort((a, b) => a.item.tier - b.item.tier || a.i - b.i)
-    .map(({ item }) => item);
-
-  return { items, dropped, duplicates, collapsed, foreign, quarantined };
+    weaker?: {
+        match: RegExp;
+        canonical: string;
+        concept: string;
+        strongEvidence?: RegExp;
+    };
 }
-
-/** Rows that fit page 1, filling by priority tier. */
-export function selectForPageOne(items: CuratedItem[], capacity: number): {
-  pageOne: CuratedItem[];
-  continuation: CuratedItem[];
+function evidenceLevel(rule: ConceptRule, name: string, alt = name): {
+    bucket: string;
+    concept: string;
+    canonical: string;
 } {
-  if (capacity >= items.length) return { pageOne: items, continuation: [] };
-  return { pageOne: items.slice(0, capacity), continuation: items.slice(capacity) };
+    const hit = (re?: RegExp) => !!re && (re.test(name) || re.test(alt));
+    const w = rule.weaker;
+    if (w && hit(w.match) && !hit(w.strongEvidence)) {
+        return { bucket: w.concept, concept: w.concept, canonical: w.canonical };
+    }
+    const up = rule.upgrade;
+    if (up && hit(up.match)) {
+        return { bucket: rule.concept, concept: up.concept ?? rule.concept, canonical: up.canonical };
+    }
+    return { bucket: rule.concept, concept: rule.concept, canonical: rule.canonical };
+}
+const BRANDED_SOURCE = new RegExp([
+    "propilot",
+    "pro ?pilot",
+    "safety shield",
+    "super ?cruise",
+    "bluecruise",
+    "co-?pilot ?360",
+    "drive pilot",
+    "honda sensing",
+    "acurawatch",
+    "eyesight",
+    "toyota safety sense",
+    "lexus safety system",
+    "distronic",
+    "pre-?safe",
+    "driving assistant",
+    "active driving assistant",
+    "pilot assist",
+    "city safety",
+    "intellisafe",
+    "smart ?sense",
+    "highway driving assist",
+    "autopilot",
+    "travel assist",
+    "iq\\.?drive",
+    "audi pre ?sense",
+    "i-?activsense",
+    "mi-?pilot",
+    "activedriveassist",
+    "nissan safety shield",
+    "\\bbsd\\b",
+    "\\bhda\\b",
+    "activeglide",
+    "teammate",
+    "dreamdrive",
+    "innodrive",
+    "drive wise",
+    "lanesense",
+    "driverfocus",
+    "attention assist",
+    "parktronic",
+    "parksense",
+    "parkview",
+    "blis\\b",
+    "side blind zone",
+    "around view",
+    "intellibeam",
+    "rivian autonomy",
+    "highway assistant",
+    "steering and lane control",
+    "bose",
+    "burmester",
+    "mark levinson",
+    "harman ?kardon",
+    "meridian",
+    "revel",
+    "bang (&|and) olufsen",
+    "b&o",
+    "naim",
+    "akg",
+    "sony",
+    "jbl",
+    "infinity",
+    "klipsch",
+    "lexicon",
+    "dynaudio",
+    "focal",
+    "els studio",
+    "fender",
+    "beats",
+    "alpine",
+    "rockford fosgate",
+    "mcintosh",
+    "sennheiser",
+    "sync ?[0-9]?",
+    "uconnect",
+    "idrive",
+    "mbux",
+    "comand",
+    "\\bmmi\\b",
+    "entune",
+    "onstar",
+    "blue ?link",
+    "fordpass",
+    "starlink",
+    "nissanconnect",
+    "kia connect",
+    "wireless (apple )?carplay",
+    "android auto",
+    "quattro",
+    "xdrive",
+    "4matic",
+    "sh-?awd",
+    "real time awd",
+    "terrain response",
+    "magnetic ride control",
+    "magneride",
+    "adaptive air suspension",
+    "torsen",
+    "e-?lsd",
+    "e-?4orce",
+    "ecoboost",
+    "powerboost",
+    "hemi",
+    "duramax",
+    "power ?stroke",
+    "\\btdi\\b",
+    "\\btfsi\\b",
+    "i-?vtec",
+    "\\bvtec\\b",
+    "skyactiv",
+    "crawl control",
+    "trail control",
+    "terrain management",
+    "selec-?terrain",
+    "s-?awc",
+    "4motion",
+    "all4",
+    "\\bpdk\\b",
+    "tiptronic",
+    "x-?mode",
+    "g\\.?o\\.?a\\.?t\\.? modes",
+    "multi-?terrain select",
+    "pro trailer backup",
+    "advanced trailering",
+    "airmatic",
+    "e-?active body control",
+    "dynamic chassis control",
+    "\\be-?pedal\\b",
+    "\\bi-?pedal\\b",
+    "vista roof",
+    "commandview",
+    "panoramic vista",
+    "magic body control",
+    "head-?up display",
+    "night vision assist",
+    "surround ?view",
+    "birds-?eye view",
+    "around view monitor",
+    "multi-?terrain monitor",
+    "clearsight",
+    "multibeam",
+    "digital light",
+    "matrix(-| )design",
+    "pixel led",
+    "panoramic view monitor",
+    "glass canopy",
+].join("|"), "i");
+export const isBrandedSource = (name: string): boolean => BRANDED_SOURCE.test(name);
+const CONCEPT_RULES: ConceptRule[] = [
+    {
+        concept: "aeb",
+        canonical: "Automatic Emergency Braking",
+        tier: 1,
+        match: /\b(automatic braking|automatic emergency brak|brakes? at low speed|emergency brak|forward collision|pre-?collision|pedestrian (&|and)? ?cyclist|city brak)/i,
+        weaker: {
+            match: /\b(forward collision|pre-?collision)\b/i,
+            strongEvidence: /\bbrak/i,
+            canonical: "Forward Collision Warning",
+            concept: "fcw",
+        },
+    },
+    {
+        concept: "sunroof",
+        canonical: "Power Sunroof",
+        tier: 1,
+        match: /\b(sunroofs?|moonroofs?|panoramic roof|glass roof)\b/i,
+        upgrade: { match: /\bpanoram/i, canonical: "Panoramic Sunroof", concept: "panoramic_sunroof" },
+    },
+    {
+        concept: "adaptive_cruise",
+        canonical: "Adaptive Cruise Control",
+        tier: 1,
+        match: /\b(adaptive cruise|intelligent cruise|radar cruise|stop function cruise|propilot)\b/i,
+    },
+    {
+        concept: "blind_spot",
+        canonical: "Blind Spot Monitor",
+        tier: 1,
+        match: /\b(blind ?spot|blind zone|side assist)\b/i,
+    },
+    {
+        concept: "rear_cross_traffic",
+        canonical: "Rear Cross-Traffic Alert",
+        tier: 2,
+        match: /\b(cross ?traffic|cross path)\b/i,
+    },
+    {
+        concept: "lane_keep",
+        canonical: "Lane Keep Assist",
+        tier: 1,
+        match: /\b(lane keep|lane-?keeping|lane departure|lane intervention|lanesense)\b/i,
+        weaker: {
+            match: /\blane departure\b/i,
+            strongEvidence: /\b(keep|keeping|assist|intervention|steer|centering)/i,
+            canonical: "Lane Departure Warning",
+            concept: "ldw",
+        },
+    },
+    {
+        concept: "lane_centering",
+        canonical: "Lane Centering Assist",
+        tier: 2,
+        match: /\b(lane centering|lane tracing|lane following)\b/i,
+    },
+    {
+        concept: "traffic_sign_recognition",
+        canonical: "Traffic Sign Recognition",
+        tier: 3,
+        match: /\b(traffic sign|road sign|speed limit (info|assist)|speed sign)\b/i,
+    },
+    {
+        concept: "driver_attention",
+        canonical: "Driver Attention Monitor",
+        tier: 3,
+        match: /\b(driver (attention|alert|drowsiness|fatigue)|drowsy driver|attentiveness)\b/i,
+    },
+    {
+        concept: "surround_view",
+        canonical: "Surround View Camera",
+        tier: 1,
+        match: /\b(surround ?view|360-?degree camera|360°|birds-?eye view|around view|panoramic view monitor|multi-?view camera)\b/i,
+    },
+    {
+        concept: "self_parking",
+        canonical: "Automated Parking Assist",
+        tier: 2,
+        match: /\b(automated parking|automatic parking assist|active park assist|self-?parking|remote smart parking|autopark)\b/i,
+    },
+    {
+        concept: "parking_sensors",
+        canonical: "Parking Sensors",
+        tier: 3,
+        match: /\b(parking sensors?|park distance|parking distance|park assist sensors?|sonar system|parktronic)\b/i,
+    },
+    {
+        concept: "safe_exit",
+        canonical: "Safe Exit Warning",
+        tier: 3,
+        match: /\b(safe exit|exit warning)\b/i,
+    },
+    {
+        concept: "rear_seat_reminder",
+        canonical: "Rear Seat Reminder",
+        tier: 3,
+        match: /\b(rear seat reminder|rear door alert|rear occupant alert)\b/i,
+    },
+    {
+        concept: "power_liftgate",
+        canonical: "Power Liftgate",
+        tier: 2,
+        match: /\b(power (liftgate|tailgate|rear gate|back door)|hands-?free (liftgate|tailgate|access)|motion activated liftgate)\b/i,
+        upgrade: {
+            match: /\b(hands-?free|foot-?activated|kick sensor|motion activated|gesture|easy open)\b/i,
+            canonical: "Hands-Free Power Liftgate",
+            concept: "hands_free_liftgate",
+        },
+    },
+    {
+        concept: "remote_start",
+        canonical: "Remote Engine Start",
+        tier: 2,
+        match: /\bremote (engine )?start\b/i,
+    },
+    {
+        concept: "trailer_assist",
+        canonical: "Trailer Assist",
+        tier: 3,
+        match: /\b(trailer (assist|backup|reverse)|tow assist|trailering system)\b/i,
+    },
+    {
+        concept: "cruise",
+        canonical: "Cruise Control",
+        tier: 2,
+        match: /\b(cruise controls?|speed limiter|steering wheel mounted cruise)\b/i,
+        weaker: {
+            match: /\bspeed limiter\b/i,
+            strongEvidence: /\bcruise\b/i,
+            canonical: "Speed Limiter",
+            concept: "speed_limiter",
+        },
+    },
+    {
+        concept: "led_headlights",
+        canonical: "LED Headlights",
+        tier: 2,
+        match: /\b(led headlights?|led head ?lamps?|complex surface headlights?|headlights?[- ](low|high) beam)\b/i,
+        weaker: {
+            match: /\bheadlights?[- ](low|high) beam\b/i,
+            strongEvidence: /\bled\b/i,
+            canonical: "Headlamps",
+            concept: "headlamps",
+        },
+    },
+    {
+        concept: "auto_high_beam",
+        canonical: "Automatic High Beams",
+        tier: 3,
+        match: /\b(auto high beams?|automatic high beams?|high beam assist|dusk sensor)\b/i,
+        weaker: {
+            match: /\bdusk sensor\b/i,
+            strongEvidence: /\bhigh beam\b/i,
+            canonical: "Automatic Headlamp Control",
+            concept: "auto_headlamps",
+        },
+    },
+    {
+        concept: "premium_audio",
+        canonical: "Audio System",
+        tier: 2,
+        match: /\b(premium brand speakers?|surround sound|subwoofer|\d+ speakers?|bose|bang (&|and) olufsen|harman|klipsch|premium audio)\b/i,
+        upgrade: {
+            match: /\b(premium|surround sound|subwoofer|bose|bang (&|and) olufsen|harman|klipsch|burmester|revel|meridian|mark levinson)\b/i,
+            canonical: "Premium Audio System",
+        },
+    },
+    {
+        concept: "running_boards",
+        canonical: "Power Retractable Running Boards",
+        tier: 2,
+        match: /\b(running boards?|assist steps?|illuminated steps?|side steps?)\b/i,
+        weaker: {
+            match: /\b(illuminated steps?|side steps?|assist steps?|running boards?)\b/i,
+            strongEvidence: /\b(power|retract|deploy|automatic)/i,
+            canonical: "Running Boards",
+            concept: "fixed_running_boards",
+        },
+    },
+    {
+        concept: "anti_theft",
+        canonical: "Anti-Theft Protection",
+        tier: 3,
+        match: /\b(anti-?theft|immobilizer|interior monitoring)\b/i,
+    },
+    {
+        concept: "rear_camera",
+        canonical: "Rear View Camera",
+        tier: 1,
+        match: /\b(rear ?view (mirror\/)?cameras?|backup cameras?|rear cameras?)\b/i,
+    },
+    {
+        concept: "wheel_locks",
+        canonical: "Locking Wheel Nuts",
+        tier: 3,
+        match: /\block(ing)? (front |rear )?wheel nuts?\b/i,
+    },
+    {
+        concept: "two_tone_wheels",
+        canonical: "Two-Tone Alloy Wheels",
+        tier: 2,
+        match: /\b(two-?tone wheels?|aluminum alloy wheels?|alloy wheels?)\b/i,
+    },
+    {
+        concept: "digital_radio",
+        canonical: "Digital Radio",
+        tier: 3,
+        match: /\b(rds audio|digital radio|satellite radio|siriusxm)\b/i,
+        upgrade: { match: /\b(satellite radio|siriusxm)\b/i, canonical: "Satellite Radio" },
+    },
+    {
+        concept: "smartphone",
+        canonical: "Smartphone Integration",
+        tier: 2,
+        match: /\b(bluetooth connection|built-?in apps|smartphone)\b/i,
+    },
+];
+export interface CuratedItem {
+    name: string;
+    tier: EquipmentTier;
+    concept: string | null;
+    sources: string[];
+    branded?: boolean;
+    technology?: OemTechnology;
+}
+export interface CurateResult {
+    items: CuratedItem[];
+    dropped: string[];
+    duplicates: Array<{
+        item: string;
+        keptIn: string;
+    }>;
+    collapsed: Record<string, string[]>;
+    foreign: Array<{
+        item: string;
+        technology: string;
+        owner: OemBrand;
+    }>;
+    quarantined: string[];
+}
+export interface CurateOptions {
+    make?: string | null;
+}
+export function curateEquipment(raw: string[], opts: CurateOptions = {}): CurateResult {
+    const brand: OemBrand = brandForMake(opts.make);
+    const labelFor = (concept: string, fallback: string) => oemTerm(concept, brand) ?? fallback;
+    const dropped: string[] = [];
+    const duplicates: Array<{
+        item: string;
+        keptIn: string;
+    }> = [];
+    const collapsed: Record<string, string[]> = {};
+    const foreign: Array<{
+        item: string;
+        technology: string;
+        owner: OemBrand;
+    }> = [];
+    const quarantined: string[] = [];
+    const byConcept = new Map<string, CuratedItem>();
+    const passthrough = new Map<string, CuratedItem>();
+    const order: CuratedItem[] = [];
+    const resolve = (name: string): {
+        label: string;
+        branded: boolean;
+        foreign?: boolean;
+        technology?: OemTechnology;
+    } => {
+        const tech = findTechnology(name, brand);
+        if (tech)
+            return { label: officialTechnologyName(name, brand) ?? name, branded: true, technology: tech };
+        const alien = findForeignTechnology(name, brand);
+        if (alien) {
+            foreign.push({ item: name, technology: alien.technology.name, owner: alien.owner });
+            return { label: "", branded: false, foreign: true };
+        }
+        return { label: name, branded: isBrandedSource(name) };
+    };
+    for (const source of raw) {
+        const name = String(source ?? "").replace(/\s+/g, " ").trim();
+        if (!name)
+            continue;
+        if (isDecoderNoise(name)) {
+            dropped.push(name);
+            continue;
+        }
+        const owned = resolve(name);
+        if (owned.foreign) {
+            quarantined.push(name);
+            continue;
+        }
+        const matchable = name.replace(/[-\u2010-\u2015]/g, " ").replace(/\s+/g, " ");
+        const rule = CONCEPT_RULES.find((r) => r.match.test(name) || r.match.test(matchable));
+        if (rule) {
+            const level = evidenceLevel(rule, name, matchable);
+            (collapsed[level.bucket] ||= []).push(name);
+            const existing = byConcept.get(level.bucket);
+            if (existing) {
+                existing.sources.push(name);
+                const r = owned;
+                if (r.branded) {
+                    existing.name = r.label;
+                    existing.branded = true;
+                    if (r.technology)
+                        existing.technology = r.technology;
+                }
+                else if (!existing.branded && level.canonical !== rule.canonical) {
+                    existing.name = labelFor(level.concept, level.canonical);
+                    existing.concept = level.concept;
+                }
+                continue;
+            }
+            const r = owned;
+            const item: CuratedItem = {
+                name: r.branded ? r.label : labelFor(level.concept, level.canonical),
+                tier: rule.tier,
+                concept: level.concept,
+                sources: [name],
+                ...(r.branded ? { branded: true } : {}),
+                ...(r.technology ? { technology: r.technology } : {}),
+            };
+            byConcept.set(level.bucket, item);
+            order.push(item);
+            continue;
+        }
+        const key = norm(name).replace(/[^a-z0-9]+/g, "");
+        const seen = passthrough.get(key);
+        if (seen) {
+            seen.sources.push(name);
+            duplicates.push({ item: name, keptIn: seen.name });
+            continue;
+        }
+        const r = owned;
+        const item: CuratedItem = {
+            name: r.label || name,
+            tier: 2,
+            concept: null,
+            sources: [name],
+            ...(r.technology ? { technology: r.technology } : {}),
+        };
+        passthrough.set(key, item);
+        order.push(item);
+    }
+    const items = order
+        .map((item, i) => ({ item, i }))
+        .sort((a, b) => a.item.tier - b.item.tier || a.i - b.i)
+        .map(({ item }) => item);
+    return { items, dropped, duplicates, collapsed, foreign, quarantined };
+}
+export function selectForPageOne(items: CuratedItem[], capacity: number): {
+    pageOne: CuratedItem[];
+    continuation: CuratedItem[];
+} {
+    if (capacity >= items.length)
+        return { pageOne: items, continuation: [] };
+    return { pageOne: items.slice(0, capacity), continuation: items.slice(capacity) };
 }

@@ -12,6 +12,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import ts from "typescript";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const SOURCE_DIR = join(root, "src/lib/factorySticker");
@@ -191,7 +192,21 @@ export function collectAll() {
     out.set(WARRANTY_PREFIX + name, HEADER.replace("{src}", `src/lib/warranty/${name}`) + body);
   }
   collectPageView(out);
+  for (const [rel, body] of out) out.set(rel, stripComments(rel, body));
   return out;
+}
+
+// Lovable's deploy counts every file under supabase/functions/_shared toward each
+// function's ~4.5 MB upload limit, so the generated mirror ships without the
+// source's comments: the source in src/ keeps them, and only the header stays.
+const HEADER_END = "source file and run `bun run sync:edge-sticker`.\n";
+const printer = ts.createPrinter({ removeComments: true });
+function stripComments(rel, body) {
+  const cut = body.indexOf(HEADER_END);
+  const head = cut >= 0 ? body.slice(0, cut + HEADER_END.length) : "";
+  const code = cut >= 0 ? body.slice(cut + HEADER_END.length) : body;
+  const sf = ts.createSourceFile(rel, code, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
+  return head + printer.printFile(sf);
 }
 
 export function readMirror() {
