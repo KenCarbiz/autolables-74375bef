@@ -73,7 +73,8 @@ function collect(input: VehicleConfidenceInput): Collected {
   }
 
   for (const conflict of input.dataConfidence.conflicts) {
-    if (conflict !== "odometer_conflict" && conflict !== "odometer_rollback_indicated") out.review.push(`Sources disagree: ${conflict.replace(/_/g, " ")}.`);
+    if (conflict === "odometer_conflict" || conflict === "odometer_rollback_indicated") continue;
+    out.review.push(CONFLICT_SENTENCES[conflict] ?? `Sources disagree: ${conflict.replace(/_/g, " ")}.`);
   }
   if (!r.doNotDrive && r.vinState !== "OPEN") {
     if (recallAnswered(r) && r.publicState !== "stale") out.findings.push(r.publicStatement);
@@ -84,6 +85,10 @@ function collect(input: VehicleConfidenceInput): Collected {
   else out.gaps.push("The VIN decode is not from factory build data.");
   return out;
 }
+
+const CONFLICT_SENTENCES: Record<string, string> = {
+  trim_decode_conflict: "The advertised trim does not match the factory build record for this VIN.",
+};
 
 export function buildVehicleConfidence(input: VehicleConfidenceInput): VehicleConfidenceAssessment {
   const used = input.vehicleType === "used";

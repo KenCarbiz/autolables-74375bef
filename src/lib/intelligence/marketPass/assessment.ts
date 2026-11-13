@@ -6,6 +6,7 @@
 // envelope carries the computation time and a digest of the inputs read.
 
 import { digest } from "../../market/hash.ts";
+import { isExactIdentity } from "../../market/identityMatch.ts";
 import { buildDataConfidence } from "../dataConfidence.ts";
 import { listingFacts, READ_MODEL_TTL_DAYS, providerStamp } from "../readModels/listingFacts.ts";
 import { isNewCondition } from "../readModels/shared.ts";
@@ -114,6 +115,20 @@ export interface MarketPassAssessmentInput {
   nowMs: number;
 }
 
+/**
+ * PROPOSED: the advertised trim disagrees with the factory build record. Only
+ * read when the decode is exact; every advertised trim word must appear in the
+ * decoded version, so "SPORT" against "SPORT AWD" agrees and "SPORT" against
+ * "BASE FWD" does not.
+ */
+export function identityConflicts(advertisedTrim: string | null | undefined, identity: { version: string | null; matchLevel: string }): string[] {
+  const words = (v: string | null | undefined) => (v ?? "").toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
+  const trim = words(advertisedTrim);
+  const version = new Set(words(identity.version));
+  if (!trim.length || !version.size || !isExactIdentity(identity.matchLevel as Parameters<typeof isExactIdentity>[0])) return [];
+  return trim.every((w) => version.has(w)) ? [] : ["trim_decode_conflict"];
+}
+
 export function buildMarketPassAssessment(input: MarketPassAssessmentInput): MarketPassAssessment {
   const { row, settings, nowMs } = input;
   const vehicleType: VehicleType = isNewCondition(row.condition) ? "new" : "used";
@@ -127,6 +142,7 @@ export function buildMarketPassAssessment(input: MarketPassAssessmentInput): Mar
 
   const dc = buildDataConfidence({
     vehicleType, identity: facts.identity, titleOdometer, condition, provenance, recall: facts.recall, documentation,
+    conflicts: identityConflicts(row.trim, facts.identity),
   });
   const dataConfidence: DataConfidenceAssessment = {
     indicator: "data_confidence",
