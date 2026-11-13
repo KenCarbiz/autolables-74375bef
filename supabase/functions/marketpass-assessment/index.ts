@@ -8,7 +8,7 @@ import { decidePageViewResponse, pickWindowSticker, type PublishedDocumentRow } 
 // marketpass-assessment  ·  MarketPass V2 (PROPOSED rules, NOT deployed)
 //
 //   GET /functions/v1/marketpass-assessment?slug=<slug>[&tenant_id=<uuid>][&audience=dealer]
-//   GET /functions/v1/marketpass-assessment?slug=<slug>&view=page[&tenant_id=<uuid>]
+//   GET /functions/v1/marketpass-assessment?slug=<slug>&view=page&tenant_id=<uuid>   (x-lookup-secret required)
 //
 // view=page returns { ok, page, marketpass }: everything the customer Passport
 // renders, built server-side by the same functions the page calls
@@ -34,8 +34,15 @@ import { decidePageViewResponse, pickWindowSticker, type PublishedDocumentRow } 
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-lookup-secret, x-autofilm-key",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
+};
+
+const timingSafeEqual = (a: string, b: string): boolean => {
+  if (!a || a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
 };
 
 const json = (status: number, body: unknown): Response =>
@@ -58,6 +65,14 @@ serve(async (req) => {
   const audience = url.searchParams.get("audience") === "dealer" ? "dealer" : "public";
   const viewPage = url.searchParams.get("view") === "page";
   if (viewPage && audience === "dealer") return json(400, { error: "view_page_is_public" });
+  // view=page reads the row unthrottled (below), so only AutoFilm's server may
+  // ask for it: the same shared secret autofilm-feed takes, and a tenant binding.
+  if (viewPage) {
+    const secret = Deno.env.get("AUTOLABELS_LOOKUP_SECRET") ?? "";
+    const key = req.headers.get("x-lookup-secret") ?? req.headers.get("x-autofilm-key") ?? "";
+    if (!secret || !timingSafeEqual(key, secret)) return json(401, { error: "unauthorized" });
+    if (!url.searchParams.get("tenant_id")) return json(400, { error: "tenant_id_required" });
+  }
   const expectedTenantId = (url.searchParams.get("tenant_id") ?? "").trim() || null;
   if (expectedTenantId && !/^[0-9a-f-]{36}$/i.test(expectedTenantId)) return json(400, { error: "tenant_id_invalid" });
 

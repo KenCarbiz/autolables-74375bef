@@ -1,6 +1,8 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import AutoLabelsVerifiedCard from "@/components/passport/AutoLabelsVerifiedCard";
 import { derivePassport, fmt$, suppressPassportMarketClaim, compSampleView } from "@/lib/passportV2Data";
 import { listingGallery } from "@/lib/photos";
@@ -388,5 +390,18 @@ describe("view=page request decision", () => {
     expect(body.marketpass!.audience).toBe("public");
     expect(JSON.stringify(body.marketpass)).not.toMatch(/marketDesirability|dataConfidence/);
     expect(JSON.stringify(body.marketpass)).not.toMatch(/tenant_id|"store_id"/);
+  });
+});
+
+describe("marketpass-assessment view=page is server-to-server only", () => {
+  const src = readFileSync(resolve(__dirname, "../../../supabase/functions/marketpass-assessment/index.ts"), "utf8");
+  const gate = src.slice(src.indexOf("if (viewPage) {"), src.indexOf("if (viewPage) {") + 600);
+  it("refuses a caller without AutoFilm's shared secret before any read", () => {
+    expect(gate).toMatch(/AUTOLABELS_LOOKUP_SECRET/);
+    expect(gate).toMatch(/timingSafeEqual\(key, secret\)\) return json\(401/);
+    expect(src.indexOf("if (viewPage) {")).toBeLessThan(src.indexOf("createClient("));
+  });
+  it("requires a tenant binding", () => {
+    expect(gate).toMatch(/tenant_id_required/);
   });
 });
