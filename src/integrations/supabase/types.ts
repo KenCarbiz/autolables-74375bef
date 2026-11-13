@@ -14,6 +14,64 @@ export type Database = {
   }
   public: {
     Tables: {
+      acquisition_records: {
+        Row: {
+          acquisition_cost: number | null
+          appraisal_value: number | null
+          appraised_at: string | null
+          channel: string | null
+          created_at: string
+          id: string
+          instance_id: string
+          source_record_id: string | null
+          tenant_id: string
+        }
+        Insert: {
+          acquisition_cost?: number | null
+          appraisal_value?: number | null
+          appraised_at?: string | null
+          channel?: string | null
+          created_at?: string
+          id?: string
+          instance_id: string
+          source_record_id?: string | null
+          tenant_id: string
+        }
+        Update: {
+          acquisition_cost?: number | null
+          appraisal_value?: number | null
+          appraised_at?: string | null
+          channel?: string | null
+          created_at?: string
+          id?: string
+          instance_id?: string
+          source_record_id?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "acquisition_records_instance_id_tenant_id_fkey"
+            columns: ["instance_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_instances"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "acquisition_records_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "acquisition_records_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       addendum_events: {
         Row: {
           actor: string | null
@@ -5202,6 +5260,102 @@ export type Database = {
           },
         ]
       }
+      inspection_evidence: {
+        Row: {
+          created_at: string
+          evidence_refs: string[]
+          id: string
+          inspected_at: string | null
+          instance_id: string | null
+          measurements: Json
+          odometer_miles: number | null
+          odometer_unit: string | null
+          revoked_at: string | null
+          service_visit_id: string | null
+          source_app: string
+          source_record_id: string
+          source_version: number
+          technician_verified: boolean
+          tenant_id: string
+          vin: string | null
+          visibility: string
+        }
+        Insert: {
+          created_at?: string
+          evidence_refs?: string[]
+          id?: string
+          inspected_at?: string | null
+          instance_id?: string | null
+          measurements?: Json
+          odometer_miles?: number | null
+          odometer_unit?: string | null
+          revoked_at?: string | null
+          service_visit_id?: string | null
+          source_app: string
+          source_record_id: string
+          source_version: number
+          technician_verified?: boolean
+          tenant_id: string
+          vin?: string | null
+          visibility?: string
+        }
+        Update: {
+          created_at?: string
+          evidence_refs?: string[]
+          id?: string
+          inspected_at?: string | null
+          instance_id?: string | null
+          measurements?: Json
+          odometer_miles?: number | null
+          odometer_unit?: string | null
+          revoked_at?: string | null
+          service_visit_id?: string | null
+          source_app?: string
+          source_record_id?: string
+          source_version?: number
+          technician_verified?: boolean
+          tenant_id?: string
+          vin?: string | null
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inspection_evidence_instance_restrict_fkey"
+            columns: ["instance_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_instances"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "inspection_evidence_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inspection_evidence_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inspection_evidence_vin_fkey"
+            columns: ["vin"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["vin"]
+          },
+          {
+            foreignKeyName: "inspection_evidence_visit_fkey"
+            columns: ["service_visit_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "service_visits"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
       install_proofs: {
         Row: {
           created_at: string
@@ -5294,6 +5448,351 @@ export type Database = {
           tenant_id?: string
         }
         Relationships: []
+      }
+      integration_connection_keys: {
+        Row: {
+          connection_id: string
+          created_at: string
+          id: string
+          key_id: string
+          not_after: string | null
+          revoked_at: string | null
+          status: string
+          vault_secret_name: string
+        }
+        Insert: {
+          connection_id: string
+          created_at?: string
+          id?: string
+          key_id: string
+          not_after?: string | null
+          revoked_at?: string | null
+          status?: string
+          vault_secret_name: string
+        }
+        Update: {
+          connection_id?: string
+          created_at?: string
+          id?: string
+          key_id?: string
+          not_after?: string | null
+          revoked_at?: string | null
+          status?: string
+          vault_secret_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_connection_keys_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "integration_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_connections: {
+        Row: {
+          adapter: string
+          app: string
+          created_at: string
+          created_by: string | null
+          display_name: string
+          endpoint_url: string | null
+          external_rooftop_ref: string | null
+          id: string
+          last_error_at: string | null
+          last_error_code: string | null
+          last_success_at: string | null
+          scopes: string[]
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          adapter?: string
+          app: string
+          created_at?: string
+          created_by?: string | null
+          display_name: string
+          endpoint_url?: string | null
+          external_rooftop_ref?: string | null
+          id?: string
+          last_error_at?: string | null
+          last_error_code?: string | null
+          last_success_at?: string | null
+          scopes?: string[]
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          adapter?: string
+          app?: string
+          created_at?: string
+          created_by?: string | null
+          display_name?: string
+          endpoint_url?: string | null
+          external_rooftop_ref?: string | null
+          id?: string
+          last_error_at?: string | null
+          last_error_code?: string | null
+          last_success_at?: string | null
+          scopes?: string[]
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_connections_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_connections_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_direction_flags: {
+        Row: {
+          direction: string
+          enabled: boolean
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          direction: string
+          enabled?: boolean
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          direction?: string
+          enabled?: boolean
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_direction_flags_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_direction_flags_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_inbox: {
+        Row: {
+          adapter: string
+          applied_at: string | null
+          attempts: number
+          claimed_until: string | null
+          connection_id: string
+          envelope: Json
+          event_id: string
+          event_type: string
+          id: string
+          idempotency_key: string
+          next_attempt_at: string
+          outcome_code: string | null
+          payload_checksum: string
+          producer: string
+          received_at: string
+          requested_visibility: string
+          schema_version: string
+          source_record_id: string
+          source_version: number
+          status: string
+          tenant_id: string
+          vin: string | null
+          visibility: string
+        }
+        Insert: {
+          adapter?: string
+          applied_at?: string | null
+          attempts?: number
+          claimed_until?: string | null
+          connection_id: string
+          envelope: Json
+          event_id: string
+          event_type: string
+          id?: string
+          idempotency_key: string
+          next_attempt_at?: string
+          outcome_code?: string | null
+          payload_checksum: string
+          producer: string
+          received_at?: string
+          requested_visibility?: string
+          schema_version: string
+          source_record_id: string
+          source_version: number
+          status?: string
+          tenant_id: string
+          vin?: string | null
+          visibility?: string
+        }
+        Update: {
+          adapter?: string
+          applied_at?: string | null
+          attempts?: number
+          claimed_until?: string | null
+          connection_id?: string
+          envelope?: Json
+          event_id?: string
+          event_type?: string
+          id?: string
+          idempotency_key?: string
+          next_attempt_at?: string
+          outcome_code?: string | null
+          payload_checksum?: string
+          producer?: string
+          received_at?: string
+          requested_visibility?: string
+          schema_version?: string
+          source_record_id?: string
+          source_version?: number
+          status?: string
+          tenant_id?: string
+          vin?: string | null
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_inbox_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "integration_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_inbox_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_inbox_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_outbox: {
+        Row: {
+          attempts: number
+          connection_id: string
+          created_at: string
+          delivered_at: string | null
+          envelope: Json
+          event_id: string
+          event_type: string
+          id: string
+          last_error_code: string | null
+          next_attempt_at: string
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          attempts?: number
+          connection_id: string
+          created_at?: string
+          delivered_at?: string | null
+          envelope: Json
+          event_id: string
+          event_type: string
+          id?: string
+          last_error_code?: string | null
+          next_attempt_at?: string
+          status?: string
+          tenant_id: string
+        }
+        Update: {
+          attempts?: number
+          connection_id?: string
+          created_at?: string
+          delivered_at?: string | null
+          envelope?: Json
+          event_id?: string
+          event_type?: string
+          id?: string
+          last_error_code?: string | null
+          next_attempt_at?: string
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_outbox_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "integration_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_outbox_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_outbox_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_source_versions: {
+        Row: {
+          connection_id: string
+          latest_version: number
+          source_record_id: string
+          updated_at: string
+        }
+        Insert: {
+          connection_id: string
+          latest_version: number
+          source_record_id: string
+          updated_at?: string
+        }
+        Update: {
+          connection_id?: string
+          latest_version?: number
+          source_record_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_source_versions_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "integration_connections"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       integration_timing: {
         Row: {
@@ -9829,6 +10328,143 @@ export type Database = {
         }
         Relationships: []
       }
+      repair_item_status_history: {
+        Row: {
+          changed_at: string
+          evidence_ref: string | null
+          from_status: string | null
+          id: string
+          repair_item_id: string
+          source_version: number
+          tenant_id: string
+          to_status: string
+        }
+        Insert: {
+          changed_at?: string
+          evidence_ref?: string | null
+          from_status?: string | null
+          id?: string
+          repair_item_id: string
+          source_version: number
+          tenant_id: string
+          to_status: string
+        }
+        Update: {
+          changed_at?: string
+          evidence_ref?: string | null
+          from_status?: string | null
+          id?: string
+          repair_item_id?: string
+          source_version?: number
+          tenant_id?: string
+          to_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "repair_item_status_history_repair_item_id_fkey"
+            columns: ["repair_item_id"]
+            isOneToOne: false
+            referencedRelation: "repair_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      repair_items: {
+        Row: {
+          created_at: string
+          finding_ref: string | null
+          id: string
+          instance_id: string | null
+          item: string | null
+          service_visit_id: string | null
+          severity: string | null
+          source_app: string
+          source_record_id: string
+          source_version: number
+          status: string
+          tenant_id: string
+          updated_at: string
+          verified_by: string | null
+          verified_evidence_ref: string | null
+          vin: string | null
+          visibility: string
+        }
+        Insert: {
+          created_at?: string
+          finding_ref?: string | null
+          id?: string
+          instance_id?: string | null
+          item?: string | null
+          service_visit_id?: string | null
+          severity?: string | null
+          source_app: string
+          source_record_id: string
+          source_version: number
+          status: string
+          tenant_id: string
+          updated_at?: string
+          verified_by?: string | null
+          verified_evidence_ref?: string | null
+          vin?: string | null
+          visibility?: string
+        }
+        Update: {
+          created_at?: string
+          finding_ref?: string | null
+          id?: string
+          instance_id?: string | null
+          item?: string | null
+          service_visit_id?: string | null
+          severity?: string | null
+          source_app?: string
+          source_record_id?: string
+          source_version?: number
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+          verified_by?: string | null
+          verified_evidence_ref?: string | null
+          vin?: string | null
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "repair_items_instance_restrict_fkey"
+            columns: ["instance_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_instances"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "repair_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "repair_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "repair_items_vin_fkey"
+            columns: ["vin"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["vin"]
+          },
+          {
+            foreignKeyName: "repair_items_visit_fkey"
+            columns: ["service_visit_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "service_visits"
+            referencedColumns: ["id", "tenant_id"]
+          },
+        ]
+      }
       safety_inspection_item_failures: {
         Row: {
           assignee: string | null
@@ -10419,6 +11055,89 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "safety_inspection_item_failures"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_visits: {
+        Row: {
+          closed_at: string | null
+          created_at: string
+          id: string
+          instance_id: string | null
+          intake_verification: string
+          odometer_unit: string | null
+          odometer_value: number | null
+          opened_at: string | null
+          ro_number: string | null
+          source_app: string
+          source_record_id: string
+          status: string
+          store_id: string | null
+          tenant_id: string
+          vin: string
+        }
+        Insert: {
+          closed_at?: string | null
+          created_at?: string
+          id?: string
+          instance_id?: string | null
+          intake_verification: string
+          odometer_unit?: string | null
+          odometer_value?: number | null
+          opened_at?: string | null
+          ro_number?: string | null
+          source_app: string
+          source_record_id: string
+          status?: string
+          store_id?: string | null
+          tenant_id: string
+          vin: string
+        }
+        Update: {
+          closed_at?: string | null
+          created_at?: string
+          id?: string
+          instance_id?: string | null
+          intake_verification?: string
+          odometer_unit?: string | null
+          odometer_value?: number | null
+          opened_at?: string | null
+          ro_number?: string | null
+          source_app?: string
+          source_record_id?: string
+          status?: string
+          store_id?: string | null
+          tenant_id?: string
+          vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_visits_instance_id_tenant_id_fkey"
+            columns: ["instance_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_instances"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "service_visits_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_visits_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_visits_vin_fkey"
+            columns: ["vin"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["vin"]
           },
         ]
       }
@@ -11741,6 +12460,98 @@ export type Database = {
         }
         Relationships: []
       }
+      vehicle_access_grants: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          ends_at: string | null
+          id: string
+          instance_id: string | null
+          purpose: string
+          relationship: string
+          revoke_reason: string | null
+          revoked_at: string | null
+          revoked_by: string | null
+          scopes: string[]
+          starts_at: string
+          subject_ref: string
+          subject_user_id: string
+          tenant_id: string
+          transaction_access_until: string | null
+          verification_source: string
+          vin: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          ends_at?: string | null
+          id?: string
+          instance_id?: string | null
+          purpose: string
+          relationship: string
+          revoke_reason?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          scopes: string[]
+          starts_at: string
+          subject_ref: string
+          subject_user_id: string
+          tenant_id: string
+          transaction_access_until?: string | null
+          verification_source: string
+          vin: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          ends_at?: string | null
+          id?: string
+          instance_id?: string | null
+          purpose?: string
+          relationship?: string
+          revoke_reason?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          scopes?: string[]
+          starts_at?: string
+          subject_ref?: string
+          subject_user_id?: string
+          tenant_id?: string
+          transaction_access_until?: string | null
+          verification_source?: string
+          vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_access_grants_instance_id_tenant_id_fkey"
+            columns: ["instance_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_instances"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "vehicle_access_grants_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_access_grants_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_access_grants_vin_fkey"
+            columns: ["vin"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["vin"]
+          },
+        ]
+      }
       vehicle_addendum_items: {
         Row: {
           created_at: string
@@ -11907,6 +12718,108 @@ export type Database = {
           vin?: string
         }
         Relationships: []
+      }
+      vehicle_custody_milestones: {
+        Row: {
+          causation_event_id: string | null
+          confirmed_by: string | null
+          corrects_id: string | null
+          created_at: string
+          from_state: string
+          id: string
+          idempotency_key: string | null
+          instance_id: string
+          milestone: string
+          occurred_at: string
+          occurred_tz: string | null
+          reason: string | null
+          seq: number
+          source: string
+          source_ref: string | null
+          source_revision: number | null
+          tenant_id: string
+          to_state: string
+          vin: string
+        }
+        Insert: {
+          causation_event_id?: string | null
+          confirmed_by?: string | null
+          corrects_id?: string | null
+          created_at?: string
+          from_state: string
+          id?: string
+          idempotency_key?: string | null
+          instance_id: string
+          milestone: string
+          occurred_at: string
+          occurred_tz?: string | null
+          reason?: string | null
+          seq?: never
+          source: string
+          source_ref?: string | null
+          source_revision?: number | null
+          tenant_id: string
+          to_state: string
+          vin: string
+        }
+        Update: {
+          causation_event_id?: string | null
+          confirmed_by?: string | null
+          corrects_id?: string | null
+          created_at?: string
+          from_state?: string
+          id?: string
+          idempotency_key?: string | null
+          instance_id?: string
+          milestone?: string
+          occurred_at?: string
+          occurred_tz?: string | null
+          reason?: string | null
+          seq?: never
+          source?: string
+          source_ref?: string | null
+          source_revision?: number | null
+          tenant_id?: string
+          to_state?: string
+          vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_custody_milestones_corrects_id_fkey"
+            columns: ["corrects_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_custody_milestones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_custody_milestones_instance_id_tenant_id_fkey"
+            columns: ["instance_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_instances"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "vehicle_custody_milestones_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_custody_milestones_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_custody_milestones_vin_fkey"
+            columns: ["vin"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["vin"]
+          },
+        ]
       }
       vehicle_delivery_clearance: {
         Row: {
@@ -12082,6 +12995,58 @@ export type Database = {
           vin?: string
         }
         Relationships: []
+      }
+      vehicle_external_refs: {
+        Row: {
+          app: string
+          created_at: string
+          external_id: string
+          id: string
+          instance_id: string
+          source_version: number | null
+          tenant_id: string
+        }
+        Insert: {
+          app: string
+          created_at?: string
+          external_id: string
+          id?: string
+          instance_id: string
+          source_version?: number | null
+          tenant_id: string
+        }
+        Update: {
+          app?: string
+          created_at?: string
+          external_id?: string
+          id?: string
+          instance_id?: string
+          source_version?: number | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_external_refs_instance_id_tenant_id_fkey"
+            columns: ["instance_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_instances"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "vehicle_external_refs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_external_refs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vehicle_fact_conflicts: {
         Row: {
@@ -12374,6 +13339,294 @@ export type Database = {
           },
         ]
       }
+      vehicle_history_audit: {
+        Row: {
+          action: string
+          actor: string | null
+          after: Json | null
+          before: Json | null
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          reason: string | null
+          tenant_id: string | null
+        }
+        Insert: {
+          action: string
+          actor?: string | null
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          reason?: string | null
+          tenant_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor?: string | null
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          reason?: string | null
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_history_audit_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_history_audit_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicle_history_setting_keys: {
+        Row: {
+          allowed_scopes: string[]
+          combine: string
+          consumer: string
+          key: string
+          max_value: number | null
+          min_value: number | null
+          policy_status: string
+          safe_default: Json
+          value_type: string
+        }
+        Insert: {
+          allowed_scopes: string[]
+          combine: string
+          consumer: string
+          key: string
+          max_value?: number | null
+          min_value?: number | null
+          policy_status: string
+          safe_default: Json
+          value_type: string
+        }
+        Update: {
+          allowed_scopes?: string[]
+          combine?: string
+          consumer?: string
+          key?: string
+          max_value?: number | null
+          min_value?: number | null
+          policy_status?: string
+          safe_default?: Json
+          value_type?: string
+        }
+        Relationships: []
+      }
+      vehicle_history_settings: {
+        Row: {
+          created_at: string
+          id: string
+          key: string
+          reason: string
+          scope_id: string | null
+          scope_type: string
+          set_by: string | null
+          tenant_id: string | null
+          value: Json
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key: string
+          reason: string
+          scope_id?: string | null
+          scope_type: string
+          set_by?: string | null
+          tenant_id?: string | null
+          value: Json
+          version: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key?: string
+          reason?: string
+          scope_id?: string | null
+          scope_type?: string
+          set_by?: string | null
+          tenant_id?: string | null
+          value?: Json
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_history_settings_key_fkey"
+            columns: ["key"]
+            isOneToOne: false
+            referencedRelation: "vehicle_history_setting_keys"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "vehicle_history_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_history_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicle_identity_corrections: {
+        Row: {
+          before_after: Json | null
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          from_vin: string
+          id: string
+          reason: string
+          record_refs: Json
+          requested_by: string
+          status: string
+          tenant_id: string
+          to_vin: string
+        }
+        Insert: {
+          before_after?: Json | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          from_vin: string
+          id?: string
+          reason: string
+          record_refs: Json
+          requested_by: string
+          status?: string
+          tenant_id: string
+          to_vin: string
+        }
+        Update: {
+          before_after?: Json | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          from_vin?: string
+          id?: string
+          reason?: string
+          record_refs?: Json
+          requested_by?: string
+          status?: string
+          tenant_id?: string
+          to_vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_identity_corrections_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_identity_corrections_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_identity_corrections_to_vin_fkey"
+            columns: ["to_vin"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["vin"]
+          },
+        ]
+      }
+      vehicle_identity_quarantine: {
+        Row: {
+          created_at: string
+          id: string
+          inbox_id: string | null
+          raw_vin: string
+          reason: string
+          resolution: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          source_app: string
+          source_ref: string | null
+          status: string
+          store_id: string | null
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          inbox_id?: string | null
+          raw_vin: string
+          reason: string
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          source_app: string
+          source_ref?: string | null
+          status?: string
+          store_id?: string | null
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          inbox_id?: string | null
+          raw_vin?: string
+          reason?: string
+          resolution?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          source_app?: string
+          source_ref?: string | null
+          status?: string
+          store_id?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_identity_quarantine_inbox_id_fkey"
+            columns: ["inbox_id"]
+            isOneToOne: false
+            referencedRelation: "integration_inbox"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_identity_quarantine_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_identity_quarantine_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vehicle_ingest_ledger: {
         Row: {
           attempt_count: number
@@ -12438,6 +13691,96 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "vehicle_listings"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicle_instances: {
+        Row: {
+          acquired_at: string | null
+          acquisition_channel: string
+          created_at: string
+          custody_state: string
+          disposed_at: string | null
+          disposition: string | null
+          id: string
+          listing_id: string | null
+          opened_reason: string
+          previous_instance_id: string | null
+          status: string
+          store_id: string | null
+          tenant_id: string
+          updated_at: string
+          vin: string
+        }
+        Insert: {
+          acquired_at?: string | null
+          acquisition_channel?: string
+          created_at?: string
+          custody_state?: string
+          disposed_at?: string | null
+          disposition?: string | null
+          id?: string
+          listing_id?: string | null
+          opened_reason?: string
+          previous_instance_id?: string | null
+          status?: string
+          store_id?: string | null
+          tenant_id: string
+          updated_at?: string
+          vin: string
+        }
+        Update: {
+          acquired_at?: string | null
+          acquisition_channel?: string
+          created_at?: string
+          custody_state?: string
+          disposed_at?: string | null
+          disposition?: string | null
+          id?: string
+          listing_id?: string | null
+          opened_reason?: string
+          previous_instance_id?: string | null
+          status?: string
+          store_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+          vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_instances_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_instances_previous_instance_id_fkey"
+            columns: ["previous_instance_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_instances_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_instances_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_instances_vin_fkey"
+            columns: ["vin"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["vin"]
           },
         ]
       }
@@ -13344,6 +14687,92 @@ export type Database = {
         }
         Relationships: []
       }
+      vehicle_reappearance_reviews: {
+        Row: {
+          decided_at: string | null
+          decided_by: string | null
+          decision: string | null
+          detected_at: string
+          detected_ref: string | null
+          detected_source: string
+          id: string
+          listing_id: string | null
+          prior_custody_state: string | null
+          prior_instance_id: string | null
+          reason: string | null
+          resulting_instance_id: string | null
+          status: string
+          store_id: string | null
+          tenant_id: string
+          vin: string
+        }
+        Insert: {
+          decided_at?: string | null
+          decided_by?: string | null
+          decision?: string | null
+          detected_at?: string
+          detected_ref?: string | null
+          detected_source: string
+          id?: string
+          listing_id?: string | null
+          prior_custody_state?: string | null
+          prior_instance_id?: string | null
+          reason?: string | null
+          resulting_instance_id?: string | null
+          status?: string
+          store_id?: string | null
+          tenant_id: string
+          vin: string
+        }
+        Update: {
+          decided_at?: string | null
+          decided_by?: string | null
+          decision?: string | null
+          detected_at?: string
+          detected_ref?: string | null
+          detected_source?: string
+          id?: string
+          listing_id?: string | null
+          prior_custody_state?: string | null
+          prior_instance_id?: string | null
+          reason?: string | null
+          resulting_instance_id?: string | null
+          status?: string
+          store_id?: string | null
+          tenant_id?: string
+          vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_reappearance_reviews_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_reappearance_reviews_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_reappearance_reviews_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_reappearance_reviews_vin_fkey"
+            columns: ["vin"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["vin"]
+          },
+        ]
+      }
       vehicle_snapshots: {
         Row: {
           affected_families: string[]
@@ -13639,6 +15068,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      vehicles: {
+        Row: {
+          created_at: string
+          first_seen_at: string
+          id: string
+          vin: string
+        }
+        Insert: {
+          created_at?: string
+          first_seen_at?: string
+          id?: string
+          vin: string
+        }
+        Update: {
+          created_at?: string
+          first_seen_at?: string
+          id?: string
+          vin?: string
+        }
+        Relationships: []
       }
       vin_queue: {
         Row: {
@@ -15001,6 +16451,84 @@ export type Database = {
       installs_block_finalize: {
         Args: { _tenant_id: string; _vin: string }
         Returns: boolean
+      }
+      integration_apply_event: {
+        Args: { p_inbox_id: string; p_plan: Json }
+        Returns: Json
+      }
+      integration_claim_inbox: {
+        Args: { p_lease_seconds?: number; p_limit: number }
+        Returns: {
+          adapter: string
+          applied_at: string | null
+          attempts: number
+          claimed_until: string | null
+          connection_id: string
+          envelope: Json
+          event_id: string
+          event_type: string
+          id: string
+          idempotency_key: string
+          next_attempt_at: string
+          outcome_code: string | null
+          payload_checksum: string
+          producer: string
+          received_at: string
+          requested_visibility: string
+          schema_version: string
+          source_record_id: string
+          source_version: number
+          status: string
+          tenant_id: string
+          vin: string | null
+          visibility: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "integration_inbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      integration_connection_secrets: {
+        Args: { p_connection_id: string }
+        Returns: {
+          key_id: string
+          secret: string
+        }[]
+      }
+      integration_delivery_allowed: {
+        Args: { p_tenant: string }
+        Returns: boolean
+      }
+      integration_fail_inbox: {
+        Args: {
+          p_dead: boolean
+          p_delay_seconds: number
+          p_error_code: string
+          p_inbox_id: string
+        }
+        Returns: number
+      }
+      integration_key_secret: { Args: { p_key_id: string }; Returns: string }
+      integration_quarantine: {
+        Args: {
+          p_reason: string
+          r: Database["public"]["Tables"]["integration_inbox"]["Row"]
+        }
+        Returns: undefined
+      }
+      integration_record_source_version: {
+        Args: {
+          p_connection_id: string
+          p_source_record_id: string
+          p_version: number
+        }
+        Returns: undefined
+      }
+      integration_replay_inbox: {
+        Args: { p_ids: string[]; p_reason: string; p_tenant: string }
+        Returns: number
       }
       inv_admin_decide_mapping: {
         Args: {
@@ -16370,6 +17898,125 @@ export type Database = {
       unschedule_marketcheck_sync: { Args: never; Returns: undefined }
       unschedule_reengage_abandoned_signings: {
         Args: never
+        Returns: undefined
+      }
+      vehicle_history_apply_identity_correction: {
+        Args: { p_id: string }
+        Returns: Json
+      }
+      vehicle_history_audit_write: {
+        Args: {
+          p_action: string
+          p_after: Json
+          p_before: Json
+          p_entity_id: string
+          p_entity_type: string
+          p_reason: string
+          p_tenant: string
+        }
+        Returns: undefined
+      }
+      vehicle_history_backfill_tenant: {
+        Args: { p_dry_run?: boolean; p_tenant: string }
+        Returns: Json
+      }
+      vehicle_history_can_read: {
+        Args: {
+          p_grant: Database["public"]["Tables"]["vehicle_access_grants"]["Row"]
+          p_record_at: string
+          p_record_instance: string
+          p_scope: string
+        }
+        Returns: boolean
+      }
+      vehicle_history_effective_setting: {
+        Args: { p_key: string; p_store: string; p_tenant: string }
+        Returns: Json
+      }
+      vehicle_history_end_access: {
+        Args: {
+          p_effective_at: string
+          p_grant_id: string
+          p_mode: string
+          p_reason: string
+        }
+        Returns: undefined
+      }
+      vehicle_history_flag: {
+        Args: { p_key: string; p_store: string; p_tenant: string }
+        Returns: boolean
+      }
+      vehicle_history_flag_reappearance: {
+        Args: {
+          p_listing_id: string
+          p_ref: string
+          p_source: string
+          p_store: string
+          p_tenant: string
+          p_vin: string
+        }
+        Returns: string
+      }
+      vehicle_history_grant_access: {
+        Args: {
+          p_ends_at: string
+          p_instance_id: string
+          p_purpose: string
+          p_relationship: string
+          p_scopes: string[]
+          p_starts_at: string
+          p_subject_ref: string
+          p_subject_user: string
+          p_tenant: string
+          p_verification: string
+          p_vin: string
+        }
+        Returns: string
+      }
+      vehicle_history_is_manager: {
+        Args: { p_tenant: string }
+        Returns: boolean
+      }
+      vehicle_history_is_platform_admin: { Args: never; Returns: boolean }
+      vehicle_history_is_service: { Args: never; Returns: boolean }
+      vehicle_history_next_state: {
+        Args: { p_from: string; p_milestone: string }
+        Returns: string
+      }
+      vehicle_history_owner_view: { Args: { p_vin: string }; Returns: Json }
+      vehicle_history_record_milestone: {
+        Args: {
+          p_causation_event_id?: string
+          p_corrects_id?: string
+          p_idempotency_key?: string
+          p_instance_id: string
+          p_milestone: string
+          p_occurred_at: string
+          p_occurred_tz: string
+          p_reason: string
+          p_source: string
+          p_source_ref: string
+          p_source_revision?: number
+        }
+        Returns: Json
+      }
+      vehicle_history_resolve_reappearance: {
+        Args: { p_decision: string; p_reason: string; p_review_id: string }
+        Returns: Json
+      }
+      vehicle_history_set_setting: {
+        Args: {
+          p_expected_version: number
+          p_key: string
+          p_reason: string
+          p_scope_id: string
+          p_scope_type: string
+          p_value: Json
+        }
+        Returns: Json
+      }
+      vehicle_history_set_transaction_retention: {
+        Args: { p_grant_id: string; p_reason: string; p_until: string }
         Returns: undefined
       }
       vendor_assigned_lines: {
