@@ -13,10 +13,11 @@
 name: CI
 
 on:
+  # PRs are the automatic validation gate for Claude branches. Running the
+  # same suite on both the branch push and the PR update duplicates work.
   push:
     branches:
       - main
-      - 'claude/**'
   pull_request:
     branches:
       - main
