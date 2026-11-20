@@ -42,7 +42,11 @@ export interface FeedMeta {
   store_id: string;
   last_seen_at?: string | null;
   updated_at?: string | null;
+  /** Only 'present' rows count anywhere; when absent the caller already filtered. */
+  presence?: string | null;
 }
+
+const isPresent = (f: FeedMeta): boolean => f.presence === undefined || f.presence === null || f.presence === "present";
 
 export type OwnerSource = "listing" | "feed";
 
@@ -77,18 +81,24 @@ export function defaultStore(stores: FeedStore[]): FeedStore | null {
 }
 
 /**
- * Which store a listing belongs to (contract rule 2). owning_store_id is
- * verified evidence and wins when it names one of the tenant's stores. A text
- * store_id naming one of the tenant's stores is next. Everything else (null,
- * the tenant id, an unknown value) is legacy and resolves to the default store.
+ * Which store a listing belongs to (contract rule 2, location truth first).
+ *  1. owning_store_id when it names one of the tenant's stores,
+ *  2. else the one store whose present feed carries this VIN (several: fall
+ *     through, never guess),
+ *  3. else a text store_id naming a tenant store,
+ *  4. else the default store (primary, or the sole store).
+ * presentStoreIds are stores with a presence='present' feed row for the VIN.
  */
 export function resolveListingStore(
   l: Pick<ListingMeta, "owning_store_id" | "store_id">,
   stores: FeedStore[],
+  presentStoreIds: string[] = [],
 ): string | null {
   const ids = new Set(stores.map((s) => s.id));
   const owning = (l.owning_store_id ?? "").trim().toLowerCase();
   if (owning && ids.has(owning)) return owning;
+  const present = [...new Set(presentStoreIds.map((x) => x.toLowerCase()))].filter((x) => ids.has(x));
+  if (present.length === 1) return present[0];
   const text = (l.store_id ?? "").trim().toLowerCase();
   if (text && ids.has(text)) return text;
   return defaultStore(stores)?.id ?? null;
@@ -111,7 +121,14 @@ export function resolveOwners(
   listings: ListingMeta[],
   feed: FeedMeta[],
   stores: FeedStore[],
+  serveFeed = true,
 ): { owned: Owned[]; duplicates: DuplicateReport[] } {
+  feed = feed.filter(isPresent);
+  const presentByVin = new Map<string, string[]>();
+  for (const f of feed) {
+    const a = presentByVin.get(f.vin);
+    if (a) a.push(f.store_id); else presentByVin.set(f.vin, [f.store_id]);
+  }
   type Cand = { source: OwnerSource; store_id: string | null; listing?: ListingMeta; feed?: FeedMeta };
   const byVin = new Map<string, Cand[]>();
   const push = (vin: string, c: Cand) => {
@@ -120,9 +137,9 @@ export function resolveOwners(
   };
   for (const l of listings) {
     if (!l.vin) continue;
-    push(l.vin, { source: "listing", store_id: resolveListingStore(l, stores), listing: l });
+    push(l.vin, { source: "listing", store_id: resolveListingStore(l, stores, presentByVin.get(l.vin) ?? []), listing: l });
   }
-  for (const f of feed) {
+  for (const f of serveFeed ? feed : []) {
     if (!f.vin) continue;
     push(f.vin, { source: "feed", store_id: f.store_id, feed: f });
   }
@@ -302,8 +319,8 @@ export function planList(args: {
 }): { owned: Owned[]; duplicates: DuplicateReport[] } {
   const { listings, stores, params, updatedSince } = args;
   const enabled = new Set(stores.filter((s) => s.inventory_feed_enabled && (s.status ?? "active") === "active").map((s) => s.id));
-  const feed = params.includeFeed ? args.feed.filter((f) => enabled.has(f.store_id)) : [];
-  const all = resolveOwners(listings, feed, stores);
+  const feed = args.feed.filter((f) => enabled.has(f.store_id));
+  const all = resolveOwners(listings, feed, stores, params.includeFeed);
   const since = updatedSince ? Date.parse(updatedSince) : null;
   const fresh = (o: Owned) => {
     if (since === null) return true;
@@ -343,7 +360,7 @@ export function buildStoresReport(args: {
 }): StoresReportRow[] {
   const { stores, listings } = args;
   const enabled = new Set(stores.filter((s) => s.inventory_feed_enabled).map((s) => s.id));
-  const feed = args.feed.filter((f) => enabled.has(f.store_id));
+  const feed = args.feed.filter((f) => enabled.has(f.store_id) && isPresent(f));
   const { duplicates } = resolveOwners(listings, feed, stores);
   const lost = new Map<string, number>();
   for (const d of duplicates) {

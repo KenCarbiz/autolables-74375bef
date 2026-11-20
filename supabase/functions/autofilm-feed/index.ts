@@ -6,7 +6,7 @@ import {
 } from "../_shared/lotFeedRow.ts";
 import {
   parseListParams, isExtendedList, storeBelongs, planList, buildStoresReport,
-  shapeFeedRow, annotateListingRow, storeRef, resolveListingStore,
+  shapeFeedRow, annotateListingRow, storeRef,
   type FeedStore, type ListingMeta, type FeedMeta, type FeedInventoryRow, type StoreRef,
 } from "../_shared/autofilmFeedStores.ts";
 import { factAuthority } from "../_shared/factorySticker/lib/vehicleTruth/precedence.ts";
@@ -191,7 +191,7 @@ serve(async (req) => {
       if (!ids.length) return Promise.resolve({ rows: [] as FeedMeta[], error: null as string | null });
       return pageAll<FeedMeta>(() =>
         admin.from("store_inventory")
-          .select("id, vin, store_id, last_seen_at, updated_at")
+          .select("id, vin, store_id, last_seen_at, updated_at, presence")
           .in("store_id", ids).eq("presence", "present").order("id", { ascending: true }));
     };
     const loadListingMeta = () => pageAll<ListingMeta>(() =>
@@ -418,7 +418,7 @@ serve(async (req) => {
     if (!detailVin && isExtendedList(listParams)) {
       const li = await loadListingMeta();
       if (li.error) return json(500, { error: li.error });
-      const fd = listParams.includeFeed ? await loadFeedMeta(extStores) : { rows: [] as FeedMeta[], error: null };
+      const fd = await loadFeedMeta(extStores);
       if (fd.error) return json(500, { error: fd.error });
       const plan = planList({
         listings: li.rows, feed: fd.rows, stores: extStores, params: listParams, updatedSince,
@@ -459,7 +459,7 @@ serve(async (req) => {
       for (const o of pageOwned) {
         if (o.source === "listing") {
           const v = shapedById.get(o.listing!.id);
-          if (v) vehicles.push(annotateListingRow(v, refFor(resolveListingStore(o.listing!, extStores))));
+          if (v) vehicles.push(annotateListingRow(v, refFor(o.store_id)));
         } else {
           const fr = feedRows.get(o.feed!.id);
           if (!fr) continue;
