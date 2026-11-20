@@ -6,7 +6,7 @@ import {
 } from "../_shared/lotFeedRow.ts";
 import {
   parseListParams, isExtendedList, storeBelongs, planList, buildStoresReport,
-  shapeFeedRow, annotateListingRow, storeRef,
+  shapeFeedRow, annotateListingRow, storeRef, unresolvedListings,
   type FeedStore, type ListingMeta, type FeedMeta, type FeedInventoryRow, type StoreRef,
 } from "../_shared/autofilmFeedStores.ts";
 import { factAuthority } from "../_shared/factorySticker/lib/vehicleTruth/precedence.ts";
@@ -42,7 +42,12 @@ import { factAuthority } from "../_shared/factorySticker/lib/vehicleTruth/preced
 //          One VIN, one owner per tenant; losers are reported in
 //          duplicates[] / duplicate_count and never served. A store_id that is
 //          not a store of tenant_id is a 400.
-//   STORES GET ?tenant_id=<uuid>&stores=1
+//          Extended responses also carry unresolved_count / unresolved_vins
+//          (listings with no resolvable store; capped) and vanished_count
+//          (rows that left between the metadata read and the fetch; total is
+//          reduced by it so a walk sums to total).
+//   STORES GET ?tenant_id=<uuid>&stores=1[&summary=1 -> {stores, unresolved_listings, unresolved_vins}]
+//          GET ?tenant_id=<uuid>&stores=1
 //          [{id, display_name, legal_name, city, state, is_primary,
 //            inventory_feed_enabled, feed_last_seen_at, feed_count,
 //            duplicate_vins}]  (a bare array; read-only)
@@ -207,7 +212,12 @@ serve(async (req) => {
       if (fd.error) return json(500, { error: fd.error });
       const li = await loadListingMeta();
       if (li.error) return json(500, { error: li.error });
-      return json(200, buildStoresReport({ stores: st.rows, feed: fd.rows, listings: li.rows }));
+      const report = buildStoresReport({ stores: st.rows, feed: fd.rows, listings: li.rows });
+      if (url.searchParams.get("summary") === "1") {
+        const un = unresolvedListings(li.rows, fd.rows, st.rows);
+        return json(200, { stores: report, unresolved_listings: un.count, unresolved_vins: un.vins });
+      }
+      return json(200, report);
     }
 
     let extStores: FeedStore[] = [];
@@ -456,23 +466,27 @@ serve(async (req) => {
 
       let feedIdentityGaps = 0;
       const vehicles: Record<string, unknown>[] = [];
+      let vanished = 0;
       for (const o of pageOwned) {
         if (o.source === "listing") {
           const v = shapedById.get(o.listing!.id);
-          if (v) vehicles.push(annotateListingRow(v, refFor(o.store_id)));
+          if (v) vehicles.push(annotateListingRow(v, refFor(o.store_id))); else vanished++;
         } else {
           const fr = feedRows.get(o.feed!.id);
-          if (!fr) continue;
+          if (!fr) { vanished++; continue; }
           if (!fr.make) feedIdentityGaps++;
           vehicles.push(shapeFeedRow(fr, refFor(o.store_id)));
         }
       }
       return json(200, {
-        total: plan.owned.length,
+        total: plan.owned.length - vanished,
         limit,
         has_more: extHasMore,
-        next_cursor: extHasMore ? String(vehicles[vehicles.length - 1]?.vin ?? "") || null : null,
+        next_cursor: extHasMore ? pageOwned[pageOwned.length - 1]?.vin ?? null : null,
         identity_incomplete: shaped.identity_incomplete + feedIdentityGaps,
+        vanished_count: vanished,
+        unresolved_count: plan.unresolved.count,
+        unresolved_vins: plan.unresolved.vins,
         duplicate_count: plan.duplicates.length,
         duplicates: plan.duplicates,
         vehicles,

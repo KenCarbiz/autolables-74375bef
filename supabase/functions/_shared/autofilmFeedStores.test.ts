@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   buildStoresReport, defaultStore, isExtendedList, parseListParams, planList,
-  resolveListingStore, resolveOwners, shapeFeedRow, storeBelongs,
+  resolveListingStore, resolveOwners, shapeFeedRow, storeBelongs, unresolvedListings,
   type FeedMeta, type FeedStore, type ListingMeta,
 } from "./autofilmFeedStores";
 
@@ -178,6 +178,31 @@ describe("location truth for legacy listings (contract rule 2)", () => {
   });
 });
 
+describe("unresolved listings and store status", () => {
+  const noPrimary = STORES.map((s) => ({ ...s, is_primary_inventory_store: false }));
+  it("listings with no resolvable store are counted and capped, never silent", () => {
+    const ls = Array.from({ length: 60 }, () => listing(vin()));
+    const p = planList({ listings: ls, feed: [], stores: noPrimary, params: { storeId: sid(2), includeFeed: false } });
+    expect(p.owned).toHaveLength(0);
+    expect(p.unresolved.count).toBe(60);
+    expect(p.unresolved.vins).toHaveLength(50);
+    expect(unresolvedListings(ls, [], STORES).count).toBe(0);
+    const two = STORES.map((s, i) => ({ ...s, is_primary_inventory_store: i < 2 }));
+    expect(unresolvedListings(ls.slice(0, 3), [], two).count).toBe(3);
+  });
+  it("a listing resolved by a single present feed row is not unresolved", () => {
+    const v = vin();
+    expect(unresolvedListings([listing(v)], [feedRow(sid(2), v)], noPrimary).count).toBe(0);
+  });
+  it("feed_count ignores inactive stores exactly as a slice does", () => {
+    const v = vin();
+    const stores = STORES.map((s) => (s.id === sid(2) ? { ...s, status: "inactive" } : s));
+    const f = [feedRow(sid(2), v)];
+    expect(buildStoresReport({ stores, feed: f, listings: [] }).find((r) => r.id === sid(2))?.feed_count).toBe(0);
+    expect(planList({ listings: [], feed: f, stores, params: { storeId: sid(2), includeFeed: true } }).owned).toHaveLength(0);
+  });
+});
+
 describe("fixture shaped like the live 20 Nov reconciliation", () => {
   // order: Harte INFINITI (primary), GH INFINITI, GH Nissan, Hyundai, Harte Nissan, VW
   const present = [104, 96, 202, 141, 142, 132];
@@ -255,8 +280,10 @@ const isP = (f: FeedMeta) => f.presence === undefined || f.presence === "present
 
 type Row = Record<string, any>;
 const DB: Record<string, Row[]> = {};
+const HIDE_ON_FETCH = new Set<string>();
 const applyOps = (table: string, ops: Array<[string, ...any[]]>, head: boolean) => {
   let rows = [...(DB[table] ?? [])];
+  if (table === "vehicle_listings" && ops.some(([o, a]) => o === "in" && a === "id")) rows = rows.filter((r) => !HIDE_ON_FETCH.has(r.id));
   let lim: number | null = null; let rng: [number, number] | null = null;
   let order: { col: string; asc: boolean } | null = null;
   for (const [op, a, b] of ops) {
@@ -395,6 +422,44 @@ describe("autofilm-feed handler", () => {
     const p3 = await call(`tenant_id=${TENANT}&include_feed=1&limit=2&cursor=${p2.body.next_cursor}`);
     expect(p3.body.vehicles).toHaveLength(1);
     expect(p3.body.has_more).toBe(false);
+  });
+
+  it("a row that vanishes between metadata and fetch does not break the walk: cursor from owned rows, total reduced", async () => {
+    HIDE_ON_FETCH.add("l2");
+    try {
+      const seen: string[] = [];
+      let cursor = ""; let first: any = null;
+      for (let i = 0; i < 6; i++) {
+        const r = await call(`tenant_id=${TENANT}&include_feed=1&limit=1${cursor ? `&cursor=${cursor}` : ""}`);
+        first ??= r.body;
+        seen.push(...r.body.vehicles.map((v: Row) => v.vin));
+        if (!r.body.has_more) break;
+        expect(r.body.next_cursor).toBeTruthy();
+        cursor = r.body.next_cursor;
+      }
+      expect(seen).not.toContain(LV_GH);
+      expect(seen).toHaveLength(4);
+      const whole = await call(`tenant_id=${TENANT}&include_feed=1`);
+      expect(whole.body.vanished_count).toBe(1);
+      expect(whole.body.total).toBe(whole.body.vehicles.length);
+    } finally { HIDE_ON_FETCH.clear(); }
+  });
+
+  it("extended response reports unresolved listings; stores summary reports them too", async () => {
+    const r = await call(`tenant_id=${TENANT}&include_feed=1`);
+    expect(r.body.unresolved_count).toBe(0);
+    expect(r.body.unresolved_vins).toEqual([]);
+    const saved = DB.dealer_stores;
+    DB.dealer_stores = saved.map((s) => ({ ...s, is_primary_inventory_store: false }));
+    try {
+      const x = await call(`tenant_id=${TENANT}&include_feed=1`);
+      expect(x.body.unresolved_count).toBe(1);
+      expect(x.body.unresolved_vins).toEqual([LV_PRIMARY]);
+      const sm = await call(`tenant_id=${TENANT}&stores=1&summary=1`);
+      expect(sm.body.unresolved_listings).toBe(1);
+      expect(Array.isArray(sm.body.stores)).toBe(true);
+    } finally { DB.dealer_stores = saved; }
+    expect(Array.isArray((await call(`tenant_id=${TENANT}&stores=1`)).body)).toBe(true);
   });
 
   it("stores mode returns the bare array per contract and is tenant scoped", async () => {

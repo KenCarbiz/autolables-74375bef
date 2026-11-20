@@ -316,9 +316,9 @@ export function planList(args: {
   stores: FeedStore[];
   params: ListParams;
   updatedSince?: string | null;
-}): { owned: Owned[]; duplicates: DuplicateReport[] } {
+}): { owned: Owned[]; duplicates: DuplicateReport[]; unresolved: { count: number; vins: string[] } } {
   const { listings, stores, params, updatedSince } = args;
-  const enabled = new Set(stores.filter((s) => s.inventory_feed_enabled && (s.status ?? "active") === "active").map((s) => s.id));
+  const enabled = feedEnabledIds(stores);
   const feed = args.feed.filter((f) => enabled.has(f.store_id));
   const all = resolveOwners(listings, feed, stores, params.includeFeed);
   const since = updatedSince ? Date.parse(updatedSince) : null;
@@ -332,7 +332,23 @@ export function planList(args: {
   const duplicates = sid === null
     ? all.duplicates
     : all.duplicates.filter((d) => d.owner.store_id === sid || d.losers.some((l) => l.store_id === sid));
-  return { owned, duplicates };
+  return { owned, duplicates, unresolved: unresolvedListings(listings, args.feed, stores) };
+}
+
+/** Stores whose feed is served and counted: enabled and active. One definition
+ *  so a slice and the STORES report cannot disagree. */
+export const feedEnabledIds = (stores: FeedStore[]): Set<string> =>
+  new Set(stores.filter((s) => s.inventory_feed_enabled && (s.status ?? "active") === "active").map((s) => s.id));
+
+export const UNRESOLVED_VIN_CAP = 50;
+
+/** Listings whose store cannot be resolved. They have no slice of their own, so
+ *  they are reported rather than left to vanish from every store_id view. */
+export function unresolvedListings(listings: ListingMeta[], feed: FeedMeta[], stores: FeedStore[]): { count: number; vins: string[] } {
+  const enabled = feedEnabledIds(stores);
+  const { owned } = resolveOwners(listings, feed.filter((f) => enabled.has(f.store_id)), stores, false);
+  const un = owned.filter((o) => o.source === "listing" && o.store_id === null).map((o) => o.vin);
+  return { count: un.length, vins: un.slice(0, UNRESOLVED_VIN_CAP) };
 }
 
 export interface StoresReportRow {
@@ -359,7 +375,7 @@ export function buildStoresReport(args: {
   listings: ListingMeta[];
 }): StoresReportRow[] {
   const { stores, listings } = args;
-  const enabled = new Set(stores.filter((s) => s.inventory_feed_enabled).map((s) => s.id));
+  const enabled = feedEnabledIds(stores);
   const feed = args.feed.filter((f) => enabled.has(f.store_id) && isPresent(f));
   const { duplicates } = resolveOwners(listings, feed, stores);
   const lost = new Map<string, number>();
