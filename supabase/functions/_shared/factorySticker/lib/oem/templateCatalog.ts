@@ -641,13 +641,28 @@ export function evaluateCatalogTemplate(t: {
 }
 export type CatalogFlag = "template_configuration_unsupported" | "template_pending_owner_approval" | "epa_match_conflict";
 export interface CatalogResolution {
-    status: "approved_match" | "pending_match" | "configuration_unsupported" | "no_catalog_for_make";
+    status: "approved_match" | "brand_match" | "pending_match" | "configuration_unsupported" | "no_catalog_for_make";
     template: CatalogTemplate | null;
     flags: CatalogFlag[];
     candidates: string[];
     reasons: string[];
 }
 export const isRoutable = (t: CatalogTemplate): boolean => t.approval === "approved" && t.layoutStatus === "approved";
+const ELECTRIFIED_NAME = /hybrid|plug-?in|phev|\bev\b|electric|4xe|e-?tron|\brecharge\b|\b\d{3}h\b/i;
+export const BRAND_WIDE_MIN_MODEL_YEAR = 2013;
+export function brandWideTemplate(v: CatalogVehicleInput): CatalogTemplate | null {
+    const make = token(v.make);
+    const fuel = v.fuelClass;
+    if (!make || !fuel || v.modelYear === null || v.modelYear < BRAND_WIDE_MIN_MODEL_YEAR)
+        return null;
+    if (fuel !== "hybrid" && fuel !== "phev" && fuel !== "ev" && ELECTRIFIED_NAME.test(`${v.model ?? ""} ${v.trim ?? ""}`))
+        return null;
+    const pool = TEMPLATE_CATALOG.filter((t) => t.canonicalMake === make && isRoutable(t) && t.match.fuelClasses.includes(fuel));
+    if (!pool.length)
+        return null;
+    const body = normalizeBodyClass(v.bodyClass);
+    return (body ? pool.find((t) => t.match.bodyClasses.includes(body)) : undefined) ?? pool[0];
+}
 export function resolveCatalogTemplate(v: CatalogVehicleInput): CatalogResolution {
     const make = token(v.make);
     const sameMake = TEMPLATE_CATALOG.filter((t) => t.canonicalMake === make);
@@ -667,6 +682,10 @@ export function resolveCatalogTemplate(v: CatalogVehicleInput): CatalogResolutio
     const approved = matches.find(isRoutable);
     if (approved)
         return { status: "approved_match", template: approved, flags: [], candidates, reasons: [] };
+    const brand = brandWideTemplate(v);
+    if (brand) {
+        return { status: "brand_match", template: brand, flags: [], candidates, reasons: [`${brand.id}: serves the make for ${v.fuelClass} vehicles`] };
+    }
     if (matches.length) {
         return {
             status: "pending_match",

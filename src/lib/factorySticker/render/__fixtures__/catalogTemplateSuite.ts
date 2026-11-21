@@ -4,7 +4,7 @@
 // barcode, no reference leakage, routing).
 
 import { describe, expect, it } from "vitest";
-import { buildRenderLayout, templateRoutingFacts, type FactoryStickerRenderData, type FactoryStickerTheme } from "../contract";
+import { buildRenderLayout, productionLayoutKey, templateRoutingFacts, type FactoryStickerRenderData, type FactoryStickerTheme } from "../contract";
 import { textBBox, type LayoutModel, type TextPrimitive } from "../layout";
 import { expectNoTextOverlap, pageStrings } from "./layoutAsserts";
 import { canonicalPassportUrl, PASSPORT_QR_CAPTION, REPRODUCTION_BANNER, REPRODUCTION_DISCLOSURE } from "../../reproduction";
@@ -361,22 +361,32 @@ export function describeCatalogTemplate(c: CatalogSuiteConfig): void {
       it("is never selected by production routing while pending owner approval", () => {
         withState("pending_owner_approval", "sample_ready", () => {
           for (const data of [real, ref]) {
-            const production = buildRenderLayout(data, theme);
-            expect(production.fit.ok ? production.fit.figmaMaster : undefined).toBeUndefined();
-            expect(production.width).toBe(792);
+            expect(productionLayoutKey(data, theme)).not.toBe(c.templateId);
+            if (productionLayoutKey(data, theme) === null) {
+              const production = buildRenderLayout(data, theme);
+              expect(production.fit.ok ? production.fit.figmaMaster : undefined).toBeUndefined();
+              expect(production.width).toBe(792);
+            }
           }
         });
       });
 
       it("routes to the template in production only once owner approval and the layout are both approved", () => {
         withState("approved", "sample_ready", () => {
-          expect(buildRenderLayout(ref, theme).width).toBe(792);
+          expect(productionLayoutKey(ref, theme)).not.toBe(c.templateId);
         });
         withState("approved", "approved", () => {
           const routed = buildRenderLayout(ref, theme);
           expect([routed.width, routed.height]).toEqual(c.pageSize ?? [1224, 792]);
           expect(routed.fit.ok && routed.fit.figmaMaster).toBe(true);
-          expect(buildRenderLayout({ ...ref, identity: { ...ref.identity, year: c.offYear ?? "2025" } }, theme).width).toBe(792);
+          const offYear = { ...ref, identity: { ...ref.identity, year: c.offYear ?? "2025" } };
+          const offFacts = templateRoutingFacts(offYear);
+          if (!offFacts.servedByApprovedMaster && offFacts.status === "brand_match") {
+            expect(offFacts.template?.canonicalMake).toBe(entry().canonicalMake);
+            expect(isRoutable(offFacts.template!)).toBe(true);
+          } else if (!offFacts.servedByApprovedMaster) {
+            expect(buildRenderLayout(offYear, theme).width).toBe(792);
+          }
         });
       });
 
@@ -401,13 +411,25 @@ export function describeCatalogTemplate(c: CatalogSuiteConfig): void {
 
       it("flags the stress record and every unsupported configuration", () => {
         withState("pending_owner_approval", "sample_ready", () => {
-          expect(templateRoutingFacts(real).flags).toEqual(c.stressOtherMake ? [] : [
-            ...(c.stressMatches ? ["template_pending_owner_approval"] : ["template_configuration_unsupported"]),
-            ...(real.neovin?.epaConflict ? ["epa_match_conflict"] : []),
-          ]);
+          const stress = templateRoutingFacts(real);
+          if (stress.status === "brand_match") {
+            expect(stress.template?.id).not.toBe(c.templateId);
+            expect(isRoutable(stress.template!)).toBe(true);
+          } else {
+            expect(stress.flags).toEqual(c.stressOtherMake ? [] : [
+              ...(c.stressMatches ? ["template_pending_owner_approval"] : ["template_configuration_unsupported"]),
+              ...(real.neovin?.epaConflict ? ["epa_match_conflict"] : []),
+            ]);
+          }
         });
         for (const u of c.unsupported) {
           const facts = templateRoutingFacts(u.patch(ref));
+          if (facts.status === "brand_match") {
+            // Served brand-wide by an approved template of the same make and fuel class (owner decision 2026-11-21).
+            expect(isRoutable(facts.template!), u.label).toBe(true);
+            expect(facts.template!.canonicalMake, u.label).toBe(entry().canonicalMake);
+            continue;
+          }
           expect(facts.flags, u.label).toEqual(["template_configuration_unsupported"]);
           expect(facts.template, u.label).toBeNull();
         }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRenderLayout, equipmentBase, templateRoutingFacts, type FactoryStickerRenderData, type FactoryStickerTheme } from "../contract";
+import { buildRenderLayout, productionLayoutKey, equipmentBase, templateRoutingFacts, type FactoryStickerRenderData, type FactoryStickerTheme } from "../contract";
 import { withCatalogEquipment } from "../catalogEquipment";
 import { textBBox, type LayoutModel, type TextPrimitive } from "../layout";
 import { expectNoTextOverlap, pageStrings } from "../__fixtures__/layoutAsserts";
@@ -272,8 +272,8 @@ describe("Hyundai Tucson gasoline template", () => {
         const routed = buildRenderLayout(records[0], theme);
         expect([routed.width, routed.height]).toEqual([1224, 792]);
         expect(routed.fit.ok && routed.fit.figmaMaster).toBe(true);
-        const wrongYear = buildRenderLayout({ ...records[0], identity: { ...records[0].identity, year: "2025" } }, theme);
-        expect(wrongYear.width).toBe(792);
+        // Owner decision 2026-11-21: another model year of the make is served brand-wide by the template.
+        expect(productionLayoutKey({ ...records[0], identity: { ...records[0].identity, year: "2025" } }, theme)).toBe(HYUNDAI_TUCSON_GAS_ID);
       } finally {
         Object.assign(mutable, saved);
       }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  BLOCKED_VARIANT_REQUESTS, CATALOG_ENTRY_COUNT, TEMPLATE_CATALOG, evaluateCatalogTemplate, hasBuiltCatalogTemplates, getCatalogTemplate, isRoutable, normalizeBodyClass,
+  BLOCKED_VARIANT_REQUESTS, BRAND_WIDE_MIN_MODEL_YEAR, CATALOG_ENTRY_COUNT, brandWideTemplate, TEMPLATE_CATALOG, evaluateCatalogTemplate, hasBuiltCatalogTemplates, getCatalogTemplate, isRoutable, normalizeBodyClass,
   resolveCatalogTemplate, type CatalogVehicleInput,
 } from "./templateCatalog";
 import { pinCatalogPending } from "../render/__fixtures__/catalogState";
@@ -263,5 +263,47 @@ describe("template catalog", () => {
     expect(status(veh("Dodge", "Durango", { fuelClass: "phev" }))).toBe("configuration_unsupported");
     expect(status(veh("Buick", "Envista"))).toBe("pending_match");
     expect(status(veh("Buick", "Envista", { bodyClass: "Sedan" }))).toBe("configuration_unsupported");
+  });
+});
+
+describe("brand-wide routing (owner decision 2026-11-21)", () => {
+  const kia = (over: Partial<CatalogVehicleInput> = {}): CatalogVehicleInput => ({
+    make: "Kia", modelYear: 2024, model: "Telluride", trim: "SX", bodyClass: "SUV",
+    fuelClass: "gasoline", drivetrain: "AWD", ...over,
+  });
+
+  it("serves another model and year of the make with its approved same-fuel template", () => {
+    const r = resolveCatalogTemplate(kia());
+    expect(r.status).toBe("brand_match");
+    expect(r.template?.id).toBe("kia_2026_sorento_lx");
+    expect(r.flags).toEqual([]);
+    expect(brandWideTemplate(kia({ model: "Forte", bodyClass: "Sedan", modelYear: 2021 }))?.id).toBe("kia_2026_sorento_lx");
+  });
+
+  it("keeps the exact approved match ahead of the brand-wide route", () => {
+    expect(resolveCatalogTemplate(kia({ modelYear: 2026, model: "Sorento", trim: "LX" })).status).toBe("approved_match");
+  });
+
+  it("never crosses fuel classes, label eras, electrified names or unapproved templates", () => {
+    expect(brandWideTemplate(kia({ fuelClass: "ev", model: "EV9" }))).toBeNull();
+    expect(brandWideTemplate(kia({ fuelClass: "hybrid" }))).toBeNull();
+    expect(brandWideTemplate(kia({ fuelClass: null }))).toBeNull();
+    expect(brandWideTemplate(kia({ modelYear: BRAND_WIDE_MIN_MODEL_YEAR - 1 }))).toBeNull();
+    expect(brandWideTemplate(kia({ model: "Sorento Hybrid" }))).toBeNull();
+    expect(brandWideTemplate(kia({ make: "Lexus", model: "NX 350h" }))).toBeNull();
+    expect(brandWideTemplate(kia({ make: "Honda", model: "Pilot" }))).toBeNull();
+    expect(resolveCatalogTemplate(kia({ make: "Honda", model: "Pilot" })).status).toBe("configuration_unsupported");
+  });
+
+  it("only ever returns routable templates of the vehicle's own make and fuel class", () => {
+    for (const t of TEMPLATE_CATALOG) {
+      for (const fuel of ["gasoline", "hybrid", "phev", "ev", "diesel"] as const) {
+        const got = brandWideTemplate({ make: t.brand, modelYear: 2022, model: "Other", trim: null, bodyClass: null, fuelClass: fuel, drivetrain: null });
+        if (!got) continue;
+        expect(isRoutable(got)).toBe(true);
+        expect(got.canonicalMake).toBe(t.canonicalMake);
+        expect(got.match.fuelClasses).toContain(fuel);
+      }
+    }
   });
 });

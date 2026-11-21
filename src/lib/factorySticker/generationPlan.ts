@@ -213,8 +213,14 @@ export function assessRenderedSticker(input: {
   // landscape one would have.
   // An approved catalog template declares its own page (the OEM reference's
   // size), so it is checked against that, never against the brand default.
-  const catalogTemplate = plan.templateRouting.status === "approved_match" && !plan.templateRouting.servedByApprovedMaster
-    ? plan.templateRouting.template : null;
+  const routed = plan.templateRouting.servedByApprovedMaster ? null : plan.templateRouting.template;
+  // A brand-wide route falls back to the generic layout when the content does
+  // not fit, so its page is checked against the template only when it printed on it.
+  const catalogTemplate = !routed ? null
+    : plan.templateRouting.status === "approved_match" ? routed
+    : plan.templateRouting.status === "brand_match"
+      && Number(layout.widthPt ?? 0) === routed.page.widthPt && Number(layout.heightPt ?? 0) === routed.page.heightPt ? routed
+    : null;
   const pageFormat = catalogTemplate
     ? {
       widthInches: catalogTemplate.page.widthPt / 72, heightInches: catalogTemplate.page.heightPt / 72,
