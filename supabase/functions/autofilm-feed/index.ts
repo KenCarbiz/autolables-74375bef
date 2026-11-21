@@ -6,7 +6,7 @@ import {
 } from "../_shared/lotFeedRow.ts";
 import {
   parseListParams, isExtendedList, storeBelongs, planList, buildStoresReport,
-  shapeFeedRow, annotateListingRow, storeRef, unresolvedListings,
+  shapeFeedRow, annotateListingRow, storeRef, unresolvedListings, listingOnlyListings,
   type FeedStore, type ListingMeta, type FeedMeta, type FeedInventoryRow, type StoreRef,
 } from "../_shared/autofilmFeedStores.ts";
 import { factAuthority } from "../_shared/factorySticker/lib/vehicleTruth/precedence.ts";
@@ -35,18 +35,24 @@ import { factAuthority } from "../_shared/factorySticker/lib/vehicleTruth/preced
 //   LIST (multi-rooftop, additive; contract v1 2026-11-20)
 //          + [&store_id=<dealer_stores uuid of tenant_id>][&include_feed=1]
 //          Absent both, the response is exactly the legacy one. With either,
-//          every row gains store {id, display_name, city, state} and
-//          availability_source "listing"|"feed"; include_feed also serves
+//          every row gains store {id, display_name, city, state},
+//          availability_source "listing"|"feed" and feed_confirmed (true when
+//          the VIN has a present store_inventory row in an enabled, active
+//          store; always true for feed rows, false for listing-only cars that
+//          must not be presented as confirmed in stock); include_feed also serves
 //          feed-only rows (store_inventory present rows of stores with
 //          inventory_feed_enabled) that have no sticker/passport/documents.
 //          One VIN, one owner per tenant; losers are reported in
 //          duplicates[] / duplicate_count and never served. A store_id that is
 //          not a store of tenant_id is a 400.
 //          Extended responses also carry unresolved_count / unresolved_vins
-//          (listings with no resolvable store; capped) and vanished_count
+//          (listings with no resolvable store; capped), listing_only_count /
+//          listing_only_vins (live listings in no present feed row of an
+//          enabled, active store; capped at 50) and vanished_count
 //          (rows that left between the metadata read and the fetch; total is
 //          reduced by it so a walk sums to total).
-//   STORES GET ?tenant_id=<uuid>&stores=1[&summary=1 -> {stores, unresolved_listings, unresolved_vins}]
+//   STORES GET ?tenant_id=<uuid>&stores=1[&summary=1 -> {stores, unresolved_listings, unresolved_vins,
+//          listing_only_count, listing_only_vins}]
 //          GET ?tenant_id=<uuid>&stores=1
 //          [{id, display_name, legal_name, city, state, is_primary,
 //            inventory_feed_enabled, feed_last_seen_at, feed_count,
@@ -215,7 +221,11 @@ serve(async (req) => {
       const report = buildStoresReport({ stores: st.rows, feed: fd.rows, listings: li.rows });
       if (url.searchParams.get("summary") === "1") {
         const un = unresolvedListings(li.rows, fd.rows, st.rows);
-        return json(200, { stores: report, unresolved_listings: un.count, unresolved_vins: un.vins });
+        const lo = listingOnlyListings(li.rows, fd.rows, st.rows);
+        return json(200, {
+          stores: report, unresolved_listings: un.count, unresolved_vins: un.vins,
+          listing_only_count: lo.count, listing_only_vins: lo.vins,
+        });
       }
       return json(200, report);
     }
@@ -470,7 +480,7 @@ serve(async (req) => {
       for (const o of pageOwned) {
         if (o.source === "listing") {
           const v = shapedById.get(o.listing!.id);
-          if (v) vehicles.push(annotateListingRow(v, refFor(o.store_id))); else vanished++;
+          if (v) vehicles.push(annotateListingRow(v, refFor(o.store_id), o.feed_confirmed)); else vanished++;
         } else {
           const fr = feedRows.get(o.feed!.id);
           if (!fr) { vanished++; continue; }
@@ -487,6 +497,8 @@ serve(async (req) => {
         vanished_count: vanished,
         unresolved_count: plan.unresolved.count,
         unresolved_vins: plan.unresolved.vins,
+        listing_only_count: plan.listingOnly.count,
+        listing_only_vins: plan.listingOnly.vins,
         duplicate_count: plan.duplicates.length,
         duplicates: plan.duplicates,
         vehicles,

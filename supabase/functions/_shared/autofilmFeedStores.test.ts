@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   buildStoresReport, defaultStore, isExtendedList, parseListParams, planList,
-  resolveListingStore, resolveOwners, shapeFeedRow, storeBelongs, unresolvedListings,
+  resolveListingStore, resolveOwners, shapeFeedRow, storeBelongs, unresolvedListings, listingOnlyListings,
   type FeedMeta, type FeedStore, type ListingMeta,
 } from "./autofilmFeedStores";
 
@@ -264,6 +264,19 @@ describe("fixture shaped like the live 20 Nov reconciliation", () => {
     expect(all.owned.some((o) => o.source === "feed" && rrVins.includes(o.vin))).toBe(false);
     expect(rrVins.slice(0, 9).every((v) => all.owned.find((o) => o.vin === v)?.store_id === HARTE)).toBe(true);
   });
+  it("39 listing-only cars are flagged feed_confirmed=false; everything else is confirmed", () => {
+    const all = planList({ listings, feed, stores: STORES, params: { storeId: null, includeFeed: true } });
+    expect(all.owned.filter((o) => !o.feed_confirmed)).toHaveLength(39);
+    expect(all.owned.filter((o) => !o.feed_confirmed).every((o) => o.source === "listing")).toBe(true);
+    expect(all.owned.filter((o) => o.source === "feed").every((o) => o.feed_confirmed)).toBe(true);
+    expect(all.listingOnly.count).toBe(39);
+    expect(all.listingOnly.vins).toHaveLength(39);
+    // the 9 listings backed only by a retirement_review row are listing-only too
+    expect(rrVins.slice(0, 9).every((v) => all.listingOnly.vins.includes(v))).toBe(true);
+    // a disabled or inactive store's present row does not confirm
+    const off = STORES.map((s) => (s.id === sid(2) ? { ...s, inventory_feed_enabled: false } : s));
+    expect(listingOnlyListings(listings, feed, off).count).toBe(39 + 36);
+  });
   it("a planted cross-store duplicate is served once, to the primary", () => {
     const stolen = pv[0][103];
     const dup = [...feed, feedRow(sid(2), stolen, "2026-11-20T23:00:00Z")];
@@ -372,6 +385,7 @@ describe("autofilm-feed handler", () => {
     for (const v of body.vehicles) {
       expect(v).not.toHaveProperty("store");
       expect(v).not.toHaveProperty("availability_source");
+      expect(v).not.toHaveProperty("feed_confirmed");
     }
   });
 
@@ -392,7 +406,7 @@ describe("autofilm-feed handler", () => {
     expect(body.duplicates[0]).toMatchObject({ vin: DUP2, owner: { store_id: sid(2), source: "listing" }, losers: [{ store_id: sid(3), source: "feed" }] });
     // Listing rows are the legacy rows plus exactly the two additive keys.
     for (const lr of legacy.body.vehicles) {
-      const ext = { ...by(lr.vin) }; delete ext.store; delete ext.availability_source;
+      const ext = { ...by(lr.vin) }; delete ext.store; delete ext.availability_source; delete ext.feed_confirmed;
       expect(ext).toEqual(lr);
     }
   });
@@ -448,6 +462,10 @@ describe("autofilm-feed handler", () => {
   it("extended response reports unresolved listings; stores summary reports them too", async () => {
     const r = await call(`tenant_id=${TENANT}&include_feed=1`);
     expect(r.body.unresolved_count).toBe(0);
+    expect(r.body.listing_only_count).toBe(2);
+    expect(r.body.listing_only_vins).toEqual([LV_GH, LV_PRIMARY]);
+    const conf = Object.fromEntries(r.body.vehicles.map((v: Row) => [v.vin, v.feed_confirmed]));
+    expect(conf).toEqual({ [LV_PRIMARY]: false, [LV_GH]: false, [DUP]: true, [DUP2]: true, [FV_ONLY]: true });
     expect(r.body.unresolved_vins).toEqual([]);
     const saved = DB.dealer_stores;
     DB.dealer_stores = saved.map((s) => ({ ...s, is_primary_inventory_store: false }));
@@ -457,6 +475,7 @@ describe("autofilm-feed handler", () => {
       expect(x.body.unresolved_vins).toEqual([LV_PRIMARY]);
       const sm = await call(`tenant_id=${TENANT}&stores=1&summary=1`);
       expect(sm.body.unresolved_listings).toBe(1);
+      expect(sm.body.listing_only_count).toBe(2);
       expect(Array.isArray(sm.body.stores)).toBe(true);
     } finally { DB.dealer_stores = saved; }
     expect(Array.isArray((await call(`tenant_id=${TENANT}&stores=1`)).body)).toBe(true);

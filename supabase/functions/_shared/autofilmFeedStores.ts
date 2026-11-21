@@ -56,6 +56,9 @@ export interface Owned {
   store_id: string | null;
   listing?: ListingMeta;
   feed?: FeedMeta;
+  /** The VIN has a present row in an enabled, active store's feed. Always true
+   *  for a feed-sourced owner; false marks a listing-only car. */
+  feed_confirmed: boolean;
 }
 
 export interface DuplicateReport {
@@ -166,6 +169,7 @@ export function resolveOwners(
     owned.push({
       vin,
       source: winner.source,
+      feed_confirmed: winner.source === "feed" || presentByVin.has(vin),
       store_id: winner.store_id,
       listing: winner.listing,
       feed: winner.source === "feed" ? winner.feed : feedCands.find((c) => c.store_id === winner.store_id)?.feed,
@@ -264,12 +268,14 @@ export function shapeFeedRow(r: FeedInventoryRow, store: StoreRef | null): Recor
     detail_version: null,
     store,
     availability_source: "feed" as const,
+    feed_confirmed: true,
   };
 }
 
 /** Additive fields on a listing-backed row. Existing fields are untouched. */
-export function annotateListingRow(row: Record<string, unknown>, store: StoreRef | null): Record<string, unknown> {
+export function annotateListingRow(row: Record<string, unknown>, store: StoreRef | null, feedConfirmed: boolean): Record<string, unknown> {
   row.store = store;
+  row.feed_confirmed = feedConfirmed;
   row.availability_source = "listing";
   return row;
 }
@@ -316,7 +322,7 @@ export function planList(args: {
   stores: FeedStore[];
   params: ListParams;
   updatedSince?: string | null;
-}): { owned: Owned[]; duplicates: DuplicateReport[]; unresolved: { count: number; vins: string[] } } {
+}): { owned: Owned[]; duplicates: DuplicateReport[]; unresolved: { count: number; vins: string[] }; listingOnly: { count: number; vins: string[] } } {
   const { listings, stores, params, updatedSince } = args;
   const enabled = feedEnabledIds(stores);
   const feed = args.feed.filter((f) => enabled.has(f.store_id));
@@ -332,7 +338,7 @@ export function planList(args: {
   const duplicates = sid === null
     ? all.duplicates
     : all.duplicates.filter((d) => d.owner.store_id === sid || d.losers.some((l) => l.store_id === sid));
-  return { owned, duplicates, unresolved: unresolvedListings(listings, args.feed, stores) };
+  return { owned, duplicates, unresolved: unresolvedListings(listings, args.feed, stores), listingOnly: listingOnlyListings(listings, args.feed, stores) };
 }
 
 /** Stores whose feed is served and counted: enabled and active. One definition
@@ -349,6 +355,15 @@ export function unresolvedListings(listings: ListingMeta[], feed: FeedMeta[], st
   const { owned } = resolveOwners(listings, feed.filter((f) => enabled.has(f.store_id)), stores, false);
   const un = owned.filter((o) => o.source === "listing" && o.store_id === null).map((o) => o.vin);
   return { count: un.length, vins: un.slice(0, UNRESOLVED_VIN_CAP) };
+}
+
+/** Live listings no enabled, active store's present feed confirms. AutoFilm
+ *  must not present these as confirmed in stock. */
+export function listingOnlyListings(listings: ListingMeta[], feed: FeedMeta[], stores: FeedStore[]): { count: number; vins: string[] } {
+  const enabled = feedEnabledIds(stores);
+  const { owned } = resolveOwners(listings, feed.filter((f) => enabled.has(f.store_id)), stores, false);
+  const vins = owned.filter((o) => o.source === "listing" && !o.feed_confirmed).map((o) => o.vin);
+  return { count: vins.length, vins: vins.slice(0, UNRESOLVED_VIN_CAP) };
 }
 
 export interface StoresReportRow {
