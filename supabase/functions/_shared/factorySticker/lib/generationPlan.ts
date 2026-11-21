@@ -204,8 +204,12 @@ export function assessRenderedSticker(input: {
     const { normalized, plan, layout, vin, canonicalPassportUrl } = input;
     const { selection, eligibility, appliedOverride, reconciliation } = plan;
     const drawn = layout.drawnStrings || [];
-    const catalogTemplate = plan.templateRouting.status === "approved_match" && !plan.templateRouting.servedByApprovedMaster
-        ? plan.templateRouting.template : null;
+    const routed = plan.templateRouting.servedByApprovedMaster ? null : plan.templateRouting.template;
+    const catalogTemplate = !routed ? null
+        : plan.templateRouting.status === "approved_match" ? routed
+            : plan.templateRouting.status === "brand_match"
+                && Number(layout.widthPt ?? 0) === routed.page.widthPt && Number(layout.heightPt ?? 0) === routed.page.heightPt ? routed
+                : null;
     const pageFormat = catalogTemplate
         ? {
             widthInches: catalogTemplate.page.widthPt / 72,

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { adaptRenderData, buildRenderLayout, resolveRenderTheme } from "./contract";
+
+// These pin the generic brand-profile layout, not the brand-wide OEM catalog templates.
+const GENERIC = { brandWide: false } as const;
 import { buildStickerLayout } from "./layout";
 import { resolveThemeProfile } from "../oem/profiles";
 import {
@@ -125,7 +128,7 @@ describe("five-OEM design system", () => {
   });
 
   it("BMW keeps option codes secondary to normalized descriptions", () => {
-    const model = buildRenderLayout(bmwFixture(), themeFor(null));
+    const model = buildRenderLayout(bmwFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(page1).toContain("ZPP");
     expect(page1.some((s) => s.includes("Premium Package"))).toBe(true);
@@ -133,7 +136,7 @@ describe("five-OEM design system", () => {
 
   it("outputs are visibly distinct: band fills differ across profiles", () => {
     const fills = (fixture: () => ReturnType<typeof jeepFixture>): Set<string> => {
-      const model = buildRenderLayout(fixture(), themeFor(null));
+      const model = buildRenderLayout(fixture(), themeFor(null), undefined, GENERIC);
       return new Set(
         model.pages[0].primitives
           .filter((p) => p.kind === "rect" && p.fill !== null && p.fill !== "#ffffff")
@@ -165,7 +168,7 @@ describe("Genesis profile (genesis-us-2025-v1)", () => {
   });
 
   it("GV80 gasoline benchmark renders reconciled on one page", () => {
-    const model = buildRenderLayout(genesisGv80Fixture(), themeFor(null));
+    const model = buildRenderLayout(genesisGv80Fixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(model.pages.length).toBe(1);
     expect(page1).toContain("$79,145.00");
@@ -175,7 +178,7 @@ describe("Genesis profile (genesis-us-2025-v1)", () => {
   });
 
   it("Electrified GV70 uses the EV module with no gasoline content", () => {
-    const model = buildRenderLayout(genesisEvFixture(), themeFor(null));
+    const model = buildRenderLayout(genesisEvFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(page1).toContain("MPGe");
     expect(page1.some((s) => s.includes("miles driving range"))).toBe(true);
@@ -185,7 +188,7 @@ describe("Genesis profile (genesis-us-2025-v1)", () => {
   });
 
   it("G90 long-equipment stays on one physical page", () => {
-    const model = buildRenderLayout(genesisG90LongFixture(), themeFor(null));
+    const model = buildRenderLayout(genesisG90LongFixture(), themeFor(null), undefined, GENERIC);
     expect(model.pages.length).toBe(1);
     expect(model.fit.ok).toBe(model.mode !== "REVIEW_REQUIRED");
     expect(pageStrings(model, 0).join(" ")).not.toMatch(/CONTINUATION|PAGE 2 OF/);
@@ -219,7 +222,7 @@ describe("Kia profile (kia-us-2026-v1)", () => {
   for (const c of RECONCILED) {
     it(`${c.name} renders reconciled on one page with identity payloads`, () => {
       const data = c.fixture();
-      const model = buildRenderLayout(data, themeFor(null));
+      const model = buildRenderLayout(data, themeFor(null), undefined, GENERIC);
       const page1 = pageStrings(model, 0);
       expect(model.pages.length).toBe(1);
       expect(page1).toContain(c.total);
@@ -234,7 +237,7 @@ describe("Kia profile (kia-us-2026-v1)", () => {
   }
 
   it("Sportage Hybrid keeps the gasoline regulatory shape under the Hybrid Vehicle tag", () => {
-    const model = buildRenderLayout(kiaHybridFixture(), themeFor(null));
+    const model = buildRenderLayout(kiaHybridFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(page1.some((s) => s.includes("Hybrid Vehicle"))).toBe(true);
     expect(page1).toContain("MPG");
@@ -244,7 +247,7 @@ describe("Kia profile (kia-us-2026-v1)", () => {
   });
 
   it("Sportage PHEV uses the plug-in module, never gasoline-only or EV-only language", () => {
-    const model = buildRenderLayout(kiaPhevFixture(), themeFor(null));
+    const model = buildRenderLayout(kiaPhevFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(page1).toContain("MPGe");
     expect(page1.some((s) => s.includes("miles electric range"))).toBe(true);
@@ -255,7 +258,7 @@ describe("Kia profile (kia-us-2026-v1)", () => {
   });
 
   it("EV9 uses the EV module with no gasoline content", () => {
-    const model = buildRenderLayout(kiaEvFixture(), themeFor(null));
+    const model = buildRenderLayout(kiaEvFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(page1).toContain("MPGe");
     expect(page1.some((s) => s.includes("miles driving range"))).toBe(true);
@@ -265,7 +268,7 @@ describe("Kia profile (kia-us-2026-v1)", () => {
   });
 
   it("Telluride X-Pro long-equipment stays on one physical page", () => {
-    const model = buildRenderLayout(kiaTellurideLongFixture(), themeFor(null));
+    const model = buildRenderLayout(kiaTellurideLongFixture(), themeFor(null), undefined, GENERIC);
     expect(model.pages.length).toBe(1);
     expect(model.fit.ok).toBe(model.mode !== "REVIEW_REQUIRED");
     expect(pageStrings(model, 0).join(" ")).not.toMatch(/CONTINUATION|PAGE 2 OF/);
@@ -273,7 +276,7 @@ describe("Kia profile (kia-us-2026-v1)", () => {
   });
 
   it("renders the white-header treatment: no dark header band, ink total band, subtle heading fills", () => {
-    const model = buildRenderLayout(kiaTellurideFixture(), themeFor(null));
+    const model = buildRenderLayout(kiaTellurideFixture(), themeFor(null), undefined, GENERIC);
     const rects = model.pages[0].primitives.filter((p) => p.kind === "rect" && p.fill !== null);
     const fills = new Set(rects.map((r) => (r.kind === "rect" ? String(r.fill) : "")));
     expect(fills.has("#111111")).toBe(true);   // ink total band
@@ -296,7 +299,7 @@ describe("Mazda profile (mazda-us-2026-v1)", () => {
 
   it("CX-90 benchmark reconciles base + options + port + destination on one page", () => {
     const data = mazdaCx90Fixture();
-    const model = buildRenderLayout(data, themeFor(null));
+    const model = buildRenderLayout(data, themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(model.pages.length).toBe(1);
     expect(page1).toContain("$60,595.00");
@@ -311,7 +314,7 @@ describe("Mazda profile (mazda-us-2026-v1)", () => {
   });
 
   it("renders parts content, warranty, ship-to and the MSRP footnote from verified data", () => {
-    const model = buildRenderLayout(mazdaCx90Fixture(), themeFor(null));
+    const model = buildRenderLayout(mazdaCx90Fixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(page1.some((s) => s.includes("PARTS CONTENT INFORMATION"))).toBe(true);
     expect(page1.some((s) => s.includes("HIROSHIMA, JAPAN"))).toBe(true);
@@ -324,7 +327,7 @@ describe("Mazda profile (mazda-us-2026-v1)", () => {
   });
 
   it("uses factory red for rules only, never as a background fill", () => {
-    const model = buildRenderLayout(mazdaCx90Fixture(), themeFor(null));
+    const model = buildRenderLayout(mazdaCx90Fixture(), themeFor(null), undefined, GENERIC);
     const prims = model.pages[0].primitives;
     const redRules = prims.filter((p) => p.kind === "rule" && p.color === "#c8102e");
     const redRects = prims.filter((p) => p.kind === "rect" && p.fill === "#c8102e");
@@ -335,7 +338,7 @@ describe("Mazda profile (mazda-us-2026-v1)", () => {
   });
 
   it("CX-90 PHEV uses the plug-in module, never gasoline-only or EV-only language", () => {
-    const model = buildRenderLayout(mazdaPhevFixture(), themeFor(null));
+    const model = buildRenderLayout(mazdaPhevFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(page1).toContain("MPGe");
     expect(page1.some((s) => s.includes("miles electric range"))).toBe(true);
@@ -347,7 +350,7 @@ describe("Mazda profile (mazda-us-2026-v1)", () => {
 
   it("MX-5 short-content build keeps the factory structure on one page", () => {
     const data = mazdaMiataFixture();
-    const model = buildRenderLayout(data, themeFor(null));
+    const model = buildRenderLayout(data, themeFor(null), undefined, GENERIC);
     expect(model.pages.length).toBe(1);
     expect(pageStrings(model, 0)).toContain("$41,430.00");
     expect(model.drawnStrings).toContain("JM1NDAM75T0612345");
@@ -356,7 +359,7 @@ describe("Mazda profile (mazda-us-2026-v1)", () => {
   });
 
   it("long-equipment CX-90 stays on one physical page", () => {
-    const model = buildRenderLayout(mazdaLongFixture(), themeFor(null));
+    const model = buildRenderLayout(mazdaLongFixture(), themeFor(null), undefined, GENERIC);
     expect(model.pages.length).toBe(1);
     expect(model.fit.ok).toBe(model.mode !== "REVIEW_REQUIRED");
     expect(pageStrings(model, 0).join(" ")).not.toMatch(/CONTINUATION|PAGE 2 OF/);
@@ -377,7 +380,7 @@ describe("Subaru profile (subaru-us-2026-v1)", () => {
 
   it("Outback Touring XT reconciles 42,795 + 3,101 + 1,420 with coded options", () => {
     const data = subaruOutbackFixture();
-    const model = buildRenderLayout(data, themeFor(null));
+    const model = buildRenderLayout(data, themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(model.pages.length).toBe(1);
     expect(page1).toContain("$47,316.00");
@@ -394,7 +397,7 @@ describe("Subaru profile (subaru-us-2026-v1)", () => {
   });
 
   it("Solterra uses the EV module with no gasoline content", () => {
-    const model = buildRenderLayout(subaruSolterraFixture(), themeFor(null));
+    const model = buildRenderLayout(subaruSolterraFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(page1).toContain("MPGe");
     expect(page1.some((s) => s.includes("miles driving range"))).toBe(true);
@@ -405,7 +408,7 @@ describe("Subaru profile (subaru-us-2026-v1)", () => {
   });
 
   it("Ascent long-equipment stays on one physical page", () => {
-    const model = buildRenderLayout(subaruAscentLongFixture(), themeFor(null));
+    const model = buildRenderLayout(subaruAscentLongFixture(), themeFor(null), undefined, GENERIC);
     expect(model.pages.length).toBe(1);
     expect(model.fit.ok).toBe(model.mode !== "REVIEW_REQUIRED");
     expect(pageStrings(model, 0).join(" ")).not.toMatch(/CONTINUATION|PAGE 2 OF/);
@@ -414,7 +417,7 @@ describe("Subaru profile (subaru-us-2026-v1)", () => {
 
   it("Mazda and Subaru outputs stay visibly distinct: band fills and keylines differ", () => {
     const paint = (fixture: () => ReturnType<typeof mazdaCx90Fixture>) => {
-      const model = buildRenderLayout(fixture(), themeFor(null));
+      const model = buildRenderLayout(fixture(), themeFor(null), undefined, GENERIC);
       const prims = model.pages[0].primitives;
       return {
         fills: new Set(prims.filter((p) => p.kind === "rect" && p.fill !== null).map((p) => (p.kind === "rect" ? String(p.fill) : ""))),
@@ -441,7 +444,7 @@ describe("Honda profile (honda-us-2026-v1)", () => {
 
   it("CR-V Hybrid benchmark reconciles accessories as port items on one page", () => {
     const data = hondaCrvHybridFixture();
-    const model = buildRenderLayout(data, themeFor(null));
+    const model = buildRenderLayout(data, themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(model.pages.length).toBe(1);
     expect(page1).toContain("$40,070.00");
@@ -459,7 +462,7 @@ describe("Honda profile (honda-us-2026-v1)", () => {
 
   it("keeps the Passport QR and the EPA QR separate with distinct payloads", () => {
     const data = hondaCrvHybridFixture();
-    const model = buildRenderLayout(data, themeFor(null));
+    const model = buildRenderLayout(data, themeFor(null), undefined, GENERIC);
     const qrs = model.pages[0].primitives.filter((p) => p.kind === "qr");
     const payloads = qrs.map((q) => (q.kind === "qr" ? q.payload : ""));
     expect(payloads).toContain(data.passportUrl);
@@ -470,7 +473,7 @@ describe("Honda profile (honda-us-2026-v1)", () => {
   });
 
   it("renders Honda parts content, warranty, ship-to street address and red rules only", () => {
-    const model = buildRenderLayout(hondaCrvHybridFixture(), themeFor(null));
+    const model = buildRenderLayout(hondaCrvHybridFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(page1.some((s) => s.includes("PARTS CONTENT INFORMATION"))).toBe(true);
     expect(page1.some((s) => s.includes("EAST LIBERTY, OHIO, USA"))).toBe(true);
@@ -485,7 +488,7 @@ describe("Honda profile (honda-us-2026-v1)", () => {
   });
 
   it("Pilot gasoline build renders reconciled on one page", () => {
-    const model = buildRenderLayout(hondaPilotFixture(), themeFor(null));
+    const model = buildRenderLayout(hondaPilotFixture(), themeFor(null), undefined, GENERIC);
     expect(model.pages.length).toBe(1);
     expect(pageStrings(model, 0)).toContain("$56,670.00");
     expectWithinBounds(model);
@@ -493,7 +496,7 @@ describe("Honda profile (honda-us-2026-v1)", () => {
   });
 
   it("Prologue uses the EV module with no gasoline content", () => {
-    const model = buildRenderLayout(hondaPrologueFixture(), themeFor(null));
+    const model = buildRenderLayout(hondaPrologueFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(page1).toContain("MPGe");
     expect(page1.some((s) => s.includes("miles driving range"))).toBe(true);
@@ -503,7 +506,7 @@ describe("Honda profile (honda-us-2026-v1)", () => {
   });
 
   it("long-equipment Pilot stays on one physical page", () => {
-    const model = buildRenderLayout(hondaLongFixture(), themeFor(null));
+    const model = buildRenderLayout(hondaLongFixture(), themeFor(null), undefined, GENERIC);
     expect(model.pages.length).toBe(1);
     expect(model.fit.ok).toBe(model.mode !== "REVIEW_REQUIRED");
     expect(pageStrings(model, 0).join(" ")).not.toMatch(/CONTINUATION|PAGE 2 OF/);
@@ -524,7 +527,7 @@ describe("Acura profile (acura-us-2026-v1)", () => {
 
   it("RDX benchmark reconciles 50,800 + 4,650 + 1,195 on one page", () => {
     const data = acuraRdxFixture();
-    const model = buildRenderLayout(data, themeFor(null));
+    const model = buildRenderLayout(data, themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(model.pages.length).toBe(1);
     expect(page1).toContain("$56,645.00");
@@ -537,7 +540,7 @@ describe("Acura profile (acura-us-2026-v1)", () => {
 
   it("renders MSRP Includes, rated 5-star panel, parts content and the Passport brand line", () => {
     const data = acuraRdxFixture();
-    const model = buildRenderLayout(data, themeFor(null));
+    const model = buildRenderLayout(data, themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(page1.some((s) => s.includes("MSRP INCLUDES"))).toBe(true);
     expect(page1.some((s) => s.includes("6-YEAR/70,000-MILE POWERTRAIN WARRANTY"))).toBe(true);
@@ -559,7 +562,7 @@ describe("Acura profile (acura-us-2026-v1)", () => {
   });
 
   it("fills the masthead block black with a paper model band", () => {
-    const model = buildRenderLayout(acuraRdxFixture(), themeFor(null));
+    const model = buildRenderLayout(acuraRdxFixture(), themeFor(null), undefined, GENERIC);
     const rects = model.pages[0].primitives.filter((p) => p.kind === "rect" && p.fill === "#000000");
     expect(rects.length).toBeGreaterThan(0);
     const block = rects.find((r) => r.kind === "rect" && r.w < 100 && r.h > 40);
@@ -567,7 +570,7 @@ describe("Acura profile (acura-us-2026-v1)", () => {
   });
 
   it("ZDX uses the EV module with no gasoline content", () => {
-    const model = buildRenderLayout(acuraZdxFixture(), themeFor(null));
+    const model = buildRenderLayout(acuraZdxFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(page1).toContain("MPGe");
     expect(page1.some((s) => s.includes("miles driving range"))).toBe(true);
@@ -577,7 +580,7 @@ describe("Acura profile (acura-us-2026-v1)", () => {
   });
 
   it("long-equipment MDX stays on one physical page", () => {
-    const model = buildRenderLayout(acuraLongFixture(), themeFor(null));
+    const model = buildRenderLayout(acuraLongFixture(), themeFor(null), undefined, GENERIC);
     expect(model.pages.length).toBe(1);
     expect(model.fit.ok).toBe(model.mode !== "REVIEW_REQUIRED");
     expect(pageStrings(model, 0).join(" ")).not.toMatch(/CONTINUATION|PAGE 2 OF/);
@@ -636,7 +639,7 @@ describe("INFINITI profile (infiniti-us-2026-v2)", () => {
   });
 
   it("keeps the used-record QX80 rendering reconciled on the same engine", () => {
-    const model = buildRenderLayout(infinitiBenchmark(), themeFor(null));
+    const model = buildRenderLayout(infinitiBenchmark(), themeFor(null), undefined, GENERIC);
     expect(pageStrings(model, 0)).toContain("$95,695.00");
     expect(model.drawnStrings).toContain(infinitiBenchmark().vin);
     expectWithinBounds(model);
@@ -658,7 +661,7 @@ describe("Hyundai profile (hyundai-us-2026-v2)", () => {
 
   it("Palisade benchmark reconciles 53,945 + 445 port + 1,415 with the full panel set", () => {
     const data = hyundaiPalisadeFixture();
-    const model = buildRenderLayout(data, themeFor(null));
+    const model = buildRenderLayout(data, themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(model.pages.length).toBe(1);
     expect(page1).toContain("$55,805.00");
@@ -682,7 +685,7 @@ describe("Hyundai profile (hyundai-us-2026-v2)", () => {
   });
 
   it("uses Hyundai blue sparingly: band and keyline only, never Genesis bronze or Kia treatment", () => {
-    const model = buildRenderLayout(hyundaiPalisadeFixture(), themeFor(null));
+    const model = buildRenderLayout(hyundaiPalisadeFixture(), themeFor(null), undefined, GENERIC);
     const prims = model.pages[0].primitives;
     const fills = new Set(prims.filter((p) => p.kind === "rect" && p.fill !== null).map((p) => (p.kind === "rect" ? String(p.fill) : "")));
     const rules = new Set(prims.filter((p) => p.kind === "rule").map((p) => (p.kind === "rule" ? String(p.color) : "")));
@@ -694,7 +697,7 @@ describe("Hyundai profile (hyundai-us-2026-v2)", () => {
   });
 
   it("IONIQ 5 uses the EV module with no gasoline content and the battery warranty line", () => {
-    const model = buildRenderLayout(hyundaiIoniq5Fixture(), themeFor(null));
+    const model = buildRenderLayout(hyundaiIoniq5Fixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(page1).toContain("MPGe");
     expect(page1.some((s) => s.includes("miles driving range"))).toBe(true);
@@ -714,7 +717,7 @@ describe("Hyundai profile (hyundai-us-2026-v2)", () => {
   });
 
   it("long-equipment Palisade stays on one physical page", () => {
-    const model = buildRenderLayout(hyundaiLongFixture(), themeFor(null));
+    const model = buildRenderLayout(hyundaiLongFixture(), themeFor(null), undefined, GENERIC);
     expect(model.pages.length).toBe(1);
     expect(model.fit.ok).toBe(model.mode !== "REVIEW_REQUIRED");
     expect(pageStrings(model, 0).join(" ")).not.toMatch(/CONTINUATION|PAGE 2 OF/);
@@ -736,7 +739,7 @@ describe("Lincoln profile (lincoln-us-2026-v1)", () => {
 
   it("Nautilus benchmark reconciles equipment-group pricing with the full panel set", () => {
     const data = lincolnNautilusFixture();
-    const model = buildRenderLayout(data, themeFor(null));
+    const model = buildRenderLayout(data, themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(model.pages.length).toBe(1);
     expect(page1).toContain("$59,285.00");
@@ -761,7 +764,7 @@ describe("Lincoln profile (lincoln-us-2026-v1)", () => {
   });
 
   it("uses navy as the only brand color: band and keyline, never Ford blue", () => {
-    const model = buildRenderLayout(lincolnNautilusFixture(), themeFor(null));
+    const model = buildRenderLayout(lincolnNautilusFixture(), themeFor(null), undefined, GENERIC);
     const prims = model.pages[0].primitives;
     const fills = new Set(prims.filter((p) => p.kind === "rect" && p.fill !== null).map((p) => (p.kind === "rect" ? String(p.fill) : "")));
     const rules = new Set(prims.filter((p) => p.kind === "rule").map((p) => (p.kind === "rule" ? String(p.color) : "")));
@@ -772,7 +775,7 @@ describe("Lincoln profile (lincoln-us-2026-v1)", () => {
   });
 
   it("Nautilus Hybrid keeps the gasoline regulatory shape under the Hybrid Vehicle tag", () => {
-    const model = buildRenderLayout(lincolnHybridFixture(), themeFor(null));
+    const model = buildRenderLayout(lincolnHybridFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(page1.some((s) => s.includes("Hybrid Vehicle"))).toBe(true);
     expect(page1.some((s) => s.includes("MPGe"))).toBe(false);
@@ -780,7 +783,7 @@ describe("Lincoln profile (lincoln-us-2026-v1)", () => {
   });
 
   it("Corsair Grand Touring uses the plug-in module with battery warranty", () => {
-    const model = buildRenderLayout(lincolnPhevFixture(), themeFor(null));
+    const model = buildRenderLayout(lincolnPhevFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(page1).toContain("MPGe");
     expect(page1.some((s) => s.includes("miles electric range"))).toBe(true);
@@ -792,7 +795,7 @@ describe("Lincoln profile (lincoln-us-2026-v1)", () => {
   });
 
   it("long-equipment Navigator stays on one physical page", () => {
-    const model = buildRenderLayout(lincolnLongFixture(), themeFor(null));
+    const model = buildRenderLayout(lincolnLongFixture(), themeFor(null), undefined, GENERIC);
     expect(model.pages.length).toBe(1);
     expect(model.fit.ok).toBe(model.mode !== "REVIEW_REQUIRED");
     expect(pageStrings(model, 0).join(" ")).not.toMatch(/CONTINUATION|PAGE 2 OF/);
@@ -813,7 +816,7 @@ describe("Mercedes-Benz profile (mercedes-benz-us-2026-v1)", () => {
 
   it("GLE 450 benchmark reconciles coded packages with the full panel set", () => {
     const data = mercedesGleFixture();
-    const model = buildRenderLayout(data, themeFor(null));
+    const model = buildRenderLayout(data, themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(model.pages.length).toBe(1);
     expect(page1).toContain("$79,050.00");
@@ -842,7 +845,7 @@ describe("Mercedes-Benz profile (mercedes-benz-us-2026-v1)", () => {
   });
 
   it("stays monochrome: silver keyline only, no other brand colors", () => {
-    const model = buildRenderLayout(mercedesGleFixture(), themeFor(null));
+    const model = buildRenderLayout(mercedesGleFixture(), themeFor(null), undefined, GENERIC);
     const prims = model.pages[0].primitives;
     const fills = new Set(prims.filter((p) => p.kind === "rect" && p.fill !== null).map((p) => (p.kind === "rect" ? String(p.fill) : "")));
     const rules = new Set(prims.filter((p) => p.kind === "rule").map((p) => (p.kind === "rule" ? String(p.color) : "")));
@@ -854,7 +857,7 @@ describe("Mercedes-Benz profile (mercedes-benz-us-2026-v1)", () => {
   });
 
   it("GLE 450e uses the plug-in module with battery coverage", () => {
-    const model = buildRenderLayout(mercedesPhevFixture(), themeFor(null));
+    const model = buildRenderLayout(mercedesPhevFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(page1).toContain("MPGe");
     expect(page1.some((s) => s.includes("miles electric range"))).toBe(true);
@@ -865,7 +868,7 @@ describe("Mercedes-Benz profile (mercedes-benz-us-2026-v1)", () => {
   });
 
   it("EQE SUV uses the EV module with no gasoline content", () => {
-    const model = buildRenderLayout(mercedesEqFixture(), themeFor(null));
+    const model = buildRenderLayout(mercedesEqFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(page1).toContain("MPGe");
     expect(page1.some((s) => s.includes("miles driving range"))).toBe(true);
@@ -876,7 +879,7 @@ describe("Mercedes-Benz profile (mercedes-benz-us-2026-v1)", () => {
   });
 
   it("AMG GLE 63 S long-equipment stays on one physical page", () => {
-    const model = buildRenderLayout(mercedesAmgLongFixture(), themeFor(null));
+    const model = buildRenderLayout(mercedesAmgLongFixture(), themeFor(null), undefined, GENERIC);
     expect(model.pages.length).toBe(1);
     expect(model.fit.ok).toBe(model.mode !== "REVIEW_REQUIRED");
     expect(pageStrings(model, 0).join(" ")).not.toMatch(/CONTINUATION|PAGE 2 OF/);
@@ -892,7 +895,7 @@ describe("GM truck and luxury profiles (gmc-us-2026-v1, cadillac-us-2026-v2)", (
     expect(g.profile.status).toBe("draft");
     expect(g.profile.themeVersion).not.toBe(c.profile.themeVersion);
     expect(resolveThemeProfile("GMC", 2021).profile.status).toBe("fallback");
-    const model = buildRenderLayout(gmcSierraFixture(), themeFor(null));
+    const model = buildRenderLayout(gmcSierraFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(model.pages.length).toBe(1);
     expect(page1).toContain("$75,970.00");
@@ -906,7 +909,7 @@ describe("GM truck and luxury profiles (gmc-us-2026-v1, cadillac-us-2026-v2)", (
   });
 
   it("Sierra EV uses the EV module with propulsion battery warranty", () => {
-    const model = buildRenderLayout(gmcEvFixture(), themeFor(null));
+    const model = buildRenderLayout(gmcEvFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(page1).toContain("MPGe");
     expect(page1.some((s) => s.includes("miles driving range"))).toBe(true);
@@ -935,7 +938,7 @@ describe("GM truck and luxury profiles (gmc-us-2026-v1, cadillac-us-2026-v2)", (
 
   it("renders the owner's Escalade reference reconciled to $109,335 with the crest segment rule", () => {
     const data = cadillacEscaladeFixture();
-    const model = buildRenderLayout(data, themeFor(null));
+    const model = buildRenderLayout(data, themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
     expect(model.pages.length).toBe(1);
@@ -970,7 +973,7 @@ describe("GM truck and luxury profiles (gmc-us-2026-v1, cadillac-us-2026-v2)", (
   });
 
   it("LYRIQ uses the EV module with no gasoline content", () => {
-    const model = buildRenderLayout(cadillacLyriqFixture(), themeFor(null));
+    const model = buildRenderLayout(cadillacLyriqFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(page1).toContain("MPGe");
     expect(page1.some((s) => s.includes("Electric Vehicle"))).toBe(true);
@@ -1001,7 +1004,7 @@ describe("Ram profile (ram-us-2026-v2, commercial-factory-technical)", () => {
   });
 
   it("renders the owner's 1500 Laramie reference reconciled with coded packages", () => {
-    const model = buildRenderLayout(ramFixture(), themeFor(null));
+    const model = buildRenderLayout(ramFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
     expect(model.pages.length).toBe(1);
@@ -1037,7 +1040,7 @@ describe("Ram profile (ram-us-2026-v2, commercial-factory-technical)", () => {
   });
 
   it("heavy-duty chassis cab renders no fuel-economy panel instead of invented MPG", () => {
-    const model = buildRenderLayout(ramChassisCabFixture(), themeFor(null));
+    const model = buildRenderLayout(ramChassisCabFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
     expect(model.pages.length).toBe(1);
@@ -1070,13 +1073,13 @@ describe("Volkswagen profile (german-technical)", () => {
     expect(v.profile.themeVersion).toBe("volkswagen-us-2026-v1");
     expect(v.theme.templateFamilyId).toBe(b.theme.templateFamilyId);
     expect(v.profile.themeVersion).not.toBe(b.profile.themeVersion);
-    const model = buildRenderLayout(vwAtlasFixture(), themeFor(null));
+    const model = buildRenderLayout(vwAtlasFixture(), themeFor(null), undefined, GENERIC);
     const fills = new Set(model.pages[0].primitives.filter((p) => p.kind === "rect" && p.fill !== null).map((p) => (p.kind === "rect" ? String(p.fill) : "")));
     expect(fills.has("#001e50")).toBe(true);   // VW dark blue band
   });
 
   it("Atlas renders reconciled with rated NHTSA rows", () => {
-    const model = buildRenderLayout(vwAtlasFixture(), themeFor(null));
+    const model = buildRenderLayout(vwAtlasFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(model.pages.length).toBe(1);
     expect(page1).toContain("$52,095.00");
@@ -1087,7 +1090,7 @@ describe("Volkswagen profile (german-technical)", () => {
   });
 
   it("ID.4 uses the EV module", () => {
-    const model = buildRenderLayout(vwId4Fixture(), themeFor(null));
+    const model = buildRenderLayout(vwId4Fixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(page1).toContain("MPGe");
     expect(page1.some((s) => s.includes("miles driving range"))).toBe(true);
@@ -1115,7 +1118,7 @@ describe("Audi profile (audi-us-2026-v2, german-factory-technical)", () => {
   });
 
   it("renders the owner's Q5 reference reconciled to $61,640 with coded package membership", () => {
-    const model = buildRenderLayout(audiQ5Fixture(), themeFor(null));
+    const model = buildRenderLayout(audiQ5Fixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
     expect(model.pages.length).toBe(1);
@@ -1149,7 +1152,7 @@ describe("Audi profile (audi-us-2026-v2, german-factory-technical)", () => {
   });
 
   it("Q5 55 TFSI e uses the PHEV module and S line stays appearance equipment", () => {
-    const model = buildRenderLayout(audiPhevFixture(), themeFor(null));
+    const model = buildRenderLayout(audiPhevFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
     expect(page1).toContain("MPGe");
@@ -1165,7 +1168,7 @@ describe("Audi profile (audi-us-2026-v2, german-factory-technical)", () => {
   });
 
   it("Q6 e-tron keeps the EV module with no gasoline content", () => {
-    const model = buildRenderLayout(audiEtronFixture(), themeFor(null));
+    const model = buildRenderLayout(audiEtronFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     expect(page1).toContain("MPGe");
     expect(page1.some((s) => s.includes("miles driving range"))).toBe(true);
@@ -1193,7 +1196,7 @@ describe("Volvo profile (volvo-us-2026-v1, scandinavian-factory-technical)", () 
   });
 
   it("renders the XC90 B5 mild hybrid benchmark reconciled to $64,185 on the gasoline layout", () => {
-    const model = buildRenderLayout(volvoXc90Fixture(), themeFor(null));
+    const model = buildRenderLayout(volvoXc90Fixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
     expect(model.pages.length).toBe(1);
@@ -1230,7 +1233,7 @@ describe("Volvo profile (volvo-us-2026-v1, scandinavian-factory-technical)", () 
   });
 
   it("XC60 T8 uses the PHEV module and stays distinct from battery electric", () => {
-    const model = buildRenderLayout(volvoPhevFixture(), themeFor(null));
+    const model = buildRenderLayout(volvoPhevFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
     expect(model.pages.length).toBe(1);
@@ -1246,7 +1249,7 @@ describe("Volvo profile (volvo-us-2026-v1, scandinavian-factory-technical)", () 
   });
 
   it("EX90 uses the EV module with US assembly matched per vehicle", () => {
-    const model = buildRenderLayout(volvoEvFixture(), themeFor(null));
+    const model = buildRenderLayout(volvoEvFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
     expect(model.pages.length).toBe(1);
@@ -1287,7 +1290,7 @@ describe("Tesla profile (tesla-us-2026-v1, minimal-factory-technical)", () => {
   });
 
   it("renders the owner's Model Y reference reconciled to $51,630 with INCLUDED no-cost items", () => {
-    const model = buildRenderLayout(teslaModelYFixture(), themeFor(null));
+    const model = buildRenderLayout(teslaModelYFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
     expect(model.pages.length).toBe(1);
@@ -1324,7 +1327,7 @@ describe("Tesla profile (tesla-us-2026-v1, minimal-factory-technical)", () => {
   });
 
   it("Cybertruck keeps its own model line, EPA record, plant and coverage", () => {
-    const model = buildRenderLayout(teslaCybertruckFixture(), themeFor(null));
+    const model = buildRenderLayout(teslaCybertruckFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
     expect(model.pages.length).toBe(1);
@@ -1366,7 +1369,7 @@ describe("Porsche profile (porsche-us-2026-v1, sport-factory-technical)", () => 
   });
 
   it("renders the owner's 911 Carrera 4 GTS reference reconciled to $182,785", () => {
-    const model = buildRenderLayout(porsche911Fixture(), themeFor(null));
+    const model = buildRenderLayout(porsche911Fixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
     expect(model.pages.length).toBe(1);
@@ -1403,7 +1406,7 @@ describe("Porsche profile (porsche-us-2026-v1, sport-factory-technical)", () => 
   });
 
   it("gas-guzzler tax prints and reconciles only when it is on the price record", () => {
-    const model = buildRenderLayout(porscheGuzzlerFixture(), themeFor(null));
+    const model = buildRenderLayout(porscheGuzzlerFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
     expect(model.pages.length).toBe(1);
@@ -1423,7 +1426,7 @@ describe("Porsche profile (porsche-us-2026-v1, sport-factory-technical)", () => 
   });
 
   it("Macan Electric keeps its own EPA record, plant and battery coverage", () => {
-    const model = buildRenderLayout(porscheMacanEvFixture(), themeFor(null));
+    const model = buildRenderLayout(porscheMacanEvFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
     expect(model.pages.length).toBe(1);
@@ -1470,7 +1473,7 @@ describe("Land Rover profile (land-rover-us-2026-v1, british-factory-technical)"
   });
 
   it("renders the owner's Range Rover Sport reference reconciled to $99,150", () => {
-    const model = buildRenderLayout(landRoverSportFixture(), themeFor(null));
+    const model = buildRenderLayout(landRoverSportFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
     expect(model.pages.length).toBe(1);
@@ -1506,7 +1509,7 @@ describe("Land Rover profile (land-rover-us-2026-v1, british-factory-technical)"
   });
 
   it("Range Rover SV LWB uses the PHEV module and stays distinct from the Sport", () => {
-    const model = buildRenderLayout(landRoverPhevFixture(), themeFor(null));
+    const model = buildRenderLayout(landRoverPhevFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
     expect(model.pages.length).toBe(1);
@@ -1529,7 +1532,7 @@ describe("Land Rover profile (land-rover-us-2026-v1, british-factory-technical)"
   });
 
   it("Defender 130 keeps its own body length, plant and EPA record", () => {
-    const model = buildRenderLayout(landRoverDefenderFixture(), themeFor(null));
+    const model = buildRenderLayout(landRoverDefenderFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
     expect(model.pages.length).toBe(1);
@@ -1576,7 +1579,7 @@ describe("Chrysler profile (chrysler-us-2026-v1, american-factory-technical)", (
   });
 
   it("renders the Pacifica Limited AWD benchmark with coded packages priced once", () => {
-    const model = buildRenderLayout(chryslerPacificaFixture(), themeFor(null));
+    const model = buildRenderLayout(chryslerPacificaFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
     expect(model.pages.length).toBe(1);
@@ -1612,7 +1615,7 @@ describe("Chrysler profile (chrysler-us-2026-v1, american-factory-technical)", (
   });
 
   it("Pacifica Plug-In Hybrid uses the PHEV module and its own battery coverage", () => {
-    const model = buildRenderLayout(chryslerPhevFixture(), themeFor(null));
+    const model = buildRenderLayout(chryslerPhevFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
     expect(model.pages.length).toBe(1);
@@ -1630,7 +1633,7 @@ describe("Chrysler profile (chrysler-us-2026-v1, american-factory-technical)", (
   });
 
   it("Voyager stays a distinct model line from Pacifica", () => {
-    const model = buildRenderLayout(chryslerVoyagerFixture(), themeFor(null));
+    const model = buildRenderLayout(chryslerVoyagerFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
     expect(model.pages.length).toBe(1);
@@ -1677,7 +1680,7 @@ describe("Buick profile (buick-us-2026-v1, refined-factory-technical)", () => {
   });
 
   it("renders the Envision Avenir reference reconciled to $53,195 with burgundy headings", () => {
-    const model = buildRenderLayout(buickEnvisionFixture(), themeFor(null));
+    const model = buildRenderLayout(buickEnvisionFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
     expect(model.pages.length).toBe(1);
@@ -1726,7 +1729,7 @@ describe("Buick profile (buick-us-2026-v1, refined-factory-technical)", () => {
   });
 
   it("Envista stays a distinct model line from Envision", () => {
-    const model = buildRenderLayout(buickEnvistaFixture(), themeFor(null));
+    const model = buildRenderLayout(buickEnvistaFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
     expect(model.pages.length).toBe(1);
@@ -1747,7 +1750,7 @@ describe("Buick profile (buick-us-2026-v1, refined-factory-technical)", () => {
   });
 
   it("Enclave keeps its own base price, V6 record and US assembly", () => {
-    const model = buildRenderLayout(buickEnclaveFixture(), themeFor(null));
+    const model = buildRenderLayout(buickEnclaveFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
     expect(model.pages.length).toBe(1);
@@ -1797,7 +1800,7 @@ describe("Dodge profile (dodge-us-2026-v1, muscle-factory-technical)", () => {
   });
 
   it("renders the Durango R/T Plus reference reconciled to $63,575 with black section bars", () => {
-    const model = buildRenderLayout(dodgeDurangoFixture(), themeFor(null));
+    const model = buildRenderLayout(dodgeDurangoFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
     expect(model.pages.length).toBe(1);
@@ -1831,7 +1834,7 @@ describe("Dodge profile (dodge-us-2026-v1, muscle-factory-technical)", () => {
   });
 
   it("Charger Daytona uses the EV module and never the gasoline Charger's data", () => {
-    const model = buildRenderLayout(dodgeChargerEvFixture(), themeFor(null));
+    const model = buildRenderLayout(dodgeChargerEvFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
     expect(model.pages.length).toBe(1);
@@ -1850,7 +1853,7 @@ describe("Dodge profile (dodge-us-2026-v1, muscle-factory-technical)", () => {
   });
 
   it("Hornet R/T uses the PHEV module and stays distinct from the gasoline GT", () => {
-    const model = buildRenderLayout(dodgeHornetPhevFixture(), themeFor(null));
+    const model = buildRenderLayout(dodgeHornetPhevFixture(), themeFor(null), undefined, GENERIC);
     const page1 = pageStrings(model, 0);
     const joined = page1.join(" ");
     expect(model.pages.length).toBe(1);

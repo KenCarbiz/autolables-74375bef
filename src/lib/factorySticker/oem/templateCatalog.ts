@@ -669,7 +669,7 @@ export function evaluateCatalogTemplate(
 export type CatalogFlag = "template_configuration_unsupported" | "template_pending_owner_approval" | "epa_match_conflict";
 
 export interface CatalogResolution {
-  status: "approved_match" | "pending_match" | "configuration_unsupported" | "no_catalog_for_make";
+  status: "approved_match" | "brand_match" | "pending_match" | "configuration_unsupported" | "no_catalog_for_make";
   template: CatalogTemplate | null;
   flags: CatalogFlag[];
   /** Same-make templates considered. */
@@ -680,6 +680,28 @@ export interface CatalogResolution {
 /** A template production routing may use: owner-approved with a finished layout. */
 export const isRoutable = (t: CatalogTemplate): boolean =>
   t.approval === "approved" && t.layoutStatus === "approved";
+
+/** A model or trim named as electrified is never put on a gasoline or diesel layout, whatever the fuel row says. */
+const ELECTRIFIED_NAME = /hybrid|plug-?in|phev|\bev\b|electric|4xe|e-?tron|\brecharge\b|\b\d{3}h\b/i;
+
+/** First model year on the current EPA fuel economy label design. */
+export const BRAND_WIDE_MIN_MODEL_YEAR = 2013;
+
+/**
+ * Owner decision (2026-11-21): an approved template also serves every other
+ * vehicle of its make with the same fuel class, from the current EPA label
+ * era on. A template whose body class matches the vehicle is preferred.
+ */
+export function brandWideTemplate(v: CatalogVehicleInput): CatalogTemplate | null {
+  const make = token(v.make);
+  const fuel = v.fuelClass;
+  if (!make || !fuel || v.modelYear === null || v.modelYear < BRAND_WIDE_MIN_MODEL_YEAR) return null;
+  if (fuel !== "hybrid" && fuel !== "phev" && fuel !== "ev" && ELECTRIFIED_NAME.test(`${v.model ?? ""} ${v.trim ?? ""}`)) return null;
+  const pool = TEMPLATE_CATALOG.filter((t) => t.canonicalMake === make && isRoutable(t) && t.match.fuelClasses.includes(fuel));
+  if (!pool.length) return null;
+  const body = normalizeBodyClass(v.bodyClass);
+  return (body ? pool.find((t) => t.match.bodyClasses.includes(body)) : undefined) ?? pool[0];
+}
 
 export function resolveCatalogTemplate(v: CatalogVehicleInput): CatalogResolution {
   const make = token(v.make);
@@ -697,6 +719,10 @@ export function resolveCatalogTemplate(v: CatalogVehicleInput): CatalogResolutio
   const candidates = sameMake.map((t) => t.id);
   const approved = matches.find(isRoutable);
   if (approved) return { status: "approved_match", template: approved, flags: [], candidates, reasons: [] };
+  const brand = brandWideTemplate(v);
+  if (brand) {
+    return { status: "brand_match", template: brand, flags: [], candidates, reasons: [`${brand.id}: serves the make for ${v.fuelClass} vehicles`] };
+  }
   if (matches.length) {
     return {
       status: "pending_match", template: matches[0], flags: ["template_pending_owner_approval"], candidates,

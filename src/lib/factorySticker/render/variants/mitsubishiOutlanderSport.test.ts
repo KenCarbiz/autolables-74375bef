@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRenderLayout, templateRoutingFacts, type FactoryStickerRenderData, type FactoryStickerTheme } from "../contract";
+import { buildRenderLayout, productionLayoutKey, templateRoutingFacts, type FactoryStickerRenderData, type FactoryStickerTheme } from "../contract";
 import { textBBox, type LayoutModel, type TextPrimitive } from "../layout";
 import { expectNoTextOverlap, pageStrings } from "../__fixtures__/layoutAsserts";
 import { OUTLANDER_SPORT_REFERENCE_VIN, outlanderSportListing, outlanderSportReferenceMatchData, outlanderSportRenderData } from "../__fixtures__/outlanderSport";
@@ -288,7 +288,8 @@ describe("Mitsubishi Outlander Sport gasoline template", () => {
         const routed = buildRenderLayout(ref, theme);
         expect([routed.width, routed.height]).toEqual([1224, 792]);
         expect(routed.fit.ok && routed.fit.figmaMaster).toBe(true);
-        expect(buildRenderLayout({ ...ref, identity: { ...ref.identity, year: "2025" } }, theme).height).toBe(612);
+        // Owner decision 2026-11-21: another model year of the make is served brand-wide by the template.
+        expect(productionLayoutKey({ ...ref, identity: { ...ref.identity, year: "2025" } }, theme)).toBe(MITSUBISHI_OUTLANDER_SPORT_ID);
       } finally {
         Object.assign(mutable, saved);
       }
