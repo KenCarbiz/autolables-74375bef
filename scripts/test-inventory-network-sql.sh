@@ -26,7 +26,9 @@ $P -d "$DB" -f drizzle/migrations/0014_inventory_duplicate_reconciliation.sql
 $P -d "$DB" -f supabase/tests/inventory_network/60_dedupe_stub.sql
 $P -d "$DB" -f supabase/tests/inventory_network/61_dedupe.sql
 $P -d "$DB" -f drizzle/migrations/0016_feed_completeness_hold.sql
+$P -d "$DB" -f drizzle/migrations/0021_held_feed_auto_confirm.sql
 $P -d "$DB" -f supabase/tests/inventory_network/70_completeness_hold.sql
+$P -d "$DB" -f supabase/tests/inventory_network/71_held_auto_confirm.sql
 $P -d "$DB" -f supabase/tests/inventory_network/79_estimator_stub.sql
 $P -d "$DB" -f drizzle/migrations/0009_passport_payment_estimator.sql
 $P -d "$DB" -f supabase/proposed/20261108000000_canonical_store_registry.sql
