@@ -4,6 +4,11 @@ import {
   shapeLotRow, identityIncomplete, detailVersion,
   type LotFeedFile, type DetailVersionSnapshot,
 } from "../_shared/lotFeedRow.ts";
+import {
+  parseListParams, isExtendedList, storeBelongs, planList, buildStoresReport,
+  shapeFeedRow, annotateListingRow, storeRef, unresolvedListings, listingOnlyListings,
+  type FeedStore, type ListingMeta, type FeedMeta, type FeedInventoryRow, type StoreRef,
+} from "../_shared/autofilmFeedStores.ts";
 import { factAuthority } from "../_shared/factorySticker/lib/vehicleTruth/precedence.ts";
 
 // ──────────────────────────────────────────────────────────────
@@ -27,6 +32,31 @@ import { factAuthority } from "../_shared/factorySticker/lib/vehicleTruth/preced
 //          facts[] carries factory and history facts only. Dealer-controlled
 //          facts (price, mileage, stock number) come from `vehicle`, which is
 //          the live listing row.
+//   LIST (multi-rooftop, additive; contract v1 2026-11-20)
+//          + [&store_id=<dealer_stores uuid of tenant_id>][&include_feed=1]
+//          Absent both, the response is exactly the legacy one. With either,
+//          every row gains store {id, display_name, city, state},
+//          availability_source "listing"|"feed" and feed_confirmed (true when
+//          the VIN has a present store_inventory row in an enabled, active
+//          store; always true for feed rows, false for listing-only cars that
+//          must not be presented as confirmed in stock); include_feed also serves
+//          feed-only rows (store_inventory present rows of stores with
+//          inventory_feed_enabled) that have no sticker/passport/documents.
+//          One VIN, one owner per tenant; losers are reported in
+//          duplicates[] / duplicate_count and never served. A store_id that is
+//          not a store of tenant_id is a 400.
+//          Extended responses also carry unresolved_count / unresolved_vins
+//          (listings with no resolvable store; capped), listing_only_count /
+//          listing_only_vins (live listings in no present feed row of an
+//          enabled, active store; capped at 50) and vanished_count
+//          (rows that left between the metadata read and the fetch; total is
+//          reduced by it so a walk sums to total).
+//   STORES GET ?tenant_id=<uuid>&stores=1[&summary=1 -> {stores, unresolved_listings, unresolved_vins,
+//          listing_only_count, listing_only_vins}]
+//          GET ?tenant_id=<uuid>&stores=1
+//          [{id, display_name, legal_name, city, state, is_primary,
+//            inventory_feed_enabled, feed_last_seen_at, feed_count,
+//            duplicate_vins}]  (a bare array; read-only)
 //   Headers: x-lookup-secret: <AUTOLABELS_LOOKUP_SECRET>
 //            (x-autofilm-key is accepted as an alias for the same value)
 //
@@ -145,6 +175,71 @@ serve(async (req) => {
 
     const admin = createClient(supabaseUrl, serviceKey);
 
+    const lp = parseListParams(url.searchParams);
+    if (!lp.ok) return json(400, { error: lp.error });
+    const listParams = lp.value;
+    const wantsStores = listParams.stores && !detailVin;
+
+    // Multi-rooftop helpers. Only touched by STORES and the extended list; the
+    // legacy path below never calls them.
+    const pageAll = async <T,>(build: () => any): Promise<{ rows: T[]; error: string | null }> => {
+      const rows: T[] = [];
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await build().range(from, from + 999);
+        if (error) return { rows, error: error.message };
+        const got = (data ?? []) as T[];
+        rows.push(...got);
+        if (got.length < 1000) break;
+      }
+      return { rows, error: null };
+    };
+    const loadStores = () => pageAll<FeedStore>(() =>
+      admin.from("dealer_stores")
+        .select("id, display_name, legal_name, city, state, status, is_primary_inventory_store, inventory_feed_enabled")
+        .eq("tenant_id", tenantId).order("id", { ascending: true }));
+    const loadFeedMeta = (stores: FeedStore[]) => {
+      const ids = stores.filter((s) => s.inventory_feed_enabled).map((s) => s.id);
+      if (!ids.length) return Promise.resolve({ rows: [] as FeedMeta[], error: null as string | null });
+      return pageAll<FeedMeta>(() =>
+        admin.from("store_inventory")
+          .select("id, vin, store_id, last_seen_at, updated_at, presence")
+          .in("store_id", ids).eq("presence", "present").order("id", { ascending: true }));
+    };
+    const loadListingMeta = () => pageAll<ListingMeta>(() =>
+      admin.from("vehicle_listings")
+        .select("id, vin, owning_store_id, store_id, updated_at")
+        .eq("tenant_id", tenantId).is("archived_at", null)
+        .in("status", ["published", "active"]).order("id", { ascending: true }));
+
+    if (wantsStores) {
+      const st = await loadStores();
+      if (st.error) return json(500, { error: st.error });
+      const fd = await loadFeedMeta(st.rows);
+      if (fd.error) return json(500, { error: fd.error });
+      const li = await loadListingMeta();
+      if (li.error) return json(500, { error: li.error });
+      const report = buildStoresReport({ stores: st.rows, feed: fd.rows, listings: li.rows });
+      if (url.searchParams.get("summary") === "1") {
+        const un = unresolvedListings(li.rows, fd.rows, st.rows);
+        const lo = listingOnlyListings(li.rows, fd.rows, st.rows);
+        return json(200, {
+          stores: report, unresolved_listings: un.count, unresolved_vins: un.vins,
+          listing_only_count: lo.count, listing_only_vins: lo.vins,
+        });
+      }
+      return json(200, report);
+    }
+
+    let extStores: FeedStore[] = [];
+    if (!detailVin && isExtendedList(listParams)) {
+      const st = await loadStores();
+      if (st.error) return json(500, { error: st.error });
+      extStores = st.rows;
+      if (listParams.storeId && !storeBelongs(listParams.storeId, extStores)) {
+        return json(400, { error: "store_id does not belong to tenant_id" });
+      }
+    }
+
     // ── Detail: one vehicle, everything we hold ───────────────────────
     //
     // The list answers "what is on the lot". This answers "tell me everything
@@ -259,6 +354,157 @@ serve(async (req) => {
           .in("status", ["published", "active"]),
       );
 
+    const shapePage = async (page: Record<string, unknown>[]) => {
+      // vehicle_listings holds neither the discrete year/make/model nor the DMS
+      // stock number as columns; vehicle_files holds both. marketcheck-sync
+      // composes ymm from exactly these three and writes them here at the same
+      // time, so they are read rather than parsed back out of the display string.
+      const filesByVin = new Map<string, LotFeedFile>();
+      const vins = page.map((r) => r.vin).filter(Boolean) as string[];
+      if (vins.length) {
+        const { data: files } = await admin
+          .from("vehicle_files")
+          .select("vin, year, make, model, trim, stock_number")
+          .eq("tenant_id", tenantId)
+          .in("vin", vins);
+        for (const f of (files ?? []) as (LotFeedFile & { vin: string })[]) {
+          if (f.vin) filesByVin.set(f.vin, f);
+        }
+      }
+
+      // Which of these vehicles actually have a published factory sticker on
+      // file. The oem_sticker_url column is empty on every row of this lot while
+      // 102 of 140 have a filed, published PDF — reading the column alone
+      // reported "no window sticker" for three quarters of the cars that have
+      // one.
+      const stickerVehicleIds = new Set<string>();
+      const ids = page.map((r) => r.id).filter(Boolean) as string[];
+      if (ids.length) {
+        const { data: docs } = await admin
+          .from("generated_documents")
+          .select("vehicle_id")
+          .eq("tenant_id", tenantId)
+          .eq("document_type", "factory_sticker")
+          .eq("document_status", "published")
+          .in("vehicle_id", ids);
+        for (const d of (docs ?? []) as { vehicle_id: string | null }[]) {
+          if (d.vehicle_id) stickerVehicleIds.add(d.vehicle_id);
+        }
+      }
+
+      // The truth snapshot feeds detail_version, so a change in the fact ledger
+      // moves it even when the listing row itself did not change. One query for
+      // the page, not one per row.
+      const snapByVehicle = new Map<string, DetailVersionSnapshot>();
+      if (ids.length) {
+        const { data: snaps } = await admin
+          .from("vehicle_snapshots")
+          .select("vehicle_id, snapshot_version, content_checksum")
+          .eq("tenant_id", tenantId)
+          .in("vehicle_id", ids)
+          .order("snapshot_version", { ascending: false });
+        for (const sn of (snaps ?? []) as Record<string, unknown>[]) {
+          const k = String(sn.vehicle_id);
+          // Ordered newest-first, so the first one seen per vehicle is current.
+          if (!snapByVehicle.has(k)) {
+            snapByVehicle.set(k, {
+              snapshot_version: sn.snapshot_version as number,
+              content_checksum: sn.content_checksum as string,
+            });
+          }
+        }
+      }
+
+      const vehicles = await Promise.all(page.map(async (r) => {
+        const shaped = shapeLotRow(r, filesByVin.get(String(r.vin)) ?? null, {
+          supabaseUrl,
+          hasFactorySticker: stickerVehicleIds.has(String(r.id)),
+        });
+        shaped.detail_version = await detailVersion(r, snapByVehicle.get(String(r.id)) ?? null);
+        return shaped;
+      }));
+
+      // A vehicle with no discrete make is filtered off the consumer's screens.
+      // Counted here so that shows up as a number in the response rather than as
+      // an empty page nobody can explain.
+      const identity_incomplete = page.filter((r) =>
+        identityIncomplete(r, filesByVin.get(String(r.vin)) ?? null)
+      ).length;
+
+
+      return { vehicles, identity_incomplete };
+    };
+
+    if (!detailVin && isExtendedList(listParams)) {
+      const li = await loadListingMeta();
+      if (li.error) return json(500, { error: li.error });
+      const fd = await loadFeedMeta(extStores);
+      if (fd.error) return json(500, { error: fd.error });
+      const plan = planList({
+        listings: li.rows, feed: fd.rows, stores: extStores, params: listParams, updatedSince,
+      });
+      const after = cursor ? plan.owned.filter((o) => o.vin > cursor) : plan.owned;
+      const slice = after.slice(0, limit + 1);
+      const extHasMore = slice.length > limit;
+      const pageOwned = slice.slice(0, limit);
+      const storeById = new Map<string, StoreRef>(extStores.map((s) => [s.id, storeRef(s)]));
+      const refFor = (id: string | null) => (id ? storeById.get(id) ?? null : null);
+
+      const listingIds = pageOwned.filter((o) => o.source === "listing").map((o) => o.listing!.id);
+      const listingRows = new Map<string, Record<string, unknown>>();
+      for (let i = 0; i < listingIds.length; i += 200) {
+        const { data, error } = await admin.from("vehicle_listings").select("*")
+          .eq("tenant_id", tenantId).in("id", listingIds.slice(i, i + 200));
+        if (error) return json(500, { error: error.message });
+        for (const r of (data ?? []) as Record<string, unknown>[]) listingRows.set(String(r.id), r);
+      }
+      const feedIds = pageOwned.filter((o) => o.source === "feed").map((o) => o.feed!.id);
+      const feedRows = new Map<string, FeedInventoryRow>();
+      for (let i = 0; i < feedIds.length; i += 200) {
+        const { data, error } = await admin.from("store_inventory")
+          .select("id, store_id, vin, stock_number, condition, certified, year, make, model, trim, body, drivetrain, engine, transmission, fuel, mileage, msrp, feed_price, feed_price_status, exterior_color, interior_color, photos, description, inventory_date, last_seen_at, updated_at")
+          .in("id", feedIds.slice(i, i + 200));
+        if (error) return json(500, { error: error.message });
+        for (const r of (data ?? []) as FeedInventoryRow[]) feedRows.set(r.id, r);
+      }
+
+      const listingPage = pageOwned.filter((o) => o.source === "listing")
+        .map((o) => listingRows.get(o.listing!.id)).filter(Boolean) as Record<string, unknown>[];
+      const shaped = await shapePage(listingPage);
+      const shapedById = new Map<string, Record<string, unknown>>();
+      listingPage.forEach((r, i) => shapedById.set(String(r.id), shaped.vehicles[i]));
+
+      let feedIdentityGaps = 0;
+      const vehicles: Record<string, unknown>[] = [];
+      let vanished = 0;
+      for (const o of pageOwned) {
+        if (o.source === "listing") {
+          const v = shapedById.get(o.listing!.id);
+          if (v) vehicles.push(annotateListingRow(v, refFor(o.store_id), o.feed_confirmed)); else vanished++;
+        } else {
+          const fr = feedRows.get(o.feed!.id);
+          if (!fr) { vanished++; continue; }
+          if (!fr.make) feedIdentityGaps++;
+          vehicles.push(shapeFeedRow(fr, refFor(o.store_id)));
+        }
+      }
+      return json(200, {
+        total: plan.owned.length - vanished,
+        limit,
+        has_more: extHasMore,
+        next_cursor: extHasMore ? pageOwned[pageOwned.length - 1]?.vin ?? null : null,
+        identity_incomplete: shaped.identity_incomplete + feedIdentityGaps,
+        vanished_count: vanished,
+        unresolved_count: plan.unresolved.count,
+        unresolved_vins: plan.unresolved.vins,
+        listing_only_count: plan.listingOnly.count,
+        listing_only_vins: plan.listingOnly.vins,
+        duplicate_count: plan.duplicates.length,
+        duplicates: plan.duplicates,
+        vehicles,
+      });
+    }
+
     const { count, error: countErr } = await scoped(
       admin
         .from("vehicle_listings")
@@ -278,81 +524,7 @@ serve(async (req) => {
     const hasMore = rows.length > limit;
     const page = rows.slice(0, limit);
 
-    // vehicle_listings holds neither the discrete year/make/model nor the DMS
-    // stock number as columns; vehicle_files holds both. marketcheck-sync
-    // composes ymm from exactly these three and writes them here at the same
-    // time, so they are read rather than parsed back out of the display string.
-    const filesByVin = new Map<string, LotFeedFile>();
-    const vins = page.map((r) => r.vin).filter(Boolean) as string[];
-    if (vins.length) {
-      const { data: files } = await admin
-        .from("vehicle_files")
-        .select("vin, year, make, model, trim, stock_number")
-        .eq("tenant_id", tenantId)
-        .in("vin", vins);
-      for (const f of (files ?? []) as (LotFeedFile & { vin: string })[]) {
-        if (f.vin) filesByVin.set(f.vin, f);
-      }
-    }
-
-    // Which of these vehicles actually have a published factory sticker on
-    // file. The oem_sticker_url column is empty on every row of this lot while
-    // 102 of 140 have a filed, published PDF — reading the column alone
-    // reported "no window sticker" for three quarters of the cars that have
-    // one.
-    const stickerVehicleIds = new Set<string>();
-    const ids = page.map((r) => r.id).filter(Boolean) as string[];
-    if (ids.length) {
-      const { data: docs } = await admin
-        .from("generated_documents")
-        .select("vehicle_id")
-        .eq("tenant_id", tenantId)
-        .eq("document_type", "factory_sticker")
-        .eq("document_status", "published")
-        .in("vehicle_id", ids);
-      for (const d of (docs ?? []) as { vehicle_id: string | null }[]) {
-        if (d.vehicle_id) stickerVehicleIds.add(d.vehicle_id);
-      }
-    }
-
-    // The truth snapshot feeds detail_version, so a change in the fact ledger
-    // moves it even when the listing row itself did not change. One query for
-    // the page, not one per row.
-    const snapByVehicle = new Map<string, DetailVersionSnapshot>();
-    if (ids.length) {
-      const { data: snaps } = await admin
-        .from("vehicle_snapshots")
-        .select("vehicle_id, snapshot_version, content_checksum")
-        .eq("tenant_id", tenantId)
-        .in("vehicle_id", ids)
-        .order("snapshot_version", { ascending: false });
-      for (const sn of (snaps ?? []) as Record<string, unknown>[]) {
-        const k = String(sn.vehicle_id);
-        // Ordered newest-first, so the first one seen per vehicle is current.
-        if (!snapByVehicle.has(k)) {
-          snapByVehicle.set(k, {
-            snapshot_version: sn.snapshot_version as number,
-            content_checksum: sn.content_checksum as string,
-          });
-        }
-      }
-    }
-
-    const vehicles = await Promise.all(page.map(async (r) => {
-      const shaped = shapeLotRow(r, filesByVin.get(String(r.vin)) ?? null, {
-        supabaseUrl,
-        hasFactorySticker: stickerVehicleIds.has(String(r.id)),
-      });
-      shaped.detail_version = await detailVersion(r, snapByVehicle.get(String(r.id)) ?? null);
-      return shaped;
-    }));
-
-    // A vehicle with no discrete make is filtered off the consumer's screens.
-    // Counted here so that shows up as a number in the response rather than as
-    // an empty page nobody can explain.
-    const identity_incomplete = page.filter((r) =>
-      identityIncomplete(r, filesByVin.get(String(r.vin)) ?? null)
-    ).length;
+    const { vehicles, identity_incomplete } = await shapePage(page);
 
     return json(200, {
       total: count ?? 0,
