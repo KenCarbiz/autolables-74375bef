@@ -646,6 +646,11 @@ export interface BuildRenderOptions {
    * path never passes it.
    */
   sampleTemplateId?: string;
+  /**
+   * false renders a vehicle that only a brand-wide catalog route would serve
+   * on the generic brand-profile layout. Exact matches and masters are unaffected.
+   */
+  brandWide?: boolean;
 }
 
 export function buildRenderLayout(
@@ -655,7 +660,8 @@ export function buildRenderLayout(
   options: BuildRenderOptions = {},
 ): LayoutModel {
   const baseInput = adaptRenderData(data);
-  const route = resolveVariantRoute(data, theme, baseInput, options.sampleTemplateId ?? null);
+  const source = data;
+  const route = resolveVariantRoute(data, theme, baseInput, options.sampleTemplateId ?? null, options.brandWide !== false);
   const isCatalog = !!route && !!CATALOG_LAYOUTS[route.variantKey];
   if (isCatalog) data = withCatalogEpaGuard(withCatalogNeovin(withCatalogEquipment(data, route!.variantKey)));
   const input = isCatalog ? adaptRenderData(data) : baseInput;
@@ -711,7 +717,8 @@ export function buildRenderLayout(
 
   const viaVariant = route ? tryTarget("variant") : null;
   if (viaVariant) return viaVariant;
-  if (route?.masterRouted) return masterHold(route.variantKey, policy, buildStickerLayout(input, genericTheme));
+  if (route?.fallbackToGeneric) return buildRenderLayout(source, theme, policy, { brandWide: false });
+  if (route?.masterRouted && !route.fallbackToGeneric) return masterHold(route.variantKey, policy, buildStickerLayout(input, genericTheme));
   const viaGeneric = tryTarget("generic");
   return viaGeneric ?? state.hold ?? buildStickerLayout(input, genericTheme);
 }
@@ -736,6 +743,8 @@ interface VariantRoute {
   variantKey: string;
   masterRouted: boolean;
   build: VariantLayoutBuilder;
+  /** Brand-wide catalog route: content that does not fit the template renders on the generic layout instead of holding for review. */
+  fallbackToGeneric?: boolean;
 }
 
 /**
@@ -751,6 +760,7 @@ function resolveVariantRoute(
   theme: FactoryStickerTheme,
   input: StickerLayoutInput,
   sampleTemplateId: string | null = null,
+  brandWide = true,
 ): VariantRoute | null {
   if (sampleTemplateId) {
     const build = CATALOG_LAYOUTS[sampleTemplateId];
@@ -777,8 +787,10 @@ function resolveVariantRoute(
   if (!exact && !master && !input.generic) {
     const resolved = catalogResolutionFor(data);
     const build = resolved.template ? CATALOG_LAYOUTS[resolved.template.id] : undefined;
-    return resolved.status === "approved_match" && resolved.template && build
-      ? { variantKey: resolved.template.id, masterRouted: true, build } : null;
+    if (!resolved.template || !build) return null;
+    if (resolved.status === "approved_match") return { variantKey: resolved.template.id, masterRouted: true, build };
+    if (resolved.status === "brand_match" && brandWide) return { variantKey: resolved.template.id, masterRouted: true, build, fallbackToGeneric: true };
+    return null;
   }
   if (!exact && (!master || input.generic)) return null;
   const variantKey = exact ? match.variant!.key : master!.variantKey;

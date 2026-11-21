@@ -555,10 +555,12 @@ const masterGroups = (groups: StandardEquipmentGroup[]): Array<{
 }> => groups.map((g) => ({ hint: CATEGORY_MASTER_HINT[g.category], items: g.items }));
 export interface BuildRenderOptions {
     sampleTemplateId?: string;
+    brandWide?: boolean;
 }
 export function buildRenderLayout(data: FactoryStickerRenderData, theme: FactoryStickerTheme, policy: EquipmentScopePolicy = EQUIPMENT_SCOPE_POLICY, options: BuildRenderOptions = {}): LayoutModel {
     const baseInput = adaptRenderData(data);
-    const route = resolveVariantRoute(data, theme, baseInput, options.sampleTemplateId ?? null);
+    const source = data;
+    const route = resolveVariantRoute(data, theme, baseInput, options.sampleTemplateId ?? null, options.brandWide !== false);
     const isCatalog = !!route && !!CATALOG_LAYOUTS[route.variantKey];
     if (isCatalog)
         data = withCatalogEpaGuard(withCatalogNeovin(withCatalogEquipment(data, route!.variantKey)));
@@ -620,7 +622,9 @@ export function buildRenderLayout(data: FactoryStickerRenderData, theme: Factory
     const viaVariant = route ? tryTarget("variant") : null;
     if (viaVariant)
         return viaVariant;
-    if (route?.masterRouted)
+    if (route?.fallbackToGeneric)
+        return buildRenderLayout(source, theme, policy, { brandWide: false });
+    if (route?.masterRouted && !route.fallbackToGeneric)
         return masterHold(route.variantKey, policy, buildStickerLayout(input, genericTheme));
     const viaGeneric = tryTarget("generic");
     return viaGeneric ?? state.hold ?? buildStickerLayout(input, genericTheme);
@@ -644,8 +648,9 @@ interface VariantRoute {
     variantKey: string;
     masterRouted: boolean;
     build: VariantLayoutBuilder;
+    fallbackToGeneric?: boolean;
 }
-function resolveVariantRoute(data: FactoryStickerRenderData, theme: FactoryStickerTheme, input: StickerLayoutInput, sampleTemplateId: string | null = null): VariantRoute | null {
+function resolveVariantRoute(data: FactoryStickerRenderData, theme: FactoryStickerTheme, input: StickerLayoutInput, sampleTemplateId: string | null = null, brandWide = true): VariantRoute | null {
     if (sampleTemplateId) {
         const build = CATALOG_LAYOUTS[sampleTemplateId];
         const masterKey = getCatalogTemplate(sampleTemplateId)?.existingMasterKey;
@@ -673,8 +678,13 @@ function resolveVariantRoute(data: FactoryStickerRenderData, theme: FactoryStick
     if (!exact && !master && !input.generic) {
         const resolved = catalogResolutionFor(data);
         const build = resolved.template ? CATALOG_LAYOUTS[resolved.template.id] : undefined;
-        return resolved.status === "approved_match" && resolved.template && build
-            ? { variantKey: resolved.template.id, masterRouted: true, build } : null;
+        if (!resolved.template || !build)
+            return null;
+        if (resolved.status === "approved_match")
+            return { variantKey: resolved.template.id, masterRouted: true, build };
+        if (resolved.status === "brand_match" && brandWide)
+            return { variantKey: resolved.template.id, masterRouted: true, build, fallbackToGeneric: true };
+        return null;
     }
     if (!exact && (!master || input.generic))
         return null;

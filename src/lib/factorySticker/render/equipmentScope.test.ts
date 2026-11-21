@@ -74,7 +74,7 @@ describe("equipment scope policy", () => {
 
   it("applies to the generic layout too", () => {
     const d = build(900);
-    const m = buildRenderLayout({ ...d, identity: { ...d.identity, make: "Toyota" } }, themeFor("toyota"));
+    const m = buildRenderLayout({ ...d, identity: { ...d.identity, make: "Toyota" } }, themeFor("toyota"), undefined, { brandWide: false });
     expect(m.fit.ok).toBe(true);
     expect(scopeOf(m)).toBe("selected");
     expect(m.drawnStrings).toContain(SELECTED_EQUIPMENT_NOTE);
