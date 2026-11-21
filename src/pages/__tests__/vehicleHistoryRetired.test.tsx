@@ -35,4 +35,13 @@ describe("the standalone History & Title page is retired", () => {
     );
     expect(screen.getByTestId("where").textContent).toBe("/v/demo?preview=1&scenario=new2026");
   });
+
+  it("served Passport buttons open the in-page Vehicle History panel, not the retired page", () => {
+    const panel = readFileSync(join(ROOT, "src/components/passport/PassportPanel.tsx"), "utf8");
+    const docs = readFileSync(join(ROOT, "src/pages/VehiclePassportDocuments.tsx"), "utf8");
+    expect(panel).toMatch(/openPanel\("vehicle-history"\)/);
+    expect(panel).not.toMatch(/go\("vehicle-history"\)/);
+    expect(docs).toMatch(/\{ label: "Vehicle History", panel: "vehicle-history" \}/);
+    expect(docs).not.toMatch(/to: "vehicle-history"/);
+  });
 });

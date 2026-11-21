@@ -1539,23 +1539,23 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       // Mobile command-center data (badges/cards/rows open the dedicated reports).
       const overviewBadges = ([
         d.warrantyStr ? { icon: ShieldCheck, label: "Factory Warranty", fn: () => openPanel("factory-warranty") } : null,
-        d.cleanTitle && d.accidentCount === 0 ? { icon: CheckCircle2, label: "Clean History", fn: () => go("vehicle-history") } : null,
+        d.cleanTitle && d.accidentCount === 0 ? { icon: CheckCircle2, label: "Clean History", fn: () => openPanel("vehicle-history") } : null,
         isGreat ? { icon: BadgeCheck, label: "Great Price", fn: () => openPanel("market-price") } : null,
       ].filter(Boolean) as { icon: React.ElementType; label: string; fn: () => void }[]).slice(0, 4);
       const aiTraits = [d.ownerCount === 1 ? "one-owner ownership" : null, d.warrantyStr ? "remaining factory warranty" : null, (d.cleanTitle && d.accidentCount === 0) ? "a clean vehicle history" : null, isGreat ? "below-market pricing" : null, (d.viewCount ?? 0) > 20 ? "strong local demand" : null].filter(Boolean) as string[];
       const aiSummary = aiTraits.length >= 2 ? `This ${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""} combines ${aiTraits.slice(0, -1).join(", ")} and ${aiTraits[aiTraits.length - 1]} — one of the strongest ${premium ? "luxury " : ""}values currently available.` : (d.overview ? d.overview.split(". ").slice(0, 2).join(". ") : `The ${listing.ymm} pairs capable performance with a well-equipped cabin.`);
       const snap = ([
-        d.ownerCount === 1 ? { icon: Users, v: "1 Owner", s: "Personal use", fn: () => go("vehicle-history") } : null,
+        d.ownerCount === 1 ? { icon: Users, v: "1 Owner", s: "Personal use", fn: () => openPanel("vehicle-history") } : null,
         d.warrantyStr ? { icon: ShieldCheck, v: d.warrantyStr, s: "Warranty left", fn: () => openPanel("factory-warranty") } : null,
         listing.mileage != null ? { icon: Gauge, v: listing.mileage.toLocaleString(), s: "Miles", fn: () => openPanel("key-specs") } : null,
         d.belowMarket && d.belowMarket > 0 ? { icon: BadgeCheck, v: fmt$(d.belowMarket), s: "Est. below market", fn: () => openPanel("market-price") } : null,
         drivetrain ? { icon: Car, v: drivetrain, s: "Drivetrain", fn: () => openPanel("key-specs") } : null,
-        d.recallClear ? { icon: CheckCircle2, v: "No Recalls", s: "Verified for this VIN", fn: () => go("vehicle-history") } : null,
+        d.recallClear ? { icon: CheckCircle2, v: "No Recalls", s: "Verified for this VIN", fn: () => openPanel("vehicle-history") } : null,
       ].filter(Boolean) as { icon: React.ElementType; v: string; s: string; fn: () => void }[]).slice(0, 4);
       const carousel = (d.highlights.length ? d.highlights.map((h) => ({ t: h.label, s: h.sub })) : Object.values(groups).flat().map((x) => ({ t: x, s: "" }))).slice(0, 12);
       const explore: { icon: React.ElementType; t: string; s: string; fn: () => void }[] = [
         { icon: ShieldCheck, t: "Warranty", s: "Coverage remaining", fn: () => openPanel("factory-warranty") },
-        { icon: History, t: "Vehicle History", s: "Ownership, title, accidents", fn: () => go("vehicle-history") },
+        { icon: History, t: "Vehicle History", s: "Ownership, title, accidents", fn: () => openPanel("vehicle-history") },
         { icon: DollarSign, t: "Market Price", s: "How the price compares", fn: () => openPanel("market-price") },
         { icon: TrendingUp, t: "Market Demand", s: "Local shopper interest", fn: () => openPanel("market-demand") },
         { icon: Car, t: "Comparable Vehicles", s: "Similar listings nearby", fn: () => openPanel("comparable-vehicles") },
@@ -2184,7 +2184,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         subtitle: isNew ? "The short, confident story of a factory-new vehicle." : "The journey of this vehicle, told from verified records.",
         footerQuestion: "Questions about this vehicle's timeline?",
         primary: { label: "Contact Dealer", onClick: () => go("contact") },
-        secondary: hasHistory ? { label: "View Vehicle History Report", onClick: () => go("vehicle-history") } : undefined,
+        secondary: hasHistory ? { label: "View Vehicle History Report", onClick: () => openPanel("vehicle-history") } : undefined,
         body: <>
           <div className="md:hidden"><MHero tone={isNew ? "blue" : "green"} icon={Clock} eyebrow={heroEyebrow} title={listing.ymm || "Timeline"} note={heroNote} /></div>
           {chips.length >= 2 && (
@@ -2227,7 +2227,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
             <p className="text-[12px] text-[#64748B]">Want the complete picture? Ask {d.dealerName} for the full history report.</p>
           )}
           {hasHistory && (
-            <button onClick={() => go("vehicle-history")} className="w-full h-11 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-2 transition-colors"><History className="w-4 h-4" /> View Full Vehicle History Report</button>
+            <button onClick={() => openPanel("vehicle-history")} className="w-full h-11 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-2 transition-colors"><History className="w-4 h-4" /> View Full Vehicle History Report</button>
           )}
           {d.historyReport && packetVisible(listing, "historyReport") && (
             <a
