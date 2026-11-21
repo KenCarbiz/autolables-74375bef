@@ -141,6 +141,13 @@
       "when": 1793999490911,
       "tag": "0019_group_inventory_view",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1795280987549,
+      "tag": "0020_restrict_platform_configuration_readers",
+      "breakpoints": true
     }
   ]
 }
