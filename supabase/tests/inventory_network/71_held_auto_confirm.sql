@@ -34,7 +34,8 @@ CREATE TEMP TABLE st2 (k text PRIMARY KEY, id uuid);
 INSERT INTO st2 VALUES
   ('agree', inv_admin_save_store('{"group_id":"00000000-0000-0000-0000-00000000aa01","display_name":"Hold Agree","state":"CT"}')),
   ('trunc', inv_admin_save_store('{"group_id":"00000000-0000-0000-0000-00000000aa01","display_name":"Hold Truncated","state":"CT"}')),
-  ('drift', inv_admin_save_store('{"group_id":"00000000-0000-0000-0000-00000000aa01","display_name":"Hold Drift","state":"CT"}'));
+  ('drift', inv_admin_save_store('{"group_id":"00000000-0000-0000-0000-00000000aa01","display_name":"Hold Drift","state":"CT"}')),
+  ('same',  inv_admin_save_store('{"group_id":"00000000-0000-0000-0000-00000000aa01","display_name":"Hold Same","state":"CT"}'));
 SELECT inv_admin_save_store(jsonb_build_object('id', id, 'inventory_feed_enabled', true, 'missing_snapshot_threshold', 3, 'retirement_automation_enabled', false)) FROM st2;
 SELECT inv_admin_set_feed_completeness(id, '{"min_absent_vehicles":2,"max_count_drop_pct":20}', 'production settings') FROM st2;
 INSERT INTO inventory_source_mappings (source_dealer_id, group_id, store_id, status, observed_identity, approved_at)
@@ -78,3 +79,13 @@ CREATE TEMP TABLE rd2 AS SELECT inventory_apply_store_snapshot(pg_temp.snap(pg_t
 SELECT pg_temp.expect((SELECT r->>'reason' = 'held_for_review' FROM rd2), 'an unclean file is not released automatically');
 SELECT pg_temp.expect(pg_temp.present(pg_temp.sid('drift')) = 100, 'disagreeing files change nothing');
 SELECT pg_temp.expect((SELECT count(*) FROM inventory_network_audit WHERE action = 'snapshot_auto_confirmed') = 1, 'only the agreeing pair was released');
+
+-- An unchanged export at the next drop (same content, newer time) confirms (0022).
+SELECT inventory_apply_store_snapshot(pg_temp.snap(pg_temp.sid('same'), 'CHsame_inventory', 100, 8001, 1));
+CREATE TEMP TABLE s1 AS SELECT pg_temp.snap(pg_temp.sid('same'), 'CHsame_inventory', 78, 8023, 2) AS id;
+SELECT inventory_apply_store_snapshot((SELECT id FROM s1));
+CREATE TEMP TABLE s2 AS SELECT pg_temp.snap(pg_temp.sid('same'), 'CHsame_inventory', 78, 8023, 3) AS id;
+UPDATE inventory_store_snapshots SET content_sha256 = (SELECT content_sha256 FROM inventory_store_snapshots WHERE id = (SELECT id FROM s1)) WHERE id = (SELECT id FROM s2);
+CREATE TEMP TABLE rs AS SELECT inventory_apply_store_snapshot((SELECT id FROM s2)) AS r;
+SELECT pg_temp.expect((SELECT (r->>'applied')::boolean AND (r->>'missing')::int = 22 FROM rs), 'an unchanged file at the next drop confirms the held one');
+SELECT pg_temp.expect(pg_temp.present(pg_temp.sid('same')) = 78, 'the unchanged pair applies the sale');
