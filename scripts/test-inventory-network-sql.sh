@@ -27,6 +27,7 @@ $P -d "$DB" -f supabase/tests/inventory_network/60_dedupe_stub.sql
 $P -d "$DB" -f supabase/tests/inventory_network/61_dedupe.sql
 $P -d "$DB" -f drizzle/migrations/0016_feed_completeness_hold.sql
 $P -d "$DB" -f drizzle/migrations/0021_held_feed_recovery_agreement.sql
+$P -d "$DB" -f drizzle/migrations/0022_held_feed_same_content_confirms.sql
 $P -d "$DB" -f supabase/tests/inventory_network/70_completeness_hold.sql
 $P -d "$DB" -f supabase/tests/inventory_network/71_held_auto_confirm.sql
 $P -d "$DB" -f supabase/tests/inventory_network/79_estimator_stub.sql
