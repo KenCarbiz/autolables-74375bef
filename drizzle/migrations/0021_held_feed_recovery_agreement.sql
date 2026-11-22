@@ -104,7 +104,7 @@ BEGIN
     SELECT * INTO p FROM inventory_store_snapshots
      WHERE store_id = st.id AND status = 'held' AND id <> s.id AND clean
        AND source_mtime < s.source_mtime AND content_sha256 IS DISTINCT FROM s.content_sha256
-     ORDER BY source_mtime DESC LIMIT 1;
+      ORDER BY source_mtime DESC LIMIT 1;
     IF p.id IS NOT NULL THEN
       SELECT count(*) INTO v_since_prior FROM inventory_snapshot_vehicles x
        WHERE x.snapshot_id = p.id AND NOT EXISTS (SELECT 1 FROM inventory_snapshot_vehicles y WHERE y.snapshot_id = s.id AND y.vin = x.vin);
