@@ -35,7 +35,8 @@ INSERT INTO st2 VALUES
   ('agree', inv_admin_save_store('{"group_id":"00000000-0000-0000-0000-00000000aa01","display_name":"Hold Agree","state":"CT"}')),
   ('trunc', inv_admin_save_store('{"group_id":"00000000-0000-0000-0000-00000000aa01","display_name":"Hold Truncated","state":"CT"}')),
   ('drift', inv_admin_save_store('{"group_id":"00000000-0000-0000-0000-00000000aa01","display_name":"Hold Drift","state":"CT"}')),
-  ('same',  inv_admin_save_store('{"group_id":"00000000-0000-0000-0000-00000000aa01","display_name":"Hold Same","state":"CT"}'));
+  ('same',  inv_admin_save_store('{"group_id":"00000000-0000-0000-0000-00000000aa01","display_name":"Hold Same","state":"CT"}')),
+  ('rev',   inv_admin_save_store('{"group_id":"00000000-0000-0000-0000-00000000aa01","display_name":"Hold Review","state":"CT"}'));
 SELECT inv_admin_save_store(jsonb_build_object('id', id, 'inventory_feed_enabled', true, 'missing_snapshot_threshold', 3, 'retirement_automation_enabled', false)) FROM st2;
 SELECT inv_admin_set_feed_completeness(id, '{"min_absent_vehicles":2,"max_count_drop_pct":20}', 'production settings') FROM st2;
 INSERT INTO inventory_source_mappings (source_dealer_id, group_id, store_id, status, observed_identity, approved_at)
@@ -89,3 +90,16 @@ UPDATE inventory_store_snapshots SET content_sha256 = (SELECT content_sha256 FRO
 CREATE TEMP TABLE rs AS SELECT inventory_apply_store_snapshot((SELECT id FROM s2)) AS r;
 SELECT pg_temp.expect((SELECT (r->>'applied')::boolean AND (r->>'missing')::int = 22 FROM rs), 'an unchanged file at the next drop confirms the held one');
 SELECT pg_temp.expect(pg_temp.present(pg_temp.sid('same')) = 78, 'the unchanged pair applies the sale');
+
+-- Cars already marked missing or in review do not hold the next files again (0023).
+SELECT inv_admin_save_store(jsonb_build_object('id', pg_temp.sid('rev'), 'missing_snapshot_threshold', 2));
+SELECT inventory_apply_store_snapshot(pg_temp.snap(pg_temp.sid('rev'), 'CHrev_inventory', 100, 9001, 1));
+SELECT inventory_apply_store_snapshot(pg_temp.snap(pg_temp.sid('rev'), 'CHrev_inventory', 78, 9023, 2));
+SELECT pg_temp.expect(inventory_apply_store_snapshot(pg_temp.snap(pg_temp.sid('rev'), 'CHrev_inventory', 78, 9023, 3))->>'applied' = 'true', 'the agreeing file applies');
+SELECT pg_temp.expect((SELECT count(*) FROM store_inventory WHERE store_id = pg_temp.sid('rev') AND presence = 'missing') = 22, 'the sold cars are marked missing');
+CREATE TEMP TABLE rr AS SELECT inventory_apply_store_snapshot(pg_temp.snap(pg_temp.sid('rev'), 'CHrev_inventory', 78, 9023, 4)) AS r;
+SELECT pg_temp.expect((SELECT (r->>'applied')::boolean FROM rr), 'the next file applies directly; missing cars are not counted again');
+SELECT pg_temp.expect((SELECT count(*) FROM store_inventory WHERE store_id = pg_temp.sid('rev') AND presence = 'retirement_review') = 22, 'the sold cars move to retirement review');
+CREATE TEMP TABLE rr2 AS SELECT inventory_apply_store_snapshot(pg_temp.snap(pg_temp.sid('rev'), 'CHrev_inventory', 78, 9023, 5)) AS r;
+SELECT pg_temp.expect((SELECT (r->>'applied')::boolean FROM rr2), 'files keep applying while cars wait in review');
+SELECT pg_temp.expect((SELECT count(*) FROM store_inventory WHERE store_id = pg_temp.sid('rev') AND presence = 'retirement_review') = 22, 'cars in review stay in review');
