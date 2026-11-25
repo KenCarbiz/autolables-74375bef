@@ -15604,6 +15604,10 @@ export type Database = {
         Returns: string
       }
       accept_addendum: { Args: { _addendum_id: string }; Returns: Json }
+      activate_bundled_entitlement: {
+        Args: { _app_slug?: string; _tenant_id: string }
+        Returns: boolean
+      }
       admin_clear_synced_inventory: {
         Args: { _tenant_id: string }
         Returns: Json

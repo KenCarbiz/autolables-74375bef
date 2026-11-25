@@ -1,5 +1,7 @@
 import { json, preflight } from "../_shared/http.ts";
-import { SUPABASE_URL, SERVICE_KEY, adminClient, isServiceOrCron } from "../_shared/supabase.ts";
+import { SUPABASE_URL, SERVICE_KEY, adminClient } from "../_shared/supabase.ts";
+import { authenticateCronRequest } from "../_shared/cron-auth.ts";
+import { constantTimeEquals } from "../_shared/functionAuth.ts";
 
 // ──────────────────────────────────────────────────────────────────────
 // title-reminders-sweep — for each tenant with reminders enabled, re-email the
@@ -13,9 +15,12 @@ const PER_TENANT_CAP = 60;
 Deno.serve(async (req) => {
   const pf = preflight(req);
   if (pf) return pf;
-  // Service-role or the cron secret only — this fans out emails, so it must not
-  // be publicly triggerable.
-  if (!isServiceOrCron(req)) return json(401, { error: "unauthorized" });
+  // Service-role or managed LOVABLE_CRON_SECRET only — legacy x-cron-secret
+  // headers exposed in historical migrations are no longer accepted.
+  const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+  const isService = !!SERVICE_KEY && await constantTimeEquals(jwt, SERVICE_KEY);
+  const isCron = authenticateCronRequest(req) === null;
+  if (!isService && !isCron) return json(401, { error: "unauthorized" });
 
   const admin = adminClient();
 

@@ -1,43 +1,47 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { assertSafePublicUrl, isPrivateOrReservedIp, normalizeDomainHost } from '../_shared/security.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 }
 
-// SSRF guard: reject hosts that resolve to private / link-local /
-// loopback ranges, plus obvious metadata hostnames. Cheap textual
-// check first — anything that looks like a private IP literal is
-// blocked without DNS. A real DNS-pinning resolver would be ideal
-// but isn't available in the Deno edge runtime, so this is a
-// best-effort layer in front of an authenticated endpoint.
-const BLOCKED_HOST_PATTERNS: RegExp[] = [
-  /^localhost$/i,
-  /^127\./, /^0\./, /^10\./,
-  /^169\.254\./,            // AWS / link-local
-  /^192\.168\./,
-  /^172\.(1[6-9]|2\d|3[0-1])\./,
-  /^::1$/, /^fe80:/i, /^fc[0-9a-f]{2}:/i, /^fd[0-9a-f]{2}:/i,
-  /metadata\.google\.internal$/i,
-  /metadata\.azure\.com$/i,
-]
+const MAX_HTML_BYTES = 2 * 1024 * 1024
+const MANAGER_ROLES = new Set(['owner', 'admin', 'general_manager', 'gsm', 'manager'])
 
-const isUrlSafe = (raw: string): { ok: true; url: URL } | { ok: false; reason: string } => {
+const assertSafeAdminUrl = async (raw: string): Promise<{ ok: true; url: URL } | { ok: false; reason: string }> => {
   let u: URL
   try { u = new URL(raw) } catch { return { ok: false, reason: 'invalid URL' } }
-  if (u.protocol !== 'http:' && u.protocol !== 'https:') return { ok: false, reason: 'unsupported protocol' }
-  const host = u.hostname
-  if (!host) return { ok: false, reason: 'missing host' }
-  for (const pat of BLOCKED_HOST_PATTERNS) {
-    if (pat.test(host)) return { ok: false, reason: `blocked host (${host})` }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return { ok: false, reason: 'unsupported protocol' }
+  if (u.username || u.password) return { ok: false, reason: 'credentials not allowed' }
+  if (u.port && u.port !== '80' && u.port !== '443') return { ok: false, reason: 'non-standard port not allowed' }
+  const host = u.hostname.toLowerCase()
+  if (!host || !host.includes('.') || isPrivateOrReservedIp(host)) return { ok: false, reason: 'blocked host' }
+  let resolvedAny = false
+  for (const recordType of ['A', 'AAAA'] as const) {
+    try {
+      const addrs = await Deno.resolveDns(host, recordType)
+      for (const ip of addrs) {
+        resolvedAny = true
+        if (isPrivateOrReservedIp(ip)) return { ok: false, reason: 'host resolves to private or reserved IP' }
+      }
+    } catch { /* record type absent */ }
   }
+  if (!resolvedAny) return { ok: false, reason: 'host could not be resolved' }
   return { ok: true, url: u }
 }
 
-const safeFetch = async (url: string, init: RequestInit, maxRedirects = 5): Promise<Response> => {
+const safeFetch = async (
+  url: string,
+  init: RequestInit,
+  allowedDomains: Set<string> | null,
+  maxRedirects = 5,
+): Promise<Response> => {
   let current = url
   for (let i = 0; i <= maxRedirects; i++) {
-    const safety = isUrlSafe(current)
+    const safety = allowedDomains
+      ? await assertSafePublicUrl(current, allowedDomains)
+      : await assertSafeAdminUrl(current)
     if (!safety.ok) throw new Error(`redirect blocked: ${safety.reason}`)
     const res = await fetch(current, { ...init, redirect: 'manual' })
     if (res.status >= 300 && res.status < 400) {
@@ -68,14 +72,59 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: false, error: 'missing bearer token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
-    if (jwt !== serviceKey) {
-      const admin = createClient(supabaseUrl, serviceKey, {
-        auth: { persistSession: false, autoRefreshToken: false },
-      })
+    const admin = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
+    const isServiceCaller = !!serviceKey && jwt === serviceKey
+    let allowedDomains: Set<string> | null = null
+    if (!isServiceCaller) {
       const { data: userRes, error: userErr } = await admin.auth.getUser(jwt)
       if (userErr || !userRes?.user) {
         return new Response(JSON.stringify({ success: false, error: 'invalid token' }),
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      const user = userRes.user
+      if (!user.email_confirmed_at) {
+        return new Response(JSON.stringify({ success: false, error: 'email confirmation required' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+      const { data: pa } = await admin.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'admin').maybeSingle()
+      if (!pa) {
+        const { data: mems } = await admin
+          .from('tenant_members')
+          .select('tenant_id, role')
+          .eq('user_id', user.id)
+          .not('accepted_at', 'is', null)
+        const managerTenantIds = (mems || [])
+          .filter((m: { role?: string }) => MANAGER_ROLES.has(String(m.role || '').toLowerCase()))
+          .map((m: { tenant_id: string }) => m.tenant_id)
+        if (managerTenantIds.length === 0) {
+          return new Response(JSON.stringify({ success: false, error: 'manager authority required' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+        }
+        const [tRes, obRes, profRes, stRes] = await Promise.all([
+          admin.from('tenants').select('domain').in('id', managerTenantIds),
+          admin.from('onboarding_profiles').select('website').in('tenant_id', managerTenantIds),
+          admin.from('dealer_profiles').select('settings').in('tenant_id', managerTenantIds),
+          admin.from('dealer_stores').select('website').in('tenant_id', managerTenantIds),
+        ])
+        allowedDomains = new Set<string>()
+        const addDomain = (val: unknown) => {
+          const host = normalizeDomainHost(val)
+          if (host) allowedDomains!.add(host)
+        }
+        for (const t of tRes.data || []) addDomain((t as { domain?: string }).domain)
+        for (const o of obRes.data || []) addDomain((o as { website?: string }).website)
+        for (const p of profRes.data || []) {
+          const s = (p as { settings?: Record<string, unknown> }).settings
+          addDomain(s?.website)
+          addDomain(s?.dealer_website)
+        }
+        for (const st of stRes.data || []) addDomain((st as { website?: string }).website)
+        if (allowedDomains.size === 0) {
+          return new Response(JSON.stringify({ success: false, error: 'no authorized dealership domain configured' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+        }
       }
     }
 
@@ -92,7 +141,9 @@ Deno.serve(async (req) => {
       formattedUrl = `https://${formattedUrl}`
     }
 
-    const safety = isUrlSafe(formattedUrl)
+    const safety = allowedDomains
+      ? await assertSafePublicUrl(formattedUrl, allowedDomains)
+      : await assertSafeAdminUrl(formattedUrl)
     if (!safety.ok) {
       return new Response(
         JSON.stringify({ success: false, error: `URL rejected: ${safety.reason}` }),
@@ -142,11 +193,11 @@ Deno.serve(async (req) => {
         const res = await safeFetch(tryUrl, {
           signal: controller.signal,
           headers: browserHeaders,
-        })
+        }, allowedDomains)
         clearTimeout(timeout)
 
         if (res.ok) {
-          const text = await res.text()
+          const text = (await res.text()).slice(0, MAX_HTML_BYTES)
           if (text.length > 500) {
             html = text
             finalUrl = tryUrl

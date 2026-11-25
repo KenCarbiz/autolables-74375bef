@@ -16,6 +16,7 @@ import { usedSafetyInspectionForm } from "@/data/safetyInspection";
 import { useVinDecode } from "@/hooks/useVinDecode";
 import { clearIntakeQueued, markIntakeQueued, persistStockNumber, runManualIntakeOrchestration } from "@/lib/manualIntakeOrchestration";
 import { toast } from "sonner";
+import { escapeCsvCell } from "@/lib/csvSafe";
 import {
   Plus, Search, Upload, Car, FileText, Printer, Signature, ScanLine,
   X, CheckCircle2, AlertTriangle, RefreshCw, MoreVertical, MoreHorizontal, Building2,
@@ -597,7 +598,7 @@ const InventoryModern = () => {
 
   const exportPicked = () => {
     const chosen = rows.filter((r) => picked.has(r.id));
-    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const esc = (v: unknown) => escapeCsvCell(v);
     const csv = [
       [...(combinedView ? ["Dealership"] : []), "Stock", "VIN", "Vehicle", "Condition", "Status", "Price"].join(","),
       ...chosen.map((r) => [...(combinedView ? [r.gv?.storeName] : []), r.stock_number, r.vin, r.ymm, r.condition, r.gv ? DISPLAY_STATUS_LABEL[r.gv.status] : r.status, r.price].map(esc).join(",")),

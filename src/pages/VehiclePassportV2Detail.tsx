@@ -159,16 +159,25 @@ const LeadForm = ({
       // role. The routing columns land with a migration; until it's applied
       // the routed insert fails — a lead must never be lost to that, so
       // retry with the bare payload.
-      type LeadsTable = { from: (t: string) => { insert: (r: unknown) => Promise<{ error: unknown }> } };
-      let insErr = (await (supabase as unknown as LeadsTable).from("leads").insert(routedPayload)).error;
-      if (insErr) insErr = (await (supabase as unknown as LeadsTable).from("leads").insert(basePayload)).error;
-      if (insErr) throw insErr;
+      // Submit atomically through lead-alert so the server assigns routing once
+      // at creation time; fall back to direct insert only if the function fails.
+      const { data: alertRes, error: alertErr } = await supabase.functions.invoke("lead-alert", {
+        body: {
+          create_lead: true,
+          slug: listing.slug, vin: listing.vin, intent,
+          name: name.trim(), phone: phone.trim() || null, email: email.trim() || null,
+          source: src, sub_source: subSource,
+          vehicle_interest: basePayload.vehicle_interest,
+          notes: basePayload.notes,
+        },
+      });
+      if (alertErr || !(alertRes as { ok?: boolean } | null)?.ok) {
+        type LeadsTable = { from: (t: string) => { insert: (r: unknown) => Promise<{ error: unknown }> } };
+        let insErr = (await (supabase as unknown as LeadsTable).from("leads").insert(routedPayload)).error;
+        if (insErr) insErr = (await (supabase as unknown as LeadsTable).from("leads").insert(basePayload)).error;
+        if (insErr) throw insErr;
+      }
       trackLeadSubmitted({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: src === "qr_scan" ? "window_sticker_qr" : "passport", metadata: { intent, routing_target_type: (routing?.routingTargetType as string) ?? null } });
-      // Fire-and-forget dealer alert — a submitted lead should page someone
-      // faster than a page view does.
-      supabase.functions.invoke("lead-alert", {
-        body: { slug: listing.slug, vin: listing.vin, intent, name: name.trim(), phone: phone.trim() || null, email: email.trim() || null, source: src, sub_source: subSource },
-      }).catch(() => { /* alert failure never blocks the shopper */ });
       if (flowPrefix) { trackFlow(listing, `${flowPrefix}_form_submitted`); trackFlow(listing, `${flowPrefix}_form_success`); }
       setSent(true);
       onDone?.();
@@ -331,14 +340,23 @@ const ReserveExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
           afterHours: routing.afterHours ?? false,
         } : null,
       };
-      type LeadsTable = { from: (t: string) => { insert: (r: unknown) => Promise<{ error: unknown }> } };
-      let insErr = (await (supabase as unknown as LeadsTable).from("leads").insert(routedPayload)).error;
-      if (insErr) insErr = (await (supabase as unknown as LeadsTable).from("leads").insert(basePayload)).error;
-      if (insErr) throw insErr;
+      const { data: alertRes, error: alertErr } = await supabase.functions.invoke("lead-alert", {
+        body: {
+          create_lead: true,
+          slug: listing.slug, vin: listing.vin, intent: "reserve",
+          name: name.trim(), phone: phone.trim() || null, email: email.trim() || null,
+          source: src, sub_source: "reserve_vehicle",
+          vehicle_interest: basePayload.vehicle_interest,
+          notes: basePayload.notes,
+        },
+      });
+      if (alertErr || !(alertRes as { ok?: boolean } | null)?.ok) {
+        type LeadsTable = { from: (t: string) => { insert: (r: unknown) => Promise<{ error: unknown }> } };
+        let insErr = (await (supabase as unknown as LeadsTable).from("leads").insert(routedPayload)).error;
+        if (insErr) insErr = (await (supabase as unknown as LeadsTable).from("leads").insert(basePayload)).error;
+        if (insErr) throw insErr;
+      }
       trackLeadSubmitted({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: src === "qr_scan" ? "window_sticker_qr" : "passport", metadata: { intent: "reserve", event: "reserve_form_submitted", contact_method: method, timing, routing_target_type: (routing?.routingTargetType as string) ?? null } });
-      supabase.functions.invoke("lead-alert", {
-        body: { slug: listing.slug, vin: listing.vin, intent: "reserve", name: name.trim(), phone: phone.trim() || null, email: email.trim() || null, source: src, sub_source: "reserve_vehicle" },
-      }).catch(() => { /* alert failure never blocks the shopper */ });
       trackFlow(listing, "reserve_form_success");
       setSent(true);
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -632,14 +650,23 @@ const ContactExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
           afterHours: routing.afterHours ?? false,
         } : null,
       };
-      type LeadsTable = { from: (t: string) => { insert: (r: unknown) => Promise<{ error: unknown }> } };
-      let insErr = (await (supabase as unknown as LeadsTable).from("leads").insert(routedPayload)).error;
-      if (insErr) insErr = (await (supabase as unknown as LeadsTable).from("leads").insert(basePayload)).error;
-      if (insErr) throw insErr;
+      const { data: alertRes, error: alertErr } = await supabase.functions.invoke("lead-alert", {
+        body: {
+          create_lead: true,
+          slug: listing.slug, vin: listing.vin, intent: "contact",
+          name: name.trim(), phone: phone.trim() || null, email: email.trim() || null,
+          source: src, sub_source: "contact", topic: topicDef.label,
+          vehicle_interest: basePayload.vehicle_interest,
+          notes: basePayload.notes,
+        },
+      });
+      if (alertErr || !(alertRes as { ok?: boolean } | null)?.ok) {
+        type LeadsTable = { from: (t: string) => { insert: (r: unknown) => Promise<{ error: unknown }> } };
+        let insErr = (await (supabase as unknown as LeadsTable).from("leads").insert(routedPayload)).error;
+        if (insErr) insErr = (await (supabase as unknown as LeadsTable).from("leads").insert(basePayload)).error;
+        if (insErr) throw insErr;
+      }
       trackLeadSubmitted({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: src === "qr_scan" ? "window_sticker_qr" : "passport", metadata: { intent: "contact", event: "contact_form_submitted", topic, contact_method: method, routing_target_type: (routing?.routingTargetType as string) ?? null } });
-      supabase.functions.invoke("lead-alert", {
-        body: { slug: listing.slug, vin: listing.vin, intent: "contact", name: name.trim(), phone: phone.trim() || null, email: email.trim() || null, source: src, sub_source: "contact", topic: topicDef.label },
-      }).catch(() => { /* alert failure never blocks the shopper */ });
       trackFlow(listing, "contact_form_success");
       setSent(true);
       window.scrollTo({ top: 0, behavior: "smooth" });

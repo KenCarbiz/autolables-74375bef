@@ -20,6 +20,7 @@
 import { json, preflight } from "../_shared/http.ts";
 import { adminClient, SERVICE_KEY } from "../_shared/supabase.ts";
 import { resolveCustomerPassportRouting, type PassportAgent, type PassportRoutingResult } from "../_shared/passport-routing.ts";
+import { resolveAllowedOrigin } from "../_shared/security.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 
@@ -44,8 +45,9 @@ Deno.serve(async (req) => {
     const admin = adminClient();
     const { data: rows } = await admin
       .from("vehicle_listings")
-      .select("id, tenant_id, store_id, ymm, trim, price, vin, stock_number, slug, assigned_agent_id")
+      .select("id, tenant_id, store_id, ymm, trim, price, vin, stock_number, slug, assigned_agent_id, status")
       .eq("slug", slug)
+      .eq("status", "published")
       .limit(1);
     const row = rows?.[0];
     if (!row?.tenant_id) return json(200, { ok: false, error: "listing_not_found" });
@@ -95,20 +97,29 @@ Deno.serve(async (req) => {
       });
       if (routing.email) routedEmail = routing.email.toLowerCase();
 
-      // Stamp the freshest matching lead row (client inserts anonymously and
-      // can't read the id back) and advance rotation memory.
-      const twoMinAgo = new Date(Date.now() - 2 * 60_000).toISOString();
-      const { data: fresh } = await admin.from("leads")
-        .select("id, routing").eq("store_id", row.store_id).eq("vehicle_vin", row.vin)
-        .eq("name", name).gte("created_at", twoMinAgo)
-        .order("created_at", { ascending: false }).limit(1);
-      const leadId = fresh?.[0]?.id || null;
-      // A group-inventory interest lead carries the sibling vehicle it is about;
-      // routing stays with this (the originating) listing, and that context is kept.
-      const groupInventory = ((fresh?.[0]?.routing ?? null) as { group_inventory?: unknown } | null)?.group_inventory ?? null;
-      if (leadId) {
+      // Never look up and overwrite an existing lead row from an unauthenticated
+      // request. When the shopper submits with create_lead=true, insert the new
+      // lead atomically with server-computed routing so no caller can hijack
+      // another shopper's lead routing.
+      const allowedSubSources = new Set(["reserve_vehicle", "trade_appraisal", "contact", "group_inventory"]);
+      const subSource = allowedSubSources.has(String(body.sub_source || "")) ? String(body.sub_source) : null;
+      if (body.create_lead === true) {
+        const validSources = new Set(["website", "qr_scan", "signing_link"]);
+        const leadSource = validSources.has(String(body.source || "")) ? String(body.source) : "website";
         const isAgentTarget = ["crm_owner", "vehicle_assigned_agent", "sales_rotation"].includes(routing.routingTargetType);
-        await admin.from("leads").update({
+        const leadNotes = String(body.notes || "").slice(0, 2000) || null;
+        const vehicleInterest = String(body.vehicle_interest || `${row.ymm || "Vehicle"}`).slice(0, 200);
+        const { error: insertErr } = await admin.from("leads").insert({
+          tenant_id: row.tenant_id,
+          store_id: row.store_id,
+          name: name.slice(0, 120),
+          email: leadEmail.slice(0, 160),
+          phone: String(body.phone || "").trim().slice(0, 40),
+          vehicle_interest: vehicleInterest,
+          vehicle_vin: row.vin,
+          source: leadSource,
+          status: "new",
+          notes: leadNotes,
           routed_agent_id: isAgentTarget ? routing.routingTargetId ?? null : null,
           routing: {
             source: "customer_passport",
@@ -117,16 +128,18 @@ Deno.serve(async (req) => {
             routingReason: routing.routingReason,
             displayMode: routing.displayMode,
             afterHours: routing.afterHours,
-            ...(groupInventory ? { group_inventory: groupInventory } : {}),
           },
-          sub_source: String(body.sub_source || "") || (groupInventory ? "group_inventory" : null),
-        }).eq("id", leadId).then(() => {}, () => {});
-      }
-      if (routing.routingTargetType === "sales_rotation" && routing.routingTargetId) {
-        const state = { ...((s.passport_rotation_state ?? {}) as Record<string, string>), [routing.routingTargetId]: new Date().toISOString() };
-        await admin.from("dealer_profiles")
-          .update({ settings: { ...s, passport_rotation_state: state } })
-          .eq("tenant_id", row.tenant_id).then(() => {}, () => {});
+          sub_source: subSource,
+        });
+        if (insertErr) {
+          return json(500, { ok: false, error: "lead_insert_failed" });
+        }
+        if (routing.routingTargetType === "sales_rotation" && routing.routingTargetId) {
+          const state = { ...((s.passport_rotation_state ?? {}) as Record<string, string>), [routing.routingTargetId]: new Date().toISOString() };
+          await admin.from("dealer_profiles")
+            .update({ settings: { ...s, passport_rotation_state: state } })
+            .eq("tenant_id", row.tenant_id).then(() => {}, () => {});
+        }
       }
     } catch { /* routing must never block the alert */ }
 
@@ -142,8 +155,8 @@ Deno.serve(async (req) => {
     const title = esc(`${row.ymm || "Vehicle"}${row.trim ? ` ${row.trim}` : ""}`);
     const priceNum = Number(row.price);
     const priceStr = Number.isFinite(priceNum) && priceNum > 0 ? `$${Math.round(priceNum).toLocaleString("en-US")}` : "";
-    const origin = (req.headers.get("origin") || "").replace(/\/$/, "");
-    const packetUrl = `${origin || "https://autolabels.io"}/v/${encodeURIComponent(row.slug)}`;
+    const origin = resolveAllowedOrigin([req.headers.get("origin")], "https://autolabels.io");
+    const packetUrl = `${origin}/v/${encodeURIComponent(row.slug)}`;
     const contactBits = [body.phone ? `<a href="tel:${esc(body.phone)}">${esc(body.phone)}</a>` : "", esc(body.email)].filter(Boolean).join(" &middot; ");
     const routedLine = routing && routing.routingTargetType !== "dealership_default"
       ? `<p style="font-size:12px;color:#64748B;margin:0 0 10px">Routed to: <b>${esc(routing.routingTargetType.replace(/_/g, " "))}</b>${routing.routingTargetId ? ` (${esc(routing.routingTargetId)})` : ""}</p>`

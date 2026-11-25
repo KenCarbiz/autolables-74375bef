@@ -169,6 +169,13 @@
       "when": 1795466696759,
       "tag": "0023_held_feed_present_only_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1795629217444,
+      "tag": "0024_security_fixes_access_control_and_validation",
+      "breakpoints": true
     }
   ]
 }

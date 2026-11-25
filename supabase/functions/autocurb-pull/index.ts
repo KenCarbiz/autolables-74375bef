@@ -112,6 +112,9 @@ serve(async (req) => {
     const { data: userRes } = await admin.auth.getUser(jwt);
     const user = userRes?.user;
     if (!user) return json(401, { error: "invalid token" });
+    if (!user.email_confirmed_at) {
+      return json(403, { matched: false, error: "email_not_confirmed" });
+    }
 
     // 1. If the user already has a tenant_members row, this function
     //    is a no-op. Return matched=true so the client refreshes.
@@ -139,7 +142,12 @@ serve(async (req) => {
       .maybeSingle();
 
     let tenantId = linked?.id as string | undefined;
+    const createdTenant = !tenantId;
     if (!tenantId) {
+      const primaryEmail = (profile.primary_email || "").trim().toLowerCase();
+      if (primaryEmail && primaryEmail !== email.trim().toLowerCase()) {
+        return json(403, { matched: false, error: "email_mismatch" });
+      }
       const { data: created, error: createErr } = await admin
         .from("tenants")
         .insert({
@@ -175,7 +183,9 @@ serve(async (req) => {
       });
     }
 
-    // 4. Add the user as owner if not yet a member.
+    // 4. Only assign owner when creating the tenant for the first time; never
+    //    elevate a new account to owner on an already-linked tenant unless an
+    //    existing pending invitation matches their confirmed email.
     const { data: m } = await admin
       .from("tenant_members")
       .select("id")
@@ -183,13 +193,31 @@ serve(async (req) => {
       .eq("user_id", user.id)
       .maybeSingle();
     if (!m) {
-      await admin.from("tenant_members").insert({
-        tenant_id: tenantId,
-        user_id: user.id,
-        role: "owner",
-        accepted_at: new Date().toISOString(),
-        invited_by: user.id,
-      });
+      if (createdTenant) {
+        await admin.from("tenant_members").insert({
+          tenant_id: tenantId,
+          user_id: user.id,
+          invited_email: email,
+          role: "owner",
+          accepted_at: new Date().toISOString(),
+          invited_by: user.id,
+        });
+      } else {
+        const { data: invite } = await admin
+          .from("tenant_members")
+          .select("id")
+          .eq("tenant_id", tenantId)
+          .ilike("invited_email", email)
+          .is("user_id", null)
+          .maybeSingle();
+        if (!invite) {
+          return json(403, { matched: false, error: "tenant_already_linked" });
+        }
+        await admin
+          .from("tenant_members")
+          .update({ user_id: user.id, accepted_at: new Date().toISOString() })
+          .eq("id", invite.id);
+      }
     }
 
     // 5. Provision an entitlement for the requested app. If Autocurb

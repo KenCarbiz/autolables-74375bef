@@ -1,5 +1,6 @@
-import { json, preflight } from "../_shared/http.ts";
+import { json, preflight, htmlEscape } from "../_shared/http.ts";
 import { SUPABASE_URL, SERVICE_KEY, adminClient, isServiceOrCron } from "../_shared/supabase.ts";
+import { resolveAllowedOrigin } from "../_shared/security.ts";
 
 // ──────────────────────────────────────────────────────────────────────
 // price-drop-reengage — re-engages shoppers who asked to be notified when a
@@ -76,14 +77,15 @@ Deno.serve(async (req) => {
 
     const title = [listing.year, listing.make, listing.model, listing.trim].filter(Boolean).join(" ").trim() || "the vehicle you viewed";
     const slug = listing.slug || w.slug || w.vin;
-    const origin = (req.headers.get("origin") || "").replace(/\/$/, "");
-    const packetUrl = `${origin || "https://autolabels.io"}/v/${encodeURIComponent(slug)}`;
-    const greeting = w.name ? `Hi ${w.name.split(" ")[0]},` : "Hi,";
+    const origin = resolveAllowedOrigin([req.headers.get("origin")], "https://autolabels.io");
+    const packetUrl = `${origin}/v/${encodeURIComponent(slug)}`;
+    const firstName = w.name ? w.name.trim().split(/\s+/)[0]?.slice(0, 60) : "";
+    const greeting = firstName ? `Hi ${htmlEscape(firstName)},` : "Hi,";
     const html = `
       <div style="font-family:Inter,Arial,sans-serif;max-width:520px;margin:0 auto;color:#0F172A">
         <p style="font-size:15px;margin:0 0 12px">${greeting}</p>
         <p style="font-size:15px;margin:0 0 4px">Good news — the price just dropped on a vehicle you were watching:</p>
-        <h2 style="font-size:20px;margin:10px 0 4px">${title}</h2>
+        <h2 style="font-size:20px;margin:10px 0 4px">${htmlEscape(title)}</h2>
         <p style="font-size:15px;margin:0 0 2px">
           <span style="color:#94A3B8;text-decoration:line-through">${money(base)}</span>
           &nbsp;<span style="color:#16A34A;font-weight:700;font-size:18px">${money(now)}</span>

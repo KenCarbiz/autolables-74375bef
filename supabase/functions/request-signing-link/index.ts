@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { json, preflight } from "../_shared/http.ts";
 import { SUPABASE_URL, SERVICE_KEY, adminClient } from "../_shared/supabase.ts";
+import { resolveAllowedOrigin } from "../_shared/security.ts";
 
 // ──────────────────────────────────────────────────────────────
 // request-signing-link
@@ -61,7 +62,7 @@ serve(async (req) => {
     return json(200, { ok: true });
   }
 
-  const origin = req.headers.get("origin") || "https://autolabels.io";
+  const origin = resolveAllowedOrigin([req.headers.get("origin")], "https://autolabels.io");
 
   try {
     const admin = adminClient();
@@ -76,10 +77,11 @@ serve(async (req) => {
     if (dispatch?.email && dispatch?.signing_url) {
       const dealerName = dispatch.dealer_name || "your dealership";
       const ymm = dispatch.ymm || "your vehicle";
+      const safeUrl = escapeHtml(dispatch.signing_url);
       const html = `
         <p>Here's your signing link for the <strong>${escapeHtml(ymm)}</strong> at ${escapeHtml(dealerName)}:</p>
-        <p><a href="${dispatch.signing_url}" style="display:inline-block;padding:12px 18px;background:#0f172a;color:#fff;text-decoration:none;border-radius:8px;font-weight:600">Open your signing page</a></p>
-        <p style="font-size:12px;color:#555">Or paste this URL into your browser: ${dispatch.signing_url}</p>
+        <p><a href="${safeUrl}" style="display:inline-block;padding:12px 18px;background:#0f172a;color:#fff;text-decoration:none;border-radius:8px;font-weight:600">Open your signing page</a></p>
+        <p style="font-size:12px;color:#555">Or paste this URL into your browser: ${safeUrl}</p>
         <p style="font-size:11px;color:#888">This link is yours. Please do not share it.</p>
       `;
 

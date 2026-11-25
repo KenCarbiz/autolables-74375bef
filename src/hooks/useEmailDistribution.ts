@@ -181,18 +181,19 @@ export const useEmailDistribution = (storeId: string = "") => {
     setSending(true);
     setError(null);
 
-    const html = renderSignedAddendumEmail(data);
-
     try {
       const { data: result, error: fnError } = await supabase.functions.invoke("send-email", {
         body: {
+          template: "signed_addendum_packet",
           to: data.to,
-          subject: `Signed Addendum: ${data.vehicleYmm} — ${data.customerName}`,
-          html,
-          attachments: data.pdfBase64 ? [{
-            filename: `Addendum-${data.vehicleVin}.pdf`,
-            content: data.pdfBase64,
-          }] : undefined,
+          data: {
+            dealer_name: data.dealerName,
+            vehicle_ymm: data.vehicleYmm,
+            vehicle_vin: data.vehicleVin,
+            customer_name: data.customerName,
+            signing_date: data.signingDate,
+            pdf_base64: data.pdfBase64,
+          },
         },
       });
 
@@ -242,13 +243,19 @@ export const useEmailDistribution = (storeId: string = "") => {
     }
     setSending(true);
     setError(null);
-    const html = renderGetReadyEmail(data);
     try {
       const { data: result, error: fnError } = await supabase.functions.invoke("send-email", {
         body: {
+          template: "get_ready_complete",
           to,
-          subject: `Get-Ready Complete: ${data.vehicleYmm} — ${data.vehicleVin.slice(-8)}`,
-          html,
+          data: {
+            dealer_name: data.dealerName,
+            vehicle_ymm: data.vehicleYmm,
+            vehicle_vin: data.vehicleVin,
+            stock_number: data.stockNumber,
+            accessories: data.accessories,
+            deep_link_url: data.deepLinkUrl,
+          },
         },
       });
       if (fnError) throw new Error(fnError.message);

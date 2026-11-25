@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import Stripe from "https://esm.sh/stripe@14?target=deno";
+import { isAllowedRedirectUrl, resolveAllowedOrigin } from "../_shared/security.ts";
 
 // ──────────────────────────────────────────────────────────────
 // billing-portal-session
@@ -69,17 +70,39 @@ serve(async (req) => {
     // 2. Service role for the tenant lookup + customer create/update.
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
+    const { data: platformAdmin } = await admin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("role", "admin")
+      .maybeSingle();
+
     const { data: membership } = await admin
       .from("tenant_members")
       .select("tenant_id, role")
       .eq("user_id", user.id)
+      .in("role", ["owner", "admin"])
       .not("accepted_at", "is", null)
       .order("role", { ascending: true })
       .limit(1)
       .maybeSingle();
 
+    if (!membership && !platformAdmin) {
+      return json({ error: "must be tenant owner or admin" }, 403);
+    }
 
-    if (!membership) {
+    let tenantId = membership?.tenant_id ?? null;
+    if (!tenantId && platformAdmin) {
+      const { data: anyMem } = await admin
+        .from("tenant_members")
+        .select("tenant_id")
+        .eq("user_id", user.id)
+        .not("accepted_at", "is", null)
+        .limit(1)
+        .maybeSingle();
+      tenantId = anyMem?.tenant_id ?? null;
+    }
+    if (!tenantId) {
       return json({ error: "no tenant" }, 404);
     }
 
@@ -88,7 +111,7 @@ serve(async (req) => {
       .select(
         "id, name, stripe_customer_id, billing_email, primary_email"
       )
-      .eq("id", membership.tenant_id)
+      .eq("id", tenantId)
       .maybeSingle();
 
     if (!tenant) return json({ error: "tenant not found" }, 404);
@@ -121,8 +144,10 @@ serve(async (req) => {
     const body = (await req.json().catch(() => ({}))) as {
       return_url?: string;
     };
-    const origin = req.headers.get("origin") || "https://autolabels.io";
-    const returnUrl = body.return_url || `${origin}/admin?tab=branding`;
+    const origin = resolveAllowedOrigin([req.headers.get("origin")], "https://autolabels.io");
+    const returnUrl = body.return_url
+      ? (isAllowedRedirectUrl(body.return_url) ? body.return_url : `${origin}/admin?tab=branding`)
+      : `${origin}/admin?tab=branding`;
 
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,

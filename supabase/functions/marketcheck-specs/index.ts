@@ -105,17 +105,27 @@ Deno.serve(async (req) => {
   // ── Auth gate: service-role bypasses; otherwise require a signed-in
   // tenant member or platform admin for the requested tenant.
   const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-  if (auth !== SERVICE_KEY) {
+  const isServiceCaller = !!SERVICE_KEY && auth === SERVICE_KEY;
+  let isPlatformAdmin = false;
+  if (!isServiceCaller) {
     const { data: ures, error: uerr } = await admin.auth.getUser(auth);
     const userId = ures?.user?.id;
     if (uerr || !userId) return json(401, { ok: false, error: "authentication required" });
     if (!tenantId) return json(400, { ok: false, error: "tenant_id required" });
     const { data: isAdmin } = await admin.from("user_roles")
       .select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
+    isPlatformAdmin = !!isAdmin;
     if (!isAdmin) {
       const { data: membership } = await admin.from("tenant_members")
-        .select("tenant_id").eq("user_id", userId).eq("tenant_id", tenantId).maybeSingle();
+        .select("tenant_id").eq("user_id", userId).eq("tenant_id", tenantId).not("accepted_at", "is", null).maybeSingle();
       if (!membership) return json(403, { ok: false, error: "not a member of this tenant" });
+    }
+    if (vehicleId) {
+      const { data: ownedVehicle } = await admin.from("vehicle_listings")
+        .select("id, tenant_id").eq("id", vehicleId).eq("tenant_id", tenantId).maybeSingle();
+      if (!ownedVehicle && !isPlatformAdmin) {
+        return json(403, { ok: false, error: "vehicle does not belong to this tenant" });
+      }
     }
   }
 
@@ -279,8 +289,10 @@ Deno.serve(async (req) => {
       // sticker workspace and the orchestrator both read the row addressed by
       // vehicle_id and saw nothing.
       let sel = admin.from("vehicle_listings").select("id, mc_attributes");
-      if (vehicleId) sel = sel.eq("id", vehicleId);
-      else {
+      if (vehicleId) {
+        sel = sel.eq("id", vehicleId);
+        if (tenantId) sel = sel.eq("tenant_id", tenantId);
+      } else {
         sel = sel.eq("vin", vin);
         if (tenantId) sel = sel.eq("tenant_id", tenantId);
       }
@@ -355,7 +367,9 @@ Deno.serve(async (req) => {
           ...(strictAttempted ? { specs_strict_attempted: true } : {}),
           specs_decoded_at: new Date().toISOString(),
         };
-        await admin.from("vehicle_listings").update({ mc_attributes: merged }).eq("id", row.id);
+        let upd = admin.from("vehicle_listings").update({ mc_attributes: merged }).eq("id", row.id);
+        if (tenantId) upd = upd.eq("tenant_id", tenantId);
+        await upd;
       }
     } catch { /* mc_attributes may not be migrated yet */ }
   }

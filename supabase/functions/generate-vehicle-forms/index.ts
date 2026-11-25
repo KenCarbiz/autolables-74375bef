@@ -1,6 +1,7 @@
 import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 import { json, preflight } from "../_shared/http.ts";
 import { adminClient, isServiceOrCron } from "../_shared/supabase.ts";
+import { resolveAllowedOrigin } from "../_shared/security.ts";
 import { invokeFunction } from "../_shared/invoke.ts";
 import { findVehiclesNeedingForms } from "../_shared/complianceFormsSweep.ts";
 import { parseYmm } from "../_shared/factorySticker/lib/ymm.ts";
@@ -60,14 +61,10 @@ const USED_CONDITIONS = ["used", "cpo", "certified", "certified pre-owned", "pre
 // old hard-coded "autolabels.io" default fetched from the marketing site, which
 // doesn't serve /forms, so every fill 500'd.)
 function resolveAppBase(req: Request, appBase?: string): string {
-  const isHttp = (u?: string | null): u is string => !!u && /^https?:\/\//i.test(u);
-  const clean = (u: string) => u.replace(/\/+$/, "");
-  if (isHttp(appBase)) return clean(appBase);
-  const origin = req.headers.get("origin");
-  if (isHttp(origin)) return clean(origin);
-  const env = Deno.env.get("APP_BASE_URL");
-  if (isHttp(env)) return clean(env);
-  return TEMPLATE_HOST_FALLBACKS[0];
+  return resolveAllowedOrigin(
+    [appBase, req.headers.get("origin"), Deno.env.get("APP_BASE_URL")],
+    TEMPLATE_HOST_FALLBACKS[0],
+  );
 }
 
 // Hosts known to serve the bundled /forms/*.pdf masters. The first is the

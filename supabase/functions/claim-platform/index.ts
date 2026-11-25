@@ -41,16 +41,8 @@ serve(async (req) => {
     const user = userRes.user;
     const email = user.email || "";
 
-    // Count existing admins.
-    const { count: adminCount, error: countErr } = await admin
-      .from("user_roles")
-      .select("*", { head: true, count: "exact" })
-      .eq("role", "admin");
-    if (countErr) {
-      return json(500, { error: "user_roles table missing or unreadable — confirm migrations were applied", detail: countErr.message });
-    }
-
-    // Is the caller already the admin?
+    // Self-claim is permanently disabled. Only an existing platform admin
+    // recorded in public.user_roles may refresh house-tenant membership.
     const { data: existingRole } = await admin
       .from("user_roles")
       .select("id")
@@ -58,21 +50,11 @@ serve(async (req) => {
       .eq("role", "admin")
       .maybeSingle();
 
-    if ((adminCount ?? 0) > 0 && !existingRole) {
-      return json(403, {
-        error: "already_claimed",
-        message: "An admin already exists on this platform. Ask them to add your email as a tenant member.",
-      });
-    }
-
-    // Grant admin if not already granted.
     if (!existingRole) {
-      const { error: roleErr } = await admin
-        .from("user_roles")
-        .insert({ user_id: user.id, role: "admin" });
-      if (roleErr && !roleErr.message.toLowerCase().includes("duplicate")) {
-        return json(500, { error: "role grant failed", detail: roleErr.message });
-      }
+      return json(403, {
+        error: "forbidden",
+        message: "Platform administrator access must be granted by an existing administrator.",
+      });
     }
 
     // Find or create the house tenant.
@@ -145,24 +127,21 @@ serve(async (req) => {
     }
 
     await admin.from("audit_log").insert({
-      action: "platform_claimed",
+      action: "platform_house_tenant_refreshed",
       entity_type: "platform",
       entity_id: tenantId,
       user_id: user.id,
       user_email: email,
       details: {
-        already_admin: !!existingRole,
-        admin_count_before: adminCount ?? 0,
+        already_admin: true,
       },
     });
 
     return json(200, {
       ok: true,
-      already_admin: !!existingRole,
+      already_admin: true,
       tenant_id: tenantId,
-      message: existingRole
-        ? "You were already the admin. Membership + entitlement refreshed."
-        : "Platform claimed. You are now the admin of the AutoLabels.io house tenant.",
+      message: "You are already an admin. House-tenant membership and entitlement refreshed.",
     });
   } catch (err) {
     return json(500, { error: err instanceof Error ? err.message : "unknown error" });

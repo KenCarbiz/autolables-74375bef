@@ -120,14 +120,34 @@ const str = (v: unknown, max = 500): string | null => {
   return s.length > max ? s.slice(0, max) : s;
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const VIN_RE = /^[A-HJ-NPR-Z0-9]{17}$/;
+
+interface ResolvedListing {
+  id: string;
+  tenant_id: string;
+  store_id: string | null;
+  vin: string | null;
+  stock_number: string | null;
+}
+
 // deno-lint-ignore no-explicit-any
 type Row = Record<string, any>;
 
 // deno-lint-ignore no-explicit-any
-const buildRow = (e: any, ip: string | null, ua: string, geo: { country: string | null; region: string | null; city: string | null }): Row | null => {
+const buildRow = (
+  e: any,
+  listing: ResolvedListing,
+  ip: string | null,
+  ua: string,
+  geo: { country: string | null; region: string | null; city: string | null },
+): Row | null => {
   if (!e || typeof e !== "object") return null;
   const eventType = typeof e.event_type === "string" ? e.event_type : "";
   if (!EVENT_TYPES.has(eventType)) return null;
+  // Reject spoofed tenant_id that disagrees with the authoritative listing row.
+  const claimedTenant = str(e.tenant_id, 100);
+  if (claimedTenant && claimedTenant !== listing.tenant_id) return null;
 
   const device = parseUa(ua);
 
@@ -157,11 +177,11 @@ const buildRow = (e: any, ip: string | null, ua: string, geo: { country: string 
   const surface = SURFACES.has(e.surface) ? e.surface : "unknown";
 
   const row: Row = {
-    tenant_id: str(e.tenant_id, 100),
-    store_id: str(e.store_id, 100),
-    vehicle_id: str(e.vehicle_id, 100),
-    vin: str(e.vin, 40),
-    stock: str(e.stock, 80),
+    tenant_id: listing.tenant_id,
+    store_id: listing.store_id,
+    vehicle_id: listing.id,
+    vin: listing.vin,
+    stock: listing.stock_number,
     session_id: str(e.session_id, 200) || `srv_${crypto.randomUUID()}`,
     visitor_id: str(e.visitor_id, 200),
     source,
@@ -185,10 +205,12 @@ const buildRow = (e: any, ip: string | null, ua: string, geo: { country: string 
     metadata,
   };
 
-  // Honor a client occurred_at only when it parses; otherwise the column
-  // defaults to now() server-side.
+  // Clamp client occurred_at to a narrow window around server now().
   const occurred = typeof e.occurred_at === "string" ? Date.parse(e.occurred_at) : NaN;
-  if (!Number.isNaN(occurred)) row.occurred_at = new Date(occurred).toISOString();
+  const nowMs = Date.now();
+  if (!Number.isNaN(occurred) && occurred >= nowMs - 24 * 60 * 60_000 && occurred <= nowMs + 5 * 60_000) {
+    row.occurred_at = new Date(occurred).toISOString();
+  }
 
   return row;
 };
@@ -238,10 +260,47 @@ serve(async (req) => {
       }
     }
 
-    const rows = incoming
-      .slice(0, 20)
-      .map((e) => buildRow(e, ip, ua, geo))
-      .filter((r): r is Row => r != null);
+    const batch = incoming.slice(0, 20);
+    const vehicleIds = [...new Set(
+      batch.map((e) => (typeof e?.vehicle_id === "string" ? e.vehicle_id.trim() : "")).filter((id) => UUID_RE.test(id)),
+    )];
+    const vins = [...new Set(
+      batch.map((e) => (typeof e?.vin === "string" ? e.vin.trim().toUpperCase() : "")).filter((v) => VIN_RE.test(v)),
+    )];
+
+    const byId = new Map<string, ResolvedListing>();
+    const byVin = new Map<string, ResolvedListing>();
+    if (vehicleIds.length > 0) {
+      const { data: idRows } = await admin
+        .from("vehicle_listings")
+        .select("id, tenant_id, store_id, vin, stock_number")
+        .in("id", vehicleIds)
+        .eq("status", "published");
+      for (const r of (idRows || []) as ResolvedListing[]) {
+        if (r.id && r.tenant_id) byId.set(r.id, r);
+      }
+    }
+    if (vins.length > 0) {
+      const { data: vinRows } = await admin
+        .from("vehicle_listings")
+        .select("id, tenant_id, store_id, vin, stock_number")
+        .in("vin", vins)
+        .eq("status", "published");
+      for (const r of (vinRows || []) as ResolvedListing[]) {
+        const key = String(r.vin || "").toUpperCase();
+        if (key && r.tenant_id && !byVin.has(key)) byVin.set(key, r);
+      }
+    }
+
+    const rows: Row[] = [];
+    for (const e of batch) {
+      const vid = typeof e?.vehicle_id === "string" ? e.vehicle_id.trim() : "";
+      const vin = typeof e?.vin === "string" ? e.vin.trim().toUpperCase() : "";
+      const resolved = (vid ? byId.get(vid) : undefined) ?? (vin ? byVin.get(vin) : undefined);
+      if (!resolved) continue;
+      const built = buildRow(e, resolved, ip, ua, geo);
+      if (built) rows.push(built);
+    }
     if (!rows.length) return json(200, { ok: true, inserted: 0 });
 
     const { error } = await admin.from("customer_engagement_events").insert(rows);

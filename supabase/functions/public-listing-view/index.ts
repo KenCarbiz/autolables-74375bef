@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { htmlEscape } from "../_shared/http.ts";
+import { resolveAllowedOrigin } from "../_shared/security.ts";
 import { normalizeReceiptVin, projectVinDecodeReceipts, VIN_DECODE_RECEIPT_LIMIT, VIN_DECODE_RECEIPT_SELECT } from "../_shared/vinDecodeReceipt.ts";
 import { resolveCustomerPassportRouting, type PassportAgent } from "../_shared/passport-routing.ts";
 import { matchIihsAward, type IihsAward } from "../_shared/iihs-awards.ts";
@@ -676,15 +678,15 @@ serve(async (req) => {
             const priceNum = typeof row.price === "number" ? row.price : Number(row.price);
             const priceStr = Number.isFinite(priceNum) && priceNum > 0
               ? `$${Math.round(priceNum).toLocaleString("en-US")}` : "";
-            const origin = (req.headers.get("origin") || "").replace(/\/$/, "");
-            const packetUrl = `${origin || "https://autolabels.io"}/v/${encodeURIComponent(row.slug || vinU)}`;
+            const origin = resolveAllowedOrigin([req.headers.get("origin")], "https://autolabels.io");
+            const packetUrl = `${origin}/v/${encodeURIComponent(row.slug || vinU)}`;
             const stockStr = (row.mc_attributes && (row.mc_attributes as Record<string, unknown>).stock_no) || row.stock_number || "";
             const html = `
               <div style="font-family:Inter,Arial,sans-serif;max-width:520px;margin:0 auto;color:#0F172A">
                 <p style="font-size:15px;margin:0 0 4px">A shopper just opened the digital packet for:</p>
-                <h2 style="font-size:20px;margin:8px 0 2px">${title}</h2>
+                <h2 style="font-size:20px;margin:8px 0 2px">${htmlEscape(title)}</h2>
                 ${priceStr ? `<p style="font-size:15px;color:#2563EB;font-weight:700;margin:0 0 2px">${priceStr}</p>` : ""}
-                <p style="font-size:13px;color:#475569;margin:0 0 16px">VIN ${vinU}${stockStr ? ` &middot; Stock ${stockStr}` : ""}</p>
+                <p style="font-size:13px;color:#475569;margin:0 0 16px">VIN ${htmlEscape(vinU)}${stockStr ? ` &middot; Stock ${htmlEscape(stockStr)}` : ""}</p>
                 <a href="${packetUrl}" style="display:inline-block;background:#2563EB;color:#fff;text-decoration:none;padding:11px 18px;border-radius:12px;font-weight:600;font-size:14px">View the packet</a>
                 <p style="font-size:12px;color:#94A3B8;margin:18px 0 0">You're receiving this because packet-view alerts are on for this dealership. Turn them off in AutoLabels &rarr; Admin.</p>
               </div>`;

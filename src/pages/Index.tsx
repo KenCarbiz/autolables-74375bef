@@ -1208,19 +1208,13 @@ const Index = () => {
 
   // Email the guided-review link via the existing send-email edge function.
   const sendSigningEmail = async (toEmail: string) => {
-    const link = signingUrl;
-    const html = `
-      <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto">
-        <h2 style="font-weight:800">Review &amp; sign your addendum</h2>
-        <p>${settings.dealer_name || currentStore?.name || "Your dealership"} has prepared your
-        ${vehicle.ymm || "vehicle"} addendum for review.</p>
-        <p style="margin:24px 0">
-          <a href="${link}" style="background:#0f172a;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700">Review &amp; sign</a>
-        </p>
-        <p style="font-size:12px;color:#64748b">Or open this link: ${link}</p>
-      </div>`;
+    if (!readyDealId) { toast.error("Lock the addendum before emailing a signing link"); return; }
     const { error } = await supabase.functions.invoke("send-email", {
-      body: { to: [toEmail], subject: `Review & sign your addendum — ${vehicle.ymm || "your vehicle"}`, html },
+      body: {
+        template: "addendum_signing_link",
+        to: [toEmail],
+        data: { addendum_id: readyDealId },
+      },
     });
     if (error) { toast.error("Email failed to send"); return; }
     toast.success(`Signing link emailed to ${toEmail}`);

@@ -4,6 +4,7 @@ import { shortVehicle } from "@/lib/shortVehicle";
 import { SectionLinksMenu } from "@/components/layout/SectionTabs";
 import { MoreHorizontal, Mail, Phone, Search, UserRound } from "lucide-react";
 import { toast } from "sonner";
+import { escapeCsvCell } from "@/lib/csvSafe";
 import { supabase } from "@/integrations/supabase/client";
 import Seo from "@/components/Seo";
 import {
@@ -125,7 +126,7 @@ const Customers = () => {
           c.lastActivityAt || "",
           c.nextAction.headline,
         ]
-          .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+          .map((v) => escapeCsvCell(v))
           .join(","),
       ),
     ].join("\n");

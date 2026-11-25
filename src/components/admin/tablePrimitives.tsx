@@ -4,6 +4,7 @@ import {
   ChevronLeft, ChevronRight, Download,
   Rows3, Rows4, Rows2,
 } from "lucide-react";
+import { escapeCsvCell } from "@/lib/csvSafe";
 
 // ──────────────────────────────────────────────────────────────
 // tablePrimitives — shared sort + pagination + CSV helpers used
@@ -215,15 +216,7 @@ export interface CsvColumn<T> {
 }
 
 export function toCsv<T>(rows: T[], columns: CsvColumn<T>[]): string {
-  const esc = (v: unknown): string => {
-    if (v == null) return "";
-    const s = v instanceof Date
-      ? v.toISOString()
-      : typeof v === "object"
-        ? JSON.stringify(v)
-        : String(v);
-    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
+  const esc = (v: unknown): string => escapeCsvCell(v, false);
   const head = columns.map(c => esc(c.header)).join(",");
   const body = rows.map(r => columns.map(c => esc(c.get(r))).join(",")).join("\r\n");
   return `${head}\r\n${body}`;

@@ -298,33 +298,17 @@ export const useEntitlements = () => {
   // Provision or re-activate the autolabels entitlement for the current tenant.
   // Used by the "Activate AutoLabels" paywall for users who came from autocurb.
   const activateApp = useCallback(
-    async (slug: AppSlug, planTier: string = "essential"): Promise<boolean> => {
+    async (slug: AppSlug, _planTier: string = "essential"): Promise<boolean> => {
       if (!state.tenant) return false;
-      const existing = state.entitlements.find((e) => e.app_slug === slug);
-      if (existing) {
-        const { error } = await (supabase as any)
-          .from("app_entitlements")
-          .update({
-            status: "trial",
-            plan_tier: planTier,
-            trial_ends_at: new Date(Date.now() + 14 * 86400_000).toISOString(),
-          })
-          .eq("id", existing.id);
-        if (error) return false;
-      } else {
-        const { error } = await (supabase as any).from("app_entitlements").insert({
-          tenant_id: state.tenant.id,
-          app_slug: slug,
-          plan_tier: planTier,
-          status: "trial",
-          trial_ends_at: new Date(Date.now() + 14 * 86400_000).toISOString(),
-        });
-        if (error) return false;
-      }
+      const { error } = await (supabase as any).rpc("activate_bundled_entitlement", {
+        _tenant_id: state.tenant.id,
+        _app_slug: slug,
+      });
+      if (error) return false;
       await load();
       return true;
     },
-    [state.tenant, state.entitlements, load]
+    [state.tenant, load]
   );
 
   // For a direct-signup user with no tenant yet.

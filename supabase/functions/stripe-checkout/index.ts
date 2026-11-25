@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { isAllowedRedirectUrl } from "../_shared/security.ts";
 
 // ──────────────────────────────────────────────────────────────
 // stripe-checkout
@@ -58,6 +59,9 @@ serve(async (req) => {
     const { app_slug, plan_tier, success_url, cancel_url } = await req.json().catch(() => ({}));
     if (!app_slug || !plan_tier || !success_url || !cancel_url) {
       return json(400, { error: "app_slug, plan_tier, success_url, cancel_url required" });
+    }
+    if (!isAllowedRedirectUrl(success_url) || !isAllowedRedirectUrl(cancel_url)) {
+      return json(400, { error: "invalid_redirect_url" });
     }
 
     const priceId = Deno.env.get(priceEnvKey(app_slug, plan_tier));

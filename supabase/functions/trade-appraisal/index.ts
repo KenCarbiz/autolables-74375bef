@@ -91,14 +91,20 @@ interface ValuationRange {
  * until someone has physically seen the car, and printing one exact figure
  * would promise a number the dealer has not agreed to.
  */
-async function valueTrade(vin: string, mileage: number, condition: Condition, zip: string | null): Promise<ValuationRange> {
+async function valueTrade(
+  vin: string,
+  mileage: number,
+  condition: Condition,
+  zip: string | null,
+  tenantId: string,
+): Promise<ValuationRange> {
   const empty: ValuationRange = { available: false, low: null, high: null, condition, provider: null, checkedAt: null };
   if (!SUPABASE_URL || !SERVICE_KEY) return { ...empty, reason: "not_configured" };
   try {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/blackbook-values`, {
       method: "POST",
       headers: { Authorization: `Bearer ${SERVICE_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ vin, mileage, zip: zip || undefined, caller: "trade-appraisal" }),
+      body: JSON.stringify({ vin, mileage, zip: zip || undefined, tenant_id: tenantId, caller: "trade-appraisal" }),
       signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) return { ...empty, reason: `provider_${res.status}` };
@@ -156,7 +162,35 @@ Deno.serve(async (req) => {
       : "average";
     if (!VIN_RE.test(vin)) return json(400, { error: "valid_vin_required" });
     if (mileage == null || mileage > 1_000_000) return json(400, { error: "valid_mileage_required" });
-    const valuation = await valueTrade(vin, mileage, condition, clean(body.zip, 10) || null);
+
+    // Paid Black Book lookups require an authenticated dealership member so
+    // anonymous traffic cannot incur external provider spend. Unauthenticated
+    // shoppers gracefully fall back to submitting a dealer appraisal request.
+    const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "").trim();
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+    if (!jwt || jwt === anonKey) {
+      return json(200, {
+        ok: true,
+        valuation: { available: false, low: null, high: null, condition, provider: null, checkedAt: null, reason: "dealer_appraisal_required" },
+      });
+    }
+    const admin = adminClient();
+    const { data: uRes } = await admin.auth.getUser(jwt);
+    const uid = uRes?.user?.id;
+    if (!uid) {
+      return json(401, { error: "authentication_required" });
+    }
+    const { data: mem } = await admin
+      .from("tenant_members")
+      .select("tenant_id")
+      .eq("user_id", uid)
+      .not("accepted_at", "is", null)
+      .limit(1)
+      .maybeSingle();
+    if (!mem?.tenant_id) {
+      return json(403, { error: "tenant_membership_required" });
+    }
+    const valuation = await valueTrade(vin, mileage, condition, clean(body.zip, 10) || null, mem.tenant_id);
     return json(200, { ok: true, valuation });
   }
 

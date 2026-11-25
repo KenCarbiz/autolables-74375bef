@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.45/deno-dom-wasm.ts";
+import { assertSafePublicUrl, normalizeDomainHost } from "../_shared/security.ts";
 
 // deno-dom returns an Element-like object; Deno's TS lib doesn't ship a global Document type.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -45,28 +46,7 @@ const json = (status: number, body: unknown) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
-// SSRF guard — block private/loopback/link-local/cloud-metadata hosts.
-const BLOCKED_HOST_PATTERNS: RegExp[] = [
-  /^localhost$/i,
-  /^127\./, /^0\./, /^10\./,
-  /^169\.254\./,
-  /^192\.168\./,
-  /^172\.(1[6-9]|2\d|3[0-1])\./,
-  /^::1$/, /^fe80:/i, /^fc[0-9a-f]{2}:/i, /^fd[0-9a-f]{2}:/i,
-  /metadata\.google\.internal$/i,
-  /metadata\.azure\.com$/i,
-];
-const isUrlSafe = (raw: string): { ok: true; url: URL } | { ok: false; reason: string } => {
-  let u: URL;
-  try { u = new URL(raw); } catch { return { ok: false, reason: "invalid URL" }; }
-  if (u.protocol !== "http:" && u.protocol !== "https:") return { ok: false, reason: "unsupported protocol" };
-  const host = u.hostname;
-  if (!host) return { ok: false, reason: "missing host" };
-  for (const pat of BLOCKED_HOST_PATTERNS) {
-    if (pat.test(host)) return { ok: false, reason: `blocked host (${host})` };
-  }
-  return { ok: true, url: u };
-};
+const MAX_HTML_BYTES = 2 * 1024 * 1024;
 
 interface ScrapeResult {
   photos: Array<{ url: string; alt?: string; kind?: string }>;
@@ -200,10 +180,15 @@ const extractHeuristic = (doc: Doc, baseUrl: URL): ScrapeResult => {
   };
 };
 
-const safeFetch = async (url: string, init: RequestInit, maxRedirects = 5): Promise<Response> => {
+const safeFetch = async (
+  url: string,
+  init: RequestInit,
+  allowedDomains: Set<string>,
+  maxRedirects = 5,
+): Promise<Response> => {
   let current = url;
   for (let i = 0; i <= maxRedirects; i++) {
-    const safety = isUrlSafe(current);
+    const safety = await assertSafePublicUrl(current, allowedDomains);
     if (!safety.ok) throw new Error(`redirect blocked: ${safety.reason}`);
     const res = await fetch(current, { ...init, redirect: "manual" });
     if (res.status >= 300 && res.status < 400) {
@@ -217,16 +202,16 @@ const safeFetch = async (url: string, init: RequestInit, maxRedirects = 5): Prom
   throw new Error("too many redirects");
 };
 
-const scrape = async (url: string): Promise<ScrapeResult> => {
+const scrape = async (url: string, allowedDomains: Set<string>): Promise<ScrapeResult> => {
   const res = await safeFetch(url, {
     headers: {
       "User-Agent": "Mozilla/5.0 (compatible; AutoLabelsVDPBot/1.0; +https://autolabels.io/bot)",
       Accept: "text/html,application/xhtml+xml",
     },
     signal: AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined,
-  });
+  }, allowedDomains);
   if (!res.ok) throw new Error(`fetch ${res.status}`);
-  const html = await res.text();
+  const html = (await res.text()).slice(0, MAX_HTML_BYTES);
   const doc = new DOMParser().parseFromString(html, "text/html");
 
   // 1. JSON-LD preferred
@@ -245,8 +230,9 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!supabaseUrl || !serviceKey) return json(500, { error: "supabase not configured" });
+    if (!supabaseUrl || !serviceKey || !anonKey) return json(500, { error: "supabase not configured" });
 
     const authHeader = req.headers.get("Authorization") || "";
     const jwt = authHeader.replace(/^Bearer\s+/i, "");
@@ -260,32 +246,64 @@ serve(async (req) => {
       return json(400, { error: "vehicle_id and source_url required" });
     }
 
-    const safety = isUrlSafe(body.source_url);
-    if (!safety.ok) {
-      return json(400, { error: `source_url rejected: ${safety.reason}` });
-    }
-
     const admin = createClient(supabaseUrl, serviceKey);
     const { data: userRes } = await admin.auth.getUser(jwt);
     if (!userRes?.user) return json(401, { error: "invalid token" });
+    const userId = userRes.user.id;
 
-    // Confirm the vehicle belongs to a tenant the caller is a member of,
-    // or the caller is an admin. We do NOT need to pull the full row —
-    // the merge RPC re-checks authorization via RLS.
+    // Enforce tenant authorization BEFORE reading VIN or fetching any external URL.
     const { data: vrow } = await admin
       .from("vehicle_listings")
-      .select("id,vin,tenant_id")
+      .select("id,vin,tenant_id,scrape_source_url")
       .eq("id", body.vehicle_id)
       .maybeSingle();
     if (!vrow) return json(404, { error: "vehicle not found" });
 
-    const scraped = await scrape(body.source_url);
+    const [{ data: isAdmin }, { data: membership }] = await Promise.all([
+      admin.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle(),
+      admin.from("tenant_members").select("tenant_id").eq("tenant_id", vrow.tenant_id).eq("user_id", userId).not("accepted_at", "is", null).maybeSingle(),
+    ]);
+    if (!isAdmin && !membership) {
+      return json(403, { error: "forbidden" });
+    }
+
+    // Derive allowed dealership domains strictly from server-stored tenant records.
+    const [tenantRes, obRes, profRes, storesRes, mcRes] = await Promise.all([
+      admin.from("tenants").select("domain").eq("id", vrow.tenant_id).maybeSingle(),
+      admin.from("onboarding_profiles").select("website").eq("tenant_id", vrow.tenant_id).maybeSingle(),
+      admin.from("dealer_profiles").select("settings").eq("tenant_id", vrow.tenant_id).maybeSingle(),
+      admin.from("dealer_stores").select("website").eq("tenant_id", vrow.tenant_id),
+      admin.from("marketcheck_sync_config").select("website").eq("tenant_id", vrow.tenant_id),
+    ]);
+    const allowedDomains = new Set<string>();
+    const addDomain = (val: unknown) => {
+      const host = normalizeDomainHost(val);
+      if (host) allowedDomains.add(host);
+    };
+    addDomain(tenantRes.data?.domain);
+    addDomain(obRes.data?.website);
+    addDomain((profRes.data?.settings as Record<string, unknown> | null)?.website);
+    addDomain((profRes.data?.settings as Record<string, unknown> | null)?.dealer_website);
+    for (const st of storesRes.data || []) addDomain((st as { website?: string }).website);
+    for (const mc of mcRes.data || []) addDomain((mc as { website?: string }).website);
+    addDomain(vrow.scrape_source_url);
+
+    if (allowedDomains.size === 0) {
+      return json(400, { error: "Configure your dealership website domain in Settings before importing a VDP URL." });
+    }
+
+    const safety = await assertSafePublicUrl(body.source_url, allowedDomains);
+    if (!safety.ok) {
+      return json(400, { error: `source_url rejected: ${safety.reason}` });
+    }
+
+    const scraped = await scrape(body.source_url, allowedDomains);
 
     // VIN mismatch guard
     if (scraped.vin && vrow.vin && scraped.vin.toUpperCase() !== vrow.vin.toUpperCase()) {
       return json(409, {
         error: "vin_mismatch",
-        message: `Scraped page VIN ${scraped.vin} does not match vehicle ${vrow.vin}.`,
+        message: "Scraped page VIN does not match this vehicle.",
       });
     }
 
@@ -308,7 +326,7 @@ serve(async (req) => {
 
     // Use a user-scoped client so the has_role / current_tenant_id
     // checks inside merge_scraped_vdp evaluate against the caller.
-    const userClient = createClient(supabaseUrl, serviceKey, {
+    const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: `Bearer ${jwt}` } },
     });
     const { error } = await userClient.rpc("merge_scraped_vdp", payload);

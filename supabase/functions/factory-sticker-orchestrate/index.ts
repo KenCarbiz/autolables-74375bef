@@ -26,6 +26,8 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { authenticateCronRequest } from "../_shared/cron-auth.ts";
+import { constantTimeEquals } from "../_shared/functionAuth.ts";
 import { normalizeForSticker } from "./normalize.ts";
 import {
   renderFactorySticker, FACTORY_STICKER_RENDERER_VERSION,
@@ -58,7 +60,6 @@ const json = (b: unknown, status = 200) =>
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const CRON_SECRET = Deno.env.get("MARKETCHECK_CRON_SECRET") || "";
 
 const BUCKET = "vehicle-docs";
 const TEMPLATE_VERSION = "1.0.0";
@@ -954,9 +955,10 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   try {
     const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-    const cronHeader = req.headers.get("x-cron-secret") || "";
-    const isService = !!SERVICE_KEY && jwt === SERVICE_KEY;
-    const isCron = !!CRON_SECRET && cronHeader === CRON_SECRET;
+    const isService = !!SERVICE_KEY && await constantTimeEquals(jwt, SERVICE_KEY);
+    // Require managed LOVABLE_CRON_SECRET bearer auth for scheduled sweeps;
+    // legacy x-cron-secret headers exposed in historical migrations are rejected.
+    const isCron = authenticateCronRequest(req) === null;
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
       auth: { persistSession: false, autoRefreshToken: false },

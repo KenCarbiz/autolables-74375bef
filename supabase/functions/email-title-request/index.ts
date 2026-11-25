@@ -13,6 +13,10 @@ import { SUPABASE_URL, SERVICE_KEY, adminClient, isServiceOrCron } from "../_sha
 // ──────────────────────────────────────────────────────────────────────
 
 const APP_BASE = Deno.env.get("APP_BASE_URL") || "https://autolabels.io";
+const TITLE_MANAGER_ROLES = new Set([
+  "owner", "admin", "general_manager", "gsm", "manager",
+  "sales_manager", "used_car_manager", "inventory_manager", "office_manager", "title_clerk",
+]);
 
 const hex16 = () => {
   const b = new Uint8Array(16); crypto.getRandomValues(b);
@@ -38,24 +42,34 @@ Deno.serve(async (req) => {
 
   // Auth gate: service/cron callers (marketcheck-sync, title-reminders-sweep)
   // pass the service key or cron secret. Browser callers must be a signed-in
-  // member of the target tenant — otherwise anyone could mint a 365-day
-  // title-upload token and harvest the clerk email for any tenant/VIN.
-  if (!isServiceOrCron(req)) {
+  // accepted manager/office member of the target tenant (or platform admin).
+  const isTrustedServer = isServiceOrCron(req);
+  if (!isTrustedServer) {
     const authHeader = req.headers.get("Authorization") || "";
     const jwt = authHeader.replace(/^Bearer\s+/i, "");
     if (!jwt) return json(401, { error: "unauthorized" });
-    const { data: claims, error: claimsErr } = await admin.auth.getClaims(jwt);
-    const uid = claims?.claims?.sub;
-    if (claimsErr || !uid) return json(401, { error: "unauthorized" });
-    const { data: member } = await admin.from("tenant_members")
-      .select("user_id").eq("tenant_id", tenantId).eq("user_id", uid).maybeSingle();
-    if (!member) return json(403, { error: "forbidden" });
+    const { data: uRes, error: uErr } = await admin.auth.getUser(jwt);
+    const uid = uRes?.user?.id;
+    if (uErr || !uid) return json(401, { error: "unauthorized" });
+    const [{ data: pa }, { data: member }] = await Promise.all([
+      admin.from("user_roles").select("role").eq("user_id", uid).eq("role", "admin").maybeSingle(),
+      admin.from("tenant_members")
+        .select("user_id, role")
+        .eq("tenant_id", tenantId)
+        .eq("user_id", uid)
+        .not("accepted_at", "is", null)
+        .maybeSingle(),
+    ]);
+    if (!pa && (!member || !TITLE_MANAGER_ROLES.has(String(member.role || "").trim().toLowerCase()))) {
+      return json(403, { error: "forbidden" });
+    }
   }
 
 
   // Vehicle context for the email.
   const { data: listing } = await admin.from("vehicle_listings").select("id, ymm, condition").eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
   const { data: vf } = await admin.from("vehicle_files").select("stock_number").eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
+  if (!listing && !vf) return json(404, { error: "vehicle not found for tenant" });
   const ymm = listing?.ymm || "Vehicle";
   const stock = vf?.stock_number || "";
   const isNew = String(listing?.condition || "").toLowerCase() === "new";
@@ -63,13 +77,35 @@ Deno.serve(async (req) => {
 
   // Recipients: explicit → tenant setting (may be several, comma/newline-
   // separated, e.g. a backup clerk when someone's out) → onboarding email.
-  const splitEmails = (s: string) => s.split(/[,;\n]/).map((x) => x.trim()).filter((x) => /.+@.+\..+/.test(x));
+  const splitEmails = (s: string) => s.split(/[,;\n]/).map((x) => x.trim().toLowerCase()).filter((x) => /.+@.+\..+/.test(x));
   const { data: prof } = await admin.from("dealer_profiles").select("settings").eq("tenant_id", tenantId).maybeSingle();
   const settings = (prof?.settings || {}) as Record<string, string>;
-  let recipients = body.to ? splitEmails(body.to) : splitEmails(settings.title_clerk_email || "");
   const { data: ob } = await admin.from("onboarding_profiles").select("display_name").eq("tenant_id", tenantId).maybeSingle();
   const dealerName = (ob?.display_name as string) || "";
   const { data: ten } = await admin.from("tenants").select("primary_email").eq("id", tenantId).maybeSingle();
+
+  let recipients = splitEmails(settings.title_clerk_email || "");
+  if (body.to) {
+    const requested = splitEmails(body.to);
+    if (!isTrustedServer) {
+      // User-JWT callers may only address emails already registered for this tenant.
+      const [{ data: recRows }, { data: memRows }] = await Promise.all([
+        admin.from("email_recipients").select("email").eq("tenant_id", tenantId),
+        admin.from("tenant_members").select("invited_email").eq("tenant_id", tenantId).not("accepted_at", "is", null),
+      ]);
+      const allow = new Set<string>([
+        ...splitEmails(settings.title_clerk_email || ""),
+        ...splitEmails((ten?.primary_email as string) || ""),
+        ...(recRows || []).map((r: { email?: string }) => String(r.email || "").trim().toLowerCase()).filter(Boolean),
+        ...(memRows || []).map((m: { invited_email?: string }) => String(m.invited_email || "").trim().toLowerCase()).filter(Boolean),
+      ]);
+      const blocked = requested.filter((e) => !allow.has(e));
+      if (blocked.length > 0) {
+        return json(403, { error: "recipient_not_allowed", message: "Title upload links may only be emailed to configured dealership contacts." });
+      }
+    }
+    recipients = requested;
+  }
   if (recipients.length === 0 && ten?.primary_email) recipients = splitEmails(ten.primary_email as string);
   if (recipients.length === 0) return json(400, { error: "no recipient — set a title clerk email in Settings" });
 

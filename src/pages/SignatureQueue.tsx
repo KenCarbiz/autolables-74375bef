@@ -123,14 +123,12 @@ const SignatureQueue = () => {
   };
 
   const sendEmail = async (a: AddendumRow, toEmail: string) => {
-    const url = reviewUrl(a.signing_token);
-    const html = `<div style="font-family:system-ui,sans-serif;font-size:14px;color:#0e1f3d">
-      <p>Your ${a.vehicle_ymm || "vehicle"} addendum is ready to review and sign.</p>
-      <p><a href="${url}" style="color:#2563eb">Review &amp; sign your addendum</a></p>
-      <p style="font-size:12px;color:#64748b">Or open this link: ${url}</p>
-    </div>`;
     const { error } = await supabase.functions.invoke("send-email", {
-      body: { to: [toEmail], subject: `Review & sign your ${a.vehicle_ymm || "vehicle"} addendum`, html },
+      body: {
+        template: "addendum_signing_link",
+        to: [toEmail],
+        data: { addendum_id: a.id },
+      },
     });
     if (error) { toast.error("Email could not be sent."); return; }
     toast.success("Email sent");

@@ -1,6 +1,7 @@
 import { qrcode } from "https://deno.land/x/qrcode@v2.0.0/mod.ts";
 import { json, preflight, htmlEscape } from "../_shared/http.ts";
 import { SUPABASE_URL, SERVICE_KEY, adminClient, isServiceOrCron } from "../_shared/supabase.ts";
+import { resolveAllowedOrigin } from "../_shared/security.ts";
 
 // ──────────────────────────────────────────────────────────────────────
 // notify-getready — emails the detail department the per-vehicle Get-Ready
@@ -17,14 +18,10 @@ import { SUPABASE_URL, SERVICE_KEY, adminClient, isServiceOrCron } from "../_sha
 // app_base, else the Origin header, else the secret, else the app host. (The old
 // autolabels.io default is the marketing site, whose /ready link 404s.)
 function resolveAppBase(req: Request, appBase?: string): string {
-  const isHttp = (u?: string | null): u is string => !!u && /^https?:\/\//i.test(u);
-  const clean = (u: string) => u.replace(/\/+$/, "");
-  if (isHttp(appBase)) return clean(appBase);
-  const origin = req.headers.get("origin");
-  if (isHttp(origin)) return clean(origin);
-  const env = Deno.env.get("APP_BASE_URL");
-  if (isHttp(env)) return clean(env);
-  return "https://app.autolabels.io";
+  return resolveAllowedOrigin(
+    [appBase, req.headers.get("origin"), Deno.env.get("APP_BASE_URL")],
+    "https://app.autolabels.io",
+  );
 }
 
 // Roles that hold can_approve_print (mirrors dealerRoleCapabilities.ts). Keep in
@@ -63,11 +60,8 @@ Deno.serve(async (req) => {
   const appBase = resolveAppBase(req, body.app_base);
   const tenantId = body.tenant_id;
   const vin = (body.vin || "").toUpperCase().trim();
-  // Third-party vendors assigned to specific installs — each is emailed their
-  // own work order. Passed by the manager's Authorize & Dispatch (derived from
-  // get-ready items whose department is "vendor").
-  const vendors = (Array.isArray(body.vendors) ? body.vendors : [])
-    .map((v) => ({ name: String(v?.name || "Vendor").trim(), email: String(v?.email || "").trim() }))
+  const requestedVendors = (Array.isArray(body.vendors) ? body.vendors : [])
+    .map((v) => ({ name: String(v?.name || "Vendor").trim(), email: String(v?.email || "").trim().toLowerCase() }))
     .filter((v) => /.+@.+\..+/.test(v.email));
   // Which departments to dispatch. Manager acceptance requests both
   // (["detail","service"]); the auto-ingest path passes nothing and stays
@@ -88,6 +82,45 @@ Deno.serve(async (req) => {
 
   const { data: prof } = await admin.from("dealer_profiles").select("settings").eq("tenant_id", tenantId).maybeSingle();
   const settings = (prof?.settings || {}) as Record<string, string>;
+
+  // Server-derive authorized vendor recipients from persisted get_ready_records
+  // for this vehicle and active installer_contacts for this tenant. Never send
+  // work orders to arbitrary caller-supplied email addresses.
+  const [{ data: grRow }, { data: installers }] = await Promise.all([
+    admin.from("get_ready_records")
+      .select("items")
+      .eq("tenant_id", tenantId)
+      .in("vin", [vin, vin.toLowerCase()])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    admin.from("installer_contacts")
+      .select("company, email")
+      .eq("tenant_id", tenantId)
+      .eq("active", true),
+  ]);
+  const verifiedVendorMap = new Map<string, string>();
+  const grItems = Array.isArray(grRow?.items) ? (grRow.items as Array<Record<string, unknown>>) : [];
+  for (const item of grItems) {
+    const e1 = String(item?.vendorEmail || "").trim().toLowerCase();
+    const e2 = String((item?.checkRequest as Record<string, unknown> | undefined)?.vendorEmail || "").trim().toLowerCase();
+    const vName = String(item?.vendorName || (item?.checkRequest as Record<string, unknown> | undefined)?.vendorName || "Vendor").trim();
+    if (/.+@.+\..+/.test(e1)) verifiedVendorMap.set(e1, vName || "Vendor");
+    if (/.+@.+\..+/.test(e2)) verifiedVendorMap.set(e2, vName || "Vendor");
+  }
+  for (const inst of (installers || []) as Array<{ company?: string; email?: string }>) {
+    const e = String(inst.email || "").trim().toLowerCase();
+    if (/.+@.+\..+/.test(e) && !verifiedVendorMap.has(e)) {
+      verifiedVendorMap.set(e, String(inst.company || "Vendor").trim() || "Vendor");
+    }
+  }
+  const vendors = requestedVendors.length > 0
+    ? requestedVendors
+        .filter((v) => verifiedVendorMap.has(v.email))
+        .map((v) => ({ name: verifiedVendorMap.get(v.email) || v.name, email: v.email }))
+    : requestedDepts.includes("vendor")
+      ? Array.from(verifiedVendorMap.entries()).map(([email, name]) => ({ name, email }))
+      : [];
 
   // The permanent Get-Ready hub token (minted at intake). Don't create one here
   // — if it isn't there yet, there's nothing to dispatch to.
