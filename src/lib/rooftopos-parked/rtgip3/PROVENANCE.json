@@ -1,0 +1,87 @@
+{
+  "schema": "rtgip3-mirror-provenance/1",
+  "repository": "KenCarbiz/rooftopos-gateway-staging",
+  "modules_commit": "23616fddca174493051153b1c248448cb9969918",
+  "contract_commit": "3e80b37a8d22cf60cf764f3a5bd19986d521b5b5",
+  "rule": "Every mirror is byte-identical to its source at the named commit. Never edit a mirror; a change lands in the Gateway first and is re-copied with a new commit here. The modules import ../rtgip2/core, which is the app binding below.",
+  "files": [
+    {
+      "source": "src/lib/gateway/rtgip3/sig.ts",
+      "commit": "23616fddca174493051153b1c248448cb9969918",
+      "mirror": "src/lib/rooftopos-parked/rtgip3/sig.ts",
+      "git_blob": "1488b4bb27a3482d41cb8ea14a7d57b83046bf46",
+      "sha256": "5a5923ef14cb394099ddc813868f30bc04fc43b4387b0317053aba1e88db6a56",
+      "bytes": 6785
+    },
+    {
+      "source": "src/lib/gateway/rtgip3/keys3.ts",
+      "commit": "23616fddca174493051153b1c248448cb9969918",
+      "mirror": "src/lib/rooftopos-parked/rtgip3/keys3.ts",
+      "git_blob": "533df6fa7c65b5c567a287bdddcd3c41b12de49e",
+      "sha256": "a453dd92355916af63456253396be2174087e6f02eab8f43eac94fd3badb1146",
+      "bytes": 5342
+    },
+    {
+      "source": "src/lib/gateway/rtgip3/core3.ts",
+      "commit": "23616fddca174493051153b1c248448cb9969918",
+      "mirror": "src/lib/rooftopos-parked/rtgip3/core3.ts",
+      "git_blob": "345d184fb1a4abd28fcdf9389e21fb538c470b09",
+      "sha256": "ab702ad4d3f935f778a7eee21f57f49ad9f4c181efa1512a8ab318c0f99038e5",
+      "bytes": 18774
+    },
+    {
+      "source": "src/lib/gateway/rtgip3/receipt3.ts",
+      "commit": "23616fddca174493051153b1c248448cb9969918",
+      "mirror": "src/lib/rooftopos-parked/rtgip3/receipt3.ts",
+      "git_blob": "b266a3c10e2e49486a2ec10855bd63c45f830e35",
+      "sha256": "e3c00b69a2754aa580fc971a46d465d05f6901c160aeb4b8b6cb273017149608",
+      "bytes": 11502
+    },
+    {
+      "source": "src/lib/gateway/rtgip3/receipt-query3.ts",
+      "commit": "23616fddca174493051153b1c248448cb9969918",
+      "mirror": "src/lib/rooftopos-parked/rtgip3/receipt-query3.ts",
+      "git_blob": "261626f0d3f04b49f28531e5a9ab6cbc5875d25b",
+      "sha256": "3b523f7d401b4b19e35a51b7df2dbfa031f8d3df6146e090a3cb87f6b8c03a74",
+      "bytes": 5646
+    },
+    {
+      "source": "src/lib/gateway/rtgip3/modules.test.ts",
+      "commit": "23616fddca174493051153b1c248448cb9969918",
+      "mirror": "src/lib/rooftopos-parked/rtgip3/modules.test.ts",
+      "git_blob": "a78808dd4082886eeeb02d0aac7dbffc74ee982b",
+      "sha256": "791ef87e37ae7f3244b998d58bc9d2844cdaf41ccaa97d86cca68a550ef40946",
+      "bytes": 11693
+    },
+    {
+      "source": "src/lib/gateway/rtgip3/kat.ts",
+      "commit": "3e80b37a8d22cf60cf764f3a5bd19986d521b5b5",
+      "mirror": "src/lib/rooftopos-parked/rtgip3/kat.ts",
+      "git_blob": "cec3793d9837631cf7451627f7eb897e11ef8224",
+      "sha256": "7f001c6aecb732c73b4cfcd290edda57cb5cd81040ece29be699ccaccce6b413",
+      "bytes": 35648
+    },
+    {
+      "source": "src/lib/gateway/rtgip3/kat.test.ts",
+      "commit": "3e80b37a8d22cf60cf764f3a5bd19986d521b5b5",
+      "mirror": "src/lib/rooftopos-parked/rtgip3/kat.test.ts",
+      "git_blob": "dd378d98918ef761c8624f5f687938bef96241ae",
+      "sha256": "82af37698192fefbed2355b222d80a52e87f565f7d94a723c70d72e8af585627",
+      "bytes": 5864
+    },
+    {
+      "source": "docs/contracts/rtgip3/refusal-policy.v1.json",
+      "commit": "3e80b37a8d22cf60cf764f3a5bd19986d521b5b5",
+      "mirror": "src/lib/rooftopos-parked/rtgip3/refusal-policy.v1.json",
+      "git_blob": "4b4c87020e05f3e5d0eb123649632ac09e0fbca7",
+      "sha256": "ad61f9c9e49f038940145f7b62d8ecb468332324758277d8e53b82c1d38d321f",
+      "bytes": 6174
+    }
+  ],
+  "binding": {
+    "file": "src/lib/rooftopos-parked/rtgip2/core.ts",
+    "sha256": "652016be864c76b8a71800d49685d40d9864d3613dfe0f326585a0f8f235c353",
+    "resolves_to": "src/lib/rooftopos-parked/rtgip2/protocol.ts",
+    "why": "the app's frozen rtgip/2 core (byte-identical in the three apps) stands in for the Gateway's src/lib/gateway/rtgip2/core.ts; both export the same names and the KAT runs through it here"
+  }
+}

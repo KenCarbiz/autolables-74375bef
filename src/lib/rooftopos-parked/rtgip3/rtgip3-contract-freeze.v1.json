@@ -1,0 +1,33 @@
+{
+  "freeze": "rtgip/3-contract-freeze/1",
+  "status": "app-side pin of the Gateway freeze; local files only, nothing installed, deployed or peer-negotiated",
+  "gateway_repository": "KenCarbiz/rooftopos-gateway-staging",
+  "gateway_commit": "3e80b37a8d22cf60cf764f3a5bd19986d521b5b5",
+  "gateway_freeze_file": "docs/contracts/rtgip3/contract-freeze.v1.json",
+  "gateway_freeze_sha256": "62ed0cc9786b3bfd3292df6fe3e01115871f96392aa8bb95d6bc44f9934b9022",
+  "versions": {
+    "transport": "rtgip/3",
+    "envelope_body": "rtgip/2",
+    "receipt": "rtgip/3-receipt/3",
+    "forward": "rtgip/3-forward/1",
+    "receipt_query": "rtgip/3-receipt-query/2",
+    "refusal_policy": "rtgip/3-refusal-policy/1",
+    "attest": "rtgip/3-attest/1",
+    "keyset": "rtgip/3-keyset/1"
+  },
+  "gateway_pins": {
+    "docs/contracts/RTGIP3-CANDIDATE.md": "1e4ce1749df2f09f873179afa7ee42e5d6ceff2fa4be2c60990ac4c810278535",
+    "docs/contracts/rtgip3/keyset.v1.json": "1894f73f7daf96722b4b9b8c96facf331d6544b174f757b562d75bb36342887f",
+    "docs/contracts/rtgip3/attest.v1.json": "9de3c00549089cdb266848c69055b8ebf7cc0aceb3e0f08bf2e046635e7bd9b1",
+    "docs/contracts/rtgip3/refusal-policy.v1.json": "ad61f9c9e49f038940145f7b62d8ecb468332324758277d8e53b82c1d38d321f",
+    "src/test/fixtures/rtgip3-kat.v1.json": "737154a5c1ffd42368a8c040f2bce3ad1307dd3784d9554ff559755091257676",
+    "src/lib/gateway/rtgip3/kat.ts": "7f001c6aecb732c73b4cfcd290edda57cb5cd81040ece29be699ccaccce6b413",
+    "scripts/rtgip3-kat.ts": "55c1273a06bfe1a50ba406161be3b33479fab7d23a5ca9adfdcd71f987e0dfbc"
+  },
+  "app_files": {
+    "src/test/fixtures/rtgip3-kat.v1.json": "737154a5c1ffd42368a8c040f2bce3ad1307dd3784d9554ff559755091257676",
+    "src/lib/rooftopos-parked/rtgip3/kat.ts": "7f001c6aecb732c73b4cfcd290edda57cb5cd81040ece29be699ccaccce6b413",
+    "src/lib/rooftopos-parked/rtgip3/refusal-policy.v1.json": "ad61f9c9e49f038940145f7b62d8ecb468332324758277d8e53b82c1d38d321f"
+  },
+  "change_rule": "A change to any pinned file is a contract change: it needs a new Gateway freeze version, then a new pin here."
+}

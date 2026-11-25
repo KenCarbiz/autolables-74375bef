@@ -1,0 +1,29 @@
+{
+  "policy": "rtgip/2-refusal-policy/1",
+  "reason_format": "refused:<http_status>:<gateway_reason>",
+  "rule": "A refusal is permanent when its status is 400, 409 or 413, or when it is 401 or 403 with a reason listed in permanent_reasons. Every other refusal, and every 5xx or transport failure, is retryable and stays bounded by the attempt limit.",
+  "permanent_statuses": [400, 409, 413],
+  "permanent_reasons": [
+    "connection_revoked",
+    "event_not_granted",
+    "event_not_on_route",
+    "key_not_bound_to_connection",
+    "nonce_reused",
+    "not_source_authority",
+    "purpose_not_allowed",
+    "purpose_not_granted",
+    "route_reserved",
+    "source_impersonation",
+    "unknown_route",
+    "wrong_destination"
+  ],
+  "temporary_examples": [
+    "ambiguous_or_unauthorized_mapping",
+    "no_connection_for_tenant",
+    "rooftop_not_granted",
+    "producer_disabled",
+    "reader_disabled",
+    "dialect_held",
+    "admission_forbidden"
+  ]
+}

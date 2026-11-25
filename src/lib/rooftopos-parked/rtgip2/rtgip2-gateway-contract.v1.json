@@ -1,0 +1,352 @@
+{
+  "schema": "rtgip/2-gateway-contract/1",
+  "note": "Synthetic data. Signed with the public DEV-literal key gw-dev-1 from fixtures.ts, which is not a Gateway key and must never be provisioned. Verify TypeScript outcomes with nowSec = t0.",
+  "status": {
+    "rtgip/2": "contract",
+    "gateway.service/1": "HELD",
+    "gw.extension/1": "HELD"
+  },
+  "t0": 1800000000,
+  "signing": {
+    "headers": [
+      "rtgip-protocol",
+      "rtgip-key-id",
+      "rtgip-signer",
+      "rtgip-timestamp",
+      "rtgip-nonce",
+      "rtgip-scope",
+      "rtgip-signature"
+    ],
+    "preimage": "rtgip/2\\n{key_id}\\n{signer}\\n{timestamp}\\n{nonce}\\n{scope}\\n{sha256_hex(body)}",
+    "scope": "{source_app};{target_app};{tenant_id};{rooftop_id};{event_type};{schema_version};{purpose};{event_id}",
+    "signature": "rtgip2= + hex(HMAC-SHA256(secret, preimage))",
+    "timestamp_window_seconds": 300,
+    "body": "canonical JSON (sorted keys, no whitespace, integers only), exactly as signed"
+  },
+  "accepted_corpus": {
+    "file": "rtgip2-corpus.v2.json",
+    "entries": 15
+  },
+  "held_dialects": [
+    {
+      "dialect": "autoframe.ts-body/0",
+      "reason": "dialect_held"
+    },
+    {
+      "dialect": "gateway.service/1",
+      "reason": "dialect_held"
+    },
+    {
+      "dialect": "gw.extension/1",
+      "reason": "dialect_held"
+    }
+  ],
+  "cases": [
+    {
+      "name": "accepted reference delivery (corpus entry)",
+      "receiver": "autocurb",
+      "body": "{\"aggregate\":{\"domain\":\"identity\",\"id\":\"inst-syn-0001\",\"prev_revision\":null,\"revision\":1,\"type\":\"vehicle_instance\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"event_type\":\"vehicle.identity_registered\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autolabels\",\"event_id\":\"al-id-1\",\"revision\":1},\"payload\":{\"make\":\"Synthetic\",\"model\":\"Sedan\",\"registered_at\":\"2027-01-15T15:00:00Z\",\"stock_number\":\"SYN1001\",\"trim\":null,\"year\":2024},\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"protocol\":\"rtgip/2\",\"purpose\":\"inventory_sync\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"schema_version\":2,\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
+      "header_change": {
+        "kind": "none"
+      },
+      "headers": {
+        "rtgip-protocol": "rtgip/2",
+        "rtgip-key-id": "gw-dev-1",
+        "rtgip-signer": "gateway",
+        "rtgip-timestamp": "1800000000",
+        "rtgip-nonce": "gw_contract_00000001",
+        "rtgip-scope": "autolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+        "rtgip-signature": "rtgip2=cc2fbf7fcb1dd7048a6759941606d81ea8f5cfbb3afdc78578ec644566e5763b"
+      },
+      "preimage": "rtgip/2\ngw-dev-1\ngateway\n1800000000\ngw_contract_00000001\nautolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\nf8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+      "expect_ts": "ok",
+      "expect_db": "applied"
+    },
+    {
+      "name": "HELD dialect gateway.service/1 in the protocol header",
+      "receiver": "autocurb",
+      "body": "{\"aggregate\":{\"domain\":\"identity\",\"id\":\"inst-syn-0001\",\"prev_revision\":null,\"revision\":1,\"type\":\"vehicle_instance\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"event_type\":\"vehicle.identity_registered\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autolabels\",\"event_id\":\"al-id-1\",\"revision\":1},\"payload\":{\"make\":\"Synthetic\",\"model\":\"Sedan\",\"registered_at\":\"2027-01-15T15:00:00Z\",\"stock_number\":\"SYN1001\",\"trim\":null,\"year\":2024},\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"protocol\":\"rtgip/2\",\"purpose\":\"inventory_sync\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"schema_version\":2,\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
+      "header_change": {
+        "kind": "protocol",
+        "value": "gateway.service/1"
+      },
+      "headers": {
+        "rtgip-protocol": "gateway.service/1",
+        "rtgip-key-id": "gw-dev-1",
+        "rtgip-signer": "gateway",
+        "rtgip-timestamp": "1800000000",
+        "rtgip-nonce": "gw_contract_00000002",
+        "rtgip-scope": "autolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+        "rtgip-signature": "rtgip2=4e7e89406d4b0ddf63e0880c8f8df5505e5e5373375e442503f810fc423300ff"
+      },
+      "preimage": "rtgip/2\ngw-dev-1\ngateway\n1800000000\ngw_contract_00000002\nautolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\nf8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+      "expect_ts": "protocol_mismatch",
+      "expect_db": "protocol_mismatch"
+    },
+    {
+      "name": "HELD dialect gw.extension/1 in the protocol header",
+      "receiver": "autocurb",
+      "body": "{\"aggregate\":{\"domain\":\"identity\",\"id\":\"inst-syn-0001\",\"prev_revision\":null,\"revision\":1,\"type\":\"vehicle_instance\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"event_type\":\"vehicle.identity_registered\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autolabels\",\"event_id\":\"al-id-1\",\"revision\":1},\"payload\":{\"make\":\"Synthetic\",\"model\":\"Sedan\",\"registered_at\":\"2027-01-15T15:00:00Z\",\"stock_number\":\"SYN1001\",\"trim\":null,\"year\":2024},\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"protocol\":\"rtgip/2\",\"purpose\":\"inventory_sync\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"schema_version\":2,\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
+      "header_change": {
+        "kind": "protocol",
+        "value": "gw.extension/1"
+      },
+      "headers": {
+        "rtgip-protocol": "gw.extension/1",
+        "rtgip-key-id": "gw-dev-1",
+        "rtgip-signer": "gateway",
+        "rtgip-timestamp": "1800000000",
+        "rtgip-nonce": "gw_contract_00000003",
+        "rtgip-scope": "autolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+        "rtgip-signature": "rtgip2=88c948b44c4f8c101bf931dd6b800bde763fcfd41fba27c78d650479cc559d7d"
+      },
+      "preimage": "rtgip/2\ngw-dev-1\ngateway\n1800000000\ngw_contract_00000003\nautolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\nf8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+      "expect_ts": "protocol_mismatch",
+      "expect_db": "protocol_mismatch"
+    },
+    {
+      "name": "signature not produced with the key",
+      "receiver": "autocurb",
+      "body": "{\"aggregate\":{\"domain\":\"identity\",\"id\":\"inst-syn-0001\",\"prev_revision\":null,\"revision\":1,\"type\":\"vehicle_instance\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"event_type\":\"vehicle.identity_registered\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autolabels\",\"event_id\":\"al-id-1\",\"revision\":1},\"payload\":{\"make\":\"Synthetic\",\"model\":\"Sedan\",\"registered_at\":\"2027-01-15T15:00:00Z\",\"stock_number\":\"SYN1001\",\"trim\":null,\"year\":2024},\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"protocol\":\"rtgip/2\",\"purpose\":\"inventory_sync\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"schema_version\":2,\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
+      "header_change": {
+        "kind": "zero_signature"
+      },
+      "headers": {
+        "rtgip-protocol": "rtgip/2",
+        "rtgip-key-id": "gw-dev-1",
+        "rtgip-signer": "gateway",
+        "rtgip-timestamp": "1800000000",
+        "rtgip-nonce": "gw_contract_00000004",
+        "rtgip-scope": "autolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+        "rtgip-signature": "rtgip2=0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "preimage": "rtgip/2\ngw-dev-1\ngateway\n1800000000\ngw_contract_00000004\nautolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\nf8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+      "expect_ts": "bad_signature",
+      "expect_db": "bad_signature"
+    },
+    {
+      "name": "source app presenting as signer to a target",
+      "receiver": "autocurb",
+      "body": "{\"aggregate\":{\"domain\":\"identity\",\"id\":\"inst-syn-0001\",\"prev_revision\":null,\"revision\":1,\"type\":\"vehicle_instance\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"event_type\":\"vehicle.identity_registered\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autolabels\",\"event_id\":\"al-id-1\",\"revision\":1},\"payload\":{\"make\":\"Synthetic\",\"model\":\"Sedan\",\"registered_at\":\"2027-01-15T15:00:00Z\",\"stock_number\":\"SYN1001\",\"trim\":null,\"year\":2024},\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"protocol\":\"rtgip/2\",\"purpose\":\"inventory_sync\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"schema_version\":2,\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
+      "header_change": {
+        "kind": "signer",
+        "value": "autolabels"
+      },
+      "headers": {
+        "rtgip-protocol": "rtgip/2",
+        "rtgip-key-id": "gw-dev-1",
+        "rtgip-signer": "autolabels",
+        "rtgip-timestamp": "1800000000",
+        "rtgip-nonce": "gw_contract_00000005",
+        "rtgip-scope": "autolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+        "rtgip-signature": "rtgip2=77abb5db52b904daee5bb2551429ed6c1a5bb34dc3d4ec31e15f75e7cdb12618"
+      },
+      "preimage": "rtgip/2\ngw-dev-1\ngateway\n1800000000\ngw_contract_00000005\nautolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\nf8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+      "expect_ts": "signer_key_mismatch",
+      "expect_db": "signer_key_mismatch"
+    },
+    {
+      "name": "unknown key id",
+      "receiver": "autocurb",
+      "body": "{\"aggregate\":{\"domain\":\"identity\",\"id\":\"inst-syn-0001\",\"prev_revision\":null,\"revision\":1,\"type\":\"vehicle_instance\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"event_type\":\"vehicle.identity_registered\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autolabels\",\"event_id\":\"al-id-1\",\"revision\":1},\"payload\":{\"make\":\"Synthetic\",\"model\":\"Sedan\",\"registered_at\":\"2027-01-15T15:00:00Z\",\"stock_number\":\"SYN1001\",\"trim\":null,\"year\":2024},\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"protocol\":\"rtgip/2\",\"purpose\":\"inventory_sync\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"schema_version\":2,\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
+      "header_change": {
+        "kind": "key_id",
+        "value": "gw-unknown-1"
+      },
+      "headers": {
+        "rtgip-protocol": "rtgip/2",
+        "rtgip-key-id": "gw-unknown-1",
+        "rtgip-signer": "gateway",
+        "rtgip-timestamp": "1800000000",
+        "rtgip-nonce": "gw_contract_00000006",
+        "rtgip-scope": "autolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+        "rtgip-signature": "rtgip2=3df1b611d63c05e6807abc2deccfddf6132e12c4293cddbd0a68e6d74a76188c"
+      },
+      "preimage": "rtgip/2\ngw-dev-1\ngateway\n1800000000\ngw_contract_00000006\nautolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\nf8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+      "expect_ts": "unknown_key",
+      "expect_db": "unknown_key"
+    },
+    {
+      "name": "timestamp outside the 300 s window",
+      "receiver": "autocurb",
+      "body": "{\"aggregate\":{\"domain\":\"identity\",\"id\":\"inst-syn-0001\",\"prev_revision\":null,\"revision\":1,\"type\":\"vehicle_instance\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"event_type\":\"vehicle.identity_registered\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autolabels\",\"event_id\":\"al-id-1\",\"revision\":1},\"payload\":{\"make\":\"Synthetic\",\"model\":\"Sedan\",\"registered_at\":\"2027-01-15T15:00:00Z\",\"stock_number\":\"SYN1001\",\"trim\":null,\"year\":2024},\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"protocol\":\"rtgip/2\",\"purpose\":\"inventory_sync\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"schema_version\":2,\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
+      "header_change": {
+        "kind": "timestamp_offset",
+        "seconds": -900
+      },
+      "headers": {
+        "rtgip-protocol": "rtgip/2",
+        "rtgip-key-id": "gw-dev-1",
+        "rtgip-signer": "gateway",
+        "rtgip-timestamp": "1799999100",
+        "rtgip-nonce": "gw_contract_00000007",
+        "rtgip-scope": "autolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+        "rtgip-signature": "rtgip2=d550693a974b812c7a8dff0e3c3f0aa41a83ee03fe9f985eda7e58715eae9537"
+      },
+      "preimage": "rtgip/2\ngw-dev-1\ngateway\n1799999100\ngw_contract_00000007\nautolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\nf8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+      "expect_ts": "timestamp_out_of_window",
+      "expect_db": "timestamp_out_of_window"
+    },
+    {
+      "name": "nonce too short",
+      "receiver": "autocurb",
+      "body": "{\"aggregate\":{\"domain\":\"identity\",\"id\":\"inst-syn-0001\",\"prev_revision\":null,\"revision\":1,\"type\":\"vehicle_instance\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"event_type\":\"vehicle.identity_registered\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autolabels\",\"event_id\":\"al-id-1\",\"revision\":1},\"payload\":{\"make\":\"Synthetic\",\"model\":\"Sedan\",\"registered_at\":\"2027-01-15T15:00:00Z\",\"stock_number\":\"SYN1001\",\"trim\":null,\"year\":2024},\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"protocol\":\"rtgip/2\",\"purpose\":\"inventory_sync\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"schema_version\":2,\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
+      "header_change": {
+        "kind": "nonce",
+        "value": "short"
+      },
+      "headers": {
+        "rtgip-protocol": "rtgip/2",
+        "rtgip-key-id": "gw-dev-1",
+        "rtgip-signer": "gateway",
+        "rtgip-timestamp": "1800000000",
+        "rtgip-nonce": "short",
+        "rtgip-scope": "autolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+        "rtgip-signature": "rtgip2=c484fd83abcad0612e49348dbd7046a3dc909c69233c212c6abb46e341bbfe44"
+      },
+      "preimage": "rtgip/2\ngw-dev-1\ngateway\n1800000000\ngw_contract_00000008\nautolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\nf8a7420994593f5c7bc17db62c9cb42cdd244b133817f81d55267747a0a31257",
+      "expect_ts": "invalid_nonce",
+      "expect_db": "invalid_nonce"
+    },
+    {
+      "name": "body re-serialized with whitespace",
+      "receiver": "autocurb",
+      "body": "{\n \"aggregate\": {\n  \"domain\": \"identity\",\n  \"id\": \"inst-syn-0001\",\n  \"prev_revision\": null,\n  \"revision\": 1,\n  \"type\": \"vehicle_instance\"\n },\n \"causation_id\": null,\n \"classification\": \"shared_vehicle_fact\",\n \"correlation_id\": \"corr-syn-1\",\n \"emitted_at\": \"2027-01-15T15:00:00Z\",\n \"event_id\": \"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\n \"event_type\": \"vehicle.identity_registered\",\n \"occurred_at\": \"2027-01-15T15:00:00Z\",\n \"origin\": {\n  \"app\": \"autolabels\",\n  \"event_id\": \"al-id-1\",\n  \"revision\": 1\n },\n \"payload\": {\n  \"make\": \"Synthetic\",\n  \"model\": \"Sedan\",\n  \"registered_at\": \"2027-01-15T15:00:00Z\",\n  \"stock_number\": \"SYN1001\",\n  \"trim\": null,\n  \"year\": 2024\n },\n \"payload_sha256\": \"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\n \"protocol\": \"rtgip/2\",\n \"purpose\": \"inventory_sync\",\n \"rooftop_id\": \"rf-nw-01\",\n \"route\": \"autolabels->autocurb\",\n \"schema_version\": 2,\n \"source_app\": \"autolabels\",\n \"target_app\": \"autocurb\",\n \"tenant_id\": \"tnt-syn-northwind\",\n \"vehicle\": {\n  \"episode_id\": \"ep-syn-0001-1\",\n  \"instance_id\": \"inst-syn-0001\",\n  \"vin\": \"1HGCM82633A004352\"\n }\n}",
+      "header_change": {
+        "kind": "none"
+      },
+      "headers": {
+        "rtgip-protocol": "rtgip/2",
+        "rtgip-key-id": "gw-dev-1",
+        "rtgip-signer": "gateway",
+        "rtgip-timestamp": "1800000000",
+        "rtgip-nonce": "gw_contract_00000009",
+        "rtgip-scope": "autolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+        "rtgip-signature": "rtgip2=ea277313a5ad9269c69108a56ab8fd3af958dcdbe4ee055cc8a2006ba62df8c3"
+      },
+      "preimage": "rtgip/2\ngw-dev-1\ngateway\n1800000000\ngw_contract_00000009\nautolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\nbb7d2a65fef832ab406322e7e6a2ca60d0a0620fb287a0b215b638b29f18f363",
+      "expect_ts": "body_not_canonical",
+      "expect_db": "body_not_canonical"
+    },
+    {
+      "name": "integer written as float",
+      "receiver": "autocurb",
+      "body": "{\"aggregate\":{\"domain\":\"identity\",\"id\":\"inst-syn-0001\",\"prev_revision\":null,\"revision\":1,\"type\":\"vehicle_instance\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"event_type\":\"vehicle.identity_registered\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autolabels\",\"event_id\":\"al-id-1\",\"revision\":1},\"payload\":{\"make\":\"Synthetic\",\"model\":\"Sedan\",\"registered_at\":\"2027-01-15T15:00:00Z\",\"stock_number\":\"SYN1001\",\"trim\":null,\"year\":2024},\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"protocol\":\"rtgip/2\",\"purpose\":\"inventory_sync\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"schema_version\":2.0,\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
+      "header_change": {
+        "kind": "none"
+      },
+      "headers": {
+        "rtgip-protocol": "rtgip/2",
+        "rtgip-key-id": "gw-dev-1",
+        "rtgip-signer": "gateway",
+        "rtgip-timestamp": "1800000000",
+        "rtgip-nonce": "gw_contract_00000010",
+        "rtgip-scope": "autolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+        "rtgip-signature": "rtgip2=3139e0b24a2c394daa3b1547e199365e58644a395cb00c9c56d7e5f4d8878230"
+      },
+      "preimage": "rtgip/2\ngw-dev-1\ngateway\n1800000000\ngw_contract_00000010\nautolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\n4626f0f767ffa71485e84431abb7a2995561b759c8175ae37284f03f5c192e10",
+      "expect_ts": "body_not_canonical",
+      "expect_db": "body_not_canonical"
+    },
+    {
+      "name": "unknown envelope field (an untranslated extension)",
+      "receiver": "autocurb",
+      "body": "{\"aggregate\":{\"domain\":\"identity\",\"id\":\"inst-syn-0001\",\"prev_revision\":null,\"revision\":1,\"type\":\"vehicle_instance\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"event_type\":\"vehicle.identity_registered\",\"gw_extension\":{\"v\":1},\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autolabels\",\"event_id\":\"al-id-1\",\"revision\":1},\"payload\":{\"make\":\"Synthetic\",\"model\":\"Sedan\",\"registered_at\":\"2027-01-15T15:00:00Z\",\"stock_number\":\"SYN1001\",\"trim\":null,\"year\":2024},\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"protocol\":\"rtgip/2\",\"purpose\":\"inventory_sync\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"schema_version\":2,\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
+      "header_change": {
+        "kind": "none"
+      },
+      "headers": {
+        "rtgip-protocol": "rtgip/2",
+        "rtgip-key-id": "gw-dev-1",
+        "rtgip-signer": "gateway",
+        "rtgip-timestamp": "1800000000",
+        "rtgip-nonce": "gw_contract_00000011",
+        "rtgip-scope": "autolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+        "rtgip-signature": "rtgip2=060dd0455e8915db3afdcf2faaf66b347e33ca1e39a20ab7d548c24375418001"
+      },
+      "preimage": "rtgip/2\ngw-dev-1\ngateway\n1800000000\ngw_contract_00000011\nautolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\n940b1a65319d4d89a99e93a8a39c941402f8da4ddc16c73bd779adb20a948291",
+      "expect_ts": "invalid_envelope:unknown_field:gw_extension",
+      "expect_db": "invalid_envelope:fields"
+    },
+    {
+      "name": "payload changed, payload_sha256 kept",
+      "receiver": "autocurb",
+      "body": "{\"aggregate\":{\"domain\":\"identity\",\"id\":\"inst-syn-0001\",\"prev_revision\":null,\"revision\":1,\"type\":\"vehicle_instance\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"event_type\":\"vehicle.identity_registered\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autolabels\",\"event_id\":\"al-id-1\",\"revision\":1},\"payload\":{\"make\":\"Synthetic\",\"model\":\"Sedan\",\"registered_at\":\"2027-01-15T15:00:00Z\",\"status\":\"sold\",\"stock_number\":\"SYN1001\",\"trim\":null,\"year\":2024},\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"protocol\":\"rtgip/2\",\"purpose\":\"inventory_sync\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"schema_version\":2,\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
+      "header_change": {
+        "kind": "none"
+      },
+      "headers": {
+        "rtgip-protocol": "rtgip/2",
+        "rtgip-key-id": "gw-dev-1",
+        "rtgip-signer": "gateway",
+        "rtgip-timestamp": "1800000000",
+        "rtgip-nonce": "gw_contract_00000012",
+        "rtgip-scope": "autolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+        "rtgip-signature": "rtgip2=6d67bdb10917d837ab8913587e36b1f6c86e4a87bb0363cf3106561d5ff9b9b7"
+      },
+      "preimage": "rtgip/2\ngw-dev-1\ngateway\n1800000000\ngw_contract_00000012\nautolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\n0ee3e94d18ff0cd888abd6e9c13474cbe030c3732b999726854a204c379b0f75",
+      "expect_ts": "invalid_envelope:unknown_field:payload.status",
+      "expect_db": "payload_hash_mismatch"
+    },
+    {
+      "name": "event_id not derived from origin",
+      "receiver": "autocurb",
+      "body": "{\"aggregate\":{\"domain\":\"identity\",\"id\":\"inst-syn-0001\",\"prev_revision\":null,\"revision\":1,\"type\":\"vehicle_instance\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"00000000-0000-5000-8000-000000000000\",\"event_type\":\"vehicle.identity_registered\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autolabels\",\"event_id\":\"al-id-1\",\"revision\":1},\"payload\":{\"make\":\"Synthetic\",\"model\":\"Sedan\",\"registered_at\":\"2027-01-15T15:00:00Z\",\"stock_number\":\"SYN1001\",\"trim\":null,\"year\":2024},\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"protocol\":\"rtgip/2\",\"purpose\":\"inventory_sync\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"schema_version\":2,\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
+      "header_change": {
+        "kind": "none"
+      },
+      "headers": {
+        "rtgip-protocol": "rtgip/2",
+        "rtgip-key-id": "gw-dev-1",
+        "rtgip-signer": "gateway",
+        "rtgip-timestamp": "1800000000",
+        "rtgip-nonce": "gw_contract_00000013",
+        "rtgip-scope": "autolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;00000000-0000-5000-8000-000000000000",
+        "rtgip-signature": "rtgip2=849019a551c6bfd1296f0c370e1d6f4356ec8cc5cbe54d57a6a4b0e33b458f14"
+      },
+      "preimage": "rtgip/2\ngw-dev-1\ngateway\n1800000000\ngw_contract_00000013\nautolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;00000000-0000-5000-8000-000000000000\n16f9aaccd4c454c4f2f8a5492b2baba6164a68127f7072936a264097af8a3185",
+      "expect_ts": "event_id_not_derived",
+      "expect_db": "event_id_not_derived"
+    },
+    {
+      "name": "route rewritten to another destination",
+      "receiver": "autocurb",
+      "body": "{\"aggregate\":{\"domain\":\"identity\",\"id\":\"inst-syn-0001\",\"prev_revision\":null,\"revision\":1,\"type\":\"vehicle_instance\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"event_type\":\"vehicle.identity_registered\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autolabels\",\"event_id\":\"al-id-1\",\"revision\":1},\"payload\":{\"make\":\"Synthetic\",\"model\":\"Sedan\",\"registered_at\":\"2027-01-15T15:00:00Z\",\"stock_number\":\"SYN1001\",\"trim\":null,\"year\":2024},\"payload_sha256\":\"a33fac551dd5fea6c89aa824c9431b6250f0c884c1e45acf557871baf7d65200\",\"protocol\":\"rtgip/2\",\"purpose\":\"inventory_sync\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autoframe\",\"schema_version\":2,\"source_app\":\"autolabels\",\"target_app\":\"autoframe\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
+      "header_change": {
+        "kind": "none"
+      },
+      "headers": {
+        "rtgip-protocol": "rtgip/2",
+        "rtgip-key-id": "gw-dev-1",
+        "rtgip-signer": "gateway",
+        "rtgip-timestamp": "1800000000",
+        "rtgip-nonce": "gw_contract_00000014",
+        "rtgip-scope": "autolabels;autoframe;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+        "rtgip-signature": "rtgip2=af573b5b4e7ded203070d66f40735feb8187f3aa7ab1f2937f9e263efbb39018"
+      },
+      "preimage": "rtgip/2\ngw-dev-1\ngateway\n1800000000\ngw_contract_00000014\nautolabels;autoframe;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\n3f6acdbbaa3661e5472a8209434db3a5bf1d25895407a16fc004bf423be3e651",
+      "expect_ts": "event_id_not_derived",
+      "expect_db": "event_id_not_derived"
+    },
+    {
+      "name": "confidential key in the payload",
+      "receiver": "autocurb",
+      "body": "{\"aggregate\":{\"domain\":\"identity\",\"id\":\"inst-syn-0001\",\"prev_revision\":null,\"revision\":1,\"type\":\"vehicle_instance\"},\"causation_id\":null,\"classification\":\"shared_vehicle_fact\",\"correlation_id\":\"corr-syn-1\",\"emitted_at\":\"2027-01-15T15:00:00Z\",\"event_id\":\"4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\",\"event_type\":\"vehicle.identity_registered\",\"occurred_at\":\"2027-01-15T15:00:00Z\",\"origin\":{\"app\":\"autolabels\",\"event_id\":\"al-id-1\",\"revision\":1},\"payload\":{\"acv_value\":1,\"make\":\"Synthetic\",\"model\":\"Sedan\",\"registered_at\":\"2027-01-15T15:00:00Z\",\"stock_number\":\"SYN1001\",\"trim\":null,\"year\":2024},\"payload_sha256\":\"ee1e20ea63da9afa14dfc70cc1a7ce9e6090702bdc5272fb19e2f0eb676528b9\",\"protocol\":\"rtgip/2\",\"purpose\":\"inventory_sync\",\"rooftop_id\":\"rf-nw-01\",\"route\":\"autolabels->autocurb\",\"schema_version\":2,\"source_app\":\"autolabels\",\"target_app\":\"autocurb\",\"tenant_id\":\"tnt-syn-northwind\",\"vehicle\":{\"episode_id\":\"ep-syn-0001-1\",\"instance_id\":\"inst-syn-0001\",\"vin\":\"1HGCM82633A004352\"}}",
+      "header_change": {
+        "kind": "none"
+      },
+      "headers": {
+        "rtgip-protocol": "rtgip/2",
+        "rtgip-key-id": "gw-dev-1",
+        "rtgip-signer": "gateway",
+        "rtgip-timestamp": "1800000000",
+        "rtgip-nonce": "gw_contract_00000015",
+        "rtgip-scope": "autolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631",
+        "rtgip-signature": "rtgip2=3238593fe271ae95d427d3e7948b844cb207108643e1246bdee7d86572e500a7"
+      },
+      "preimage": "rtgip/2\ngw-dev-1\ngateway\n1800000000\ngw_contract_00000015\nautolabels;autocurb;tnt-syn-northwind;rf-nw-01;vehicle.identity_registered;2;inventory_sync;4d43fc3d-c56c-5ee8-8a43-f2bc3671d631\n7561795d15fe8599fb6ec3fe71fbe76738d24234969b049d8598250adfc5fe17",
+      "expect_ts": "invalid_envelope:unknown_field:payload.acv_value,sensitive:$.payload.acv_value:forbidden_key",
+      "expect_db": "invalid_envelope:sensitive_content"
+    }
+  ]
+}
